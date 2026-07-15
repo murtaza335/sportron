@@ -1,0 +1,16 @@
+-- Add new columns
+alter table public.matches
+add column if not exists player_partner_id uuid references public.profiles(id) on delete set null;
+
+alter table public.matches
+add column if not exists opponent_partner_id uuid references public.profiles(id) on delete set null;
+
+alter table public.matches
+add column if not exists match_format text
+default 'doubles'
+check (match_format in ('singles', 'doubles'));
+
+-- Make sure existing rows have a value
+update public.matches
+set match_format = 'doubles'
+where match_format is null;
