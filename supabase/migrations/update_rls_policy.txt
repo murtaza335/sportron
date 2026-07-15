@@ -1,0 +1,15 @@
+-- Drop the existing select policy
+drop policy if exists "Public matches are viewable by authenticated users" on public.matches;
+
+-- Create the updated select policy that includes match participants
+create policy "Public matches are viewable by authenticated users"
+  on public.matches for select
+  to authenticated
+  using (
+    is_public = true 
+    or created_by = auth.uid() 
+    or player_id = auth.uid() 
+    or player_partner_id = auth.uid() 
+    or opponent_id = auth.uid() 
+    or opponent_partner_id = auth.uid()
+  );

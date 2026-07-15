@@ -1,0 +1,57 @@
+-- Create Match Likes table
+create table if not exists public.match_likes (
+  match_id uuid references public.matches(id) on delete cascade,
+  profile_id uuid references public.profiles(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (match_id, profile_id)
+);
+
+-- Create Match Comments table
+create table if not exists public.match_comments (
+  id uuid primary key default gen_random_uuid(),
+  match_id uuid references public.matches(id) on delete cascade,
+  profile_id uuid references public.profiles(id) on delete cascade,
+  content text not null,
+  created_at timestamptz not null default now()
+);
+
+-- Enable RLS
+alter table public.match_likes enable row level security;
+alter table public.match_comments enable row level security;
+
+-- Policies for match_likes
+create policy "Likes are viewable by authenticated users"
+  on public.match_likes for select
+  to authenticated
+  using (true);
+
+create policy "Users can insert their own likes"
+  on public.match_likes for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+create policy "Users can delete their own likes"
+  on public.match_likes for delete
+  to authenticated
+  using (auth.uid() = profile_id);
+
+-- Policies for match_comments
+create policy "Comments are viewable by authenticated users"
+  on public.match_comments for select
+  to authenticated
+  using (true);
+
+create policy "Users can insert their own comments"
+  on public.match_comments for insert
+  to authenticated
+  with check (auth.uid() = profile_id);
+
+create policy "Users can update their own comments"
+  on public.match_comments for update
+  to authenticated
+  using (auth.uid() = profile_id);
+
+create policy "Users can delete their own comments"
+  on public.match_comments for delete
+  to authenticated
+  using (auth.uid() = profile_id);
