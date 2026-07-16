@@ -1,5 +1,5 @@
-import { useRouter, useFocusEffect } from 'expo-router';
-import { Plus, Trophy, Target, TrendingUp, Clock } from 'lucide-react-native';
+import { useFocusEffect, useRouter } from 'expo-router';
+import { Clock, Plus, Target, TrendingUp, Trophy } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -7,10 +7,10 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
-import { useAuth } from '@/contexts/AuthContext';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import { useMatchStats } from '@/hooks/useMatchStats';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { useMatchStats } from '@/hooks/useMatchStats';
 import { fetchPendingApprovalMatches } from '@/services/matches';
 import type { MatchWithProfiles } from '@/types';
 
@@ -146,23 +146,6 @@ export default function HomeScreen() {
                   color="#EF4444"
                 />
               </View>
-              <Card style={styles.winRateCard}>
-                <View style={styles.winRateContent}>
-                  <View style={styles.winRateItem}>
-                    <ThemedText variant="caption" muted>Win Rate</ThemedText>
-                    <ThemedText variant="hero" style={{ fontSize: 28, color: theme.text }}>
-                      {winRate}%
-                    </ThemedText>
-                  </View>
-                  <View style={styles.winRateDivider} />
-                  <View style={styles.winRateItem}>
-                    <ThemedText variant="caption" muted>Record</ThemedText>
-                    <ThemedText variant="body" style={{ fontWeight: '700', color: theme.text }}>
-                      {stats.wins}-{stats.losses}
-                    </ThemedText>
-                  </View>
-                </View>
-              </Card>
             </>
           )}
         </View>
