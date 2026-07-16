@@ -27,13 +27,17 @@ export function useMatches(userId: string | undefined, mode: 'global' | 'mine') 
 
   useEffect(() => {
     if (mode === 'mine' && !userId) {
-      setMatches([]);
-      setLoading(false);
+      setTimeout(() => {
+        setMatches([]);
+        setLoading(false);
+      }, 0);
       return;
     }
 
-    setLoading(true);
-    load().finally(() => setLoading(false));
+    setTimeout(() => {
+      setLoading(true);
+      load().finally(() => setLoading(false));
+    }, 0);
   }, [load, mode, userId]);
 
   return { matches, loading, refreshing, refresh };

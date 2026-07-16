@@ -27,7 +27,7 @@ export function Button({
   const backgroundColor =
     variant === 'primary' ? theme.text : variant === 'secondary' ? theme.backgroundElement : 'transparent';
   const textColor = variant === 'primary' ? theme.background : theme.text;
-  const borderColor = variant === 'secondary' ? theme.border : 'transparent';
+  const borderColor = variant === 'secondary' ? theme.border : variant === 'ghost' ? theme.border : 'transparent';
 
   return (
     <Pressable
@@ -38,13 +38,17 @@ export function Button({
           backgroundColor,
           borderColor,
           opacity: isDisabled ? 0.5 : state.pressed ? 0.85 : 1,
+          transform: state.pressed && !isDisabled ? [{ scale: 0.98 }] : [],
         },
         buttonStyle,
         typeof style === 'function' ? style(state) : style,
       ]}
-      {...rest}>
+      {...rest}
+      hitSlop={16}
+      accessibilityRole="button"
+      accessibilityState={{ disabled: isDisabled }}>
       {loading ? (
-        <ActivityIndicator color={textColor} />
+        <ActivityIndicator color={textColor} size="large" />
       ) : (
         <View style={styles.content}>
           {icon}
@@ -57,7 +61,7 @@ export function Button({
 
 const styles = StyleSheet.create({
   button: {
-    minHeight: 52,
+    minHeight: 56,
     borderRadius: Radius.md,
     borderWidth: 1,
     alignItems: 'center',

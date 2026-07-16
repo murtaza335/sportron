@@ -22,6 +22,7 @@ export type Match = {
   player_score: number;
   opponent_score: number;
   is_public: boolean;
+  verification_status: 'pending' | 'verified' | 'disputed';
   created_at: string;
 };
 

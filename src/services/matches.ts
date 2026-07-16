@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateMatchInput, Match, MatchStats, MatchWithProfiles, MatchComment } from '@/types';
+import type { CreateMatchInput, Match, MatchStats, MatchWithProfiles, MatchComment, MatchFormat } from '@/types';
 
 type MatchRow = Match & {
   player: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
@@ -41,6 +41,7 @@ function normalizeMatch(row: MatchRow, currentUserId?: string): MatchWithProfile
     player_score: row.player_score,
     opponent_score: row.opponent_score,
     is_public: row.is_public,
+    verification_status: row.verification_status,
     created_at: row.created_at,
     player,
     playerPartner,
@@ -67,6 +68,7 @@ export async function fetchGlobalMatches(currentUserId?: string): Promise<MatchW
     `,
     )
     .eq('is_public', true)
+    .eq('verification_status', 'verified')
     .order('created_at', { ascending: false });
 
   if (error) {
@@ -101,6 +103,8 @@ export async function fetchMyMatches(userId: string): Promise<MatchWithProfiles[
 }
 
 export async function createMatch(userId: string, input: CreateMatchInput): Promise<Match> {
+  const verification_status = (input.opponentId || input.opponentPartnerId) ? 'pending' : 'verified';
+
   const { data, error } = await supabase
     .from('matches')
     .insert({
@@ -114,6 +118,7 @@ export async function createMatch(userId: string, input: CreateMatchInput): Prom
       player_score: input.playerScore,
       opponent_score: input.opponentScore,
       is_public: input.isPublic,
+      verification_status,
     })
     .select()
     .single();
@@ -125,10 +130,25 @@ export async function createMatch(userId: string, input: CreateMatchInput): Prom
   return data;
 }
 
+export async function updateMatchVerificationStatus(
+  matchId: string,
+  status: 'verified' | 'disputed'
+): Promise<void> {
+  const { error } = await supabase
+    .from('matches')
+    .update({ verification_status: status })
+    .eq('id', matchId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function fetchMatchStats(userId: string): Promise<MatchStats> {
   const { data, error } = await supabase
     .from('matches')
     .select('player_id, player_partner_id, opponent_id, opponent_partner_id, player_score, opponent_score')
+    .eq('verification_status', 'verified')
     .or(`player_id.eq.${userId},player_partner_id.eq.${userId},opponent_id.eq.${userId},opponent_partner_id.eq.${userId}`);
 
   if (error) {
@@ -250,4 +270,54 @@ export async function addComment(matchId: string, userId: string, content: strin
     created_at: row.created_at,
     profile,
   };
+}
+
+export async function fetchPendingApprovalMatches(userId: string): Promise<MatchWithProfiles[]> {
+  const { data, error } = await supabase
+    .from('matches')
+    .select(
+      `
+      *,
+      player:profiles!matches_player_id_fkey (id, display_name),
+      playerPartner:profiles!matches_player_partner_id_fkey (id, display_name),
+      opponent:profiles!matches_opponent_id_fkey (id, display_name),
+      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, display_name),
+      likes:match_likes (profile_id),
+      comments:match_comments (id)
+    `,
+    )
+    .eq('verification_status', 'pending')
+    .or(`opponent_id.eq.${userId},opponent_partner_id.eq.${userId}`)
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw error;
+  }
+
+  const matches = data ?? [];
+  
+  // Normalize row matching the local type signature
+  type CommentLikesRow = {
+    id: string;
+    created_by: string;
+    player_id: string;
+    player_partner_id: string | null;
+    opponent_id: string | null;
+    opponent_partner_id: string | null;
+    opponent_guest_name: string | null;
+    match_format: MatchFormat;
+    player_score: number;
+    opponent_score: number;
+    is_public: boolean;
+    verification_status: 'pending' | 'verified' | 'disputed';
+    created_at: string;
+    player: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+    playerPartner: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+    opponent: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+    opponentPartner: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+    likes: { profile_id: string }[] | null;
+    comments: { id: string }[] | null;
+  };
+
+  return (matches as any[]).map((row) => normalizeMatch(row as CommentLikesRow, userId));
 }

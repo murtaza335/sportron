@@ -1,0 +1,18 @@
+-- Add verification_status column to matches table
+alter table public.matches 
+  add column if not exists verification_status text not null default 'pending' 
+  check (verification_status in ('pending', 'verified', 'disputed'));
+
+-- Drop old update policy
+drop policy if exists "Users can update their own matches" on public.matches;
+drop policy if exists "Users can update matches they created or participated in as opponents" on public.matches;
+
+-- Create new update policy that allows opponents to verify/dispute matches
+create policy "Users can update matches they created or participated in as opponents"
+  on public.matches for update
+  to authenticated
+  using (
+    auth.uid() = created_by 
+    or auth.uid() = opponent_id 
+    or auth.uid() = opponent_partner_id
+  );

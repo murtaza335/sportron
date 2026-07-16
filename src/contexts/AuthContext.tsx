@@ -40,7 +40,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     await loadProfile(session.user.id);
-  }, [loadProfile, session?.user.id]);
+  }, [loadProfile, session]);
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {

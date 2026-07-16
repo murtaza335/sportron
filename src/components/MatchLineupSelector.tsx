@@ -1,4 +1,4 @@
-import { Check, Search, X } from 'lucide-react-native';
+import { Check, Search, X, Trash2 } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -35,6 +35,7 @@ type SlotCardProps = {
   profile: Profile | null;
   helperText: string;
   onPress?: () => void;
+  onDelete?: () => void;
   locked?: boolean;
   showRole?: boolean;
 };
@@ -53,6 +54,7 @@ function SlotCard({
   profile,
   helperText,
   onPress,
+  onDelete,
   locked = false,
   showRole = true,
 }: SlotCardProps) {
@@ -102,6 +104,15 @@ function SlotCard({
       <ThemedText variant="caption" muted style={styles.slotLabel}>
         {label}
       </ThemedText>
+      {profile && onDelete && (
+        <Pressable
+          onPress={onDelete}
+          hitSlop={12}
+          style={styles.deleteButton}
+        >
+          <Trash2 size={16} color="#DC2626" />
+        </Pressable>
+      )}
       {content}
       <ThemedText variant="caption" muted style={styles.helperText}>
         {helperText}
@@ -202,6 +213,7 @@ export function MatchLineupSelector({
                 profile={selection.playerPartner}
                 helperText="Tap to add a teammate"
                 onPress={() => setActiveSlot('playerPartner')}
+                onDelete={() => onChange('playerPartner', null)}
               />
             </View>
           ) : null}
@@ -226,6 +238,7 @@ export function MatchLineupSelector({
               profile={selection.opponent}
               helperText="Tap to choose opponent"
               onPress={() => setActiveSlot('opponent')}
+              onDelete={() => onChange('opponent', null)}
             />
           </View>
 
@@ -236,6 +249,7 @@ export function MatchLineupSelector({
                 profile={selection.opponentPartner}
                 helperText="Tap to add a teammate"
                 onPress={() => setActiveSlot('opponentPartner')}
+                onDelete={() => onChange('opponentPartner', null)}
               />
             </View>
           ) : null}
@@ -374,6 +388,16 @@ const styles = StyleSheet.create({
     position: 'absolute',
     top: Spacing.sm,
     left: Spacing.sm,
+  },
+  deleteButton: {
+    position: 'absolute',
+    top: Spacing.sm,
+    right: Spacing.sm,
+    zIndex: 10,
+    width: 32,
+    height: 32,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatar: {
     width: 64,

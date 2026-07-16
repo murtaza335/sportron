@@ -1,4 +1,4 @@
-import { useEffect } from 'react';
+import { useEffect, useCallback } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
@@ -12,21 +12,7 @@ export default function AuthCallback() {
   const router = useRouter();
   const url = Linking.useURL();
 
-  useEffect(() => {
-    if (url) {
-      handleRedirect(url);
-    } else {
-      const checkInitialUrl = async () => {
-        const initialUrl = await Linking.getInitialURL();
-        if (initialUrl) {
-          handleRedirect(initialUrl);
-        }
-      };
-      checkInitialUrl();
-    }
-  }, [url]);
-
-  const handleRedirect = async (urlStr: string) => {
+  const handleRedirect = useCallback(async (urlStr: string) => {
     try {
       let normalizedUrl = urlStr;
       if (urlStr.includes('#')) {
@@ -53,7 +39,21 @@ export default function AuthCallback() {
     } finally {
       router.replace('/');
     }
-  };
+  }, [router]);
+
+  useEffect(() => {
+    if (url) {
+      handleRedirect(url);
+    } else {
+      const checkInitialUrl = async () => {
+        const initialUrl = await Linking.getInitialURL();
+        if (initialUrl) {
+          handleRedirect(initialUrl);
+        }
+      };
+      checkInitialUrl();
+    }
+  }, [url, handleRedirect]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>

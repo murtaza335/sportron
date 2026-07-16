@@ -23,6 +23,7 @@ create table if not exists public.matches (
   player_score integer not null default 0 check (player_score >= 0),
   opponent_score integer not null default 0 check (opponent_score >= 0),
   is_public boolean not null default true,
+  verification_status text not null default 'pending' check (verification_status in ('pending', 'verified', 'disputed')),
   created_at timestamptz not null default now(),
   constraint opponent_specified check (
     opponent_id is not null or (opponent_guest_name is not null and length(trim(opponent_guest_name)) > 0)
@@ -71,10 +72,14 @@ create policy "Users can insert their own matches"
   to authenticated
   with check (auth.uid() = created_by and auth.uid() = player_id);
 
-create policy "Users can update their own matches"
+create policy "Users can update matches they created or participated in as opponents"
   on public.matches for update
   to authenticated
-  using (auth.uid() = created_by);
+  using (
+    auth.uid() = created_by 
+    or auth.uid() = opponent_id 
+    or auth.uid() = opponent_partner_id
+  );
 
 create policy "Users can delete their own matches"
   on public.matches for delete
