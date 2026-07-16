@@ -1,7 +1,8 @@
-import { Calendar, Globe, Heart, Lock, Trophy, User, X } from 'lucide-react-native';
+import { Calendar, Globe, Heart, Lock, Trophy, User, X, Check, Clock, AlertTriangle } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -20,7 +21,7 @@ import { Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addComment, fetchComments, toggleLike } from '@/services/matches';
+import { addComment, fetchComments, toggleLike, updateMatchVerificationStatus } from '@/services/matches';
 import type { MatchComment, MatchWithProfiles } from '@/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -63,7 +64,7 @@ export function MatchDetailPopup({
   onRefreshFeed,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
-  const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
+  const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
   // Comments state
   const [comments, setComments] = useState<MatchComment[]>([]);
@@ -72,13 +73,53 @@ export function MatchDetailPopup({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
+  const [updatingStatus, setUpdatingStatus] = useState(false);
+
+  // Initialize pan responder in effect to avoid render-time ref access
+  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  const [panHandlers, setPanHandlers] = useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
+  useEffect(() => {
+    if (!panResponder.current) {
+      panResponder.current = PanResponder.create({
+        onStartShouldSetPanResponder: () => true,
+        onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
+        onPanResponderMove: (_, gestureState) => {
+          if (gestureState.dy > 0) {
+            translateY.setValue(gestureState.dy);
+          }
+        },
+        onPanResponderRelease: (_, gestureState) => {
+          if (gestureState.dy > 120 || gestureState.vy > 0.4) {
+            Animated.timing(translateY, {
+              toValue: SCREEN_HEIGHT,
+              duration: 220,
+              useNativeDriver: true,
+            }).start(onClose);
+          } else {
+Animated.spring(translateY, {
+              toValue: 0,
+              tension: 50,
+              friction: 8,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      });
+      setPanHandlers(panResponder.current.panHandlers);
+    }
+  }, [translateY, onClose]);
 
   // Sync likes and load comments when match changes or modal opens
   useEffect(() => {
     if (visible && match) {
-      setLiked(match.is_liked_by_user);
-      setLikesCount(match.likes_count);
-      
+      setTimeout(() => {
+        setLiked(match.is_liked_by_user);
+        setLikesCount(match.likes_count);
+        setNewCommentText('');
+        setVerificationStatus(match.verification_status);
+      }, 0);
+
       const loadComments = async () => {
         setLoadingComments(true);
         try {
@@ -90,42 +131,17 @@ export function MatchDetailPopup({
           setLoadingComments(false);
         }
       };
-      
+
       loadComments();
+    } else {
+      setTimeout(() => {
+        setComments([]);
+        setNewCommentText('');
+      }, 0);
     }
-  }, [visible, match]);
+  }, [visible, match?.id, match?.verification_status]);
 
-  // Gesture responder for dragging the bottom sheet down to dismiss (attached only to handle/header)
-  const panResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: (_, gestureState) => {
-        return gestureState.dy > 8;
-      },
-      onPanResponderMove: (_, gestureState) => {
-        if (gestureState.dy > 0) {
-          translateY.setValue(gestureState.dy);
-        }
-      },
-      onPanResponderRelease: (_, gestureState) => {
-        if (gestureState.dy > 120 || gestureState.vy > 0.4) {
-          Animated.timing(translateY, {
-            toValue: SCREEN_HEIGHT,
-            duration: 220,
-            useNativeDriver: true,
-          }).start(onClose);
-        } else {
-          Animated.spring(translateY, {
-            toValue: 0,
-            tension: 50,
-            friction: 8,
-            useNativeDriver: true,
-          }).start();
-        }
-      },
-    })
-  ).current;
-
+  // Animate sheet
   useEffect(() => {
     if (visible) {
       Animated.spring(translateY, {
@@ -137,7 +153,7 @@ export function MatchDetailPopup({
     } else {
       translateY.setValue(SCREEN_HEIGHT);
     }
-  }, [visible, translateY]);
+  }, [visible]);
 
   if (!match) {
     return null;
@@ -159,6 +175,8 @@ export function MatchDetailPopup({
   // Determine if current user won
   const isUserInPlayerTeam = currentUserId && (currentUserId === match.player_id || currentUserId === match.player_partner_id);
   const isUserInOpponentTeam = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
+
+  const isOpponent = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
 
   let userResult: 'win' | 'loss' | 'draw' | null = null;
   if (currentUserId && (isUserInPlayerTeam || isUserInOpponentTeam)) {
@@ -185,10 +203,6 @@ export function MatchDetailPopup({
     setLiked(nextLiked);
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
 
-    // Optimistically update properties in memory on the match object
-    match.is_liked_by_user = nextLiked;
-    match.likes_count = nextLiked ? match.likes_count + 1 : Math.max(0, match.likes_count - 1);
-
     try {
       await toggleLike(match.id, currentUserId, nextLiked);
       onRefreshFeed?.();
@@ -197,8 +211,6 @@ export function MatchDetailPopup({
       // Revert state
       setLiked(!nextLiked);
       setLikesCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
-      match.is_liked_by_user = !nextLiked;
-      match.likes_count = !nextLiked ? match.likes_count + 1 : Math.max(0, match.likes_count - 1);
     }
   };
 
@@ -209,14 +221,26 @@ export function MatchDetailPopup({
       const added = await addComment(match.id, currentUserId, newCommentText);
       setComments((prev) => [...prev, added]);
       setNewCommentText('');
-      
-      // Update comments count on match object in memory
-      match.comments_count = (match.comments_count || 0) + 1;
       onRefreshFeed?.();
     } catch (error) {
       console.error('Failed to add comment:', error);
     } finally {
       setSubmittingComment(false);
+    }
+  };
+
+  const handleVerifyStatus = async (status: 'verified' | 'disputed') => {
+    if (!match) return;
+    setUpdatingStatus(true);
+    try {
+      await updateMatchVerificationStatus(match.id, status);
+      setVerificationStatus(status);
+      onRefreshFeed?.();
+    } catch (error) {
+      console.error('Failed to update verification status:', error);
+      Alert.alert('Error', 'Failed to update verification status.');
+    } finally {
+      setUpdatingStatus(false);
     }
   };
 
@@ -233,7 +257,7 @@ export function MatchDetailPopup({
       >
         <View style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-          
+
           <Animated.View
             style={[
               styles.sheet,
@@ -245,12 +269,12 @@ export function MatchDetailPopup({
             ]}
           >
             {/* Pull-down drag indicator */}
-            <View style={styles.handleContainer} {...panResponder.panHandlers}>
+            <View style={styles.handleContainer} {...panHandlers}>
               <View style={[styles.handle, { backgroundColor: theme.border }]} />
             </View>
 
             {/* Header Row */}
-            <View style={styles.header} {...panResponder.panHandlers}>
+            <View style={styles.header} {...panHandlers}>
               <View style={styles.headerTitle}>
                 <ThemedText variant="label" muted style={styles.formatLabel}>
                   {match.match_format} match
@@ -296,7 +320,7 @@ export function MatchDetailPopup({
                       </View>
                     ) : null}
                   </View>
-                  
+
                   <View style={styles.namesContainer}>
                     {teamANames.map((name, i) => (
                       <ThemedText key={i} variant="caption" style={[styles.playerName, isPlayerTeamWinner && styles.boldText]}>
@@ -311,7 +335,7 @@ export function MatchDetailPopup({
                   <ThemedText style={styles.scoreText}>
                     {match.player_score} – {match.opponent_score}
                   </ThemedText>
-                  
+
                   {/* Winner badge */}
                   {isDraw ? (
                     <View style={[styles.resultBadge, { backgroundColor: theme.border }]}>
@@ -319,14 +343,14 @@ export function MatchDetailPopup({
                     </View>
                   ) : (
                     <View style={[
-                      styles.resultBadge, 
-                      isPlayerTeamWinner 
-                        ? { backgroundColor: '#10B98120' } 
-                        : { backgroundColor: '#EF444420' } 
+                      styles.resultBadge,
+                      isPlayerTeamWinner
+                        ? { backgroundColor: '#10B98120' }
+                        : { backgroundColor: '#EF444420' }
                     ]}>
                       <Trophy size={12} color={isPlayerTeamWinner ? '#10B981' : '#EF4444'} style={styles.trophyIcon} />
-                      <ThemedText 
-                        variant="caption" 
+                      <ThemedText
+                        variant="caption"
                         style={[
                           styles.resultBadgeText,
                           { color: isPlayerTeamWinner ? '#10B981' : '#EF4444', fontWeight: '800' }
@@ -373,10 +397,10 @@ export function MatchDetailPopup({
                   userResult === 'loss' && { backgroundColor: '#EF444415', borderColor: '#EF444430' },
                   userResult === 'draw' && { backgroundColor: '#6B728015', borderColor: '#6B728030' },
                 ]}>
-                  <ThemedText 
-                    variant="body" 
+                  <ThemedText
+                    variant="body"
                     style={[
-                      styles.userBannerText, 
+                      styles.userBannerText,
                       userResult === 'win' && { color: '#10B981' },
                       userResult === 'loss' && { color: '#EF4444' },
                       userResult === 'draw' && { color: '#6B7280' },
@@ -384,6 +408,34 @@ export function MatchDetailPopup({
                   >
                     {userResult === 'win' ? '🎉 You won this match!' : userResult === 'loss' ? '😔 You lost this match' : '🤝 Match ended in a draw'}
                   </ThemedText>
+                </View>
+              )}
+
+              {/* Verification Prompt Card */}
+              {verificationStatus === 'pending' && isOpponent && (
+                <View style={[styles.verifyCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <ThemedText variant="body" style={{ fontWeight: '700', textAlign: 'center' }}>
+                    Verify Match Details
+                  </ThemedText>
+                  <ThemedText variant="caption" muted style={{ textAlign: 'center', marginTop: 2, marginBottom: Spacing.sm }}>
+                    Please confirm if these scores and players are correct.
+                  </ThemedText>
+                  <View style={styles.verifyActions}>
+                    <Pressable
+                      onPress={() => handleVerifyStatus('verified')}
+                      disabled={updatingStatus}
+                      style={[styles.verifyBtn, { backgroundColor: theme.text, borderColor: theme.text }]}
+                    >
+                      <ThemedText style={{ color: theme.background, fontWeight: '700', fontSize: 13 }}>Verify</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={() => handleVerifyStatus('disputed')}
+                      disabled={updatingStatus}
+                      style={[styles.verifyBtn, { backgroundColor: 'transparent', borderColor: '#DC2626' }]}
+                    >
+                      <ThemedText style={{ color: '#DC2626', fontWeight: '700', fontSize: 13 }}>Dispute</ThemedText>
+                    </Pressable>
+                  </View>
                 </View>
               )}
 
@@ -410,6 +462,33 @@ export function MatchDetailPopup({
                     </ThemedText>
                   </View>
                 </View>
+
+                <Divider spacing={Spacing.sm} />
+
+                <View style={styles.detailItem}>
+                  {verificationStatus === 'verified' ? (
+                    <Check size={16} color="#10B981" />
+                  ) : verificationStatus === 'pending' ? (
+                    <Clock size={16} color="#D97706" />
+                  ) : (
+                    <AlertTriangle size={16} color="#DC2626" />
+                  )}
+                  <View style={styles.detailContent}>
+                    <ThemedText variant="caption" muted>Verification</ThemedText>
+                    <ThemedText
+                      variant="body"
+                      style={[
+                        styles.detailValue,
+                        { textTransform: 'capitalize' },
+                        verificationStatus === 'verified' && { color: theme.text },
+                        verificationStatus === 'pending' && { color: '#D97706' },
+                        verificationStatus === 'disputed' && { color: '#DC2626' },
+                      ]}
+                    >
+                      {verificationStatus}
+                    </ThemedText>
+                  </View>
+                </View>
               </View>
 
               <Divider spacing={Spacing.sm} />
@@ -420,10 +499,10 @@ export function MatchDetailPopup({
                   Comments ({comments.length})
                 </ThemedText>
                 <Pressable onPress={handleLike} style={styles.likeActionBtn} hitSlop={8}>
-                  <Heart 
-                    size={16} 
-                    color={liked ? '#EF4444' : theme.textSecondary} 
-                    fill={liked ? '#EF4444' : 'none'} 
+                  <Heart
+                    size={16}
+                    color={liked ? '#EF4444' : theme.textSecondary}
+                    fill={liked ? '#EF4444' : 'none'}
                   />
                   <ThemedText variant="caption" style={[styles.likeText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
                     {likesCount} {likesCount === 1 ? 'like' : 'likes'}
@@ -762,5 +841,25 @@ const styles = StyleSheet.create({
   },
   closeAction: {
     marginTop: Spacing.xs,
+  },
+  verifyCard: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    marginBottom: Spacing.md,
+    alignItems: 'center',
+  },
+  verifyActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    width: '100%',
+  },
+  verifyBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
   },
 });

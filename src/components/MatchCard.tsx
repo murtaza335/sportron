@@ -1,5 +1,5 @@
 import { Globe, Heart, Lock, MessageSquare } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState, useMemo } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
@@ -51,20 +51,40 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
   const [liked, setLiked] = useState(match.is_liked_by_user);
   const [likesCount, setLikesCount] = useState(match.likes_count);
 
-  useEffect(() => {
-    setLiked(match.is_liked_by_user);
-    setLikesCount(match.likes_count);
-  }, [match.is_liked_by_user, match.likes_count]);
+  const isParticipant = useMemo(() =>
+    currentUserId &&
+    (currentUserId === match.player_id ||
+      currentUserId === match.player_partner_id ||
+      currentUserId === match.opponent_id ||
+      currentUserId === match.opponent_partner_id),
+  [currentUserId, match.player_id, match.player_partner_id, match.opponent_id, match.opponent_partner_id]);
+
+  const isPlayerTeam = useMemo(() =>
+    currentUserId &&
+    (currentUserId === match.player_id || currentUserId === match.player_partner_id),
+  [currentUserId, match.player_id, match.player_partner_id]);
+
+  const isOpponentTeam = useMemo(() =>
+    currentUserId &&
+    (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id),
+  [currentUserId, match.opponent_id, match.opponent_partner_id]);
+
+  const resultLabel = useMemo((): 'Win' | 'Loss' | 'Draw' | null => {
+    if (!isParticipant) return null;
+    if (match.player_score === match.opponent_score) return 'Draw';
+    if (isPlayerTeam) return match.player_score > match.opponent_score ? 'Win' : 'Loss';
+    if (isOpponentTeam) return match.opponent_score > match.player_score ? 'Win' : 'Loss';
+    return null;
+  }, [isParticipant, isPlayerTeam, isOpponentTeam, match.player_score, match.opponent_score]);
+
+  const isMine = currentUserId === match.created_by;
+  const formatLabel = match.match_format === 'doubles' ? 'Doubles' : 'Singles';
 
   const handleLike = async () => {
     if (!currentUserId) return;
     const nextLiked = !liked;
     setLiked(nextLiked);
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
-
-    // Optimistically update properties in memory on the match object
-    match.is_liked_by_user = nextLiked;
-    match.likes_count = nextLiked ? match.likes_count + 1 : Math.max(0, match.likes_count - 1);
 
     try {
       await toggleLike(match.id, currentUserId, nextLiked);
@@ -73,39 +93,8 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
       // Revert state
       setLiked(!nextLiked);
       setLikesCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
-      match.is_liked_by_user = !nextLiked;
-      match.likes_count = !nextLiked ? match.likes_count + 1 : Math.max(0, match.likes_count - 1);
     }
   };
-
-  const isParticipant =
-    currentUserId &&
-    (currentUserId === match.player_id ||
-      currentUserId === match.player_partner_id ||
-      currentUserId === match.opponent_id ||
-      currentUserId === match.opponent_partner_id);
-
-  const isPlayerTeam =
-    currentUserId &&
-    (currentUserId === match.player_id || currentUserId === match.player_partner_id);
-
-  const isOpponentTeam =
-    currentUserId &&
-    (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
-
-  let resultLabel: 'Win' | 'Loss' | 'Draw' | null = null;
-  if (isParticipant) {
-    if (match.player_score === match.opponent_score) {
-      resultLabel = 'Draw';
-    } else if (isPlayerTeam) {
-      resultLabel = match.player_score > match.opponent_score ? 'Win' : 'Loss';
-    } else if (isOpponentTeam) {
-      resultLabel = match.opponent_score > match.player_score ? 'Win' : 'Loss';
-    }
-  }
-
-  const isMine = currentUserId === match.created_by;
-  const formatLabel = match.match_format === 'doubles' ? 'Doubles' : 'Singles';
 
   return (
     <Pressable
@@ -130,20 +119,32 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
           </View>
 
           <View style={styles.badges}>
-            <ThemedText 
-              variant="caption" 
+            <ThemedText
+              variant="caption"
               style={[
-                styles.badge, 
+                styles.badge,
                 { backgroundColor: theme.backgroundElement, color: theme.textSecondary }
               ]}
             >
               {formatLabel}
             </ThemedText>
+            <ThemedText
+              variant="caption"
+              style={[
+                styles.badge,
+                { borderWidth: 1, textTransform: 'capitalize' },
+                match.verification_status === 'verified' && { borderColor: theme.border, color: theme.textSecondary },
+                match.verification_status === 'pending' && { borderColor: theme.border, color: '#D97706' },
+                match.verification_status === 'disputed' && { borderColor: theme.border, color: '#DC2626' },
+              ]}
+            >
+              {match.verification_status}
+            </ThemedText>
             {isMine && showYoursBadge ? (
-              <ThemedText 
-                variant="caption" 
+              <ThemedText
+                variant="caption"
                 style={[
-                  styles.badge, 
+                  styles.badge,
                   { backgroundColor: theme.text, color: theme.background }
                 ]}
               >
@@ -155,9 +156,9 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
         <View style={styles.bodyRow}>
           <View style={styles.teamLeft}>
-            <ThemedText 
-              variant="body" 
-              numberOfLines={2} 
+            <ThemedText
+              variant="body"
+              numberOfLines={2}
               style={[
                 styles.teamName,
                 isPlayerTeam && styles.teamNameActive
@@ -171,7 +172,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
             <ThemedText style={styles.scoreText}>
               {match.player_score} – {match.opponent_score}
             </ThemedText>
-            
+
             {resultLabel === 'Win' && (
               <View style={[styles.resultBadge, { backgroundColor: '#10B98115' }]}>
                 <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
@@ -190,9 +191,9 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
           </View>
 
           <View style={styles.teamRight}>
-            <ThemedText 
-              variant="body" 
-              numberOfLines={2} 
+            <ThemedText
+              variant="body"
+              numberOfLines={2}
               style={[
                 styles.teamName,
                 isOpponentTeam && styles.teamNameActive,
@@ -206,15 +207,15 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
         {/* Social Row */}
         <View style={[styles.socialRow, { borderTopColor: theme.border }]}>
-          <Pressable 
-            onPress={handleLike} 
-            hitSlop={12} 
+          <Pressable
+            onPress={handleLike}
+            hitSlop={12}
             style={styles.socialAction}
           >
-            <Heart 
-              size={13} 
-              color={liked ? '#EF4444' : theme.textSecondary} 
-              fill={liked ? '#EF4444' : 'none'} 
+            <Heart
+              size={13}
+              color={liked ? '#EF4444' : theme.textSecondary}
+              fill={liked ? '#EF4444' : 'none'}
             />
             <ThemedText variant="caption" style={[styles.socialText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
               {likesCount} {likesCount === 1 ? 'like' : 'likes'}

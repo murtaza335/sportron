@@ -44,6 +44,9 @@ export function ProfileForm({
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text, borderColor: theme.border }]}
           autoCapitalize="words"
+          autoCorrect={false}
+          textContentType="name"
+          accessibilityLabel="Display name"
         />
       </View>
 
@@ -59,6 +62,8 @@ export function ProfileForm({
           style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.border }]}
           multiline
           numberOfLines={3}
+          autoCorrect={false}
+          accessibilityLabel="Bio"
         />
       </View>
 
@@ -76,7 +81,10 @@ export function ProfileForm({
                 style={[
                   styles.roleOption,
                   selected && { backgroundColor: theme.text },
-                ]}>
+                ]}
+                hitSlop={16}
+                accessibilityRole="button"
+                accessibilityState={{ selected }}>
                 <ThemedText
                   variant="body"
                   style={{
@@ -121,9 +129,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.md,
     fontSize: 16,
+    minHeight: 56,
   },
   textArea: {
-    minHeight: 96,
+    minHeight: 100,
     textAlignVertical: 'top',
   },
   roleRow: {
@@ -134,7 +143,9 @@ const styles = StyleSheet.create({
   },
   roleOption: {
     flex: 1,
+    minHeight: 56,
     alignItems: 'center',
+    justifyContent: 'center',
     paddingVertical: Spacing.md,
   },
 });

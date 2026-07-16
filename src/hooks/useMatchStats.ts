@@ -25,7 +25,9 @@ export function useMatchStats(userId: string | undefined) {
   }, [userId]);
 
   useEffect(() => {
-    refresh();
+    setTimeout(() => {
+      refresh();
+    }, 0);
   }, [refresh]);
 
   return { stats, loading, refresh };

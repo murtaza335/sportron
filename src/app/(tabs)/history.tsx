@@ -8,6 +8,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Clock } from 'lucide-react-native';
 
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
@@ -25,8 +26,7 @@ export default function HistoryScreen() {
   const theme = useTheme();
   const { user } = useAuth();
   const [mode, setMode] = useState<FeedMode>('global');
-  
-  // The hook correctly takes user?.id and the mode ('global' for public feed, 'mine' for involved matches)
+
   const { matches, loading, refreshing, refresh } = useMatches(user?.id, mode);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
@@ -34,23 +34,29 @@ export default function HistoryScreen() {
   useFocusEffect(
     useCallback(() => {
       refresh();
-    }, [refresh, mode]), // Added mode as a dependency to refresh when changing tabs
+    }, [refresh]),
   );
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
-        <ThemedText variant="title">History</ThemedText>
+        <View style={styles.header}>
+          <ThemedText variant="title">History</ThemedText>
+        </View>
 
-        {/* Clean, responsive tab switching mapping directly to your backend modes */}
-        <SegmentedControl
-          options={[
-            { value: 'global', label: 'All Matches' },
-            { value: 'mine', label: 'My Matches' },
-          ]}
-          value={mode}
-          onChange={(value) => setMode(value as FeedMode)}
-        />
+        <View style={styles.filterRow}>
+          <ThemedText variant="caption" muted style={styles.filterLabel}>
+            Filter
+          </ThemedText>
+          <SegmentedControl
+            options={[
+              { value: 'global', label: 'All Matches' },
+              { value: 'mine', label: 'My Matches' },
+            ]}
+            value={mode}
+            onChange={(value) => setMode(value as FeedMode)}
+          />
+        </View>
 
         {loading && !refreshing ? (
           <ActivityIndicator color={theme.text} style={styles.loader} />
@@ -65,18 +71,26 @@ export default function HistoryScreen() {
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
               <View style={styles.empty}>
-                <ThemedText variant="body" muted>
-                  {mode === 'global' 
-                    ? 'No public matches yet.' 
+                <View style={styles.emptyIcon}>
+                  <Clock size={48} color={theme.textSecondary} strokeWidth={1.5} />
+                </View>
+                <ThemedText variant="body" muted style={styles.emptyText}>
+                  {mode === 'global'
+                    ? 'No public matches yet.'
                     : 'You have not been involved in any matches yet.'}
+                </ThemedText>
+                <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                  {mode === 'global'
+                    ? 'Be the first to record a match!'
+                    : 'Start playing to see your matches here.'}
                 </ThemedText>
               </View>
             }
             renderItem={({ item }) => (
-              <MatchCard 
-                match={item} 
-                currentUserId={user?.id} 
-                showYoursBadge={mode === 'global'} 
+              <MatchCard
+                match={item}
+                currentUserId={user?.id}
+                showYoursBadge={mode === 'global'}
                 onPress={() => {
                   setSelectedMatch(item);
                   setDetailVisible(true);
@@ -87,7 +101,6 @@ export default function HistoryScreen() {
         )}
       </View>
 
-      {/* The bottom sheet layout component */}
       <MatchDetailPopup
         match={selectedMatch}
         visible={detailVisible}
@@ -96,7 +109,7 @@ export default function HistoryScreen() {
           setSelectedMatch(null);
         }}
         currentUserId={user?.id}
-        onRefreshFeed={refresh} // Automatically triggers live re-fetching on social interactions
+        onRefreshFeed={refresh}
       />
     </SafeAreaView>
   );
@@ -115,15 +128,47 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
     gap: Spacing.md,
   },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xs,
+  },
+  filterRow: {
+    gap: Spacing.sm,
+  },
+  filterLabel: {
+    marginLeft: Spacing.xs,
+    marginBottom: Spacing.xs,
+  },
   list: {
-    paddingBottom: Spacing.xxl,
+    paddingBottom: Spacing.xxxl,
     flexGrow: 1,
   },
   loader: {
     marginTop: Spacing.xxl,
   },
   empty: {
-    paddingTop: Spacing.xxl,
+    paddingTop: Spacing.xxxl,
+    paddingBottom: Spacing.xxxl,
     alignItems: 'center',
+    gap: Spacing.md,
+  },
+  emptyIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'currentColor',
+    opacity: 0.1,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  emptyText: {
+    textAlign: 'center',
+    maxWidth: 280,
+  },
+  emptySubtext: {
+    textAlign: 'center',
+    maxWidth: 280,
   },
 });

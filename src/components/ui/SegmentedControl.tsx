@@ -27,7 +27,10 @@ export function SegmentedControl<T extends string>({
             style={[
               styles.segment,
               selected && { backgroundColor: theme.text },
-            ]}>
+            ]}
+            hitSlop={16}
+            accessibilityRole="button"
+            accessibilityState={{ selected }}>
             <Text
               style={[
                 styles.label,
@@ -51,7 +54,9 @@ const styles = StyleSheet.create({
   },
   segment: {
     flex: 1,
-    paddingVertical: Spacing.sm + 2,
+    minHeight: 48,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
   },

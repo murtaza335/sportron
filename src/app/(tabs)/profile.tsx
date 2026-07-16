@@ -1,19 +1,21 @@
 import { useState } from 'react';
-import { Alert, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { Sun, Moon, Palette } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { Button } from '@/components/ui/Button';
-import { Divider } from '@/components/ui/Card';
+import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { signOut } from '@/services/auth';
 import { updateProfile } from '@/services/profiles';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { colorScheme, toggleTheme } = useTheme();
   const { profile, refreshProfile } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
@@ -60,7 +62,12 @@ export default function ProfileScreen() {
 
         {!editing ? (
           <View style={styles.summary}>
-            <ThemedText variant="heading">{profile?.display_name}</ThemedText>
+            <View style={[styles.avatar, { backgroundColor: theme.text }]}>
+              <ThemedText variant="hero" style={{ color: theme.background }}>
+                {profile?.display_name?.charAt(0)?.toUpperCase() ?? '?'}
+              </ThemedText>
+            </View>
+            <ThemedText variant="heading" style={styles.name}>{profile?.display_name}</ThemedText>
             <ThemedText variant="caption" muted style={styles.role}>
               {profile?.role}
             </ThemedText>
@@ -82,6 +89,39 @@ export default function ProfileScreen() {
             onSubmit={handleSave}
           />
         )}
+
+        <Divider spacing={Spacing.xl} />
+
+        <ThemedText variant="label" muted style={styles.sectionTitle}>
+          Appearance
+        </ThemedText>
+
+        <Card style={styles.settingCard}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]} >
+              <Palette size={22} color={theme.text} />
+            </View>
+            <View style={styles.settingContent}>
+              <ThemedText variant="body">Theme</ThemedText>
+              <ThemedText variant="caption" muted>
+                {colorScheme === 'dark' ? 'Dark mode' : colorScheme === 'light' ? 'Light mode' : 'System default'}
+              </ThemedText>
+            </View>
+            <Pressable
+              onPress={toggleTheme}
+              style={[styles.toggleButton, { backgroundColor: theme.backgroundElement }]}
+              hitSlop={12}
+            >
+              {colorScheme === 'dark' ? (
+                <Moon size={22} color={theme.text} />
+              ) : colorScheme === 'light' ? (
+                <Sun size={22} color={theme.text} />
+              ) : (
+                <Palette size={22} color={theme.text} />
+              )}
+            </Pressable>
+          </View>
+        </Card>
 
         <Divider spacing={Spacing.xl} />
 
@@ -111,7 +151,19 @@ const styles = StyleSheet.create({
     gap: Spacing.lg,
   },
   summary: {
-    gap: Spacing.sm,
+    gap: Spacing.md,
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  avatar: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  name: {
+    textAlign: 'center',
   },
   role: {
     textTransform: 'capitalize',
@@ -120,5 +172,40 @@ const styles = StyleSheet.create({
   bio: {
     marginTop: Spacing.xs,
     marginBottom: Spacing.sm,
+    textAlign: 'center',
+    maxWidth: '90%',
+  },
+  sectionTitle: {
+    marginBottom: Spacing.xs,
+    marginLeft: Spacing.sm,
+  },
+  settingCard: {
+    paddingVertical: Spacing.xs,
+  },
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  settingIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  settingContent: {
+    flex: 1,
+    gap: 2,
+  },
+  toggleButton: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });
