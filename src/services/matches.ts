@@ -272,6 +272,17 @@ export async function addComment(matchId: string, userId: string, content: strin
   };
 }
 
+export async function deleteMatch(matchId: string): Promise<void> {
+  const { error } = await supabase
+    .from('matches')
+    .delete()
+    .eq('id', matchId);
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function fetchPendingApprovalMatches(userId: string): Promise<MatchWithProfiles[]> {
   const { data, error } = await supabase
     .from('matches')

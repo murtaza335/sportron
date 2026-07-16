@@ -1,4 +1,4 @@
-import { Calendar, Globe, Heart, Lock, Trophy, User, X, Check, Clock, AlertTriangle } from 'lucide-react-native';
+import { Calendar, Globe, Heart, Lock, Trophy, Trash2, User, X, Check, Clock, AlertTriangle } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,7 +21,7 @@ import { Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addComment, fetchComments, toggleLike, updateMatchVerificationStatus } from '@/services/matches';
+import { addComment, deleteMatch, fetchComments, toggleLike, updateMatchVerificationStatus } from '@/services/matches';
 import type { MatchComment, MatchWithProfiles } from '@/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -75,6 +75,8 @@ export function MatchDetailPopup({
   const [likesCount, setLikesCount] = useState(0);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Initialize pan responder in effect to avoid render-time ref access
   const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
@@ -177,6 +179,7 @@ Animated.spring(translateY, {
   const isUserInOpponentTeam = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
 
   const isOpponent = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
+  const canDelete = currentUserId === match.created_by && verificationStatus !== 'verified';
 
   let userResult: 'win' | 'loss' | 'draw' | null = null;
   if (currentUserId && (isUserInPlayerTeam || isUserInOpponentTeam)) {
@@ -242,6 +245,31 @@ Animated.spring(translateY, {
     } finally {
       setUpdatingStatus(false);
     }
+  };
+
+  const handleDelete = () => {
+    if (!match) return;
+    setShowDeleteConfirm(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!match) return;
+    setShowDeleteConfirm(false);
+    setDeleting(true);
+    try {
+      await deleteMatch(match.id);
+      onRefreshFeed?.();
+      onClose();
+    } catch (error) {
+      console.error('Failed to delete match:', error);
+      Alert.alert('Error', 'Failed to delete match.');
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const handleCancelDelete = () => {
+    setShowDeleteConfirm(false);
   };
 
   return (
@@ -491,6 +519,22 @@ Animated.spring(translateY, {
                 </View>
               </View>
 
+              {canDelete && (
+                <>
+                  <Divider spacing={Spacing.sm} />
+                  <Pressable
+                    onPress={handleDelete}
+                    disabled={deleting}
+                    style={styles.deleteAction}
+                  >
+                    <Trash2 size={16} color="#DC2626" />
+                    <ThemedText style={{ color: '#DC2626', fontWeight: '600', marginLeft: Spacing.sm }}>
+                      {deleting ? 'Deleting...' : 'Delete Match'}
+                    </ThemedText>
+                  </Pressable>
+                </>
+              )}
+
               <Divider spacing={Spacing.sm} />
 
               {/* Social Header (Likes Count and Comments Header) */}
@@ -573,6 +617,37 @@ Animated.spring(translateY, {
             )}
 
             <Button label="Close" onPress={onClose} style={styles.closeAction} />
+
+            {/* Delete Confirmation Overlay */}
+            {showDeleteConfirm && (
+              <View style={styles.confirmOverlay}>
+                <View style={[styles.confirmCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <ThemedText variant="body" style={{ fontWeight: '700', textAlign: 'center', marginBottom: Spacing.xs }}>
+                    Delete Match
+                  </ThemedText>
+                  <ThemedText variant="caption" muted style={{ textAlign: 'center', marginBottom: Spacing.md }}>
+                    Are you sure you want to delete this match? This action cannot be undone.
+                  </ThemedText>
+                  <View style={styles.confirmActions}>
+                    <Pressable
+                      onPress={handleCancelDelete}
+                      style={[styles.confirmBtn, { borderColor: theme.border }]}
+                    >
+                      <ThemedText style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>Cancel</ThemedText>
+                    </Pressable>
+                    <Pressable
+                      onPress={handleConfirmDelete}
+                      disabled={deleting}
+                      style={[styles.confirmBtn, { backgroundColor: '#DC2626', borderColor: '#DC2626' }]}
+                    >
+                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
+                        {deleting ? 'Deleting...' : 'Delete'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
+                </View>
+              </View>
+            )}
           </Animated.View>
         </View>
       </KeyboardAvoidingView>
@@ -855,6 +930,45 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   verifyBtn: {
+    flex: 1,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+  },
+  deleteAction: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.sm + 2,
+    gap: Spacing.xs,
+  },
+  confirmOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: Spacing.md,
+    zIndex: 100,
+  },
+  confirmCard: {
+    width: '100%',
+    maxWidth: 320,
+    borderRadius: Radius.md,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  confirmActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  confirmBtn: {
     flex: 1,
     height: 40,
     borderRadius: Radius.md,
