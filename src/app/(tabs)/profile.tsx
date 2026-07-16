@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Sun, Moon, Palette } from 'lucide-react-native';
+import { Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { Button } from '@/components/ui/Button';
@@ -15,11 +15,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 export default function ProfileScreen() {
   const theme = useTheme();
-  const { colorScheme, toggleTheme } = useTheme();
+  const { colorScheme, setTheme } = useTheme();
   const { profile, refreshProfile } = useAuth();
   const [editing, setEditing] = useState(false);
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [showThemeModal, setShowThemeModal] = useState(false);
 
   const handleSave = async (data: { displayName: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
     if (!profile?.id) {
@@ -111,31 +112,79 @@ export default function ProfileScreen() {
         </ThemedText>
 
         <Card style={styles.settingCard}>
-          <View style={styles.settingRow}>
+          <Pressable
+            onPress={() => setShowThemeModal(true)}
+            style={({ pressed }) => [
+              styles.settingRow,
+              pressed && { backgroundColor: theme.backgroundElement },
+            ]}
+            hitSlop={12}
+          >
             <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]} >
               <Palette size={22} color={theme.text} />
             </View>
             <View style={styles.settingContent}>
               <ThemedText variant="body">Theme</ThemedText>
               <ThemedText variant="caption" muted>
-                {colorScheme === 'dark' ? 'Dark mode' : colorScheme === 'light' ? 'Light mode' : 'System default'}
+                {colorScheme === 'dark' ? 'Dark' : colorScheme === 'light' ? 'Light' : 'System'}
               </ThemedText>
             </View>
-            <Pressable
-              onPress={toggleTheme}
-              style={[styles.toggleButton, { backgroundColor: theme.backgroundElement }]}
-              hitSlop={12}
-            >
-              {colorScheme === 'dark' ? (
-                <Moon size={22} color={theme.text} />
-              ) : colorScheme === 'light' ? (
-                <Sun size={22} color={theme.text} />
-              ) : (
-                <Palette size={22} color={theme.text} />
-              )}
-            </Pressable>
-          </View>
+            {colorScheme === 'dark' ? (
+              <Moon size={22} color={theme.text} />
+            ) : colorScheme === 'light' ? (
+              <Sun size={22} color={theme.text} />
+            ) : (
+              <Palette size={22} color={theme.text} />
+            )}
+          </Pressable>
         </Card>
+
+        {/* Theme Modal - Slide from Bottom */}
+        {showThemeModal && (
+          <Modal
+            animationType="slide"
+            presentationStyle="formSheet"
+            transparent
+            visible={showThemeModal}
+            onRequestClose={() => setShowThemeModal(false)}
+          >
+            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowThemeModal(false)} />
+            <View style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
+              <View style={[styles.modalCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={styles.modalHeader}>
+                  <ThemedText variant="label">Choose Theme</ThemedText>
+                  <Pressable onPress={() => setShowThemeModal(false)} hitSlop={12}>
+                    <X size={20} color={theme.text} />
+                  </Pressable>
+                </View>
+                <View style={styles.modalOptions}>
+                  {(['light', 'dark', 'system'] as const).map((option) => (
+                    <Pressable
+                      key={option}
+                      onPress={() => { setTheme(option); setShowThemeModal(false); }}
+                      style={({ pressed }) => [
+                        styles.modalOption,
+                        { backgroundColor: theme.background },
+                        pressed && { backgroundColor: theme.backgroundElement },
+                        colorScheme === option && { backgroundColor: theme.backgroundElement },
+                      ]}
+                    >
+                      <View style={styles.modalOptionContent}>
+                        {option === 'light' && <Sun size={22} color={theme.text} />}
+                        {option === 'dark' && <Moon size={22} color={theme.text} />}
+                        {option === 'system' && <Palette size={22} color={theme.text} />}
+                        <ThemedText variant="body" style={{ marginLeft: Spacing.md, fontWeight: colorScheme === option ? '700' : '500' }}>
+                          {option === 'light' ? 'Light' : option === 'dark' ? 'Dark' : 'System'}
+                        </ThemedText>
+                      </View>
+                      {colorScheme === option && <Check size={22} color="#10B981" />}
+                    </Pressable>
+                  ))}
+                </View>
+              </View>
+            </View>
+          </Modal>
+        )}
 
         <Divider spacing={Spacing.xl} />
 
@@ -233,5 +282,41 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.4)',
+  },
+  modalCard: {
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    borderTopWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg + 10,
+    paddingTop: Spacing.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+  },
+  modalOptions: {
+    gap: Spacing.sm,
+  },
+  modalOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: 'transparent',
+  },
+  modalOptionContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
 });
