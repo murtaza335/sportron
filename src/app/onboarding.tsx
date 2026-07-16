@@ -2,14 +2,13 @@ import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Target, Trophy, Users } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { ThemedText } from '@/components/ui/Text';
-import { useAuth } from '@/contexts/AuthContext';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
-import { createProfile } from '@/services/profiles';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { createProfile } from '@/services/profiles';
 
 export default function OnboardingScreen() {
   const theme = useTheme();
@@ -48,45 +47,22 @@ export default function OnboardingScreen() {
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-          <View style={styles.hero}>
-            <View style={[styles.heroIcon, { backgroundColor: theme.text, opacity: 0.1 }]}>
-              <Target size={48} color={theme.text} strokeWidth={2} />
-            </View>
-            <ThemedText variant="title">Welcome to T3 Seecs</ThemedText>
+          
+          {/* Minimal Header */}
+          <View style={styles.header}>
+            <ThemedText variant="title" style={styles.title}>
+              Create Profile
+            </ThemedText>
             <ThemedText variant="body" muted style={styles.subtitle}>
-              Track your matches, compete with friends, and climb the leaderboard
+              Set up your information to get started with matches and leaderboards.
             </ThemedText>
           </View>
 
-          <View style={styles.features}>
-            <View style={styles.feature}>
-              <View style={[styles.featureIcon, { backgroundColor: '#10B981', opacity: 0.15 }]}>
-                <Trophy size={20} color="#10B981" strokeWidth={2} />
-              </View>
-              <ThemedText variant="label" style={styles.featureText}>Track Wins & Losses</ThemedText>
-            </View>
-            <View style={styles.feature}>
-              <View style={[styles.featureIcon, { backgroundColor: '#3B82F6', opacity: 0.15 }]}>
-                <Users size={20} color="#3B82F6" strokeWidth={2} />
-              </View>
-              <ThemedText variant="label" style={styles.featureText}>Play Singles & Doubles</ThemedText>
-            </View>
-            <View style={styles.feature}>
-              <View style={[styles.featureIcon, { backgroundColor: '#8B5CF6', opacity: 0.15 }]}>
-                <Target size={20} color="#8B5CF6" strokeWidth={2} />
-              </View>
-              <ThemedText variant="label" style={styles.featureText}>Global Leaderboards</ThemedText>
-            </View>
+          {/* Form Section */}
+          <View style={styles.formContainer}>
+            <ProfileForm submitLabel="Get Started" loading={loading} onSubmit={handleSubmit} />
           </View>
 
-          <ThemedText variant="label" muted style={styles.formTitle}>
-            Set up your profile
-          </ThemedText>
-          <ThemedText variant="caption" muted style={styles.formSubtitle}>
-            This helps others recognize you in matches
-          </ThemedText>
-
-          <ProfileForm submitLabel="Get started" loading={loading} onSubmit={handleSubmit} />
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -105,56 +81,25 @@ const styles = StyleSheet.create({
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.xl,
-    paddingBottom: Spacing.xxxl,
-    gap: Spacing.xl,
-  },
-  hero: {
-    alignItems: 'center',
-    gap: Spacing.lg,
-    paddingVertical: Spacing.xl,
-  },
-  heroIcon: {
-    width: 96,
-    height: 96,
-    borderRadius: 48,
-    alignItems: 'center',
+    paddingHorizontal: Spacing.xl,
+    paddingTop: Spacing.xxl,
+    paddingBottom: Spacing.xl,
     justifyContent: 'center',
+  },
+  header: {
+    marginBottom: Spacing.xl,
+    gap: Spacing.xs,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: '700',
+    letterSpacing: -0.5,
   },
   subtitle: {
-    textAlign: 'center',
-    maxWidth: 280,
-    lineHeight: 24,
+    fontSize: 15,
+    lineHeight: 22,
   },
-  features: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-    marginTop: Spacing.md,
-  },
-  feature: {
-    flex: 1,
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  featureIcon: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  featureText: {
-    textAlign: 'center',
-    fontSize: 11,
-    fontWeight: '600',
-    lineHeight: 14,
-  },
-  formTitle: {
-    marginTop: Spacing.md,
-  },
-  formSubtitle: {
-    marginBottom: Spacing.lg,
+  formContainer: {
+    width: '100%',
   },
 });
