@@ -197,6 +197,7 @@ export function MatchLineupSelector({
                 display_name: currentUserName,
                 bio: null,
                 role: 'student',
+                avatar_url: null,
                 created_at: '',
                 updated_at: '',
               }}
@@ -236,7 +237,7 @@ export function MatchLineupSelector({
             <SlotCard
               label={isDoubles ? 'Player 3' : 'Player 2'}
               profile={selection.opponent}
-              helperText="Tap to choose opponent"
+              helperText=""
               onPress={() => setActiveSlot('opponent')}
               onDelete={() => onChange('opponent', null)}
             />

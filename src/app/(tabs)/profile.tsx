@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Alert, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Sun, Moon, Palette } from 'lucide-react-native';
 
@@ -21,7 +21,7 @@ export default function ProfileScreen() {
   const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
 
-  const handleSave = async (data: { displayName: string; bio: string; role: 'student' | 'teacher' }) => {
+  const handleSave = async (data: { displayName: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
     if (!profile?.id) {
       return;
     }
@@ -32,6 +32,7 @@ export default function ProfileScreen() {
         displayName: data.displayName,
         bio: data.bio,
         role: data.role,
+        avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();
       setEditing(false);
@@ -62,10 +63,22 @@ export default function ProfileScreen() {
 
         {!editing ? (
           <View style={styles.summary}>
-            <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-              <ThemedText variant="hero" style={{ color: theme.background }}>
-                {profile?.display_name?.charAt(0)?.toUpperCase() ?? '?'}
-              </ThemedText>
+            <View style={styles.avatarContainer}>
+              {profile?.avatar_url ? (
+                <View style={[styles.avatar, { backgroundColor: theme.text }]}>
+                  <Image
+                    source={{ uri: profile.avatar_url }}
+                    style={styles.avatarImage}
+                    resizeMode="cover"
+                  />
+                </View>
+              ) : (
+                <View style={[styles.avatar, { backgroundColor: theme.text }]}>
+                  <ThemedText variant="hero" style={{ color: theme.background }}>
+                    {profile?.display_name?.charAt(0)?.toUpperCase() ?? '?'}
+                  </ThemedText>
+                </View>
+              )}
             </View>
             <ThemedText variant="heading" style={styles.name}>{profile?.display_name}</ThemedText>
             <ThemedText variant="caption" muted style={styles.role}>
@@ -84,6 +97,7 @@ export default function ProfileScreen() {
             initialName={profile?.display_name}
             initialBio={profile?.bio ?? ''}
             initialRole={profile?.role}
+            initialAvatar={profile?.avatar_url ?? null}
             submitLabel="Save changes"
             loading={saving}
             onSubmit={handleSave}
@@ -155,12 +169,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingVertical: Spacing.md,
   },
+  avatarContainer: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    overflow: 'hidden',
+  },
   avatar: {
     width: 88,
     height: 88,
     borderRadius: 44,
     alignItems: 'center',
     justifyContent: 'center',
+    overflow: 'hidden',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 44,
   },
   name: {
     textAlign: 'center',

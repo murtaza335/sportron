@@ -1,5 +1,5 @@
 import { Minus, Plus } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -10,10 +10,54 @@ type ScoreCounterProps = {
   score: number;
   onIncrement: () => void;
   onDecrement: () => void;
+  onScorePress?: () => void;
+  onScoreChange?: (score: number) => void;
 };
 
-export function ScoreCounter({ label, score, onIncrement, onDecrement }: ScoreCounterProps) {
+export function ScoreCounter({ label, score, onIncrement, onDecrement, onScorePress, onScoreChange }: ScoreCounterProps) {
   const theme = useTheme();
+
+  const handleDirectInput = () => {
+    if (!onScoreChange) return;
+    
+    const defaultValue = score.toString();
+    const title = `Set ${label} Score`;
+    const message = 'Enter the score directly';
+
+    if (Platform.OS === 'ios') {
+      Alert.prompt(
+        title,
+        message,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Set', onPress: (value) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
+        ],
+        'plain-text',
+        defaultValue,
+        'numeric'
+      );
+    } else {
+      // Android doesn't support Alert.prompt with numeric keyboard easily, use a custom approach
+      Alert.prompt(
+        title,
+        message,
+        [
+          { text: 'Cancel', style: 'cancel' },
+          { text: 'Set', onPress: (value) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
+        ],
+        'plain-text',
+        defaultValue
+      );
+    }
+  };
+
+  const handleScorePress = () => {
+    if (onScoreChange) {
+      handleDirectInput();
+    } else if (onScorePress) {
+      onScorePress();
+    }
+  };
 
   return (
     <View style={styles.container}>
@@ -29,9 +73,11 @@ export function ScoreCounter({ label, score, onIncrement, onDecrement }: ScoreCo
           <Minus size={28} color={theme.text} strokeWidth={2.5} />
         </Pressable>
 
-        <ThemedText variant="hero" style={styles.score}>
-          {score}
-        </ThemedText>
+        <Pressable onPress={handleScorePress} style={styles.scoreTouchArea} hitSlop={16}>
+          <ThemedText variant="hero" style={styles.score}>
+            {score}
+          </ThemedText>
+        </Pressable>
 
         <Pressable
           onPress={onIncrement}
@@ -76,5 +122,11 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 64,
     lineHeight: 68,
+  },
+  scoreTouchArea: {
+    minWidth: 80,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: Spacing.sm,
   },
 });

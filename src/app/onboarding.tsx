@@ -16,7 +16,7 @@ export default function OnboardingScreen() {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (data: { displayName: string; bio: string; role: 'student' | 'teacher' }) => {
+  const handleSubmit = async (data: { displayName: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
     if (!user?.id) {
       return;
     }
@@ -27,6 +27,7 @@ export default function OnboardingScreen() {
         displayName: data.displayName,
         bio: data.bio,
         role: data.role,
+        avatarUrl: data.avatarUrl,
       });
       await refreshProfile();
       router.replace('/');

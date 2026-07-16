@@ -42,6 +42,7 @@ export async function createProfile(userId: string, input: CreateProfileInput): 
       display_name: input.displayName.trim(),
       bio: input.bio?.trim() || null,
       role: input.role,
+      avatar_url: input.avatarUrl || null,
     })
     .select()
     .single();
@@ -67,6 +68,9 @@ export async function updateProfile(
   }
   if (input.role !== undefined) {
     updates.role = input.role;
+  }
+  if (input.avatarUrl !== undefined) {
+    updates.avatar_url = input.avatarUrl;
   }
 
   const { data, error } = await supabase

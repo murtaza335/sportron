@@ -158,6 +158,7 @@ export default function AddMatchScreen() {
                 score={playerScore}
                 onIncrement={() => setPlayerScore((v) => v + 1)}
                 onDecrement={() => setPlayerScore((v) => Math.max(0, v - 1))}
+                onScoreChange={setPlayerScore}
               />
               <View style={styles.vsContainer}>
                 <ThemedText variant="caption" muted style={styles.vs}>VS</ThemedText>
@@ -167,6 +168,7 @@ export default function AddMatchScreen() {
                 score={opponentScore}
                 onIncrement={() => setOpponentScore((v) => v + 1)}
                 onDecrement={() => setOpponentScore((v) => Math.max(0, v - 1))}
+                onScoreChange={setOpponentScore}
               />
             </View>
           </View>

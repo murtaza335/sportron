@@ -6,6 +6,7 @@ export type Profile = {
   display_name: string;
   bio: string | null;
   role: UserRole;
+  avatar_url: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -60,6 +61,7 @@ export type CreateProfileInput = {
   displayName: string;
   bio?: string;
   role: UserRole;
+  avatarUrl?: string;
 };
 
 export type MatchStats = {
