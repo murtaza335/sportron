@@ -154,7 +154,7 @@ export function MatchLineupSelector({
     const normalized = query.trim().toLowerCase();
     const activeSelection = activeSlot ? selection[activeSlot] : null;
 
-    return profiles.filter((profile) => {
+    const filtered = profiles.filter((profile) => {
       if (selectedIds.has(profile.id) && activeSelection?.id !== profile.id) {
         return false;
       }
@@ -165,6 +165,16 @@ export function MatchLineupSelector({
 
       return profile.display_name.toLowerCase().includes(normalized);
     });
+
+    // Add "Guest" option for partner and opponent slots
+    if (activeSlot === 'playerPartner' || activeSlot === 'opponent' || activeSlot === 'opponentPartner') {
+      return [
+        { id: `guest-${activeSlot}`, display_name: 'Guest', role: 'guest', isGuest: true },
+        ...filtered,
+      ];
+    }
+
+    return filtered;
   }, [activeSlot, profiles, query, selectedIds, selection]);
 
   const closePicker = () => {
@@ -300,6 +310,7 @@ export function MatchLineupSelector({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.list}
               renderItem={({ item }) => {
+                const isGuest = item.isGuest === true;
                 const isSelected = activeSlot ? selection[activeSlot]?.id === item.id : false;
 
                 return (
@@ -309,8 +320,14 @@ export function MatchLineupSelector({
                         return;
                       }
 
-                      onChange(activeSlot, item);
-                      closePicker();
+                      if (isGuest) {
+                        // Pass guest profile directly - one step
+                        onChange(activeSlot, item);
+                        closePicker();
+                      } else {
+                        onChange(activeSlot, item);
+                        closePicker();
+                      }
                     }}
                     style={({ pressed }) => [
                       styles.playerRow,
@@ -318,9 +335,9 @@ export function MatchLineupSelector({
                       pressed && styles.pressed,
                       isSelected && { backgroundColor: theme.backgroundElement },
                     ]}>
-                    <View style={[styles.avatarSmall, { backgroundColor: theme.text }]}>
+                    <View style={[styles.avatarSmall, { backgroundColor: isGuest ? '#6B7280' : theme.text }]}>
                       <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {getInitials(item.display_name) || '?'}
+                        {isGuest ? '+' : (getInitials(item.display_name) || '?')}
                       </ThemedText>
                     </View>
                     <View style={styles.playerMeta}>
@@ -328,10 +345,10 @@ export function MatchLineupSelector({
                         {item.display_name}
                       </ThemedText>
                       <ThemedText variant="caption" muted>
-                        {item.role}
+                        {isGuest ? 'Add unregistered player' : item.role}
                       </ThemedText>
                     </View>
-                    {isSelected ? <Check size={18} color={theme.text} /> : null}
+                    {isSelected && !isGuest && <Check size={18} color={theme.text} />}
                   </Pressable>
                 );
               }}
