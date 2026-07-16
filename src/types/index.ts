@@ -7,6 +7,14 @@ export type Profile = {
   bio: string | null;
   role: UserRole;
   avatar_url: string | null;
+  fcm_tokens: string[];
+  notification_preferences: {
+    match_pending: boolean;
+    match_approved: boolean;
+    match_rejected: boolean;
+    match_liked: boolean;
+    match_commented: boolean;
+  };
   created_at: string;
   updated_at: string;
 };
