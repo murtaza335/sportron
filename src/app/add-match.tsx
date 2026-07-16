@@ -68,12 +68,19 @@ export default function AddMatchScreen() {
     if (!user?.id || !canSave) return;
     setSaving(true);
     try {
+      const isOpponentGuest = selection.opponent?.id?.startsWith('guest-');
+      const isOpponentPartnerGuest = selection.opponentPartner?.id?.startsWith('guest-');
+      const isPlayerPartnerGuest = selection.playerPartner?.id?.startsWith('guest-');
+
+      // For singles with guest opponent, the opponent guest name is stored in opponentGuestName
+      // For doubles with guest opponent, also use opponentGuestName
+      // For guest partner, we can't store it in DB (only one guest field), so just treat as null
       await createMatch(user.id, {
         matchFormat,
-        playerPartnerId: selection.playerPartner?.id ?? null,
-        opponentId: selection.opponent?.id ?? null,
-        opponentPartnerId: selection.opponentPartner?.id ?? null,
-        opponentGuestName: null,
+        playerPartnerId: isPlayerPartnerGuest ? null : selection.playerPartner?.id ?? null,
+        opponentId: isOpponentGuest ? null : selection.opponent?.id ?? null,
+        opponentPartnerId: isOpponentPartnerGuest ? null : selection.opponentPartner?.id ?? null,
+        opponentGuestName: (isOpponentGuest || isOpponentPartnerGuest) ? 'Guest' : null,
         playerScore,
         opponentScore,
         isPublic,
