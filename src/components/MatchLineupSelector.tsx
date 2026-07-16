@@ -1,4 +1,4 @@
-import { Check, Search, X, Trash2 } from 'lucide-react-native';
+import { Check, Search, Trash2, X } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import {
   FlatList,
@@ -200,7 +200,7 @@ export function MatchLineupSelector({
                 created_at: '',
                 updated_at: '',
               }}
-              helperText="Locked to you"
+              helperText=""
               locked
               showRole={false}
             />
@@ -211,7 +211,7 @@ export function MatchLineupSelector({
               <SlotCard
                 label="Player 2"
                 profile={selection.playerPartner}
-                helperText="Tap to add a teammate"
+                helperText=""
                 onPress={() => setActiveSlot('playerPartner')}
                 onDelete={() => onChange('playerPartner', null)}
               />
@@ -247,7 +247,7 @@ export function MatchLineupSelector({
               <SlotCard
                 label="Player 4"
                 profile={selection.opponentPartner}
-                helperText="Tap to add a teammate"
+                helperText=""
                 onPress={() => setActiveSlot('opponentPartner')}
                 onDelete={() => onChange('opponentPartner', null)}
               />

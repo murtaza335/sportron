@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "T3S",
+    "name": "T3 Seecs",
     "slug": "T3S",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -8,7 +8,7 @@
     "scheme": "t3s",
     "userInterfaceStyle": "light",
     "ios": {
-      "icon": "./assets/expo.icon"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "adaptiveIcon": {
