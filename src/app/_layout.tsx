@@ -1,8 +1,9 @@
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import * as Font from 'expo-font';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
@@ -14,6 +15,22 @@ function RootNavigator() {
   const router = useRouter();
   const segments = useSegments();
   const { session, profile, loading, profileLoading } = useAuth();
+  const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  useEffect(() => {
+    const loadFonts = async () => {
+      try {
+        await Font.loadAsync({
+          // Load any custom fonts here if needed
+        });
+        setFontsLoaded(true);
+      } catch (error) {
+        console.warn('Font loading failed:', error);
+        setFontsLoaded(true);
+      }
+    };
+    loadFonts();
+  }, []);
 
   useEffect(() => {
     if (loading || profileLoading) {
@@ -40,7 +57,7 @@ function RootNavigator() {
     }
   }, [session, profile, loading, profileLoading, segments, router]);
 
-  if (loading || (session && profileLoading)) {
+  if (!fontsLoaded || loading || (session && profileLoading)) {
     return (
       <View style={[styles.loader, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.text} />

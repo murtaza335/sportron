@@ -86,11 +86,13 @@ export default function AddMatchScreen() {
     }
   };
 
-  return (
+return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+        enabled>
         <View style={styles.header}>
           <Pressable onPress={() => router.back()} hitSlop={16} style={styles.headerAction}>
             <X size={24} color={theme.text} strokeWidth={2} />
