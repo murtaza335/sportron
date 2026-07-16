@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "863351819444",
+    "project_id": "t3seecs-35e0f",
+    "storage_bucket": "t3seecs-35e0f.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:863351819444:android:a4d702ceab017608e1dbe1",
+        "android_client_info": {
+          "package_name": "com.murtazabaig.T3S"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyB2Bbde1yInhvx9WfhO-eBTHhAXV4t4O28"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

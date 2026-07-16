@@ -4,11 +4,12 @@
 
 ## Tech Stack
 - **Framework**: Expo Router (v57) with React Native 0.86
-- **Backend**: Supabase (PostgreSQL + Auth + Realtime)
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime + Edge Functions)
 - **Language**: TypeScript (strict)
 - **Styling**: Custom theme system with light/dark mode, CSS-in-JS (StyleSheet)
 - **Auth**: Google OAuth via Supabase
 - **State**: React Context + hooks (no external state lib)
+- **Push Notifications**: Firebase Cloud Messaging (FCM) via `@react-native-firebase/messaging` + `expo-notifications`
 
 ---
 
@@ -213,6 +214,79 @@ Edit `src/constants/theme.ts` → `Palette`, `Colors`, `Spacing`, `Radius`
 - Likes: `toggleLike(matchId, userId, like)` in `matches.ts`
 - Comments: `fetchComments` / `addComment` in `matches.ts`
 - Optimistic UI: update local state → call API → revert on error
+
+---
+
+## Push Notifications (FCM)
+
+### Overview
+Push notifications implemented using Firebase Cloud Messaging (FCM) with Expo Notifications.
+
+### Notification Types
+1. **match_pending** - Match needs approval (sent to opponent)
+2. **match_approved** - Match was approved by opponent
+3. **match_rejected** - Match was disputed/rejected
+4. **match_liked** - Someone liked your match
+5. **match_commented** - Someone commented on your match
+
+### Implementation Files
+- `src/services/fcm.ts` - Core FCM service (token management, listeners, scheduling)
+- `src/hooks/useFCM.ts` - React hook for FCM initialization and permissions
+- `src/services/profiles.ts` - Profile CRUD + notification preferences + FCM token management
+- `supabase/functions/send-notification/index.ts` - Edge Function for sending notifications
+- `supabase/migrations/add_fcm_to_profiles.sql` - Database migration
+
+### Database Schema Updates
+```sql
+profiles
+  ...
+  fcm_tokens (text[]) - Array of FCM device tokens
+  notification_preferences (jsonb) - User preferences per notification type
+```
+
+### Key Services
+```ts
+// fcm.ts
+registerForPushNotificationsAsync() // Get FCM token + request permissions
+saveFCMTokenToProfile(userId, token) // Store token in Supabase
+setupNotificationListeners() // Foreground/background handlers
+scheduleLocalNotification() // For testing
+
+// profiles.ts
+updateNotificationPreferences(userId, prefs) // Update user notification settings
+addFCMToken(userId, token) // Add token to user profile
+removeFCMToken(userId, token) // Remove token on logout
+```
+
+### Usage
+```tsx
+// In _layout.tsx or root component
+import { useFCM } from '@/hooks/useFCM';
+
+export default function RootLayout() {
+  const { initialize } = useFCM();
+  useEffect(() => { initialize(); }, []);
+  // ...
+}
+```
+
+### Testing
+```tsx
+const { sendTestNotification } = useFCM();
+sendTestNotification('match_liked'); // Sends test notification
+```
+
+### Firebase Console Setup
+1. Create Firebase project
+2. Add iOS/Android apps with bundle IDs
+3. Download `GoogleService-Info.plist` (iOS) and `google-services.json` (Android)
+4. Place in project root
+5. Configure APNs key in Firebase Console for iOS
+6. Build with EAS: `eas build --platform all`
+
+### Required Environment
+- `EXPO_PUBLIC_FIREBASE_API_KEY` (optional, for web)
+- Firebase project with Cloud Messaging enabled
 
 ---
 

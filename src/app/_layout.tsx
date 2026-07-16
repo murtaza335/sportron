@@ -1,12 +1,13 @@
+import * as Font from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import * as Font from 'expo-font';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { useFCM } from '@/hooks/useFCM';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -85,6 +86,8 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const { initialize } = useFCM();
+  useEffect(() => { initialize(); }, []);
   return (
     <ThemeProvider>
       <AuthProvider>
