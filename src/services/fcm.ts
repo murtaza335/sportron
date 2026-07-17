@@ -1,7 +1,8 @@
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
-import messaging from '@react-native-firebase/messaging';
+import messaging, { FirebaseMessagingTypes } from '@react-native-firebase/messaging';
 import { supabase } from '@/lib/supabase';
+import { PermissionStatus } from 'expo-modules-core';
 
 export type NotificationType =
   | 'match_pending'
@@ -29,7 +30,7 @@ Notifications.setNotificationHandler({
 });
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
-  let finalStatus: Notifications.PermissionStatus = 'denied';
+  let finalStatus: PermissionStatus = PermissionStatus.DENIED;
 
   if (Platform.OS === 'android') {
     await Notifications.setNotificationChannelAsync('default', {
@@ -37,7 +38,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       importance: Notifications.AndroidImportance.MAX,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#000000',
-      sound: 'default',
     });
 
     await Notifications.setNotificationChannelAsync('match-updates', {
@@ -45,7 +45,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
       importance: Notifications.AndroidImportance.HIGH,
       vibrationPattern: [0, 250, 250, 250],
       lightColor: '#000000',
-      sound: 'default',
     });
   }
 
@@ -56,7 +55,6 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
         allowAlert: true,
         allowBadge: true,
         allowSound: true,
-        allowAnnouncements: true,
       },
       android: {
         allowAlert: true,
@@ -161,13 +159,13 @@ export function setupNotificationListeners(
 }
 
 export async function setupBackgroundMessageHandler(): Promise<void> {
-  messaging().setBackgroundMessageHandler(async (remoteMessage) => {
+  messaging().setBackgroundMessageHandler(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
     console.log('Background message received:', remoteMessage);
   });
 }
 
 export function setupForegroundMessageHandler(
-  onMessage: (remoteMessage: messaging.RemoteMessage) => void
+  onMessage: (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => void
 ): () => void {
   const unsubscribe = messaging().onMessage(onMessage);
   return unsubscribe;
@@ -194,17 +192,19 @@ export async function scheduleLocalNotification(
     content: {
       title,
       body,
-      data,
-      sound: 'default',
+      data: data as Record<string, unknown> | undefined,
+      sound: true,
     },
     trigger: null,
   });
 }
 
 export function parseNotificationData(notification: Notifications.Notification): NotificationData | null {
-  return notification.request.content.data as NotificationData || null;
+  const data = notification.request.content.data as NotificationData | undefined;
+  return data ?? null;
 }
 
 export function parseNotificationResponseData(response: Notifications.NotificationResponse): NotificationData | null {
-  return response.notification.request.content.data as NotificationData || null;
+  const data = response.notification.request.content.data as NotificationData | undefined;
+  return data ?? null;
 }

@@ -19,6 +19,25 @@ export type Profile = {
   updated_at: string;
 };
 
+export type GuestProfile = {
+  id: string;
+  display_name: string;
+  role: string;
+  isGuest: true;
+  bio: null;
+  avatar_url: null;
+  fcm_tokens: string[];
+  notification_preferences: {
+    match_pending: boolean;
+    match_approved: boolean;
+    match_rejected: boolean;
+    match_liked: boolean;
+    match_commented: boolean;
+  };
+  created_at: string;
+  updated_at: string;
+};
+
 export type Match = {
   id: string;
   created_by: string;
