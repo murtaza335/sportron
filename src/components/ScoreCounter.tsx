@@ -30,7 +30,7 @@ export function ScoreCounter({ label, score, onIncrement, onDecrement, onScorePr
         message,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Set', onPress: (value) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
+          { text: 'Set', onPress: (value: string | undefined) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
         ],
         'plain-text',
         defaultValue,
@@ -43,7 +43,7 @@ export function ScoreCounter({ label, score, onIncrement, onDecrement, onScorePr
         message,
         [
           { text: 'Cancel', style: 'cancel' },
-          { text: 'Set', onPress: (value) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
+          { text: 'Set', onPress: (value: string | undefined) => { const n = parseInt(value ?? '', 10); if (!isNaN(n) && n >= 0) onScoreChange(n); } },
         ],
         'plain-text',
         defaultValue

@@ -7,7 +7,7 @@ import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
-import { useFCM } from '@/hooks/useFCM';
+import { FCMInitializer } from '@/components/FCMInitializer';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -68,6 +68,7 @@ function RootNavigator() {
 
   return (
     <>
+      <FCMInitializer />
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="login" />
@@ -81,13 +82,12 @@ function RootNavigator() {
           }}
         />
       </Stack>
+      <FCMInitializer />
     </>
   );
 }
 
 export default function RootLayout() {
-  const { initialize } = useFCM();
-  useEffect(() => { initialize(); }, []);
   return (
     <ThemeProvider>
       <AuthProvider>

@@ -23,12 +23,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { createMatch } from '@/services/matches';
 import { fetchAllProfiles } from '@/services/profiles';
-import type { MatchFormat, Profile } from '@/types';
+import type { MatchFormat, Profile, GuestProfile } from '@/types';
 
 type SelectionState = {
-  playerPartner: Profile | null;
-  opponent: Profile | null;
-  opponentPartner: Profile | null;
+  playerPartner: Profile | GuestProfile | null;
+  opponent: Profile | GuestProfile | null;
+  opponentPartner: Profile | GuestProfile | null;
 };
 
 export default function AddMatchScreen() {
