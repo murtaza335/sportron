@@ -1,13 +1,14 @@
 import { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import * as ImagePicker from 'expo-image-picker';
+import Svg, { Circle } from 'react-native-svg';
 
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { UserRole } from '@/types';
-import { uploadImageFromUri } from '@/lib/cloudinary';
+import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
 
 type ProfileFormProps = {
   initialName?: string;
@@ -34,6 +35,7 @@ export function ProfileForm({
   const [role, setRole] = useState<UserRole>(initialRole);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
   const canSubmit = displayName.trim().length > 0;
 
@@ -53,9 +55,12 @@ export function ProfileForm({
 
     if (!result.canceled && result.assets[0]) {
       setUploadingAvatar(true);
+      setUploadProgress({ loaded: 0, total: 0, percentage: 0 });
       try {
         const uri = result.assets[0].uri;
-        const uploadedUrl = await uploadImageFromUri(uri);
+        const uploadedUrl = await uploadImageFromUri(uri, (progress) => {
+          setUploadProgress(progress);
+        });
         if (uploadedUrl) {
           setAvatarUrl(uploadedUrl);
         } else {
@@ -66,6 +71,7 @@ export function ProfileForm({
         Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
       } finally {
         setUploadingAvatar(false);
+        setUploadProgress(null);
       }
     }
   };
@@ -88,11 +94,30 @@ export function ProfileForm({
                   resizeMode="cover"
                 />
               </View>
-              {uploadingAvatar && (
-                <View style={styles.avatarOverlay}>
-                  <ThemedText variant="caption" style={{ color: theme.background }}>
-                    Uploading...
-                  </ThemedText>
+              {uploadingAvatar && uploadProgress && (
+                <View style={styles.circularProgressContainer}>
+                  <Svg width="100" height="100">
+                    <Circle
+                      cx="50"
+                      cy="50"
+                      r="45"
+                      stroke="rgba(255,255,255,0.3)"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <Circle
+                      cx="50"
+                      cy="50"
+                      r="45"
+                      stroke="#10B981"
+                      strokeWidth="4"
+                      fill="none"
+                      strokeDasharray={2 * Math.PI * 45}
+                      strokeDashoffset={2 * Math.PI * 45 * (1 - uploadProgress.percentage / 100)}
+                      strokeLinecap="round"
+                      transform="rotate(-90, 50, 50)"
+                    />
+                  </Svg>
                 </View>
               )}
             </>
@@ -242,16 +267,14 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 50,
   },
-  avatarOverlay: {
+  circularProgressContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
     justifyContent: 'center',
-    borderRadius: 50,
+    alignItems: 'center',
   },
   avatarActions: {
     flexDirection: 'row',
