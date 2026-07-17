@@ -42,10 +42,14 @@ export async function uploadImageFromUri(
       
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable && onProgress) {
+          // Safeguard against event.total being 0, which results in NaN
+          const total = event.total > 0 ? event.total : 1;
+          const percentage = Math.max(0, Math.min(100, Math.round((event.loaded / total) * 100)));
+          
           onProgress({
             loaded: event.loaded,
             total: event.total,
-            percentage: Math.round((event.loaded / event.total) * 100),
+            percentage,
           });
         }
       });
