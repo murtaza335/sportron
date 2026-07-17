@@ -33,7 +33,7 @@ export default function ProfileScreen() {
         displayName: data.displayName,
         bio: data.bio,
         role: data.role,
-        avatarUrl: data.avatarUrl ?? undefined,
+        avatarUrl: data.avatarUrl ?? null,
       });
       await refreshProfile();
       setEditing(false);
