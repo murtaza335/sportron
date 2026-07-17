@@ -27,7 +27,7 @@ export default function OnboardingScreen() {
         displayName: data.displayName,
         bio: data.bio,
         role: data.role,
-        avatarUrl: data.avatarUrl ?? null,
+        avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();
       router.replace('/');

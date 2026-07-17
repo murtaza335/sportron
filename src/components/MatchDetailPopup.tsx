@@ -236,7 +236,7 @@ Animated.spring(translateY, {
     if (!match) return;
     setUpdatingStatus(true);
     try {
-      await updateMatchVerificationStatus(match.id, status);
+      await updateMatchVerificationStatus(match.id, status, currentUserId!);
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch (error) {

@@ -96,3 +96,21 @@ export type MatchStats = {
   wins: number;
   losses: number;
 };
+
+export type NotificationType =
+  | 'match_pending'
+  | 'match_approved'
+  | 'match_rejected'
+  | 'match_liked'
+  | 'match_commented';
+
+export type InAppNotification = {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
+};
