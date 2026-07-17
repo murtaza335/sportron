@@ -1,14 +1,14 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
 import Svg, { Circle } from 'react-native-svg';
 
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { UserRole } from '@/types';
 import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
+import type { UserRole } from '@/types';
 
 type ProfileFormProps = {
   initialName?: string;
@@ -19,6 +19,10 @@ type ProfileFormProps = {
   loading?: boolean;
   onSubmit: (data: { displayName: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
 };
+
+// Extracted for clean SVG math
+const RING_RADIUS = 52;
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export function ProfileForm({
   initialName = '',
@@ -42,7 +46,7 @@ export function ProfileForm({
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos to upload a profile picture.');
+      Alert.alert('Permission required', 'Please grant permission to access your photos.');
       return;
     }
 
@@ -54,20 +58,28 @@ export function ProfileForm({
     });
 
     if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      const previousAvatarUrl = avatarUrl;
+      
+      // Optimistic UI: Show the local image immediately so the progress ring has a truthy condition to render over
+      setAvatarUrl(uri);
       setUploadingAvatar(true);
       setUploadProgress({ loaded: 0, total: 0, percentage: 0 });
+
       try {
-        const uri = result.assets[0].uri;
         const uploadedUrl = await uploadImageFromUri(uri, (progress) => {
           setUploadProgress(progress);
         });
+        
         if (uploadedUrl) {
-          setAvatarUrl(uploadedUrl);
+          setAvatarUrl(uploadedUrl); // Replace local URI with the remote Cloudinary URL
         } else {
+          setAvatarUrl(previousAvatarUrl); // Revert on failure
           Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
         }
       } catch (error) {
         console.error('Avatar upload failed:', error);
+        setAvatarUrl(previousAvatarUrl); // Revert on failure
         Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
       } finally {
         setUploadingAvatar(false);
@@ -82,7 +94,6 @@ export function ProfileForm({
 
   return (
     <View style={styles.container}>
-      {/* Avatar Section */}
       <View style={styles.avatarSection}>
         <View style={styles.avatarContainer}>
           {avatarUrl ? (
@@ -96,26 +107,27 @@ export function ProfileForm({
               </View>
               {uploadingAvatar && uploadProgress && (
                 <View style={styles.circularProgressContainer}>
-                  <Svg width="100" height="100">
+                  {/* Container is 108x108. Center is 54,54. Radius 52 fits perfectly around the 100x100 avatar. */}
+                  <Svg width="108" height="108">
                     <Circle
-                      cx="50"
-                      cy="50"
-                      r="45"
+                      cx="54"
+                      cy="54"
+                      r={RING_RADIUS}
                       stroke="rgba(255,255,255,0.3)"
                       strokeWidth="4"
                       fill="none"
                     />
                     <Circle
-                      cx="50"
-                      cy="50"
-                      r="45"
+                      cx="54"
+                      cy="54"
+                      r={RING_RADIUS}
                       stroke="#10B981"
                       strokeWidth="4"
                       fill="none"
-                      strokeDasharray={2 * Math.PI * 45}
-                      strokeDashoffset={2 * Math.PI * 45 * (1 - uploadProgress.percentage / 100)}
+                      strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                      strokeDashoffset={CIRCUMFERENCE * (1 - Math.max(0, uploadProgress.percentage) / 100)}
                       strokeLinecap="round"
-                      transform="rotate(-90, 50, 50)"
+                      transform="rotate(-90, 54, 54)"
                     />
                   </Svg>
                 </View>
@@ -155,7 +167,6 @@ export function ProfileForm({
           )}
         </View>
       </View>
-
       <View style={styles.field}>
         <ThemedText variant="label" muted>
           Name
