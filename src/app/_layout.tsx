@@ -81,8 +81,15 @@ function RootNavigator() {
             animation: 'slide_from_bottom',
           }}
         />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: true,
+            title: 'Notifications',
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack>
-      <FCMInitializer />
     </>
   );
 }

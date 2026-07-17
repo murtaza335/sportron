@@ -7,7 +7,6 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Clock } from 'lucide-react-native';
 
 import { MatchCard } from '@/components/MatchCard';
@@ -38,12 +37,8 @@ export default function HistoryScreen() {
   );
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+    <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText variant="title">History</ThemedText>
-        </View>
-
         <View style={styles.filterRow}>
           <ThemedText variant="caption" muted style={styles.filterLabel}>
             Filter
@@ -111,7 +106,7 @@ export default function HistoryScreen() {
         currentUserId={user?.id}
         onRefreshFeed={refresh}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -127,12 +122,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     gap: Spacing.md,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: Spacing.xs,
   },
   filterRow: {
     gap: Spacing.sm,

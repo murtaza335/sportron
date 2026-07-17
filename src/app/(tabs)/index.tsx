@@ -2,7 +2,6 @@ import { useFocusEffect, useRouter } from 'expo-router';
 import { Clock, Plus, Target, TrendingUp, Trophy } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Card } from '@/components/ui/Card';
@@ -44,7 +43,7 @@ function StatBlock({
 export default function HomeScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { user, profile } = useAuth();
+  const { user } = useAuth();
   const { stats, loading, refresh } = useMatchStats(user?.id);
 
   const [pendingMatches, setPendingMatches] = useState<MatchWithProfiles[]>([]);
@@ -71,14 +70,8 @@ export default function HomeScreen() {
   const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+    <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
-        <View style={styles.header}>
-          <ThemedText variant="caption" muted>
-            Welcome back
-          </ThemedText>
-          <ThemedText variant="title">{profile?.display_name ?? 'Player'}</ThemedText>
-        </View>
 
         {pendingMatches.length > 0 && (
           <View style={styles.pendingSection}>
@@ -192,7 +185,7 @@ export default function HomeScreen() {
           refresh();
         }}
       />
-    </SafeAreaView>
+    </View>
   );
 }
 
@@ -206,10 +199,6 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: Spacing.lg,
-  },
-  header: {
-    paddingTop: Spacing.lg,
-    gap: Spacing.xs,
   },
   statsSection: {
     marginTop: Spacing.xl,

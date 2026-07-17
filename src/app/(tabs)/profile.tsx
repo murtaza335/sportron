@@ -1,6 +1,5 @@
 import { useState } from 'react';
 import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
 import { Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
@@ -33,7 +32,7 @@ export default function ProfileScreen() {
         displayName: data.displayName,
         bio: data.bio,
         role: data.role,
-        avatarUrl: data.avatarUrl ?? null,
+        avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();
       setEditing(false);
@@ -58,10 +57,8 @@ export default function ProfileScreen() {
   };
 
   return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+    <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content}>
-        <ThemedText variant="title">Profile</ThemedText>
-
         {!editing ? (
           <View style={styles.summary}>
             <View style={styles.avatarContainer}>
@@ -195,7 +192,7 @@ export default function ProfileScreen() {
           onPress={handleSignOut}
         />
       </ScrollView>
-    </SafeAreaView>
+    </View>
   );
 }
 
