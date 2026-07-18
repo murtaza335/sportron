@@ -38,7 +38,7 @@ export function OpponentSelector({
       return profiles;
     }
     return profiles.filter((profile) =>
-      profile.display_name.toLowerCase().includes(normalized),
+      profile.username.toLowerCase().includes(normalized),
     );
   }, [profiles, query]);
 
@@ -98,7 +98,7 @@ export function OpponentSelector({
               ]}>
               <View>
                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                  {item.display_name}
+                  {item.username}
                 </ThemedText>
                 <ThemedText variant="caption" muted>
                   {item.role}

@@ -17,7 +17,7 @@ function HomeHeaderTitle() {
         Welcome back
       </Text>
       <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 }}>
-        {profile?.display_name ?? 'Player'}
+        {profile?.username ?? 'Player'}
       </Text>
     </View>
   );

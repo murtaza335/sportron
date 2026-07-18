@@ -72,7 +72,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSave = async (data: { displayName: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
+  const handleSave = async (data: { username: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
     if (!profile?.id) {
       return;
     }
@@ -81,7 +81,7 @@ export default function ProfileScreen() {
 
     try {
       await updateProfile(profile.id, {
-        displayName: data.displayName,
+        username: data.username,
         bio: data.bio,
         role: data.role,
         avatarUrl: data.avatarUrl ?? undefined,
@@ -123,7 +123,7 @@ export default function ProfileScreen() {
               ) : (
                 <View style={[styles.avatar, { backgroundColor: theme.text }]}>
                   <ThemedText variant="hero" style={{ color: theme.background }}>
-                    {profile?.display_name?.charAt(0)?.toUpperCase() ?? '?'}
+                    {profile?.username?.charAt(0)?.toUpperCase() ?? '?'}
                   </ThemedText>
                 </View>
               )}
@@ -135,7 +135,7 @@ export default function ProfileScreen() {
                 <Pencil size={14} color={theme.background} />
               </Pressable>
             </View>
-            <ThemedText variant="heading" style={styles.name}>{profile?.display_name}</ThemedText>
+            <ThemedText variant="heading" style={styles.name}>{profile?.username}</ThemedText>
             <ThemedText variant="caption" muted style={styles.role}>
               {profile?.role}
             </ThemedText>
@@ -147,7 +147,7 @@ export default function ProfileScreen() {
           </View>
         ) : (
           <ProfileForm
-            initialName={profile?.display_name}
+            initialName={profile?.username}
             initialBio={profile?.bio ?? ''}
             initialRole={profile?.role}
             initialAvatar={profile?.avatar_url ?? null}

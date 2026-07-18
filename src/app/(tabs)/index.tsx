@@ -112,7 +112,7 @@ export default function HomeScreen() {
                     <Clock size={12} color="#D97706" />
                   </View>
                   <ThemedText variant="body" style={styles.pendingTeamText} numberOfLines={1}>
-                    vs {match.player?.display_name ?? 'Player'}
+                    vs {match.player?.username ?? 'Player'}
                   </ThemedText>
                   <ThemedText variant="caption" style={styles.pendingScoreText} muted>
                     Score: {match.player_score} – {match.opponent_score}

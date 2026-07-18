@@ -132,7 +132,7 @@ export function useFCM() {
       type,
       matchId: 'test-match-id',
       senderId: user.id,
-      senderName: profile?.display_name || 'Test User',
+      senderName: profile?.username || 'Test User',
     };
 
     const notificationTitles: Record<NotificationType, string> = {
@@ -147,8 +147,8 @@ export function useFCM() {
       match_pending: 'A match needs your approval',
       match_approved: 'Your match has been approved!',
       match_rejected: 'Your match was disputed',
-      match_liked: `${profile?.display_name || 'Someone'} liked your match`,
-      match_commented: `${profile?.display_name || 'Someone'} commented on your match`,
+      match_liked: `${profile?.username || 'Someone'} liked your match`,
+      match_commented: `${profile?.username || 'Someone'} commented on your match`,
     };
 
     await scheduleLocalNotification(

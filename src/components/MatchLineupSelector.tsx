@@ -64,11 +64,11 @@ function SlotCard({
     <>
       <View style={[styles.avatar, { backgroundColor: theme.text }]}>
         <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-          {getInitials(profile.display_name) || '?'}
+          {getInitials(profile.username) || '?'}
         </ThemedText>
       </View>
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
-        {profile.display_name}
+        {profile.username}
       </ThemedText>
       {showRole ? (
         <ThemedText variant="caption" muted>
@@ -163,14 +163,14 @@ export function MatchLineupSelector({
         return true;
       }
 
-      return profile.display_name.toLowerCase().includes(normalized);
+      return profile.username.toLowerCase().includes(normalized);
     });
 
     // Add "Guest" option for partner and opponent slots
     if (activeSlot === 'playerPartner' || activeSlot === 'opponent' || activeSlot === 'opponentPartner') {
       const guestProfile: GuestProfile = {
         id: `guest-${activeSlot}`,
-        display_name: 'Guest',
+        username: 'Guest',
         role: 'student' as UserRole,
         isGuest: true,
         bio: null,
@@ -222,7 +222,7 @@ export function MatchLineupSelector({
               label="Player 1 (You)"
               profile={{
                 id: 'current-user',
-                display_name: currentUserName,
+                username: currentUserName,
                 bio: null,
                 role: 'student',
                 avatar_url: null,
@@ -363,12 +363,12 @@ export function MatchLineupSelector({
                     ]}>
                     <View style={[styles.avatarSmall, { backgroundColor: isGuest ? '#6B7280' : theme.text }]}>
                       <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {isGuest ? '+' : (getInitials(item.display_name) || '?')}
+                        {isGuest ? '+' : (getInitials(item.username) || '?')}
                       </ThemedText>
                     </View>
                     <View style={styles.playerMeta}>
                       <ThemedText variant="body" style={styles.playerName}>
-                        {item.display_name}
+                        {item.username}
                       </ThemedText>
                       <ThemedText variant="caption" muted>
                         {isGuest ? 'Add unregistered player' : item.role}
