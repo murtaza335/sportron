@@ -1,6 +1,6 @@
-import { useState } from 'react';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import { Sun, Moon, Palette, X, Check } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Bell, Cog, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { Button } from '@/components/ui/Button';
@@ -9,24 +9,51 @@ import { ThemedText } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { signOut } from '@/services/auth';
-import { updateProfile } from '@/services/profiles';
+import { updateProfile, removeFCMToken } from '@/services/profiles';
 import { useTheme } from '@/hooks/use-theme';
+import { useFCM } from '@/hooks/useFCM';
+import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import messaging from '@react-native-firebase/messaging';
 
 export default function ProfileScreen() {
   const theme = useTheme();
   const { colorScheme, setTheme } = useTheme();
-  const { profile, refreshProfile } = useAuth();
+  const { profile, refreshProfile, user } = useAuth();
+  const { requestPermissions } = useFCM();
   const [editing, setEditing] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
+
+  useEffect(() => {
+    AsyncStorage.getItem('notifications-enabled').then((val) => {
+      if (val !== null) setNotificationsEnabled(val === 'true');
+    });
+  }, []);
+
+  const handleNotificationsToggle = async (value: boolean) => {
+    setNotificationsEnabled(value);
+    await AsyncStorage.setItem('notifications-enabled', String(value));
+    if (value) {
+      await requestPermissions();
+    } else if (user?.id) {
+      try {
+        const token = await messaging().getToken();
+        if (token) {
+          await removeFCMToken(user.id, token);
+        }
+      } catch {
+        // silently fail — token might not exist yet
+      }
+    }
+  };
 
   const handleSave = async (data: { displayName: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
     if (!profile?.id) {
       return;
     }
 
-    setSaving(true);
     try {
       await updateProfile(profile.id, {
         displayName: data.displayName,
@@ -39,8 +66,6 @@ export default function ProfileScreen() {
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not update profile';
       Alert.alert('Update failed', message);
-    } finally {
-      setSaving(false);
     }
   };
 
@@ -97,7 +122,6 @@ export default function ProfileScreen() {
             initialRole={profile?.role}
             initialAvatar={profile?.avatar_url ?? null}
             submitLabel="Save changes"
-            loading={saving}
             onSubmit={handleSave}
           />
         )}
@@ -182,6 +206,39 @@ export default function ProfileScreen() {
             </View>
           </Modal>
         )}
+
+        <Divider spacing={Spacing.xl} />
+
+        <ThemedText variant="label" muted style={styles.sectionTitle}>
+          Notifications
+        </ThemedText>
+
+        <Card style={styles.settingCard}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]}>
+              <Bell size={22} color={theme.text} />
+            </View>
+            <View style={styles.settingContent}>
+              <ThemedText variant="body">Push Notifications</ThemedText>
+              <ThemedText variant="caption" muted>
+                {notificationsEnabled ? 'Enabled' : 'Disabled'}
+              </ThemedText>
+            </View>
+            <Switch
+              value={notificationsEnabled}
+              onValueChange={handleNotificationsToggle}
+              trackColor={{ false: theme.border, true: theme.text }}
+              thumbColor={theme.background}
+            />
+          </View>
+        </Card>
+
+        <Button
+          label="Advanced Settings"
+          variant="ghost"
+          icon={<Cog size={18} color={theme.text} />}
+          onPress={() => router.navigate('/settings')}
+        />
 
         <Divider spacing={Spacing.xl} />
 

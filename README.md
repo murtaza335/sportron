@@ -1,56 +1,130 @@
-# Welcome to your Expo app 👋
+# T3Seecs - Table Tennis Match Tracking App
 
-This is an [Expo](https://expo.dev) project created with [`create-expo-app`](https://www.npmjs.com/package/create-expo-app).
+**Expo + Supabase + TypeScript** mobile app for tracking table tennis matches with social features.
 
-## Get started
+## Features
+
+### Match Tracking
+- Singles (1v1) and Doubles (2v2) match formats
+- Team builder with visual slot cards
+- Player picker with search + guest player free-text
+- Score counter (+/-) with minimum 0
+- Match visibility (public / private)
+- Match approval workflow (pending → verified / disputed)
+
+### Match History
+- Global feed of public matches + personal match history
+- Pull-to-refresh with auto-refresh on tab focus
+- Match cards showing teams, score, format badges, and win/loss/draw
+- Social: Like (heart) and comment count with optimistic UI
+- Bottom sheet details with full match info + comments thread
+
+### Home Dashboard
+- Stats cards: Total matches, Wins, Losses
+- Quick "Add Match" button
+
+### Authentication
+- Google OAuth via Supabase
+- Auto profile creation on first login → onboarding flow
+
+### Profile & Settings
+- Profile view/edit (name, bio, role, avatar)
+- Theme picker (Light / Dark / System)
+- **Push notification master toggle** (on/off)
+- **Advanced Settings page** with per-type notification preferences:
+  - Match Pending
+  - Match Approved
+  - Match Rejected
+  - Likes
+  - Comments
+
+### Notifications
+- Firebase Cloud Messaging (FCM) push notifications
+- Real-time in-app notification updates via Supabase Realtime
+- Notification list with mark-read, mark-all-read, and delete
+- Per-type notification preferences persisted to Supabase
+
+## Tech Stack
+
+- **Framework**: Expo Router (v57) with React Native 0.86
+- **Backend**: Supabase (PostgreSQL + Auth + Realtime + Edge Functions)
+- **Language**: TypeScript (strict)
+- **Styling**: Custom theme system with light/dark mode, CSS-in-JS (StyleSheet)
+- **Auth**: Google OAuth via Supabase
+- **Push Notifications**: Firebase Cloud Messaging (FCM) via `@react-native-firebase/messaging` + `expo-notifications`
+
+## Project Structure
+
+```
+src/
+├── app/                    # Expo Router file-based routing
+│   ├── _layout.tsx         # Root stack + auth gating
+│   ├── login.tsx           # Google OAuth login
+│   ├── onboarding.tsx      # Profile setup after first login
+│   ├── add-match.tsx       # Match creation modal
+│   ├── notifications.tsx   # In-app notification list
+│   ├── settings.tsx        # App settings (notification preferences, about)
+│   ├── (tabs)/
+│   │   ├── _layout.tsx     # 3 tabs: Home / History / Profile
+│   │   ├── index.tsx       # Home - stats + add match button
+│   │   ├── history.tsx     # Match feed with Global/My tabs
+│   │   └── profile.tsx     # Profile view/edit + notification master toggle + sign out
+├── components/
+│   ├── MatchCard.tsx       # Match list card with likes/comments
+│   ├── MatchDetailPopup.tsx # Bottom sheet with full details + comments
+│   ├── MatchLineupSelector.tsx # Visual team builder for add-match
+│   ├── OpponentSelector.tsx    # Player search + guest picker
+│   ├── ProfileForm.tsx     # Name/bio/role form
+│   ├── ScoreCounter.tsx    # +/- score input
+│   ├── PrivacyToggle.tsx   # Public/private toggle
+│   └── ui/                 # Reusable UI primitives
+├── contexts/
+│   ├── AuthContext.tsx     # Supabase auth + profile state
+│   └── ThemeContext.tsx    # Theme provider with light/dark/system
+├── hooks/
+│   ├── useMatches.ts       # Fetch global/my matches
+│   ├── useMatchStats.ts    # Win/loss stats
+│   ├── use-theme.ts        # Theme context wrapper
+│   ├── use-color-scheme.ts # System theme detection
+│   ├── useFCM.ts           # FCM initialization and permissions
+│   └── useNotifications.ts # In-app notification state + realtime
+├── services/
+│   ├── auth.ts             # Google OAuth flow
+│   ├── matches.ts          # CRUD + likes + comments + stats
+│   ├── profiles.ts         # Profile CRUD + notification prefs + FCM token management
+│   ├── fcm.ts              # Core FCM service (token, listeners, scheduling)
+│   └── notifications.ts    # Push notification dispatch helpers
+├── lib/
+│   └── supabase.ts         # Supabase client (AsyncStorage/web fallback)
+├── types/
+│   └── index.ts            # Shared TypeScript types
+└── constants/theme.ts      # Design tokens (colors, spacing, radius)
+```
+
+## Getting Started
 
 1. Install dependencies
-
    ```bash
    npm install
    ```
 
-2. Start the app
+2. Copy `.env.example` to `.env` and fill in your Supabase credentials:
+   ```
+   EXPO_PUBLIC_SUPABASE_URL=...
+   EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+   ```
 
+3. Start the app
    ```bash
    npx expo start
    ```
 
-In the output, you'll find options to open the app in a
-
-- [development build](https://docs.expo.dev/develop/development-builds/introduction/)
-- [Android emulator](https://docs.expo.dev/workflow/android-studio-emulator/)
-- [iOS simulator](https://docs.expo.dev/workflow/ios-simulator/)
-- [Expo Go](https://expo.dev/go), a limited sandbox for trying out app development with Expo
-
-You can start developing by editing the files inside the **app** directory. This project uses [file-based routing](https://docs.expo.dev/router/introduction).
-
-## Get a fresh project
-
-When you're ready, run:
+## Development Commands
 
 ```bash
-npm run reset-project
+npm start          # Expo dev server
+npm run android    # Android emulator
+npm run ios        # iOS simulator
+npm run web        # Web build
+npm run lint       # Expo lint (ESLint)
 ```
-
-This command will move the starter code to the **app-example** directory and create a blank **app** directory where you can start developing.
-
-### Other setup steps
-
-- To set up ESLint for linting, run `npx expo lint`, or follow our guide on ["Using ESLint and Prettier"](https://docs.expo.dev/guides/using-eslint/)
-- If you'd like to set up unit testing, follow our guide on ["Unit Testing with Jest"](https://docs.expo.dev/develop/unit-testing/)
-- Learn more about the TypeScript setup in this template in our guide on ["Using TypeScript"](https://docs.expo.dev/guides/typescript/)
-
-## Learn more
-
-To learn more about developing your project with Expo, look at the following resources:
-
-- [Expo documentation](https://docs.expo.dev/): Learn fundamentals, or go into advanced topics with our [guides](https://docs.expo.dev/guides).
-- [Learn Expo tutorial](https://docs.expo.dev/tutorial/introduction/): Follow a step-by-step tutorial where you'll create a project that runs on Android, iOS, and the web.
-
-## Join the community
-
-Join our community of developers creating universal apps.
-
-- [Expo on GitHub](https://github.com/expo/expo): View our open source platform and contribute.
-- [Discord community](https://chat.expo.dev): Chat with Expo users and ask questions.
