@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Alert, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useEffect, useMemo, useState } from 'react';
+import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { Bell, Cog, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
@@ -25,6 +25,17 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
+  const slideAnim = useMemo(() => new Animated.Value(0), []);
+
+  useEffect(() => {
+    if (showThemeModal) {
+      slideAnim.setValue(0);
+      Animated.spring(slideAnim, {
+        toValue: 1,
+        useNativeDriver: true,
+      }).start();
+    }
+    }, [showThemeModal, slideAnim]);
 
   useEffect(() => {
     AsyncStorage.getItem('notifications-enabled').then((val) => {
@@ -163,15 +174,30 @@ export default function ProfileScreen() {
         {/* Theme Modal - Slide from Bottom */}
         {showThemeModal && (
           <Modal
-            animationType="slide"
-            presentationStyle="formSheet"
+            animationType="none"
             transparent
             visible={showThemeModal}
             onRequestClose={() => setShowThemeModal(false)}
           >
             <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowThemeModal(false)} />
-            <View style={[styles.modalBackdrop, { backgroundColor: 'rgba(0,0,0,0.4)' }]}>
-              <View style={[styles.modalCard, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            <View style={styles.modalBackdrop}>
+              <Animated.View
+                style={[
+                  styles.modalCard,
+                  {
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                    transform: [
+                      {
+                        translateY: slideAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [400, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
                 <View style={styles.modalHeader}>
                   <ThemedText variant="label">Choose Theme</ThemedText>
                   <Pressable onPress={() => setShowThemeModal(false)} hitSlop={12}>
@@ -202,7 +228,7 @@ export default function ProfileScreen() {
                     </Pressable>
                   ))}
                 </View>
-              </View>
+              </Animated.View>
             </View>
           </Modal>
         )}
