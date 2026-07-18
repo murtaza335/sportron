@@ -9,7 +9,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { useAuth } from '@/contexts/AuthContext';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { signOut } from '@/services/auth';
-import { updateProfile, removeFCMToken } from '@/services/profiles';
+import { updateProfile, removeFCMToken, updateNotificationPreferences } from '@/services/profiles';
 import { useTheme } from '@/hooks/use-theme';
 import { useFCM } from '@/hooks/useFCM';
 import { router } from 'expo-router';
@@ -46,6 +46,18 @@ export default function ProfileScreen() {
   const handleNotificationsToggle = async (value: boolean) => {
     setNotificationsEnabled(value);
     await AsyncStorage.setItem('notifications-enabled', String(value));
+
+    if (profile?.id) {
+      try {
+        const newPrefs = value
+          ? { match_pending: true, match_approved: true, match_rejected: true, match_liked: true, match_commented: true }
+          : { match_pending: false, match_approved: false, match_rejected: false, match_liked: false, match_commented: false };
+        await updateNotificationPreferences(profile.id, newPrefs);
+      } catch {
+        // silently fail — preferences sync is best-effort
+      }
+    }
+
     if (value) {
       await requestPermissions();
     } else if (user?.id) {
@@ -65,6 +77,8 @@ export default function ProfileScreen() {
       return;
     }
 
+    setEditing(false);
+
     try {
       await updateProfile(profile.id, {
         displayName: data.displayName,
@@ -73,8 +87,8 @@ export default function ProfileScreen() {
         avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();
-      setEditing(false);
     } catch (error) {
+      setEditing(true);
       const message = error instanceof Error ? error.message : 'Could not update profile';
       Alert.alert('Update failed', message);
     }
