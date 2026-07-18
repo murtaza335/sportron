@@ -15,6 +15,7 @@ export type Profile = {
     match_liked: boolean;
     match_commented: boolean;
   };
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -34,6 +35,7 @@ export type GuestProfile = {
     match_liked: boolean;
     match_commented: boolean;
   };
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };

@@ -1,13 +1,14 @@
 import { useEffect, useState } from 'react';
 import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { Bell, BellOff, Info } from 'lucide-react-native';
+import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
 import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { removeFCMToken, updateNotificationPreferences } from '@/services/profiles';
+import { removeFCMToken, softDeleteAccount, updateNotificationPreferences } from '@/services/profiles';
+import { signOut } from '@/services/auth';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { useFCM } from '@/hooks/useFCM';
@@ -102,6 +103,37 @@ export default function SettingsScreen() {
     }
   };
 
+  const handleDeleteAccount = () => {
+    Alert.alert(
+      'Delete Account',
+      'This will permanently erase all your data except your name on existing matches. You can sign in again to re-activate your account.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (!profile?.id || !user?.id) return;
+
+            try {
+              const token = await messaging().getToken();
+              if (token) {
+                await removeFCMToken(user.id, token).catch(() => {});
+              }
+            } catch {}
+
+            try {
+              await softDeleteAccount(profile.id);
+              await signOut();
+            } catch {
+              Alert.alert('Error', 'Failed to delete account. Please try again.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
@@ -175,6 +207,35 @@ export default function SettingsScreen() {
             </ThemedText>
           </View>
         </Card>
+
+        <Divider spacing={Spacing.xl} />
+
+        <ThemedText variant="label" muted style={styles.sectionTitle}>
+          Account
+        </ThemedText>
+
+        <Card style={styles.settingCard}>
+          <View style={styles.settingRow}>
+            <View style={[styles.settingIcon, { backgroundColor: '#FEE2E2' }]}>
+              <AlertTriangle size={22} color="#DC2626" />
+            </View>
+            <View style={styles.settingContent}>
+              <ThemedText variant="body" style={{ color: '#DC2626' }}>Delete Account</ThemedText>
+              <ThemedText variant="caption" muted>
+                Permanently delete your data
+              </ThemedText>
+            </View>
+          </View>
+          <View style={styles.deleteButtonContainer}>
+            <ThemedText
+              variant="body"
+              style={styles.deleteButton}
+              onPress={handleDeleteAccount}
+            >
+              Delete My Account
+            </ThemedText>
+          </View>
+        </Card>
       </ScrollView>
     </View>
   );
@@ -219,5 +280,19 @@ const styles = StyleSheet.create({
   settingContent: {
     flex: 1,
     gap: 2,
+  },
+  deleteButtonContainer: {
+    paddingHorizontal: Spacing.md,
+    paddingBottom: Spacing.sm,
+  },
+  deleteButton: {
+    color: '#DC2626',
+    textAlign: 'center',
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderColor: '#DC2626',
+    backgroundColor: '#FEF2F2',
+    overflow: 'hidden',
   },
 });
