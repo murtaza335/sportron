@@ -1,7 +1,7 @@
 import { useFocusEffect, useRouter } from 'expo-router';
 import { Clock, Plus, Target, TrendingUp, Trophy } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Card } from '@/components/ui/Card';
@@ -49,6 +49,7 @@ export default function HomeScreen() {
   const [pendingMatches, setPendingMatches] = useState<MatchWithProfiles[]>([]);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   const loadPending = useCallback(async () => {
     if (!user?.id) return;
@@ -67,11 +68,23 @@ export default function HomeScreen() {
     }, [refresh, loadPending]),
   );
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await Promise.all([refresh(), loadPending()]);
+    setRefreshing(false);
+  }, [refresh, loadPending]);
+
   const winRate = stats.total > 0 ? Math.round((stats.wins / stats.total) * 100) : 0;
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <View style={styles.container}>
+      <ScrollView
+        style={styles.flex}
+        contentContainerStyle={styles.container}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.text} />
+        }
+      >
 
         {pendingMatches.length > 0 && (
           <View style={styles.pendingSection}>
@@ -168,7 +181,7 @@ export default function HomeScreen() {
             Add match
           </ThemedText>
         </View>
-      </View>
+      </ScrollView>
 
       <MatchDetailPopup
         match={selectedMatch}
@@ -193,8 +206,11 @@ const styles = StyleSheet.create({
   safe: {
     flex: 1,
   },
-  container: {
+  flex: {
     flex: 1,
+  },
+  container: {
+    flexGrow: 1,
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
