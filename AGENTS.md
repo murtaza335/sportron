@@ -22,11 +22,13 @@ src/
 │   ├── login.tsx           # Google OAuth login
 │   ├── onboarding.tsx      # Profile setup after first login
 │   ├── add-match.tsx       # Match creation modal
+│   ├── notifications.tsx   # In-app notification list
+│   ├── settings.tsx        # App settings (notification preferences, about)
 │   ├── (tabs)/
 │   │   ├── _layout.tsx     # 3 tabs: Home / History / Profile
 │   │   ├── index.tsx       # Home - stats + add match button
 │   │   ├── history.tsx     # Match feed with Global/My tabs
-│   │   └── profile.tsx     # Profile view/edit + sign out
+│   │   └── profile.tsx     # Profile view/edit + sign out + notification toggle
 ├── components/
 │   ├── MatchCard.tsx       # Match list card with likes/comments
 │   ├── MatchDetailPopup.tsx # Bottom sheet with full details + comments
@@ -92,6 +94,12 @@ src/
 - **Comments**: Threaded list in DetailPopup, real-time count updates
 - **Feed refresh**: `onRefreshFeed` callback propagates like/comment changes to list
 
+### 7. Settings & Notification Preferences
+- **Profile page**: Master toggle for push notifications + "Advanced Settings" link
+- **Settings page** (`/settings`): Per-type notification toggles (pending, approved, rejected, likes, comments)
+- **Master toggle**: Stored locally in AsyncStorage; toggles FCM registration on/off
+- **Per-type toggles**: Persisted to `profiles.notification_preferences` via `updateNotificationPreferences()`
+
 ---
 
 ## Data Model (Supabase)
@@ -137,6 +145,7 @@ match_comments
 
 ### Routing (expo-router v57)
 - Tabs: `/` (home), `/history`, `/profile`
+- Stack: `/notifications`, `/settings` (slide_from_right)
 - Modal: `/add-match` (fullScreenModal, slide_from_bottom)
 - Auth stack: `/login`, `/onboarding`, `/auth/callback`
 
@@ -300,5 +309,6 @@ sendTestNotification('match_liked'); // Sends test notification
 | Match detail | `src/components/MatchDetailPopup.tsx` |
 | Stats | `src/hooks/useMatchStats.ts`, `src/services/matches.ts` |
 | Profile | `src/app/(tabs)/profile.tsx`, `src/components/ProfileForm.tsx` |
+| Settings | `src/app/settings.tsx` |
 | Theme | `src/constants/theme.ts`, `src/hooks/use-theme.ts` |
 | Types | `src/types/index.ts` |
