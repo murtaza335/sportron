@@ -118,8 +118,8 @@ export default function SettingsScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={handleMasterToggle}
-              trackColor={{ false: theme.border, true: theme.text }}
-              thumbColor={theme.background}
+              trackColor={{ false: '#9CA3AF', true: '#3B82F6' }}
+              thumbColor="#F9FAFB"
             />
           </View>
         </Card>
@@ -138,8 +138,8 @@ export default function SettingsScreen() {
                 <Switch
                   value={preferences[item.type]}
                   onValueChange={(val) => handlePreferenceToggle(item.type, val)}
-                  trackColor={{ false: theme.border, true: theme.text }}
-                  thumbColor={theme.background}
+              trackColor={{ false: '#9CA3AF', true: '#3B82F6' }}
+                  thumbColor="#F9FAFB"
                   disabled={!notificationsEnabled}
                 />
               </View>
