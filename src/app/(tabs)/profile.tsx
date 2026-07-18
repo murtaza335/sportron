@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
-import { Bell, Cog, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
+import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { Button } from '@/components/ui/Button';
@@ -113,6 +113,13 @@ export default function ProfileScreen() {
                   </ThemedText>
                 </View>
               )}
+              <Pressable
+                onPress={() => setEditing(true)}
+                style={[styles.editAvatarButton, { backgroundColor: theme.text }]}
+                hitSlop={8}
+              >
+                <Pencil size={14} color={theme.background} />
+              </Pressable>
             </View>
             <ThemedText variant="heading" style={styles.name}>{profile?.display_name}</ThemedText>
             <ThemedText variant="caption" muted style={styles.role}>
@@ -123,8 +130,6 @@ export default function ProfileScreen() {
                 {profile.bio}
               </ThemedText>
             ) : null}
-
-            <Button label="Edit profile" variant="secondary" onPress={() => setEditing(true)} />
           </View>
         ) : (
           <ProfileForm
@@ -137,39 +142,26 @@ export default function ProfileScreen() {
           />
         )}
 
-        <Divider spacing={Spacing.xl} />
+        <Divider spacing={Spacing.md} />
 
-        <ThemedText variant="label" muted style={styles.sectionTitle}>
-          Appearance
-        </ThemedText>
-
-        <Card style={styles.settingCard}>
+        <View style={styles.sectionHeader}>
+          <ThemedText variant="label" muted style={styles.sectionTitle}>
+            Appearance
+          </ThemedText>
           <Pressable
             onPress={() => setShowThemeModal(true)}
-            style={({ pressed }) => [
-              styles.settingRow,
-              pressed && { backgroundColor: theme.backgroundElement },
-            ]}
+            style={[styles.sectionIcon, { backgroundColor: theme.backgroundElement }]}
             hitSlop={12}
           >
-            <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]} >
-              <Palette size={22} color={theme.text} />
-            </View>
-            <View style={styles.settingContent}>
-              <ThemedText variant="body">Theme</ThemedText>
-              <ThemedText variant="caption" muted>
-                {colorScheme === 'dark' ? 'Dark' : colorScheme === 'light' ? 'Light' : 'System'}
-              </ThemedText>
-            </View>
             {colorScheme === 'dark' ? (
-              <Moon size={22} color={theme.text} />
+              <Moon size={16} color={theme.text} />
             ) : colorScheme === 'light' ? (
-              <Sun size={22} color={theme.text} />
+              <Sun size={16} color={theme.text} />
             ) : (
-              <Palette size={22} color={theme.text} />
+              <Palette size={16} color={theme.text} />
             )}
           </Pressable>
-        </Card>
+        </View>
 
         {/* Theme Modal - Slide from Bottom */}
         {showThemeModal && (
@@ -179,8 +171,8 @@ export default function ProfileScreen() {
             visible={showThemeModal}
             onRequestClose={() => setShowThemeModal(false)}
           >
-            <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowThemeModal(false)} />
             <View style={styles.modalBackdrop}>
+              <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowThemeModal(false)} />
               <Animated.View
                 style={[
                   styles.modalCard,
@@ -233,7 +225,7 @@ export default function ProfileScreen() {
           </Modal>
         )}
 
-        <Divider spacing={Spacing.xl} />
+        <Divider spacing={Spacing.md} />
 
         <ThemedText variant="label" muted style={styles.sectionTitle}>
           Notifications
@@ -266,13 +258,19 @@ export default function ProfileScreen() {
           onPress={() => router.navigate('/settings')}
         />
 
-        <Divider spacing={Spacing.xl} />
+        <Divider spacing={Spacing.md} />
+
+        <View style={{ height: 80 }} />
 
         <Button
           label="Sign out"
           variant="ghost"
           loading={signingOut}
           onPress={handleSignOut}
+          buttonStyle={{
+            borderColor: '#DC2626',
+            backgroundColor: 'rgba(220, 38, 38, 0.08)',
+          }}
         />
       </ScrollView>
     </View>
@@ -291,7 +289,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.lg,
     paddingBottom: Spacing.xxl,
-    gap: Spacing.lg,
+    gap: Spacing.md,
   },
   summary: {
     gap: Spacing.md,
@@ -302,7 +300,6 @@ const styles = StyleSheet.create({
     width: 88,
     height: 88,
     borderRadius: 44,
-    overflow: 'hidden',
   },
   avatar: {
     width: 88,
@@ -316,6 +313,18 @@ const styles = StyleSheet.create({
     width: '100%',
     height: '100%',
     borderRadius: 44,
+  },
+  editAvatarButton: {
+    position: 'absolute',
+    bottom: 0,
+    right: 0,
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: 'transparent',
   },
   name: {
     textAlign: 'center',
@@ -331,18 +340,31 @@ const styles = StyleSheet.create({
     maxWidth: '90%',
   },
   sectionTitle: {
-    marginBottom: Spacing.xs,
     marginLeft: Spacing.sm,
   },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: 2,
+    paddingRight: Spacing.sm,
+  },
+  sectionIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   settingCard: {
-    paddingVertical: Spacing.xs,
+    paddingVertical: 0,
   },
   settingRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.xs,
   },
   settingIcon: {
     width: 36,
