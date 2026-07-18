@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateProfileInput, Profile } from '@/types';
+import type { CreateProfileInput, Profile, NotificationType } from '@/types';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -19,6 +19,7 @@ export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[
   let query = supabase
     .from('profiles')
     .select('*')
+    .is('deleted_at', null)
     .order('display_name', { ascending: true });
 
   if (excludeUserId) {
@@ -166,6 +167,44 @@ export async function removeFCMToken(userId: string, token: string): Promise<voi
   const { error } = await supabase
     .from('profiles')
     .update({ fcm_tokens: updatedTokens })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function softDeleteAccount(userId: string): Promise<void> {
+  const defaultPrefs: Record<NotificationType, boolean> = {
+    match_pending: false,
+    match_approved: false,
+    match_rejected: false,
+    match_liked: false,
+    match_commented: false,
+  };
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      bio: null,
+      avatar_url: null,
+      fcm_tokens: [],
+      notification_preferences: defaultPrefs,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function reEnableAccount(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      deleted_at: null,
+    })
     .eq('id', userId);
 
   if (error) {
