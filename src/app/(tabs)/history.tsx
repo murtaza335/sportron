@@ -60,6 +60,7 @@ export default function HistoryScreen() {
             data={matches}
             keyExtractor={(item) => item.id}
             contentContainerStyle={styles.list}
+            showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
             }
