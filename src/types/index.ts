@@ -3,7 +3,7 @@ export type MatchFormat = 'singles' | 'doubles';
 
 export type Profile = {
   id: string;
-  display_name: string;
+  username: string;
   bio: string | null;
   role: UserRole;
   avatar_url: string | null;
@@ -22,7 +22,7 @@ export type Profile = {
 
 export type GuestProfile = {
   id: string;
-  display_name: string;
+  username: string;
   role: string;
   isGuest: true;
   bio: null;
@@ -57,10 +57,10 @@ export type Match = {
 };
 
 export type MatchWithProfiles = Match & {
-  player: Pick<Profile, 'id' | 'display_name'> | null;
-  playerPartner: Pick<Profile, 'id' | 'display_name'> | null;
-  opponent: Pick<Profile, 'id' | 'display_name'> | null;
-  opponentPartner: Pick<Profile, 'id' | 'display_name'> | null;
+  player: Pick<Profile, 'id' | 'username'> | null;
+  playerPartner: Pick<Profile, 'id' | 'username'> | null;
+  opponent: Pick<Profile, 'id' | 'username'> | null;
+  opponentPartner: Pick<Profile, 'id' | 'username'> | null;
   likes_count: number;
   comments_count: number;
   is_liked_by_user: boolean;
@@ -72,7 +72,7 @@ export type MatchComment = {
   profile_id: string;
   content: string;
   created_at: string;
-  profile: Pick<Profile, 'display_name'> | null;
+  profile: Pick<Profile, 'username'> | null;
 };
 
 export type CreateMatchInput = {
@@ -87,7 +87,7 @@ export type CreateMatchInput = {
 };
 
 export type CreateProfileInput = {
-  displayName: string;
+  username: string;
   bio?: string;
   role: UserRole;
   avatarUrl?: string;

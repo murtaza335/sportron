@@ -149,7 +149,7 @@ return (
           <View style={styles.section}>
             <MatchLineupSelector
               profiles={profiles}
-              currentUserName={profile?.display_name ?? 'You'}
+              currentUserName={profile?.username ?? 'You'}
               format={matchFormat}
               selection={selection}
               onChange={(slot, selectedProfile) =>

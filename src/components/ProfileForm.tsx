@@ -17,7 +17,7 @@ type ProfileFormProps = {
   initialAvatar?: string | null;
   submitLabel?: string;
   loading?: boolean;
-  onSubmit: (data: { displayName: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
+  onSubmit: (data: { username: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
 };
 
 // Extracted for clean SVG math
@@ -34,14 +34,14 @@ export function ProfileForm({
   onSubmit,
 }: ProfileFormProps) {
   const theme = useTheme();
-  const [displayName, setDisplayName] = useState(initialName);
+  const [username, setUsername] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [role, setRole] = useState<UserRole>(initialRole);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
-  const canSubmit = displayName.trim().length > 0;
+  const canSubmit = username.trim().length > 0;
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -136,7 +136,7 @@ export function ProfileForm({
           ) : (
             <View style={[styles.avatar, { backgroundColor: theme.text }]}>
               <ThemedText variant="hero" style={{ color: theme.background }}>
-                {displayName.charAt(0)?.toUpperCase() ?? '?'}
+                {username.charAt(0)?.toUpperCase() ?? '?'}
               </ThemedText>
             </View>
           )}
@@ -169,18 +169,18 @@ export function ProfileForm({
       </View>
       <View style={styles.field}>
         <ThemedText variant="label" muted>
-          Name
+          Username
         </ThemedText>
         <TextInput
-          value={displayName}
-          onChangeText={setDisplayName}
-          placeholder="Your name"
+          value={username}
+          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+          placeholder="Your username"
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-          autoCapitalize="words"
+          autoCapitalize="none"
           autoCorrect={false}
-          textContentType="name"
-          accessibilityLabel="Display name"
+          autoComplete="off"
+          accessibilityLabel="Username"
         />
       </View>
 
@@ -240,7 +240,7 @@ export function ProfileForm({
         disabled={!canSubmit}
         onPress={() =>
           onSubmit({
-            displayName: displayName.trim(),
+            username: username.trim().toLowerCase(),
             bio: bio.trim(),
             role,
             avatarUrl,

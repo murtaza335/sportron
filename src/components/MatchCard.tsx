@@ -17,8 +17,8 @@ type MatchCardProps = {
 };
 
 function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
-  const op1 = match.opponent?.id === currentUserId ? 'You' : match.opponent?.display_name;
-  const op2 = match.opponentPartner?.id === currentUserId ? 'You' : match.opponentPartner?.display_name;
+  const op1 = match.opponent?.id === currentUserId ? 'You' : match.opponent?.username;
+  const op2 = match.opponentPartner?.id === currentUserId ? 'You' : match.opponentPartner?.username;
   const opponentNames = [op1, op2].filter(Boolean);
 
   if (opponentNames.length > 0) {
@@ -29,8 +29,8 @@ function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
 }
 
 function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
-  const p1 = match.player?.id === currentUserId ? 'You' : (match.player?.display_name ?? 'Player A');
-  const p2 = match.playerPartner?.id === currentUserId ? 'You' : match.playerPartner?.display_name;
+  const p1 = match.player?.id === currentUserId ? 'You' : (match.player?.username ?? 'Player A');
+  const p2 = match.playerPartner?.id === currentUserId ? 'You' : match.playerPartner?.username;
   return [p1, p2].filter(Boolean).join(' + ');
 }
 

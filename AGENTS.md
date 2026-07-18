@@ -107,7 +107,7 @@ src/
 ```sql
 profiles
   id (uuid, pk, references auth.users)
-  display_name (text)
+  username (text, unique, not null)
   bio (text, nullable)
   role (student|teacher)
   created_at, updated_at

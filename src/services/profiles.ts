@@ -20,7 +20,7 @@ export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[
     .from('profiles')
     .select('*')
     .is('deleted_at', null)
-    .order('display_name', { ascending: true });
+    .order('username', { ascending: true });
 
   if (excludeUserId) {
     query = query.neq('id', excludeUserId);
@@ -40,7 +40,7 @@ export async function createProfile(userId: string, input: CreateProfileInput): 
     .from('profiles')
     .insert({
       id: userId,
-      display_name: input.displayName.trim(),
+      username: input.username.trim().toLowerCase(),
       bio: input.bio?.trim() || null,
       role: input.role,
       avatar_url: input.avatarUrl || null,
@@ -61,8 +61,8 @@ export async function updateProfile(
 ): Promise<Profile> {
   const updates: Record<string, string | null | string[] | object> = {};
 
-  if (input.displayName !== undefined) {
-    updates.display_name = input.displayName.trim();
+  if (input.username !== undefined) {
+    updates.username = input.username.trim().toLowerCase();
   }
   if (input.bio !== undefined) {
     updates.bio = input.bio.trim() || null;
