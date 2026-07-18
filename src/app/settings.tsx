@@ -32,7 +32,7 @@ const DEFAULT_PREFERENCES = {
 
 export default function SettingsScreen() {
   const theme = useTheme();
-  const { profile, refreshProfile, user } = useAuth();
+  const { profile, user } = useAuth();
   const { requestPermissions } = useFCM();
 
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
@@ -58,6 +58,23 @@ export default function SettingsScreen() {
     setNotificationsEnabled(value);
     await AsyncStorage.setItem('notifications-enabled', String(value));
 
+    const newPrefs = value
+      ? { match_pending: true, match_approved: true, match_rejected: true, match_liked: true, match_commented: true }
+      : { match_pending: false, match_approved: false, match_rejected: false, match_liked: false, match_commented: false };
+    setPreferences(newPrefs);
+
+    if (profile?.id) {
+      try {
+        await updateNotificationPreferences(profile.id, newPrefs);
+      } catch {
+        setNotificationsEnabled(!value);
+        setPreferences(!value
+          ? { match_pending: true, match_approved: true, match_rejected: true, match_liked: true, match_commented: true }
+          : { match_pending: false, match_approved: false, match_rejected: false, match_liked: false, match_commented: false });
+        Alert.alert('Failed to update', 'Could not save notification preferences');
+      }
+    }
+
     if (value) {
       await requestPermissions();
     } else if (user?.id) {
@@ -78,15 +95,7 @@ export default function SettingsScreen() {
     if (!profile?.id) return;
 
     try {
-      const updated = await updateNotificationPreferences(profile.id, { [type]: value });
-      setPreferences({
-        match_pending: updated.notification_preferences.match_pending,
-        match_approved: updated.notification_preferences.match_approved,
-        match_rejected: updated.notification_preferences.match_rejected,
-        match_liked: updated.notification_preferences.match_liked,
-        match_commented: updated.notification_preferences.match_commented,
-      });
-      await refreshProfile();
+      await updateNotificationPreferences(profile.id, { [type]: value });
     } catch {
       setPreferences((prev) => ({ ...prev, [type]: !value }));
       Alert.alert('Failed to update', 'Could not save notification preference');
