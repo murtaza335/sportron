@@ -1,13 +1,14 @@
+import * as ImagePicker from 'expo-image-picker';
 import { useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
-import * as ImagePicker from 'expo-image-picker';
+import Svg, { Circle } from 'react-native-svg';
 
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
 import type { UserRole } from '@/types';
-import { uploadImageFromUri } from '@/lib/cloudinary';
 
 type ProfileFormProps = {
   initialName?: string;
@@ -16,8 +17,12 @@ type ProfileFormProps = {
   initialAvatar?: string | null;
   submitLabel?: string;
   loading?: boolean;
-  onSubmit: (data: { displayName: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
+  onSubmit: (data: { username: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
 };
+
+// Extracted for clean SVG math
+const RING_RADIUS = 52;
+const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
 export function ProfileForm({
   initialName = '',
@@ -29,18 +34,19 @@ export function ProfileForm({
   onSubmit,
 }: ProfileFormProps) {
   const theme = useTheme();
-  const [displayName, setDisplayName] = useState(initialName);
+  const [username, setUsername] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [role, setRole] = useState<UserRole>(initialRole);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
 
-  const canSubmit = displayName.trim().length > 0;
+  const canSubmit = username.trim().length > 0;
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos to upload a profile picture.');
+      Alert.alert('Permission required', 'Please grant permission to access your photos.');
       return;
     }
 
@@ -52,20 +58,32 @@ export function ProfileForm({
     });
 
     if (!result.canceled && result.assets[0]) {
+      const uri = result.assets[0].uri;
+      const previousAvatarUrl = avatarUrl;
+      
+      // Optimistic UI: Show the local image immediately so the progress ring has a truthy condition to render over
+      setAvatarUrl(uri);
       setUploadingAvatar(true);
+      setUploadProgress({ loaded: 0, total: 0, percentage: 0 });
+
       try {
-        const uri = result.assets[0].uri;
-        const uploadedUrl = await uploadImageFromUri(uri);
+        const uploadedUrl = await uploadImageFromUri(uri, (progress) => {
+          setUploadProgress(progress);
+        });
+        
         if (uploadedUrl) {
-          setAvatarUrl(uploadedUrl);
+          setAvatarUrl(uploadedUrl); // Replace local URI with the remote Cloudinary URL
         } else {
+          setAvatarUrl(previousAvatarUrl); // Revert on failure
           Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
         }
       } catch (error) {
         console.error('Avatar upload failed:', error);
+        setAvatarUrl(previousAvatarUrl); // Revert on failure
         Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
       } finally {
         setUploadingAvatar(false);
+        setUploadProgress(null);
       }
     }
   };
@@ -76,7 +94,6 @@ export function ProfileForm({
 
   return (
     <View style={styles.container}>
-      {/* Avatar Section */}
       <View style={styles.avatarSection}>
         <View style={styles.avatarContainer}>
           {avatarUrl ? (
@@ -88,18 +105,38 @@ export function ProfileForm({
                   resizeMode="cover"
                 />
               </View>
-              {uploadingAvatar && (
-                <View style={styles.avatarOverlay}>
-                  <ThemedText variant="caption" style={{ color: theme.background }}>
-                    Uploading...
-                  </ThemedText>
+              {uploadingAvatar && uploadProgress && (
+                <View style={styles.circularProgressContainer}>
+                  {/* Container is 108x108. Center is 54,54. Radius 52 fits perfectly around the 100x100 avatar. */}
+                  <Svg width="108" height="108">
+                    <Circle
+                      cx="54"
+                      cy="54"
+                      r={RING_RADIUS}
+                      stroke="rgba(255,255,255,0.3)"
+                      strokeWidth="4"
+                      fill="none"
+                    />
+                    <Circle
+                      cx="54"
+                      cy="54"
+                      r={RING_RADIUS}
+                      stroke="#10B981"
+                      strokeWidth="4"
+                      fill="none"
+                      strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
+                      strokeDashoffset={CIRCUMFERENCE * (1 - Math.max(0, uploadProgress.percentage) / 100)}
+                      strokeLinecap="round"
+                      transform="rotate(-90, 54, 54)"
+                    />
+                  </Svg>
                 </View>
               )}
             </>
           ) : (
             <View style={[styles.avatar, { backgroundColor: theme.text }]}>
               <ThemedText variant="hero" style={{ color: theme.background }}>
-                {displayName.charAt(0)?.toUpperCase() ?? '?'}
+                {username.charAt(0)?.toUpperCase() ?? '?'}
               </ThemedText>
             </View>
           )}
@@ -130,21 +167,20 @@ export function ProfileForm({
           )}
         </View>
       </View>
-
       <View style={styles.field}>
         <ThemedText variant="label" muted>
-          Name
+          Username
         </ThemedText>
         <TextInput
-          value={displayName}
-          onChangeText={setDisplayName}
-          placeholder="Your name"
+          value={username}
+          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+          placeholder="Your username"
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text, borderColor: theme.border }]}
-          autoCapitalize="words"
+          autoCapitalize="none"
           autoCorrect={false}
-          textContentType="name"
-          accessibilityLabel="Display name"
+          autoComplete="off"
+          accessibilityLabel="Username"
         />
       </View>
 
@@ -204,7 +240,7 @@ export function ProfileForm({
         disabled={!canSubmit}
         onPress={() =>
           onSubmit({
-            displayName: displayName.trim(),
+            username: username.trim().toLowerCase(),
             bio: bio.trim(),
             role,
             avatarUrl,
@@ -242,16 +278,14 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: 50,
   },
-  avatarOverlay: {
+  circularProgressContainer: {
     position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    alignItems: 'center',
+    top: -4,
+    left: -4,
+    right: -4,
+    bottom: -4,
     justifyContent: 'center',
-    borderRadius: 50,
+    alignItems: 'center',
   },
   avatarActions: {
     flexDirection: 'row',

@@ -2,7 +2,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
-import { fetchProfile } from '@/services/profiles';
+import { fetchProfile, reEnableAccount } from '@/services/profiles';
 import type { Profile } from '@/types';
 
 type AuthContextValue = {
@@ -26,10 +26,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     setProfileLoading(true);
     try {
       const data = await fetchProfile(userId);
+      if (data?.deleted_at) {
+        await reEnableAccount(userId);
+        data.deleted_at = null;
+      }
       setProfile(data);
     } catch (error) {
       console.error('Failed to load profile:', error);
-      setProfile(null);
     } finally {
       setProfileLoading(false);
     }

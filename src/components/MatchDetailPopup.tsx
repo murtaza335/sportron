@@ -162,12 +162,12 @@ Animated.spring(translateY, {
   }
 
   // Determine Teams
-  const p1 = match.player?.id === currentUserId ? 'You' : (match.player?.display_name ?? 'Player A1');
-  const p2 = match.playerPartner?.id === currentUserId ? 'You' : match.playerPartner?.display_name;
+  const p1 = match.player?.id === currentUserId ? 'You' : (match.player?.username ?? 'Player A1');
+  const p2 = match.playerPartner?.id === currentUserId ? 'You' : match.playerPartner?.username;
   const teamANames = [p1, p2].filter(Boolean);
 
-  const op1 = match.opponent?.id === currentUserId ? 'You' : (match.opponent?.display_name ?? 'Player B1');
-  const op2 = match.opponentPartner?.id === currentUserId ? 'You' : match.opponentPartner?.display_name;
+  const op1 = match.opponent?.id === currentUserId ? 'You' : (match.opponent?.username ?? 'Player B1');
+  const op2 = match.opponentPartner?.id === currentUserId ? 'You' : match.opponentPartner?.username;
   const teamBNames = [op1, op2].filter(Boolean);
 
   const isPlayerTeamWinner = match.player_score > match.opponent_score;
@@ -193,10 +193,10 @@ Animated.spring(translateY, {
   }
 
   const getCreatorName = () => {
-    if (match.player?.id === match.created_by) return match.player.display_name;
-    if (match.playerPartner?.id === match.created_by) return match.playerPartner.display_name;
-    if (match.opponent?.id === match.created_by) return match.opponent.display_name;
-    if (match.opponentPartner?.id === match.created_by) return match.opponentPartner.display_name;
+    if (match.player?.id === match.created_by) return match.player.username;
+    if (match.playerPartner?.id === match.created_by) return match.playerPartner.username;
+    if (match.opponent?.id === match.created_by) return match.opponent.username;
+    if (match.opponentPartner?.id === match.created_by) return match.opponentPartner.username;
     return 'Unknown Player';
   };
 
@@ -236,7 +236,7 @@ Animated.spring(translateY, {
     if (!match) return;
     setUpdatingStatus(true);
     try {
-      await updateMatchVerificationStatus(match.id, status);
+      await updateMatchVerificationStatus(match.id, status, currentUserId!);
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch (error) {
@@ -337,13 +337,13 @@ Animated.spring(translateY, {
                   <View style={[styles.avatarGroup, isPlayerTeamWinner && styles.winnerAvatarGroup]}>
                     <View style={[styles.avatar, { backgroundColor: theme.text }]}>
                       <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                        {getInitials(match.player?.display_name ?? 'P1')}
+                        {getInitials(match.player?.username ?? 'P1')}
                       </ThemedText>
                     </View>
                     {match.playerPartner ? (
                       <View style={[styles.avatar, styles.avatarOverlap, { backgroundColor: theme.textSecondary }]}>
                         <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                          {getInitials(match.playerPartner.display_name)}
+                          {getInitials(match.playerPartner.username)}
                         </ThemedText>
                       </View>
                     ) : null}
@@ -395,13 +395,13 @@ Animated.spring(translateY, {
                   <View style={[styles.avatarGroup, isOpponentTeamWinner && styles.winnerAvatarGroup]}>
                     <View style={[styles.avatar, { backgroundColor: theme.text }]}>
                       <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                        {getInitials(match.opponent?.display_name ?? 'P2')}
+                        {getInitials(match.opponent?.username ?? 'P2')}
                       </ThemedText>
                     </View>
                     {match.opponentPartner ? (
                       <View style={[styles.avatar, styles.avatarOverlap, { backgroundColor: theme.textSecondary }]}>
                         <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                          {getInitials(match.opponentPartner.display_name)}
+                          {getInitials(match.opponentPartner.username)}
                         </ThemedText>
                       </View>
                     ) : null}
@@ -567,13 +567,13 @@ Animated.spring(translateY, {
                     <View key={comment.id} style={styles.commentRow}>
                       <View style={[styles.commentAvatar, { backgroundColor: theme.textSecondary }]}>
                         <ThemedText style={[styles.avatarText, { fontSize: 10, color: theme.background }]}>
-                          {getInitials(comment.profile?.display_name ?? '?')}
+                          {getInitials(comment.profile?.username ?? '?')}
                         </ThemedText>
                       </View>
                       <View style={[styles.commentBody, { backgroundColor: theme.backgroundElement }]}>
                         <View style={styles.commentMeta}>
                           <ThemedText variant="caption" style={styles.commentAuthor}>
-                            {comment.profile?.display_name ?? 'Player'}
+                            {comment.profile?.username ?? 'Player'}
                           </ThemedText>
                           <ThemedText variant="caption" muted style={styles.commentTime}>
                             {new Date(comment.created_at).toLocaleDateString()}

@@ -12,14 +12,14 @@ import {
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { MatchFormat, Profile } from '@/types';
+import type { MatchFormat, Profile, UserRole, GuestProfile } from '@/types';
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
 
 type LineupSelection = {
-  playerPartner: Profile | null;
-  opponent: Profile | null;
-  opponentPartner: Profile | null;
+  playerPartner: Profile | GuestProfile | null;
+  opponent: Profile | GuestProfile | null;
+  opponentPartner: Profile | GuestProfile | null;
 };
 
 type MatchLineupSelectorProps = {
@@ -27,12 +27,12 @@ type MatchLineupSelectorProps = {
   currentUserName: string;
   format: MatchFormat;
   selection: LineupSelection;
-  onChange: (slot: TeamSlot, profile: Profile | null) => void;
+  onChange: (slot: TeamSlot, profile: Profile | GuestProfile | null) => void;
 };
 
 type SlotCardProps = {
   label: string;
-  profile: Profile | null;
+  profile: Profile | GuestProfile | null;
   helperText: string;
   onPress?: () => void;
   onDelete?: () => void;
@@ -64,11 +64,11 @@ function SlotCard({
     <>
       <View style={[styles.avatar, { backgroundColor: theme.text }]}>
         <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-          {getInitials(profile.display_name) || '?'}
+          {getInitials(profile.username) || '?'}
         </ThemedText>
       </View>
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
-        {profile.display_name}
+        {profile.username}
       </ThemedText>
       {showRole ? (
         <ThemedText variant="caption" muted>
@@ -150,7 +150,7 @@ export function MatchLineupSelector({
     );
   }, [selection.playerPartner?.id, selection.opponent?.id, selection.opponentPartner?.id]);
 
-  const availableProfiles = useMemo(() => {
+  const availableProfiles = useMemo<(Profile | GuestProfile)[]>(() => {
     const normalized = query.trim().toLowerCase();
     const activeSelection = activeSlot ? selection[activeSlot] : null;
 
@@ -163,13 +163,31 @@ export function MatchLineupSelector({
         return true;
       }
 
-      return profile.display_name.toLowerCase().includes(normalized);
+      return profile.username.toLowerCase().includes(normalized);
     });
 
     // Add "Guest" option for partner and opponent slots
     if (activeSlot === 'playerPartner' || activeSlot === 'opponent' || activeSlot === 'opponentPartner') {
+      const guestProfile: GuestProfile = {
+        id: `guest-${activeSlot}`,
+        username: 'Guest',
+        role: 'student' as UserRole,
+        isGuest: true,
+        bio: null,
+        avatar_url: null,
+        fcm_tokens: [],
+        notification_preferences: {
+          match_pending: true,
+          match_approved: true,
+          match_rejected: true,
+          match_liked: true,
+          match_commented: true,
+        },
+        created_at: '',
+        updated_at: '',
+      };
       return [
-        { id: `guest-${activeSlot}`, display_name: 'Guest', role: 'guest', isGuest: true },
+        guestProfile,
         ...filtered,
       ];
     }
@@ -204,10 +222,18 @@ export function MatchLineupSelector({
               label="Player 1 (You)"
               profile={{
                 id: 'current-user',
-                display_name: currentUserName,
+                username: currentUserName,
                 bio: null,
                 role: 'student',
                 avatar_url: null,
+                fcm_tokens: [],
+                notification_preferences: {
+                  match_pending: true,
+                  match_approved: true,
+                  match_rejected: true,
+                  match_liked: true,
+                  match_commented: true,
+                },
                 created_at: '',
                 updated_at: '',
               }}
@@ -310,7 +336,7 @@ export function MatchLineupSelector({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.list}
               renderItem={({ item }) => {
-                const isGuest = item.isGuest === true;
+                const isGuest = 'isGuest' in item && item.isGuest === true;
                 const isSelected = activeSlot ? selection[activeSlot]?.id === item.id : false;
 
                 return (
@@ -337,12 +363,12 @@ export function MatchLineupSelector({
                     ]}>
                     <View style={[styles.avatarSmall, { backgroundColor: isGuest ? '#6B7280' : theme.text }]}>
                       <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {isGuest ? '+' : (getInitials(item.display_name) || '?')}
+                        {isGuest ? '+' : (getInitials(item.username) || '?')}
                       </ThemedText>
                     </View>
                     <View style={styles.playerMeta}>
                       <ThemedText variant="body" style={styles.playerName}>
-                        {item.display_name}
+                        {item.username}
                       </ThemedText>
                       <ThemedText variant="caption" muted>
                         {isGuest ? 'Add unregistered player' : item.role}

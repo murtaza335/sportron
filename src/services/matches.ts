@@ -1,16 +1,18 @@
 import { supabase } from '@/lib/supabase';
 import type { CreateMatchInput, Match, MatchStats, MatchWithProfiles, MatchComment, MatchFormat } from '@/types';
+import { fetchProfile } from './profiles';
+import { notifyMatchPending, notifyMatchApproved, notifyMatchRejected, notifyMatchLiked, notifyMatchCommented } from './notifications';
 
 type MatchRow = Match & {
-  player: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+  player: { id: string; username: string } | { id: string; username: string }[] | null;
   playerPartner:
-    | { id: string; display_name: string }
-    | { id: string; display_name: string }[]
+    | { id: string; username: string }
+    | { id: string; username: string }[]
     | null;
-  opponent: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+  opponent: { id: string; username: string } | { id: string; username: string }[] | null;
   opponentPartner:
-    | { id: string; display_name: string }
-    | { id: string; display_name: string }[]
+    | { id: string; username: string }
+    | { id: string; username: string }[]
     | null;
   likes: { profile_id: string }[] | null;
   comments: { id: string }[] | null;
@@ -59,10 +61,10 @@ export async function fetchGlobalMatches(currentUserId?: string): Promise<MatchW
     .select(
       `
       *,
-      player:profiles!matches_player_id_fkey (id, display_name),
-      playerPartner:profiles!matches_player_partner_id_fkey (id, display_name),
-      opponent:profiles!matches_opponent_id_fkey (id, display_name),
-      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, display_name),
+      player:profiles!matches_player_id_fkey (id, username),
+      playerPartner:profiles!matches_player_partner_id_fkey (id, username),
+      opponent:profiles!matches_opponent_id_fkey (id, username),
+      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, username),
       likes:match_likes (profile_id),
       comments:match_comments (id)
     `,
@@ -84,10 +86,10 @@ export async function fetchMyMatches(userId: string): Promise<MatchWithProfiles[
     .select(
       `
       *,
-      player:profiles!matches_player_id_fkey (id, display_name),
-      playerPartner:profiles!matches_player_partner_id_fkey (id, display_name),
-      opponent:profiles!matches_opponent_id_fkey (id, display_name),
-      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, display_name),
+      player:profiles!matches_player_id_fkey (id, username),
+      playerPartner:profiles!matches_player_partner_id_fkey (id, username),
+      opponent:profiles!matches_opponent_id_fkey (id, username),
+      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, username),
       likes:match_likes (profile_id),
       comments:match_comments (id)
     `,
@@ -127,13 +129,35 @@ export async function createMatch(userId: string, input: CreateMatchInput): Prom
     throw error;
   }
 
+  try {
+    const creator = await fetchProfile(userId);
+
+    const notified = new Set<string>();
+    const opponentIds = [input.opponentId, input.opponentPartnerId].filter(Boolean) as string[];
+    for (const id of opponentIds) {
+      if (!notified.has(id)) {
+        notified.add(id);
+        await notifyMatchPending(id, data.id, creator?.username ?? 'Someone');
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send match notifications:', e);
+  }
+
   return data;
 }
 
 export async function updateMatchVerificationStatus(
   matchId: string,
-  status: 'verified' | 'disputed'
+  status: 'verified' | 'disputed',
+  actorId: string
 ): Promise<void> {
+  const { data: match } = await supabase
+    .from('matches')
+    .select('created_by')
+    .eq('id', matchId)
+    .single();
+
   const { error } = await supabase
     .from('matches')
     .update({ verification_status: status })
@@ -141,6 +165,21 @@ export async function updateMatchVerificationStatus(
 
   if (error) {
     throw error;
+  }
+
+  try {
+    if (match && match.created_by !== actorId) {
+      const actor = await fetchProfile(actorId);
+      const name = actor?.username ?? 'Someone';
+
+      if (status === 'verified') {
+        await notifyMatchApproved(match.created_by, matchId, name);
+      } else {
+        await notifyMatchRejected(match.created_by, matchId, name);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send verification notification:', e);
   }
 }
 
@@ -195,6 +234,21 @@ export async function toggleLike(matchId: string, userId: string, like: boolean)
       .from('match_likes')
       .insert({ match_id: matchId, profile_id: userId });
     if (error) throw error;
+
+    const { data: match } = await supabase
+      .from('matches')
+      .select('created_by')
+      .eq('id', matchId)
+      .single();
+
+    try {
+      if (match && match.created_by !== userId) {
+        const liker = await fetchProfile(userId);
+        await notifyMatchLiked(match.created_by, matchId, liker?.username ?? 'Someone');
+      }
+    } catch (e) {
+      console.error('Failed to send like notification:', e);
+    }
   } else {
     const { error } = await supabase
       .from('match_likes')
@@ -212,14 +266,14 @@ export async function fetchComments(matchId: string): Promise<MatchComment[]> {
     profile_id: string;
     content: string;
     created_at: string;
-    profile: { display_name: string } | { display_name: string }[] | null;
+    profile: { username: string } | { username: string }[] | null;
   };
 
   const { data, error } = await supabase
     .from('match_comments')
     .select(`
       *,
-      profile:profiles (display_name)
+      profile:profiles (username)
     `)
     .eq('match_id', matchId)
     .order('created_at', { ascending: true });
@@ -252,7 +306,7 @@ export async function addComment(matchId: string, userId: string, content: strin
     })
     .select(`
       *,
-      profile:profiles (display_name)
+      profile:profiles (username)
     `)
     .single();
 
@@ -262,6 +316,26 @@ export async function addComment(matchId: string, userId: string, content: strin
 
   const row = data as any;
   const profile = Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile;
+
+  try {
+    const { data: match } = await supabase
+      .from('matches')
+      .select('created_by')
+      .eq('id', matchId)
+      .single();
+
+    if (match && match.created_by !== userId) {
+      await notifyMatchCommented(
+        match.created_by,
+        matchId,
+        profile?.username ?? 'Someone',
+        row.id,
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send comment notification:', e);
+  }
+
   return {
     id: row.id,
     match_id: row.match_id,
@@ -289,10 +363,10 @@ export async function fetchPendingApprovalMatches(userId: string): Promise<Match
     .select(
       `
       *,
-      player:profiles!matches_player_id_fkey (id, display_name),
-      playerPartner:profiles!matches_player_partner_id_fkey (id, display_name),
-      opponent:profiles!matches_opponent_id_fkey (id, display_name),
-      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, display_name),
+      player:profiles!matches_player_id_fkey (id, username),
+      playerPartner:profiles!matches_player_partner_id_fkey (id, username),
+      opponent:profiles!matches_opponent_id_fkey (id, username),
+      opponentPartner:profiles!matches_opponent_partner_id_fkey (id, username),
       likes:match_likes (profile_id),
       comments:match_comments (id)
     `,
@@ -322,10 +396,10 @@ export async function fetchPendingApprovalMatches(userId: string): Promise<Match
     is_public: boolean;
     verification_status: 'pending' | 'verified' | 'disputed';
     created_at: string;
-    player: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
-    playerPartner: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
-    opponent: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
-    opponentPartner: { id: string; display_name: string } | { id: string; display_name: string }[] | null;
+    player: { id: string; username: string } | { id: string; username: string }[] | null;
+    playerPartner: { id: string; username: string } | { id: string; username: string }[] | null;
+    opponent: { id: string; username: string } | { id: string; username: string }[] | null;
+    opponentPartner: { id: string; username: string } | { id: string; username: string }[] | null;
     likes: { profile_id: string }[] | null;
     comments: { id: string }[] | null;
   };

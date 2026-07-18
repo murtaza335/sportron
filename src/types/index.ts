@@ -3,10 +3,39 @@ export type MatchFormat = 'singles' | 'doubles';
 
 export type Profile = {
   id: string;
-  display_name: string;
+  username: string;
   bio: string | null;
   role: UserRole;
   avatar_url: string | null;
+  fcm_tokens: string[];
+  notification_preferences: {
+    match_pending: boolean;
+    match_approved: boolean;
+    match_rejected: boolean;
+    match_liked: boolean;
+    match_commented: boolean;
+  };
+  deleted_at: string | null;
+  created_at: string;
+  updated_at: string;
+};
+
+export type GuestProfile = {
+  id: string;
+  username: string;
+  role: string;
+  isGuest: true;
+  bio: null;
+  avatar_url: null;
+  fcm_tokens: string[];
+  notification_preferences: {
+    match_pending: boolean;
+    match_approved: boolean;
+    match_rejected: boolean;
+    match_liked: boolean;
+    match_commented: boolean;
+  };
+  deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -28,10 +57,10 @@ export type Match = {
 };
 
 export type MatchWithProfiles = Match & {
-  player: Pick<Profile, 'id' | 'display_name'> | null;
-  playerPartner: Pick<Profile, 'id' | 'display_name'> | null;
-  opponent: Pick<Profile, 'id' | 'display_name'> | null;
-  opponentPartner: Pick<Profile, 'id' | 'display_name'> | null;
+  player: Pick<Profile, 'id' | 'username'> | null;
+  playerPartner: Pick<Profile, 'id' | 'username'> | null;
+  opponent: Pick<Profile, 'id' | 'username'> | null;
+  opponentPartner: Pick<Profile, 'id' | 'username'> | null;
   likes_count: number;
   comments_count: number;
   is_liked_by_user: boolean;
@@ -43,7 +72,7 @@ export type MatchComment = {
   profile_id: string;
   content: string;
   created_at: string;
-  profile: Pick<Profile, 'display_name'> | null;
+  profile: Pick<Profile, 'username'> | null;
 };
 
 export type CreateMatchInput = {
@@ -58,7 +87,7 @@ export type CreateMatchInput = {
 };
 
 export type CreateProfileInput = {
-  displayName: string;
+  username: string;
   bio?: string;
   role: UserRole;
   avatarUrl?: string;
@@ -68,4 +97,22 @@ export type MatchStats = {
   total: number;
   wins: number;
   losses: number;
+};
+
+export type NotificationType =
+  | 'match_pending'
+  | 'match_approved'
+  | 'match_rejected'
+  | 'match_liked'
+  | 'match_commented';
+
+export type InAppNotification = {
+  id: string;
+  user_id: string;
+  type: NotificationType;
+  title: string;
+  body: string;
+  data: Record<string, unknown> | null;
+  read: boolean;
+  created_at: string;
 };

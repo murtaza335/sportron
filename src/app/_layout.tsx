@@ -1,12 +1,13 @@
+import * as Font from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
-import * as Font from 'expo-font';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { FCMInitializer } from '@/components/FCMInitializer';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -57,7 +58,7 @@ function RootNavigator() {
     }
   }, [session, profile, loading, profileLoading, segments, router]);
 
-  if (!fontsLoaded || loading || (session && profileLoading)) {
+  if (!fontsLoaded || loading) {
     return (
       <View style={[styles.loader, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.text} />
@@ -66,7 +67,8 @@ function RootNavigator() {
   }
 
   return (
-    <>
+    <View style={[styles.container, { backgroundColor: theme.background }]}>
+      <FCMInitializer />
       <StatusBar style="auto" />
       <Stack screenOptions={{ headerShown: false, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="login" />
@@ -79,8 +81,24 @@ function RootNavigator() {
             animation: 'slide_from_bottom',
           }}
         />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: true,
+            title: 'Notifications',
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="settings"
+          options={{
+            headerShown: true,
+            title: 'Settings',
+            animation: 'slide_from_right',
+          }}
+        />
       </Stack>
-    </>
+    </View>
   );
 }
 
@@ -95,6 +113,9 @@ export default function RootLayout() {
 }
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
   loader: {
     flex: 1,
     alignItems: 'center',

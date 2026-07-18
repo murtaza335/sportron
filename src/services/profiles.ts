@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateProfileInput, Profile } from '@/types';
+import type { CreateProfileInput, Profile, NotificationType } from '@/types';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -19,7 +19,8 @@ export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[
   let query = supabase
     .from('profiles')
     .select('*')
-    .order('display_name', { ascending: true });
+    .is('deleted_at', null)
+    .order('username', { ascending: true });
 
   if (excludeUserId) {
     query = query.neq('id', excludeUserId);
@@ -39,7 +40,7 @@ export async function createProfile(userId: string, input: CreateProfileInput): 
     .from('profiles')
     .insert({
       id: userId,
-      display_name: input.displayName.trim(),
+      username: input.username.trim().toLowerCase(),
       bio: input.bio?.trim() || null,
       role: input.role,
       avatar_url: input.avatarUrl || null,
@@ -58,10 +59,10 @@ export async function updateProfile(
   userId: string,
   input: Partial<CreateProfileInput>,
 ): Promise<Profile> {
-  const updates: Record<string, string | null> = {};
+  const updates: Record<string, string | null | string[] | object> = {};
 
-  if (input.displayName !== undefined) {
-    updates.display_name = input.displayName.trim();
+  if (input.username !== undefined) {
+    updates.username = input.username.trim().toLowerCase();
   }
   if (input.bio !== undefined) {
     updates.bio = input.bio.trim() || null;
@@ -85,4 +86,128 @@ export async function updateProfile(
   }
 
   return data;
+}
+
+export async function updateNotificationPreferences(
+  userId: string,
+  preferences: Partial<Profile['notification_preferences']>
+): Promise<Profile> {
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('notification_preferences')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const currentPrefs = existingProfile?.notification_preferences || {
+    match_pending: true,
+    match_approved: true,
+    match_rejected: true,
+    match_liked: true,
+    match_commented: true,
+  };
+
+  const updatedPrefs = { ...currentPrefs, ...preferences };
+
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ notification_preferences: updatedPrefs })
+    .eq('id', userId)
+    .select()
+    .single();
+
+  if (error) {
+    throw error;
+  }
+
+  return data;
+}
+
+export async function addFCMToken(userId: string, token: string): Promise<void> {
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('fcm_tokens')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const existingTokens = existingProfile?.fcm_tokens || [];
+  const updatedTokens = [...new Set([...existingTokens, token])];
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ fcm_tokens: updatedTokens })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function removeFCMToken(userId: string, token: string): Promise<void> {
+  const { data: existingProfile, error: fetchError } = await supabase
+    .from('profiles')
+    .select('fcm_tokens')
+    .eq('id', userId)
+    .single();
+
+  if (fetchError) {
+    throw fetchError;
+  }
+
+  const existingTokens = existingProfile?.fcm_tokens || [];
+  const updatedTokens = existingTokens.filter((t: string) => t !== token);
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({ fcm_tokens: updatedTokens })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function softDeleteAccount(userId: string): Promise<void> {
+  const defaultPrefs: Record<NotificationType, boolean> = {
+    match_pending: false,
+    match_approved: false,
+    match_rejected: false,
+    match_liked: false,
+    match_commented: false,
+  };
+
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      bio: null,
+      avatar_url: null,
+      fcm_tokens: [],
+      notification_preferences: defaultPrefs,
+      deleted_at: new Date().toISOString(),
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
+}
+
+export async function reEnableAccount(userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('profiles')
+    .update({
+      deleted_at: null,
+    })
+    .eq('id', userId);
+
+  if (error) {
+    throw error;
+  }
 }

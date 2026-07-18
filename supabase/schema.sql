@@ -3,7 +3,7 @@
 -- Profiles (extends auth.users)
 create table if not exists public.profiles (
   id uuid primary key references auth.users (id) on delete cascade,
-  display_name text not null,
+   username text not null,
   bio text,
   role text not null check (role in ('student', 'teacher')),
   created_at timestamptz not null default now(),
@@ -33,6 +33,8 @@ create table if not exists public.matches (
 create index if not exists matches_created_by_idx on public.matches (created_by);
 create index if not exists matches_is_public_idx on public.matches (is_public);
 create index if not exists matches_created_at_idx on public.matches (created_at desc);
+
+create unique index if not exists profiles_username_idx on public.profiles (username);
 
 -- Row Level Security
 alter table public.profiles enable row level security;
