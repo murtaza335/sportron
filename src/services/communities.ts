@@ -118,7 +118,10 @@ export async function deleteCommunity(communityId: string): Promise<void> {
 export async function fetchCommunityMembers(communityId: string): Promise<CommunityMember[]> {
   const { data, error } = await supabase
     .from('community_members')
-    .select('*')
+    .select(`
+      *,
+      profile:profile_id(id, username, display_name, avatar_url)
+    `)
     .eq('community_id', communityId);
 
   if (error) throw error;
