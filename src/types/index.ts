@@ -4,6 +4,7 @@ export type MatchFormat = 'singles' | 'doubles';
 export type Profile = {
   id: string;
   username: string;
+  display_name: string | null;
   bio: string | null;
   role: UserRole;
   avatar_url: string | null;
@@ -23,6 +24,7 @@ export type Profile = {
 export type GuestProfile = {
   id: string;
   username: string;
+  display_name: null;
   role: string;
   isGuest: true;
   bio: null;
@@ -158,6 +160,7 @@ export type CommunityMember = {
   losses: number;
   win_ratio: number;
   joined_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
 };
 
 export type CreateCommunityInput = {

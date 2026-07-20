@@ -9,7 +9,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Shield, X } from 'lucide-react-native';
+import { X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -111,24 +111,35 @@ export default function CommunityMembersScreen() {
                   ]}
                 >
                   <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
-                    {item.profile_id.charAt(0).toUpperCase()}
+                    {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
                   </ThemedText>
                 </View>
                 <View>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {item.profile_id === user?.id ? 'You' : item.profile_id.slice(0, 8)}
+                    {item.profile_id === user?.id
+                      ? 'You'
+                      : item.profile?.username ?? item.profile_id.slice(0, 8)}
                   </ThemedText>
-                  {item.role === 'admin' && (
-                    <View style={styles.roleRow}>
-                      <Shield size={12} color="#D97706" strokeWidth={2.5} />
+                  {isAdmin && item.profile?.display_name && item.profile_id !== user?.id && (
+                    <ThemedText variant="caption" muted>
+                      {item.profile.display_name}
+                    </ThemedText>
+                  )}
+                  <View style={styles.roleRow}>
+                    {item.role === 'admin' && (
                       <ThemedText
                         variant="caption"
                         style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
                       >
                         Admin
                       </ThemedText>
-                    </View>
-                  )}
+                    )}
+                    {item.profile_id === user?.id && item.role === 'member' && (
+                      <ThemedText variant="caption" muted style={{ fontSize: 10 }}>
+                        You
+                      </ThemedText>
+                    )}
+                  </View>
                 </View>
               </View>
               {isAdmin && item.profile_id !== user?.id && (
