@@ -220,6 +220,30 @@ export async function fetchUserSessions(
   );
 }
 
+export async function deleteSession(sessionId: string, userId: string): Promise<void> {
+  // Check if any accepted commitments exist
+  const { count, error: countError } = await supabase
+    .from('commitments')
+    .select('id', { count: 'exact', head: true })
+    .eq('session_id', sessionId)
+    .eq('status', 'accepted');
+
+  if (countError) throw countError;
+  if (count > 0) {
+    throw new Error(
+      `Cannot delete session — ${count} participant${count > 1 ? 's have' : ' has'} already been accepted.`,
+    );
+  }
+
+  const { error } = await supabase
+    .from('sessions')
+    .delete()
+    .eq('id', sessionId)
+    .eq('created_by', userId);
+
+  if (error) throw error;
+}
+
 export async function checkTimeConflicts(
   userId: string,
   dateTime: string,
