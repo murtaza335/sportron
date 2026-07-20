@@ -97,6 +97,28 @@ function RootNavigator() {
             animation: 'slide_from_right',
           }}
         />
+        <Stack.Screen
+          name="community/[id]"
+          options={{
+            headerShown: true,
+            title: 'Community',
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
+          name="create-community"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
+        <Stack.Screen
+          name="create-session"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+          }}
+        />
       </Stack>
     </View>
   );

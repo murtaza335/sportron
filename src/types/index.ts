@@ -104,7 +104,22 @@ export type NotificationType =
   | 'match_approved'
   | 'match_rejected'
   | 'match_liked'
-  | 'match_commented';
+  | 'match_commented'
+  | 'session_application'
+  | 'session_accepted'
+  | 'session_rejected'
+  | 'session_reminder'
+  | 'feedback_prompt'
+  | 'ping'
+  | 'join_request'
+  | 'join_approved'
+  | 'join_rejected'
+  | 'match_approval_request'
+  | 'match_approved_community'
+  | 'match_disputed'
+  | 'member_removed'
+  | 'community_deleted'
+  | 'admin_transferred';
 
 export type InAppNotification = {
   id: string;
@@ -115,4 +130,79 @@ export type InAppNotification = {
   data: Record<string, unknown> | null;
   read: boolean;
   created_at: string;
+};
+
+export type CommunityVisibility = 'public' | 'restricted';
+
+export type Community = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  visibility: CommunityVisibility;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  member_count?: number;
+};
+
+export type CommunityMemberRole = 'admin' | 'member';
+
+export type CommunityMember = {
+  community_id: string;
+  profile_id: string;
+  role: CommunityMemberRole;
+  approval_status: 'approved' | 'pending' | 'rejected';
+  matches_played: number;
+  wins: number;
+  losses: number;
+  win_ratio: number;
+  joined_at: string;
+};
+
+export type CreateCommunityInput = {
+  name: string;
+  description?: string;
+  visibility: CommunityVisibility;
+};
+
+export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelled';
+
+export type Session = {
+  id: string;
+  created_by: string;
+  sport: string;
+  location: string;
+  date_time: string;
+  max_participants: number;
+  description: string | null;
+  status: SessionStatus;
+  created_at: string;
+  updated_at: string;
+  creator?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  commitment_count?: number;
+  my_commitment?: Pick<Commitment, 'id' | 'status'> | null;
+};
+
+export type CreateSessionInput = {
+  sport: string;
+  location: string;
+  date_time: string;
+  max_participants: number;
+  description?: string;
+};
+
+export type CommitmentStatus = 'pending' | 'accepted' | 'rejected';
+export type FeedbackStatus = 'showed_up' | 'no_show';
+
+export type Commitment = {
+  id: string;
+  session_id: string;
+  user_id: string;
+  status: CommitmentStatus;
+  feedback_status: FeedbackStatus | null;
+  feedback_provided_by: string | null;
+  created_at: string;
+  updated_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
 };

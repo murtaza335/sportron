@@ -1,5 +1,5 @@
 import { router, Tabs } from 'expo-router';
-import { Bell, Clock, Home, User } from 'lucide-react-native';
+import { Bell, Clock, Home, Plus, User } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
@@ -106,14 +106,58 @@ export default function TabLayout() {
         options={{
           title: 'Home',
           headerTitle: () => <HomeHeaderTitle />,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.navigate('/create-community')}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+              hitSlop={12}
+              accessibilityLabel="Create community"
+              accessibilityRole="button"
+            >
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.backgroundElement,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}>
+                <Plus size={18} color={theme.text} strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          ),
           tabBarIcon: ({ color, size }) => <Home size={size + 2} color={color} strokeWidth={2.4} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
-          headerTitle: () => <DefaultHeaderTitle title="History" />,
+          title: 'Sessions',
+          headerTitle: () => <DefaultHeaderTitle title="Find a Match" />,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.navigate('/create-session')}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+              hitSlop={12}
+              accessibilityLabel="Create session"
+              accessibilityRole="button"
+            >
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.backgroundElement,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}>
+                <Plus size={18} color={theme.text} strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          ),
           tabBarIcon: ({ color, size }) => <Clock size={size} color={color} strokeWidth={2.2} />,
         }}
       />
