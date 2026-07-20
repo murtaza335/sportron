@@ -17,6 +17,7 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useSessions } from '@/hooks/useSessions';
+import type { Session } from '@/types';
 
 function formatSessionDate(dateString: string) {
   const date = new Date(dateString);
@@ -40,6 +41,7 @@ export default function SessionsScreen() {
   const { sessions, loading, refreshing, refresh } = useSessions(user?.id);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  const [selectedSessionData, setSelectedSessionData] = useState<Partial<Session> | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
 
   useFocusEffect(
@@ -84,6 +86,7 @@ export default function SessionsScreen() {
               <Pressable
                 onPress={() => {
                   setSelectedSessionId(item.id);
+                  setSelectedSessionData(item);
                   setDetailVisible(true);
                 }}
                 style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
@@ -158,13 +161,16 @@ export default function SessionsScreen() {
       </View>
 
       <SessionDetailPopup
+        key={selectedSessionId ?? 'closed'}
         sessionId={selectedSessionId}
         visible={detailVisible}
         onClose={() => {
           setDetailVisible(false);
           setSelectedSessionId(null);
+          setSelectedSessionData(null);
         }}
         currentUserId={user?.id}
+        initialSession={selectedSessionData}
         onRefreshFeed={refresh}
       />
     </View>
