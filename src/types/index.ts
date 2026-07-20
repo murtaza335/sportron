@@ -204,5 +204,11 @@ export type Commitment = {
   feedback_provided_by: string | null;
   created_at: string;
   updated_at: string;
-  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  profile?: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    completed_sessions?: number;
+    total_committed_sessions?: number;
+  } | null;
 };
