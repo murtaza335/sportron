@@ -6,7 +6,11 @@ type SessionRow = Session & {
   commitments: { id: string; user_id: string; status: string }[] | null;
 };
 
-function normalizeSession(row: SessionRow, currentUserId?: string): Session {
+function normalizeSession(
+  row: SessionRow,
+  currentUserId?: string,
+  acceptedCount?: number,
+): Session {
   return {
     id: row.id,
     created_by: row.created_by,
@@ -19,12 +23,25 @@ function normalizeSession(row: SessionRow, currentUserId?: string): Session {
     created_at: row.created_at,
     updated_at: row.updated_at,
     creator: row.creator,
-    commitment_count: row.commitments?.filter((c) => c.status === 'accepted').length ?? 0,
+    commitment_count: acceptedCount ?? 0,
     my_commitment: currentUserId
-      ? (row.commitments?.find((c) => c.user_id === currentUserId) ??
-          null)
+      ? (row.commitments?.find((c) => c.user_id === currentUserId) ?? null)
       : null,
   };
+}
+
+async function fetchAcceptedCounts(sessionIds: string[]): Promise<Record<string, number>> {
+  if (sessionIds.length === 0) return {};
+  const { data } = await supabase.rpc('get_accepted_commitment_counts', {
+    p_session_ids: sessionIds,
+  });
+  const map: Record<string, number> = {};
+  if (data) {
+    for (const item of data) {
+      map[item.session_id] = Number(item.count);
+    }
+  }
+  return map;
 }
 
 export async function fetchOpenSessions(currentUserId?: string): Promise<Session[]> {
@@ -41,7 +58,14 @@ export async function fetchOpenSessions(currentUserId?: string): Promise<Session
     .order('date_time', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) => normalizeSession(row as SessionRow, currentUserId));
+
+  const sessions = data ?? [];
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return sessions.map((row) =>
+    normalizeSession(row as SessionRow, currentUserId, countMap[row.id] ?? 0),
+  );
 }
 
 export async function fetchSessionById(
@@ -64,7 +88,14 @@ export async function fetchSessionById(
     if (error.code === 'PGRST116') return null;
     throw error;
   }
-  return data ? normalizeSession(data as SessionRow, currentUserId) : null;
+
+  let acceptedCount = 0;
+  if (data) {
+    const countMap = await fetchAcceptedCounts([data.id]);
+    acceptedCount = countMap[data.id] ?? 0;
+  }
+
+  return data ? normalizeSession(data as SessionRow, currentUserId, acceptedCount) : null;
 }
 
 export async function createSession(
@@ -179,7 +210,14 @@ export async function fetchUserSessions(
     .order('date_time', { ascending: true });
 
   if (error) throw error;
-  return (data ?? []).map((row) => normalizeSession(row as SessionRow, userId));
+
+  const sessions = data ?? [];
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return sessions.map((row) =>
+    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
+  );
 }
 
 export async function checkTimeConflicts(
@@ -228,5 +266,11 @@ export async function checkTimeConflicts(
     .lte('date_time', endWindow);
 
   if (err3) throw err3;
-  return (conflicts ?? []).map((row) => normalizeSession(row as SessionRow, userId));
+
+  const sessionIds = (conflicts ?? []).map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return (conflicts ?? []).map((row) =>
+    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
+  );
 }
