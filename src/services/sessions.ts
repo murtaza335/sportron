@@ -153,9 +153,10 @@ export async function rejectCommitment(
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('commitments')
-    .delete()
+    .update({ status: 'left' })
     .eq('session_id', sessionId)
-    .eq('user_id', userId);
+    .eq('user_id', userId)
+    .in('status', ['pending', 'accepted']);
 
   if (error) throw error;
 }

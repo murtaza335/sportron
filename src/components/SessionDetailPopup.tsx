@@ -68,7 +68,7 @@ export function SessionDetailPopup({
   const [session, setSession] = useState<Session | null>(null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [joining, setJoining] = useState(false);
-  const [isCommitted, setIsCommitted] = useState(false);
+  const [myCommitmentStatus, setMyCommitmentStatus] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const loading = visible && session === null && sessionId !== null;
@@ -112,14 +112,14 @@ export function SessionDetailPopup({
   useEffect(() => {
     if (!visible || !sessionId) return;
     const id = sessionId;
-    fetchSessionById(id, currentUserId)
-      .then((data) => {
-        if (sessionId === id) {
-          setSession(data);
-          setIsCommitted(!!data?.my_commitment);
-        }
-      })
-      .catch((e) => console.error('Failed to load session:', e));
+      fetchSessionById(id, currentUserId)
+        .then((data) => {
+          if (sessionId === id) {
+            setSession(data);
+            setMyCommitmentStatus(data?.my_commitment?.status ?? null);
+          }
+        })
+        .catch((e) => console.error('Failed to load session:', e));
   }, [visible, sessionId, currentUserId]);
 
   // Load applicant list when session loads and user is creator
@@ -168,7 +168,7 @@ export function SessionDetailPopup({
         return;
       }
       await commitToSession(sessionId, currentUserId);
-      setIsCommitted(true);
+      setMyCommitmentStatus('pending');
       onRefreshFeed?.();
     } catch (e) {
       Alert.alert('Error', 'Failed to join session.');
@@ -183,7 +183,7 @@ export function SessionDetailPopup({
     setJoining(true);
     try {
       await uncommitFromSession(sessionId, currentUserId);
-      setIsCommitted(false);
+      setMyCommitmentStatus('left');
       onRefreshFeed?.();
     } catch (e) {
       Alert.alert('Error', 'Failed to leave session.');
@@ -200,7 +200,7 @@ export function SessionDetailPopup({
       setReloadKey((k) => k + 1);
       const sessionData = await fetchSessionById(sessionId, currentUserId);
       setSession(sessionData);
-      setIsCommitted(!!sessionData?.my_commitment);
+      setMyCommitmentStatus(sessionData?.my_commitment?.status ?? null);
       onRefreshFeed?.();
     } catch (e) {
       Alert.alert('Error', 'Failed to approve applicant.');
@@ -229,6 +229,7 @@ export function SessionDetailPopup({
   const pendingCommitments = commitments.filter((c) => c.status === 'pending');
   const acceptedCommitments = commitments.filter((c) => c.status === 'accepted');
   const rejectedCommitments = commitments.filter((c) => c.status === 'rejected');
+  const leftCommitments = commitments.filter((c) => c.status === 'left');
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -492,15 +493,76 @@ export function SessionDetailPopup({
                           ))}
                         </>
                       )}
+
+                      {/* Left */}
+                      {leftCommitments.length > 0 && (
+                        <>
+                          <ThemedText variant="label" muted style={styles.sectionTitle}>
+                            Left ({leftCommitments.length})
+                          </ThemedText>
+                          {leftCommitments.map((c) => (
+                            <View
+                              key={c.id}
+                              style={[
+                                styles.applicantCard,
+                                {
+                                  backgroundColor: theme.backgroundElement,
+                                  borderColor: theme.border,
+                                  opacity: 0.5,
+                                },
+                              ]}
+                            >
+                              <View style={styles.applicantInfo}>
+                                <View
+                                  style={[
+                                    styles.applicantAvatar,
+                                    { backgroundColor: '#A855F7', opacity: 0.6 },
+                                  ]}
+                                >
+                                  <ThemedText
+                                    style={[styles.avatarText, { color: 'white' }]}
+                                  >
+                                    {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
+                                  </ThemedText>
+                                </View>
+                                <View style={styles.applicantDetails}>
+                                  <ThemedText
+                                    variant="body"
+                                    style={{ fontWeight: '600', opacity: 0.6 }}
+                                  >
+                                    {c.profile?.username ?? 'Unknown'}
+                                  </ThemedText>
+                                  <ThemedText variant="caption" muted>
+                                    {c.profile?.completed_sessions ?? 0} /{' '}
+                                    {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                  </ThemedText>
+                                </View>
+                              </View>
+                              <View style={[styles.statusChip, { backgroundColor: '#A855F720' }]}>
+                                <ThemedText
+                                  variant="caption"
+                                  style={{
+                                    color: '#A855F7',
+                                    fontWeight: '700',
+                                    fontSize: 10,
+                                  }}
+                                >
+                                  Left
+                                </ThemedText>
+                              </View>
+                            </View>
+                          ))}
+                        </>
+                      )}
                     </>
                   )}
                 </View>
               )}
 
-              {/* Commit / Uncommit buttons — visible to non-creators */}
-              {!isCreator && (
+              {/* Action section — visible to non-creators */}
+              {!isCreator && currentUserId && (
                 <>
-                  {isCommitted ? (
+                  {myCommitmentStatus === 'accepted' && (
                     <Button
                       label="Leave Session"
                       variant="secondary"
@@ -508,14 +570,43 @@ export function SessionDetailPopup({
                       loading={joining}
                       buttonStyle={styles.actionBtn}
                     />
-                  ) : currentUserId ? (
+                  )}
+                  {myCommitmentStatus === 'pending' && (
+                    <ThemedText
+                      variant="caption"
+                      muted
+                      style={styles.statusMessage}
+                    >
+                      Your request is pending approval
+                    </ThemedText>
+                  )}
+                  {myCommitmentStatus === 'left' && (
+                    <View style={[styles.leftBanner, { backgroundColor: '#A855F715', borderColor: '#A855F730' }]}>
+                      <ThemedText
+                        variant="body"
+                        style={{ color: '#A855F7', fontWeight: '600', textAlign: 'center' }}
+                      >
+                        You left this session
+                      </ThemedText>
+                    </View>
+                  )}
+                  {myCommitmentStatus === 'rejected' && (
+                    <ThemedText
+                      variant="caption"
+                      muted
+                      style={styles.statusMessage}
+                    >
+                      Your request was declined
+                    </ThemedText>
+                  )}
+                  {!myCommitmentStatus && (
                     <Button
                       label="Yes, I'm In!"
                       onPress={handleCommit}
                       loading={joining}
                       buttonStyle={styles.actionBtn}
                     />
-                  ) : null}
+                  )}
                 </>
               )}
             </ScrollView>
@@ -671,5 +762,16 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
     borderRadius: Radius.sm,
+  },
+  statusMessage: {
+    textAlign: 'center',
+    paddingVertical: Spacing.md,
+  },
+  leftBanner: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
   },
 });

@@ -192,7 +192,7 @@ export type CreateSessionInput = {
   description?: string;
 };
 
-export type CommitmentStatus = 'pending' | 'accepted' | 'rejected';
+export type CommitmentStatus = 'pending' | 'accepted' | 'rejected' | 'left';
 export type FeedbackStatus = 'showed_up' | 'no_show';
 
 export type Commitment = {
