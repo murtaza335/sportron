@@ -97,7 +97,10 @@ export async function fetchSessionCommitments(
     .select(
       `
       *,
-      profile:profiles!commitments_user_id_fkey (id, username, avatar_url)
+      profile:profiles!commitments_user_id_fkey (
+        id, username, avatar_url,
+        completed_sessions, total_committed_sessions
+      )
     `,
     )
     .eq('session_id', sessionId)
@@ -116,13 +119,35 @@ export async function commitToSession(
     .insert({
       session_id: sessionId,
       user_id: userId,
-      status: 'accepted',
+      status: 'pending',
     })
     .select()
     .single();
 
   if (error) throw error;
   return data;
+}
+
+export async function approveCommitment(
+  commitmentId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('commitments')
+    .update({ status: 'accepted' })
+    .eq('id', commitmentId);
+
+  if (error) throw error;
+}
+
+export async function rejectCommitment(
+  commitmentId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('commitments')
+    .update({ status: 'rejected' })
+    .eq('id', commitmentId);
+
+  if (error) throw error;
 }
 
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {
