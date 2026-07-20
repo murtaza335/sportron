@@ -1,6 +1,7 @@
 import { Check, Clock, MapPin, Users, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
   Alert,
   Animated,
   Dimensions,
@@ -36,6 +37,7 @@ type SessionDetailPopupProps = {
   visible: boolean;
   onClose: () => void;
   currentUserId?: string;
+  initialSession?: Partial<Session> | null;
   onRefreshFeed?: () => void;
 };
 
@@ -61,20 +63,22 @@ export function SessionDetailPopup({
   visible,
   onClose,
   currentUserId,
+  initialSession,
   onRefreshFeed,
 }: SessionDetailPopupProps) {
   const theme = useTheme();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
-  const [session, setSession] = useState<Session | null>(null);
+  const [session, setSession] = useState<Session | null>(() => initialSession as Session | null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [joining, setJoining] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [myCommitmentStatus, setMyCommitmentStatus] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
-  const loading = visible && session === null && sessionId !== null;
-  const isCreator = currentUserId && session?.created_by === currentUserId;
+  const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const isLoading = visible && sessionId !== null && loadedSessionId !== sessionId;
+  const isCreator = currentUserId && (session?.created_by ?? (initialSession as Session | null)?.created_by) === currentUserId;
 
   // Drag-to-dismiss
   const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
@@ -114,14 +118,15 @@ export function SessionDetailPopup({
   useEffect(() => {
     if (!visible || !sessionId) return;
     const id = sessionId;
-      fetchSessionById(id, currentUserId)
-        .then((data) => {
-          if (sessionId === id) {
-            setSession(data);
-            setMyCommitmentStatus(data?.my_commitment?.status ?? null);
-          }
-        })
-        .catch((e) => console.error('Failed to load session:', e));
+    fetchSessionById(id, currentUserId)
+      .then((data) => {
+        if (sessionId === id) {
+          setSession(data);
+          setMyCommitmentStatus(data?.my_commitment?.status ?? null);
+          setLoadedSessionId(id);
+        }
+      })
+      .catch((e) => console.error('Failed to load session:', e));
   }, [visible, sessionId, currentUserId]);
 
   // Load applicant list when session loads and user is creator
@@ -282,7 +287,7 @@ export function SessionDetailPopup({
 
           <View style={styles.header} {...panHandlers}>
             <ThemedText variant="heading" numberOfLines={1} style={{ flex: 1 }}>
-              {session?.sport ?? 'Session'}
+              {session?.sport ?? initialSession?.sport ?? 'Session'}
             </ThemedText>
             <Pressable
               onPress={onClose}
@@ -293,392 +298,388 @@ export function SessionDetailPopup({
             </Pressable>
           </View>
 
-          {loading ? (
-            <View style={styles.loadingContainer}>
-              <ThemedText muted>Loading...</ThemedText>
-            </View>
-          ) : session ? (
-            <ScrollView
-              style={styles.scroll}
-              contentContainerStyle={styles.scrollContent}
-              showsVerticalScrollIndicator={false}
-            >
-              <Card style={styles.infoCard}>
-                <View style={styles.infoRow}>
-                  <MapPin size={16} color={theme.textSecondary} />
-                  <ThemedText variant="body" style={styles.infoValue}>
-                    {session.location}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Clock size={16} color={theme.textSecondary} />
-                  <ThemedText variant="body" style={styles.infoValue}>
-                    {formatSessionDate(session.date_time)} at{' '}
-                    {formatSessionTime(session.date_time)}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.infoRow}>
-                  <Users size={16} color={theme.textSecondary} />
-                  <ThemedText variant="body" style={styles.infoValue}>
-                    {session.commitment_count ?? 0} / {session.max_participants} participants
-                  </ThemedText>
-                </View>
-              </Card>
-
-              {session.description && (
-                <ThemedText variant="body" muted style={styles.description}>
-                  {session.description}
+          <ScrollView
+            style={styles.scroll}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+          >
+            <Card style={styles.infoCard}>
+              <View style={styles.infoRow}>
+                <MapPin size={16} color={theme.textSecondary} />
+                <ThemedText variant="body" style={styles.infoValue}>
+                  {session?.location ?? initialSession?.location}
                 </ThemedText>
-              )}
-
-              <View style={styles.creatorRow}>
-                <View
-                  style={[styles.creatorAvatar, { backgroundColor: theme.textSecondary }]}
-                >
-                  <ThemedText
-                    style={[styles.avatarText, { color: theme.background }]}
-                  >
-                    {(session.creator?.username ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </View>
-                <View>
-                  <ThemedText variant="caption" muted>
-                    Posted by
-                  </ThemedText>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {session.creator?.username ?? 'Unknown'}
-                  </ThemedText>
-                </View>
               </View>
 
-              {/* Applicants section — visible to creator */}
-              {isCreator && (
-                <View style={styles.applicantsSection}>
-                  <ThemedText variant="label" muted style={styles.sectionTitle}>
-                    Applicants
-                  </ThemedText>
+              <View style={styles.infoRow}>
+                <Clock size={16} color={theme.textSecondary} />
+                <ThemedText variant="body" style={styles.infoValue}>
+                  {formatSessionDate(session?.date_time ?? initialSession?.date_time ?? '')} at{' '}
+                  {formatSessionTime(session?.date_time ?? initialSession?.date_time ?? '')}
+                </ThemedText>
+              </View>
 
-                  {pendingCommitments.length === 0 && acceptedCommitments.length === 0 && leftCommitments.length === 0 && rejectedCommitments.length === 0 ? (
-                    <ThemedText variant="caption" muted style={styles.emptyApplicants}>
-                      No one has applied yet.
+              <View style={styles.infoRow}>
+                <Users size={16} color={theme.textSecondary} />
+                <ThemedText variant="body" style={styles.infoValue}>
+                  {session?.commitment_count ?? 0} / {session?.max_participants ?? initialSession?.max_participants} participants
+                </ThemedText>
+              </View>
+            </Card>
+
+            {(session?.description ?? initialSession?.description) ? (
+              <ThemedText variant="body" muted style={styles.description}>
+                {session?.description ?? initialSession?.description}
+              </ThemedText>
+            ) : null}
+
+            <View style={styles.creatorRow}>
+              <View
+                style={[styles.creatorAvatar, { backgroundColor: theme.textSecondary }]}
+              >
+                <ThemedText
+                  style={[styles.avatarText, { color: theme.background }]}
+                >
+                  {(session?.creator?.username ?? initialSession?.creator?.username ?? '?').charAt(0).toUpperCase()}
+                </ThemedText>
+              </View>
+              <View>
+                <ThemedText variant="caption" muted>
+                  Posted by
+                </ThemedText>
+                <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                  {session?.creator?.username ?? initialSession?.creator?.username ?? 'Unknown'}
+                </ThemedText>
+              </View>
+            </View>
+
+            {isLoading ? (
+              <ActivityIndicator color={theme.text} style={styles.dynamicLoader} />
+            ) : (
+              <>
+                {/* Applicants section — visible to creator */}
+                {isCreator && (
+                  <View style={styles.applicantsSection}>
+                    <ThemedText variant="label" muted style={styles.sectionTitle}>
+                      Applicants
                     </ThemedText>
-                  ) : (
-                    <>
-                      {/* Pending — needs approval */}
-                      {pendingCommitments.map((c) => (
-                        <View
-                          key={c.id}
-                          style={[
-                            styles.applicantCard,
-                            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                          ]}
-                        >
-                          <View style={styles.applicantInfo}>
-                            <View
-                              style={[
-                                styles.applicantAvatar,
-                                { backgroundColor: theme.textSecondary },
-                              ]}
-                            >
-                              <ThemedText
-                                style={[styles.avatarText, { color: theme.background }]}
-                              >
-                                {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                              </ThemedText>
-                            </View>
-                            <View style={styles.applicantDetails}>
-                              <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                                {c.profile?.username ?? 'Unknown'}
-                              </ThemedText>
-                              <ThemedText variant="caption" muted>
-                                {c.profile?.completed_sessions ?? 0} /{' '}
-                                {c.profile?.total_committed_sessions ?? 0} sessions completed
-                              </ThemedText>
-                            </View>
-                          </View>
-                          <View style={styles.applicantActions}>
-                            <Pressable
-                              onPress={() => handleApprove(c.id)}
-                              disabled={approvingId === c.id}
-                              style={[
-                                styles.actionChip,
-                                { backgroundColor: '#10B98120', borderColor: '#10B98140' },
-                              ]}
-                            >
-                              <Check size={14} color="#10B981" strokeWidth={3} />
-                            </Pressable>
-                            <Pressable
-                              onPress={() => handleReject(c.id)}
-                              disabled={approvingId === c.id}
-                              style={[
-                                styles.actionChip,
-                                { backgroundColor: '#EF444420', borderColor: '#EF444440' },
-                              ]}
-                            >
-                              <X size={14} color="#EF4444" strokeWidth={3} />
-                            </Pressable>
-                          </View>
-                        </View>
-                      ))}
 
-                      {/* Accepted */}
-                      {acceptedCommitments.map((c) => (
-                        <View
-                          key={c.id}
-                          style={[
-                            styles.applicantCard,
-                            { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                          ]}
-                        >
-                          <View style={styles.applicantInfo}>
-                            <View
-                              style={[
-                                styles.applicantAvatar,
-                                { backgroundColor: '#10B981' },
-                              ]}
-                            >
-                              <ThemedText
-                                style={[styles.avatarText, { color: 'white' }]}
+                    {pendingCommitments.length === 0 && acceptedCommitments.length === 0 && leftCommitments.length === 0 && rejectedCommitments.length === 0 ? (
+                      <ThemedText variant="caption" muted style={styles.emptyApplicants}>
+                        No one has applied yet.
+                      </ThemedText>
+                    ) : (
+                      <>
+                        {/* Pending — needs approval */}
+                        {pendingCommitments.map((c) => (
+                          <View
+                            key={c.id}
+                            style={[
+                              styles.applicantCard,
+                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                            ]}
+                          >
+                            <View style={styles.applicantInfo}>
+                              <View
+                                style={[
+                                  styles.applicantAvatar,
+                                  { backgroundColor: theme.textSecondary },
+                                ]}
                               >
-                                {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                              </ThemedText>
+                                <ThemedText
+                                  style={[styles.avatarText, { color: theme.background }]}
+                                >
+                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
+                                </ThemedText>
+                              </View>
+                              <View style={styles.applicantDetails}>
+                                <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                                  {c.profile?.username ?? 'Unknown'}
+                                </ThemedText>
+                                <ThemedText variant="caption" muted>
+                                  {c.profile?.completed_sessions ?? 0} /{' '}
+                                  {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                </ThemedText>
+                              </View>
                             </View>
-                            <View style={styles.applicantDetails}>
-                              <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                                {c.profile?.username ?? 'Unknown'}
-                              </ThemedText>
-                              <ThemedText variant="caption" muted>
-                                {c.profile?.completed_sessions ?? 0} /{' '}
-                                {c.profile?.total_committed_sessions ?? 0} sessions completed
+                            <View style={styles.applicantActions}>
+                              <Pressable
+                                onPress={() => handleApprove(c.id)}
+                                disabled={approvingId === c.id}
+                                style={[
+                                  styles.actionChip,
+                                  { backgroundColor: '#10B98120', borderColor: '#10B98140' },
+                                ]}
+                              >
+                                <Check size={14} color="#10B981" strokeWidth={3} />
+                              </Pressable>
+                              <Pressable
+                                onPress={() => handleReject(c.id)}
+                                disabled={approvingId === c.id}
+                                style={[
+                                  styles.actionChip,
+                                  { backgroundColor: '#EF444420', borderColor: '#EF444440' },
+                                ]}
+                              >
+                                <X size={14} color="#EF4444" strokeWidth={3} />
+                              </Pressable>
+                            </View>
+                          </View>
+                        ))}
+
+                        {/* Accepted */}
+                        {acceptedCommitments.map((c) => (
+                          <View
+                            key={c.id}
+                            style={[
+                              styles.applicantCard,
+                              { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                            ]}
+                          >
+                            <View style={styles.applicantInfo}>
+                              <View
+                                style={[
+                                  styles.applicantAvatar,
+                                  { backgroundColor: '#10B981' },
+                                ]}
+                              >
+                                <ThemedText
+                                  style={[styles.avatarText, { color: 'white' }]}
+                                >
+                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
+                                </ThemedText>
+                              </View>
+                              <View style={styles.applicantDetails}>
+                                <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                                  {c.profile?.username ?? 'Unknown'}
+                                </ThemedText>
+                                <ThemedText variant="caption" muted>
+                                  {c.profile?.completed_sessions ?? 0} /{' '}
+                                  {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                </ThemedText>
+                              </View>
+                            </View>
+                            <View style={[styles.statusChip, { backgroundColor: '#10B98120' }]}>
+                              <ThemedText
+                                variant="caption"
+                                style={{ color: '#10B981', fontWeight: '700', fontSize: 10 }}
+                              >
+                                Approved
                               </ThemedText>
                             </View>
                           </View>
-                          <View style={[styles.statusChip, { backgroundColor: '#10B98120' }]}>
-                            <ThemedText
-                              variant="caption"
-                              style={{ color: '#10B981', fontWeight: '700', fontSize: 10 }}
-                            >
-                              Approved
+                        ))}
+
+                        {/* Rejected */}
+                        {rejectedCommitments.length > 0 && (
+                          <>
+                            <ThemedText variant="label" muted style={styles.sectionTitle}>
+                              Declined
                             </ThemedText>
-                          </View>
-                        </View>
-                      ))}
-
-                      {/* Rejected */}
-                      {rejectedCommitments.length > 0 && (
-                        <>
-                          <ThemedText variant="label" muted style={styles.sectionTitle}>
-                            Declined
-                          </ThemedText>
-                          {rejectedCommitments.map((c) => (
-                            <View
-                              key={c.id}
-                              style={[
-                                styles.applicantCard,
-                                {
-                                  backgroundColor: theme.backgroundElement,
-                                  borderColor: theme.border,
-                                  opacity: 0.6,
-                                },
-                              ]}
-                            >
-                              <View style={styles.applicantInfo}>
-                                <View
-                                  style={[
-                                    styles.applicantAvatar,
-                                    { backgroundColor: theme.textSecondary },
-                                  ]}
-                                >
-                                  <ThemedText
-                                    style={[styles.avatarText, { color: theme.background }]}
+                            {rejectedCommitments.map((c) => (
+                              <View
+                                key={c.id}
+                                style={[
+                                  styles.applicantCard,
+                                  {
+                                    backgroundColor: theme.backgroundElement,
+                                    borderColor: theme.border,
+                                    opacity: 0.6,
+                                  },
+                                ]}
+                              >
+                                <View style={styles.applicantInfo}>
+                                  <View
+                                    style={[
+                                      styles.applicantAvatar,
+                                      { backgroundColor: theme.textSecondary },
+                                    ]}
                                   >
-                                    {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                  </ThemedText>
+                                    <ThemedText
+                                      style={[styles.avatarText, { color: theme.background }]}
+                                    >
+                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
+                                    </ThemedText>
+                                  </View>
+                                  <View style={styles.applicantDetails}>
+                                    <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                                      {c.profile?.username ?? 'Unknown'}
+                                    </ThemedText>
+                                    <ThemedText variant="caption" muted>
+                                      {c.profile?.completed_sessions ?? 0} /{' '}
+                                      {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                    </ThemedText>
+                                  </View>
                                 </View>
-                                <View style={styles.applicantDetails}>
-                                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                                    {c.profile?.username ?? 'Unknown'}
-                                  </ThemedText>
-                                  <ThemedText variant="caption" muted>
-                                    {c.profile?.completed_sessions ?? 0} /{' '}
-                                    {c.profile?.total_committed_sessions ?? 0} sessions completed
-                                  </ThemedText>
-                                </View>
-                              </View>
-                              <View style={[styles.statusChip, { backgroundColor: '#EF444420' }]}>
-                                <ThemedText
-                                  variant="caption"
-                                  style={{
-                                    color: '#EF4444',
-                                    fontWeight: '700',
-                                    fontSize: 10,
-                                  }}
-                                >
-                                  Declined
-                                </ThemedText>
-                              </View>
-                            </View>
-                          ))}
-                        </>
-                      )}
-
-                      {/* Left */}
-                      {leftCommitments.length > 0 && (
-                        <>
-                          <ThemedText variant="label" muted style={styles.sectionTitle}>
-                            Left ({leftCommitments.length})
-                          </ThemedText>
-                          {leftCommitments.map((c) => (
-                            <View
-                              key={c.id}
-                              style={[
-                                styles.applicantCard,
-                                {
-                                  backgroundColor: theme.backgroundElement,
-                                  borderColor: theme.border,
-                                  opacity: 0.5,
-                                },
-                              ]}
-                            >
-                              <View style={styles.applicantInfo}>
-                                <View
-                                  style={[
-                                    styles.applicantAvatar,
-                                    { backgroundColor: '#A855F7', opacity: 0.6 },
-                                  ]}
-                                >
+                                <View style={[styles.statusChip, { backgroundColor: '#EF444420' }]}>
                                   <ThemedText
-                                    style={[styles.avatarText, { color: 'white' }]}
+                                    variant="caption"
+                                    style={{
+                                      color: '#EF4444',
+                                      fontWeight: '700',
+                                      fontSize: 10,
+                                    }}
                                   >
-                                    {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                  </ThemedText>
-                                </View>
-                                <View style={styles.applicantDetails}>
-                                  <ThemedText
-                                    variant="body"
-                                    style={{ fontWeight: '600', opacity: 0.6 }}
-                                  >
-                                    {c.profile?.username ?? 'Unknown'}
-                                  </ThemedText>
-                                  <ThemedText variant="caption" muted>
-                                    {c.profile?.completed_sessions ?? 0} /{' '}
-                                    {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                    Declined
                                   </ThemedText>
                                 </View>
                               </View>
-                              <View style={[styles.statusChip, { backgroundColor: '#A855F720' }]}>
-                                <ThemedText
-                                  variant="caption"
-                                  style={{
-                                    color: '#A855F7',
-                                    fontWeight: '700',
-                                    fontSize: 10,
-                                  }}
-                                >
-                                  Left
-                                </ThemedText>
-                              </View>
-                            </View>
-                          ))}
-                        </>
-                      )}
-                    </>
-                  )}
-                </View>
-              )}
+                            ))}
+                          </>
+                        )}
 
-              {/* Delete — visible to creator */}
-              {isCreator && (
-                <>
-                  {hasAcceptedParticipants ? (
-                    <View
-                      style={[
-                        styles.deleteBlockedBanner,
-                        { backgroundColor: '#DC262610', borderColor: '#DC262625' },
-                      ]}
-                    >
+                        {/* Left */}
+                        {leftCommitments.length > 0 && (
+                          <>
+                            <ThemedText variant="label" muted style={styles.sectionTitle}>
+                              Left ({leftCommitments.length})
+                            </ThemedText>
+                            {leftCommitments.map((c) => (
+                              <View
+                                key={c.id}
+                                style={[
+                                  styles.applicantCard,
+                                  {
+                                    backgroundColor: theme.backgroundElement,
+                                    borderColor: theme.border,
+                                    opacity: 0.5,
+                                  },
+                                ]}
+                              >
+                                <View style={styles.applicantInfo}>
+                                  <View
+                                    style={[
+                                      styles.applicantAvatar,
+                                      { backgroundColor: '#A855F7', opacity: 0.6 },
+                                    ]}
+                                  >
+                                    <ThemedText
+                                      style={[styles.avatarText, { color: 'white' }]}
+                                    >
+                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
+                                    </ThemedText>
+                                  </View>
+                                  <View style={styles.applicantDetails}>
+                                    <ThemedText
+                                      variant="body"
+                                      style={{ fontWeight: '600', opacity: 0.6 }}
+                                    >
+                                      {c.profile?.username ?? 'Unknown'}
+                                    </ThemedText>
+                                    <ThemedText variant="caption" muted>
+                                      {c.profile?.completed_sessions ?? 0} /{' '}
+                                      {c.profile?.total_committed_sessions ?? 0} sessions completed
+                                    </ThemedText>
+                                  </View>
+                                </View>
+                                <View style={[styles.statusChip, { backgroundColor: '#A855F720' }]}>
+                                  <ThemedText
+                                    variant="caption"
+                                    style={{
+                                      color: '#A855F7',
+                                      fontWeight: '700',
+                                      fontSize: 10,
+                                    }}
+                                  >
+                                    Left
+                                  </ThemedText>
+                                </View>
+                              </View>
+                            ))}
+                          </>
+                        )}
+                      </>
+                    )}
+                  </View>
+                )}
+
+                {/* Delete — visible to creator */}
+                {isCreator && (
+                  <>
+                    {hasAcceptedParticipants ? (
+                      <View
+                        style={[
+                          styles.deleteBlockedBanner,
+                          { backgroundColor: '#DC262610', borderColor: '#DC262625' },
+                        ]}
+                      >
+                        <ThemedText
+                          variant="caption"
+                          style={{ color: '#DC2626', textAlign: 'center', fontWeight: '500' }}
+                        >
+                          Cannot delete — {acceptedCommitments.length} participant
+                          {acceptedCommitments.length > 1 ? 's have' : ' has'} already been accepted
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <Pressable
+                        onPress={handleDelete}
+                        disabled={deleting}
+                        style={styles.deleteAction}
+                      >
+                        <ThemedText
+                          style={{ color: '#DC2626', fontWeight: '600', fontSize: 14 }}
+                        >
+                          {deleting ? 'Deleting...' : 'Delete Session'}
+                        </ThemedText>
+                      </Pressable>
+                    )}
+                  </>
+                )}
+
+                {/* Action section — visible to non-creators */}
+                {!isCreator && currentUserId && (
+                  <>
+                    {myCommitmentStatus === 'accepted' && (
+                      <Button
+                        label="Leave Session"
+                        variant="secondary"
+                        onPress={handleUncommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
+                    )}
+                    {myCommitmentStatus === 'pending' && (
                       <ThemedText
                         variant="caption"
-                        style={{ color: '#DC2626', textAlign: 'center', fontWeight: '500' }}
+                        muted
+                        style={styles.statusMessage}
                       >
-                        Cannot delete — {acceptedCommitments.length} participant
-                        {acceptedCommitments.length > 1 ? 's have' : ' has'} already been accepted
+                        Your request is pending approval
                       </ThemedText>
-                    </View>
-                  ) : (
-                    <Pressable
-                      onPress={handleDelete}
-                      disabled={deleting}
-                      style={styles.deleteAction}
-                    >
+                    )}
+                    {myCommitmentStatus === 'left' && (
+                      <View style={[styles.leftBanner, { backgroundColor: '#A855F715', borderColor: '#A855F730' }]}>
+                        <ThemedText
+                          variant="body"
+                          style={{ color: '#A855F7', fontWeight: '600', textAlign: 'center' }}
+                        >
+                          You left this session
+                        </ThemedText>
+                      </View>
+                    )}
+                    {myCommitmentStatus === 'rejected' && (
                       <ThemedText
-                        style={{ color: '#DC2626', fontWeight: '600', fontSize: 14 }}
+                        variant="caption"
+                        muted
+                        style={styles.statusMessage}
                       >
-                        {deleting ? 'Deleting...' : 'Delete Session'}
+                        Your request was declined
                       </ThemedText>
-                    </Pressable>
-                  )}
-                </>
-              )}
-
-              {/* Action section — visible to non-creators */}
-              {!isCreator && currentUserId && (
-                <>
-                  {myCommitmentStatus === 'accepted' && (
-                    <Button
-                      label="Leave Session"
-                      variant="secondary"
-                      onPress={handleUncommit}
-                      loading={joining}
-                      buttonStyle={styles.actionBtn}
-                    />
-                  )}
-                  {myCommitmentStatus === 'pending' && (
-                    <ThemedText
-                      variant="caption"
-                      muted
-                      style={styles.statusMessage}
-                    >
-                      Your request is pending approval
-                    </ThemedText>
-                  )}
-                  {myCommitmentStatus === 'left' && (
-                    <View style={[styles.leftBanner, { backgroundColor: '#A855F715', borderColor: '#A855F730' }]}>
-                      <ThemedText
-                        variant="body"
-                        style={{ color: '#A855F7', fontWeight: '600', textAlign: 'center' }}
-                      >
-                        You left this session
-                      </ThemedText>
-                    </View>
-                  )}
-                  {myCommitmentStatus === 'rejected' && (
-                    <ThemedText
-                      variant="caption"
-                      muted
-                      style={styles.statusMessage}
-                    >
-                      Your request was declined
-                    </ThemedText>
-                  )}
-                  {!myCommitmentStatus && (
-                    <Button
-                      label="Yes, I'm In!"
-                      onPress={handleCommit}
-                      loading={joining}
-                      buttonStyle={styles.actionBtn}
-                    />
-                  )}
-                </>
-              )}
-            </ScrollView>
-          ) : (
-            <View style={styles.loadingContainer}>
-              <ThemedText muted>Session not found</ThemedText>
-            </View>
-          )}
+                    )}
+                    {!myCommitmentStatus && (
+                      <Button
+                        label="Yes, I'm In!"
+                        onPress={handleCommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
+                    )}
+                  </>
+                )}
+              </>
+            )}
+          </ScrollView>
         </Animated.View>
       </View>
     </Modal>
@@ -768,6 +769,9 @@ const styles = StyleSheet.create({
   loadingContainer: {
     paddingVertical: Spacing.xxl,
     alignItems: 'center',
+  },
+  dynamicLoader: {
+    paddingVertical: Spacing.xl,
   },
   applicantsSection: {
     gap: Spacing.sm,
