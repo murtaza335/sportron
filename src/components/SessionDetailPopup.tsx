@@ -360,7 +360,7 @@ export function SessionDetailPopup({
                     Applicants
                   </ThemedText>
 
-                  {pendingCommitments.length === 0 && acceptedCommitments.length === 0 ? (
+                  {pendingCommitments.length === 0 && acceptedCommitments.length === 0 && leftCommitments.length === 0 && rejectedCommitments.length === 0 ? (
                     <ThemedText variant="caption" muted style={styles.emptyApplicants}>
                       No one has applied yet.
                     </ThemedText>
