@@ -21,6 +21,7 @@ import {
   approveCommitment,
   checkTimeConflicts,
   commitToSession,
+  deleteSession,
   fetchSessionById,
   fetchSessionCommitments,
   rejectCommitment,
@@ -68,6 +69,7 @@ export function SessionDetailPopup({
   const [session, setSession] = useState<Session | null>(null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
   const [joining, setJoining] = useState(false);
+  const [deleting, setDeleting] = useState(false);
   const [myCommitmentStatus, setMyCommitmentStatus] = useState<string | null>(null);
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
@@ -224,12 +226,40 @@ export function SessionDetailPopup({
     }
   };
 
+  const handleDelete = () => {
+    if (!sessionId || !currentUserId) return;
+    Alert.alert(
+      'Delete Session',
+      'Are you sure you want to delete this session? This cannot be undone.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            try {
+              await deleteSession(sessionId, currentUserId);
+              onRefreshFeed?.();
+              onClose();
+            } catch (e: any) {
+              Alert.alert('Cannot Delete', e?.message ?? 'An error occurred.');
+            } finally {
+              setDeleting(false);
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (!visible) return null;
 
   const pendingCommitments = commitments.filter((c) => c.status === 'pending');
   const acceptedCommitments = commitments.filter((c) => c.status === 'accepted');
   const rejectedCommitments = commitments.filter((c) => c.status === 'rejected');
   const leftCommitments = commitments.filter((c) => c.status === 'left');
+  const hasAcceptedParticipants = acceptedCommitments.length > 0;
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -559,6 +589,40 @@ export function SessionDetailPopup({
                 </View>
               )}
 
+              {/* Delete — visible to creator */}
+              {isCreator && (
+                <>
+                  {hasAcceptedParticipants ? (
+                    <View
+                      style={[
+                        styles.deleteBlockedBanner,
+                        { backgroundColor: '#DC262610', borderColor: '#DC262625' },
+                      ]}
+                    >
+                      <ThemedText
+                        variant="caption"
+                        style={{ color: '#DC2626', textAlign: 'center', fontWeight: '500' }}
+                      >
+                        Cannot delete — {acceptedCommitments.length} participant
+                        {acceptedCommitments.length > 1 ? 's have' : ' has'} already been accepted
+                      </ThemedText>
+                    </View>
+                  ) : (
+                    <Pressable
+                      onPress={handleDelete}
+                      disabled={deleting}
+                      style={styles.deleteAction}
+                    >
+                      <ThemedText
+                        style={{ color: '#DC2626', fontWeight: '600', fontSize: 14 }}
+                      >
+                        {deleting ? 'Deleting...' : 'Delete Session'}
+                      </ThemedText>
+                    </Pressable>
+                  )}
+                </>
+              )}
+
               {/* Action section — visible to non-creators */}
               {!isCreator && currentUserId && (
                 <>
@@ -768,6 +832,17 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   leftBanner: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+  },
+  deleteAction: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+  },
+  deleteBlockedBanner: {
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,
