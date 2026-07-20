@@ -201,11 +201,14 @@ export function SessionDetailPopup({
   };
 
   const handleApprove = async (commitmentId: string) => {
+    const id = sessionId;
+    const uid = currentUserId;
+    if (!id || !uid) return;
     setApprovingId(commitmentId);
     try {
       await approveCommitment(commitmentId);
       setReloadKey((k) => k + 1);
-      const sessionData = await fetchSessionById(sessionId, currentUserId);
+      const sessionData = await fetchSessionById(id, uid);
       setSession(sessionData);
       setMyCommitmentStatus(sessionData?.my_commitment?.status ?? null);
       onRefreshFeed?.();
