@@ -106,6 +106,14 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="community/[id]/members"
+          options={{
+            headerShown: true,
+            title: 'Members',
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
           name="create-community"
           options={{
             presentation: 'fullScreenModal',

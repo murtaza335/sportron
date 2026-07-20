@@ -1,5 +1,13 @@
 import { supabase } from '@/lib/supabase';
-import type { Community, CommunityMember, CreateCommunityInput } from '@/types';
+import type {
+  Community,
+  CommunityJoinRequest,
+  CommunityMatch,
+  CommunityMember,
+  CreateCommunityInput,
+  Ping,
+  UpdateCommunityInput,
+} from '@/types';
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
@@ -81,6 +89,32 @@ export async function createCommunity(
   return { ...data, member_count: 1 };
 }
 
+export async function updateCommunity(
+  communityId: string,
+  input: UpdateCommunityInput,
+): Promise<void> {
+  const updates: Record<string, unknown> = {};
+  if (input.name !== undefined) updates.name = input.name.trim();
+  if (input.description !== undefined) updates.description = input.description?.trim() || null;
+  if (input.visibility !== undefined) updates.visibility = input.visibility;
+
+  const { error } = await supabase
+    .from('communities')
+    .update(updates)
+    .eq('id', communityId);
+
+  if (error) throw error;
+}
+
+export async function deleteCommunity(communityId: string): Promise<void> {
+  const { error } = await supabase
+    .from('communities')
+    .delete()
+    .eq('id', communityId);
+
+  if (error) throw error;
+}
+
 export async function fetchCommunityMembers(communityId: string): Promise<CommunityMember[]> {
   const { data, error } = await supabase
     .from('community_members')
@@ -89,6 +123,21 @@ export async function fetchCommunityMembers(communityId: string): Promise<Commun
 
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchCommunityMember(
+  communityId: string,
+  userId: string,
+): Promise<CommunityMember | null> {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select('*')
+    .eq('community_id', communityId)
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data;
 }
 
 export async function joinCommunity(communityId: string, userId: string): Promise<void> {
@@ -104,12 +153,217 @@ export async function joinCommunity(communityId: string, userId: string): Promis
   if (error) throw error;
 }
 
+export async function requestToJoinCommunity(
+  communityId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_join_requests')
+    .insert({
+      community_id: communityId,
+      user_id: userId,
+    });
+
+  if (error) throw error;
+}
+
+export async function cancelJoinRequest(communityId: string, userId: string): Promise<void> {
+  const { error } = await supabase
+    .from('community_join_requests')
+    .delete()
+    .eq('community_id', communityId)
+    .eq('user_id', userId);
+
+  if (error) throw error;
+}
+
 export async function leaveCommunity(communityId: string, userId: string): Promise<void> {
   const { error } = await supabase
     .from('community_members')
     .delete()
     .eq('community_id', communityId)
     .eq('profile_id', userId);
+
+  if (error) throw error;
+}
+
+export async function removeMember(
+  communityId: string,
+  profileId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_members')
+    .delete()
+    .eq('community_id', communityId)
+    .eq('profile_id', profileId);
+
+  if (error) throw error;
+}
+
+export async function transferAdmin(
+  communityId: string,
+  currentUserId: string,
+  newAdminId: string,
+): Promise<void> {
+  const { error: demoteError } = await supabase
+    .from('community_members')
+    .update({ role: 'member' })
+    .eq('community_id', communityId)
+    .eq('profile_id', currentUserId);
+
+  if (demoteError) throw demoteError;
+
+  const { error: promoteError } = await supabase
+    .from('community_members')
+    .update({ role: 'admin' })
+    .eq('community_id', communityId)
+    .eq('profile_id', newAdminId);
+
+  if (promoteError) throw promoteError;
+}
+
+export async function fetchJoinRequests(
+  communityId: string,
+): Promise<CommunityJoinRequest[]> {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .select(`
+      *,
+      profile:user_id(id, username, avatar_url)
+    `)
+    .eq('community_id', communityId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: true });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function respondToJoinRequest(
+  requestId: string,
+  status: 'approved' | 'rejected',
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_join_requests')
+    .update({ status })
+    .eq('id', requestId);
+
+  if (error) throw error;
+
+  if (status === 'approved') {
+    const { data: request, error: fetchError } = await supabase
+      .from('community_join_requests')
+      .select('community_id, user_id')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchError) throw fetchError;
+
+    const { error: memberError } = await supabase
+      .from('community_members')
+      .insert({
+        community_id: request.community_id,
+        profile_id: request.user_id,
+        role: 'member',
+        approval_status: 'approved',
+      });
+
+    if (memberError) throw memberError;
+  }
+}
+
+export async function sendPing(
+  communityId: string,
+  senderId: string,
+  message: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('pings')
+    .insert({
+      community_id: communityId,
+      sender_id: senderId,
+      message: message.trim(),
+    });
+
+  if (error) throw error;
+}
+
+export async function fetchPings(communityId: string): Promise<Ping[]> {
+  const { data, error } = await supabase
+    .from('pings')
+    .select(`
+      *,
+      sender:sender_id(id, username)
+    `)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false })
+    .limit(50);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function recordCommunityMatch(input: {
+  community_id: string;
+  recorded_by: string;
+  player_id: string;
+  opponent_id: string;
+  player_score: number;
+  opponent_score: number;
+}): Promise<CommunityMatch> {
+  const { data, error } = await supabase
+    .from('community_matches')
+    .insert({
+      community_id: input.community_id,
+      recorded_by: input.recorded_by,
+      player_id: input.player_id,
+      opponent_id: input.opponent_id,
+      player_score: input.player_score,
+      opponent_score: input.opponent_score,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function fetchCommunityMatches(
+  communityId: string,
+): Promise<CommunityMatch[]> {
+  const { data, error } = await supabase
+    .from('community_matches')
+    .select(`
+      *,
+      recorder:recorded_by(id, username),
+      player:player_id(id, username),
+      opponent:opponent_id(id, username)
+    `)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function approveCommunityMatch(
+  matchId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_matches')
+    .update({ approval_status: 'approved' })
+    .eq('id', matchId);
+
+  if (error) throw error;
+}
+
+export async function disputeCommunityMatch(
+  matchId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_matches')
+    .update({ approval_status: 'disputed' })
+    .eq('id', matchId);
 
   if (error) throw error;
 }

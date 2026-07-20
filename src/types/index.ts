@@ -166,6 +166,49 @@ export type CreateCommunityInput = {
   visibility: CommunityVisibility;
 };
 
+export type UpdateCommunityInput = {
+  name?: string;
+  description?: string | null;
+  visibility?: CommunityVisibility;
+};
+
+export type CommunityJoinRequest = {
+  id: string;
+  community_id: string;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
+export type Ping = {
+  id: string;
+  community_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  sender?: Pick<Profile, 'id' | 'username'> | null;
+};
+
+export type CommunityMatch = {
+  id: string;
+  community_id: string;
+  recorded_by: string;
+  player_id: string;
+  player_partner_id: string | null;
+  opponent_id: string;
+  opponent_partner_id: string | null;
+  player_score: number;
+  opponent_score: number;
+  approval_status: 'pending' | 'approved' | 'disputed';
+  created_at: string;
+  updated_at: string;
+  recorder?: Pick<Profile, 'id' | 'username'> | null;
+  player?: Pick<Profile, 'id' | 'username'> | null;
+  opponent?: Pick<Profile, 'id' | 'username'> | null;
+};
+
 export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelled';
 
 export type Session = {
