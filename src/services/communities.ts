@@ -43,6 +43,29 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
   return (data ?? []).map((row) => normalizeCommunity(row as CommunityRow));
 }
 
+export async function fetchMyCommunities(userId: string): Promise<Community[]> {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select(`
+      community:community_id(
+        *,
+        member_count:community_members(count)
+      )
+    `)
+    .eq('profile_id', userId)
+    .eq('approval_status', 'approved');
+
+  if (error) throw error;
+
+  const communities: Community[] = [];
+  for (const row of data ?? []) {
+    const c = (row as Record<string, unknown>).community as CommunityRow | undefined;
+    if (c) communities.push(normalizeCommunity(c));
+  }
+
+  return communities;
+}
+
 export async function fetchCommunityById(id: string): Promise<Community | null> {
   const { data, error } = await supabase
     .from('communities')
