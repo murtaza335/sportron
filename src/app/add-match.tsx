@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -37,16 +37,22 @@ type SelectionState = {
 export default function AddMatchScreen() {
   const theme = useTheme();
   const router = useRouter();
-  const { communityId } = useLocalSearchParams<{ communityId?: string }>();
+  const { communityId, sport: sportParam } = useLocalSearchParams<{ communityId?: string; sport?: Sport }>();
   const { user, profile } = useAuth();
+
+  const isCommunityMatch = !!communityId;
 
   const [profiles, setProfiles] = useState<Profile[]>([]);
   const [communityMembers, setCommunityMembers] = useState<CommunityMember[]>([]);
-  const [sport, setSport] = useState<Sport>('table_tennis');
+  const [sport, setSport] = useState<Sport>(
+    isCommunityMatch && sportParam ? sportParam : 'table_tennis'
+  );
   const [customSportName, setCustomSportName] = useState('');
   const [teamAName, setTeamAName] = useState('');
   const [teamBName, setTeamBName] = useState('');
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>('doubles');
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>(
+    isCommunityMatch ? 'singles' : 'doubles'
+  );
   const [selection, setSelection] = useState<SelectionState>({
     playerPartner: null,
     opponent: null,
@@ -56,8 +62,6 @@ export default function AddMatchScreen() {
   const [opponentScore, setOpponentScore] = useState(0);
   const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
-
-  const isCommunityMatch = !!communityId;
 
   // Build community member profiles for the opponent selector
   const communityProfiles: Profile[] = useMemo(
@@ -93,8 +97,6 @@ export default function AddMatchScreen() {
       fetchCommunityMembers(communityId)
         .then((data) => { if (!cancelled) setCommunityMembers(data); })
         .catch((error) => console.error('Failed to load community members:', error));
-      // For community matches, default to singles
-      setMatchFormat('singles');
     } else {
       fetchAllProfiles(user?.id)
         .then((data) => { if (!cancelled) setProfiles(data); })

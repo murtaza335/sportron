@@ -1,5 +1,19 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useState } from 'react';
+import {
+  Check,
+  ChevronRight,
+  Globe,
+  Lock,
+  LogOut,
+  Megaphone,
+  Pencil,
+  Plus,
+  Shield,
+  Swords,
+  Users,
+  X,
+} from 'lucide-react-native';
 import {
   ActivityIndicator,
   Alert,
@@ -11,28 +25,18 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import {
-  Check,
-  ChevronRight,
-  LogOut,
-  Megaphone,
-  Pencil,
-  Plus,
-  Shield,
-  Swords,
-  Users,
-  X,
-} from 'lucide-react-native';
 
+import { MatchCard } from '@/components/MatchCard';
+import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { SPORT_LABELS } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
+  fetchCommunityMatches,
   joinCommunity,
   leaveCommunity,
   requestToJoinCommunity,
@@ -43,9 +47,11 @@ import {
 } from '@/services/communities';
 import type {
   CommunityJoinRequest,
-  CommunityMember,
+  CommunityMatch,
   CommunityVisibility,
+  MatchWithProfiles,
 } from '@/types';
+import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -64,12 +70,70 @@ export default function CommunityDetailScreen() {
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
 
+  // Matches
+  const [matches, setMatches] = useState<CommunityMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(true);
+  const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
+  const [popupVisible, setPopupVisible] = useState(false);
+
+  const loadMatches = useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await fetchCommunityMatches(id, user?.id);
+      setMatches(data);
+    } catch (e) {
+      console.error('Failed to load matches:', e);
+    } finally {
+      setMatchesLoading(false);
+    }
+  }, [id, user?.id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMatches();
+    }, [loadMatches]),
+  );
+
+  const approvedMatches = matches.filter((m) => m.approval_status === 'approved');
+
+  function toMatchWithProfiles(cm: CommunityMatch): MatchWithProfiles {
+    return {
+      id: cm.id,
+      created_by: cm.recorded_by,
+      player_id: cm.player_id,
+      player_partner_id: cm.player_partner_id,
+      opponent_id: cm.opponent_id,
+      opponent_partner_id: cm.opponent_partner_id,
+      opponent_guest_name: null,
+      match_format: 'singles',
+      sport: cm.sport,
+      custom_sport_name: cm.custom_sport_name,
+      team_a_name: cm.team_a_name,
+      team_b_name: cm.team_b_name,
+      player_score: cm.player_score,
+      opponent_score: cm.opponent_score,
+      is_public: true,
+      verification_status:
+        cm.approval_status === 'approved'
+          ? 'verified'
+          : cm.approval_status === 'disputed'
+            ? 'disputed'
+            : 'pending',
+      created_at: cm.created_at,
+      player: cm.player ?? null,
+      playerPartner: null,
+      opponent: cm.opponent ?? null,
+      opponentPartner: null,
+      likes_count: 0,
+      comments_count: 0,
+      is_liked_by_user: false,
+    };
+  }
+
   // Ping modal
   const [pingModalVisible, setPingModalVisible] = useState(false);
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
-
-  // Record match — uses add-match.tsx with communityId param
 
   // Edit modal
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -165,6 +229,7 @@ export default function CommunityDetailScreen() {
           try {
             await transferAdmin(id, user!.id, text.trim());
             setMembership((prev) => prev ? { ...prev, role: 'member' } : null);
+            setEditModalVisible(false);
             refresh();
             Alert.alert('Done', 'Admin rights transferred.');
           } catch (e: any) {
@@ -211,7 +276,7 @@ export default function CommunityDetailScreen() {
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community' }} />
+        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -220,7 +285,7 @@ export default function CommunityDetailScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community' }} />
+        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -228,82 +293,124 @@ export default function CommunityDetailScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: community.name }} />
+      {/* Header Actions */}
+      <Stack.Screen
+        options={{
+          headerTitle: () =>
+            isMember ? (
+              <Pressable onPress={() => router.navigate(`/community/${id}/info`)}>
+                <ThemedText
+                  style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
+                  numberOfLines={1}
+                >
+                  {community.name}
+                </ThemedText>
+              </Pressable>
+            ) : (
+              <ThemedText
+                style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
+                numberOfLines={1}
+              >
+                {community.name}
+              </ThemedText>
+            ),
+          headerRight: () => (
+            <View style={styles.headerRight}>
+              {isAdmin && (
+                <Pressable onPress={handleOpenEdit} hitSlop={12} style={styles.headerIcon}>
+                  <Pencil size={20} color={theme.text} />
+                </Pressable>
+              )}
+              {isMember && (
+                <Pressable onPress={handleLeave} hitSlop={12} style={styles.headerIcon}>
+                  <LogOut size={20} color={theme.text} />
+                </Pressable>
+              )}
+            </View>
+          ),
+        }}
+      />
+
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={refresh}
+            onRefresh={() => { refresh(); loadMatches(); }}
             tintColor={theme.text}
           />
         }
       >
-        {/* Community info card */}
-        <Card style={styles.infoCard}>
-          <View style={styles.infoHeader}>
-            <ThemedText variant="heading" style={{ flex: 1 }}>
-              {community.name}
-            </ThemedText>
-            <View
-              style={[
-                styles.visibilityBadge,
-                {
-                  backgroundColor:
-                    community.visibility === 'public' ? '#10B98120' : '#D9770620',
-                },
-              ]}
-            >
-              <ThemedText
-                variant="caption"
-                style={{
-                  color: community.visibility === 'public' ? '#10B981' : '#D97706',
-                  fontWeight: '700',
-                }}
-              >
-                {community.visibility === 'public' ? 'Public' : 'Restricted'}
-              </ThemedText>
+        {/* 1. Info Card + Join Action (Non-members only) */}
+        {!isMember && (
+          <>
+            <Card style={styles.infoCard}>
+              <View style={styles.infoHeader}>
+                <ThemedText variant="heading" style={{ flex: 1 }}>
+                  {community.name}
+                </ThemedText>
+                <View
+                  style={[
+                    styles.visibilityBadgeSmall,
+                    {
+                      backgroundColor: community.visibility === 'public' ? '#10B98120' : '#D9770620',
+                    },
+                  ]}
+                >
+                  {community.visibility === 'public' ? (
+                    <Globe size={12} color="#10B981" strokeWidth={2.5} />
+                  ) : (
+                    <Lock size={12} color="#D97706" strokeWidth={2.5} />
+                  )}
+                  <ThemedText
+                    variant="caption"
+                    style={{
+                      color: community.visibility === 'public' ? '#10B981' : '#D97706',
+                      fontWeight: '700',
+                      fontSize: 11,
+                    }}
+                  >
+                    {community.visibility === 'public' ? 'Public' : 'Restricted'}
+                  </ThemedText>
+                </View>
+              </View>
+
+              <View style={styles.sportBadgeRow}>
+                <View style={[styles.sportBadgeSmall, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <Swords size={12} color={theme.textSecondary} strokeWidth={2} />
+                  <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
+                    {SPORT_LABELS[community.sport] || community.sport}
+                  </ThemedText>
+                </View>
+              </View>
+
+              {community.description && (
+                <ThemedText variant="body" muted style={styles.description}>
+                  {community.description}
+                </ThemedText>
+              )}
+
+              <View style={styles.metaRow}>
+                <Users size={14} color={theme.textSecondary} strokeWidth={2} />
+                <ThemedText variant="caption" muted>
+                  {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
+                </ThemedText>
+              </View>
+            </Card>
+
+            <View style={styles.primaryActionRow}>
+              <Button
+                label={community.visibility === 'restricted' ? 'Request to Join' : 'Join Community'}
+                icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
+                onPress={handleJoin}
+                buttonStyle={{ flex: 1 }}
+              />
             </View>
-          </View>
-
-          <View style={styles.badgesRow}>
-            <View style={[styles.sportBadge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
-                {SPORT_LABELS[community.sport] || community.sport}
-              </ThemedText>
-            </View>
-          </View>
-
-          {community.description && (
-            <ThemedText variant="body" muted style={styles.description}>
-              {community.description}
-            </ThemedText>
-          )}
-
-          <View style={styles.metaRow}>
-            <Users size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
-              {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
-            </ThemedText>
-          </View>
-        </Card>
-
-        {/* Admin actions */}
-        {isAdmin && (
-          <View style={styles.adminActions}>
-            <Pressable onPress={handleOpenEdit} style={styles.adminChip}>
-              <Pencil size={14} color={theme.text} strokeWidth={2} />
-              <ThemedText variant="caption" style={{ fontWeight: '600' }}>Edit</ThemedText>
-            </Pressable>
-            <Pressable onPress={handleTransferAdmin} style={styles.adminChip}>
-              <Shield size={14} color={theme.text} strokeWidth={2} />
-              <ThemedText variant="caption" style={{ fontWeight: '600' }}>Transfer Admin</ThemedText>
-            </Pressable>
-          </View>
+          </>
         )}
 
-        {/* Join requests — admin only */}
+        {/* 3. Join Requests (Admin Only Alerts) */}
         {isAdmin && joinRequests.length > 0 && (
           <View style={styles.section}>
             <ThemedText variant="label" muted style={styles.sectionTitle}>
@@ -340,75 +447,67 @@ export default function CommunityDetailScreen() {
           </View>
         )}
 
-        {/* Ping & Record Match — visible to members */}
+        {/* 4. Matches Section */}
         {isMember && (
-          <>
-            {isAdmin && (
+          <View style={styles.section}>
+            {/* Record Match + Ping Bar */}
+            <View style={styles.recordMatchBar}>
               <Button
-                label="Ping Everyone"
-                variant="secondary"
-                icon={<Megaphone size={16} color={theme.text} strokeWidth={2} />}
-                onPress={() => setPingModalVisible(true)}
-                buttonStyle={styles.fullWidthBtn}
+                label="Record Match"
+                icon={<Swords size={18} color={theme.background} strokeWidth={2} />}
+                onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
+                buttonStyle={styles.recordMatchButton}
               />
+              {isAdmin && (
+                <Pressable
+                  onPress={() => setPingModalVisible(true)}
+                  style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                >
+                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
+                  <View style={styles.pingDot} />
+                </Pressable>
+              )}
+            </View>
+
+            {/* Recent Matches */}
+            {matchesLoading ? (
+              <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
+            ) : approvedMatches.length > 0 ? (
+              <>
+                {approvedMatches.slice(0, 5).map((cm) => (
+                  <MatchCard
+                    key={cm.id}
+                    match={toMatchWithProfiles(cm)}
+                    currentUserId={user?.id}
+                    onPress={() => {
+                      setSelectedMatch(toMatchWithProfiles(cm));
+                      setPopupVisible(true);
+                    }}
+                    showYoursBadge={false}
+                  />
+                ))}
+                {approvedMatches.length > 5 && (
+                  <Pressable
+                    onPress={() => router.navigate(`/community/${id}/matches`)}
+                    style={[styles.viewAllLink, { borderColor: theme.border }]}
+                  >
+                    <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
+                      View All ({approvedMatches.length})
+                    </ThemedText>
+                    <ChevronRight size={16} color={theme.textSecondary} strokeWidth={2} />
+                  </Pressable>
+                )}
+              </>
+            ) : (
+              <Card>
+                <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
+                  No matches recorded yet. Be the first to record one!
+                </ThemedText>
+              </Card>
             )}
-            <Button
-              label="Record Match"
-              variant="secondary"
-              icon={<Swords size={16} color={theme.text} strokeWidth={2} />}
-              onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
-              buttonStyle={styles.fullWidthBtn}
-            />
-          </>
+          </View>
         )}
 
-        {/* Members — summary with navigation */}
-        <Pressable
-          onPress={() => router.navigate(`/community/${id}/members`)}
-          style={[styles.membersSummaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-        >
-          <View style={styles.membersSummaryLeft}>
-            <Users size={18} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="body" style={{ fontWeight: '600' }}>
-              {community.member_count ?? 0} Member{(community.member_count ?? 0) !== 1 ? 's' : ''}
-            </ThemedText>
-          </View>
-          <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
-        </Pressable>
-
-        {/* Match History — summary with navigation */}
-        <Pressable
-          onPress={() => router.navigate(`/community/${id}/matches`)}
-          style={[styles.membersSummaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-        >
-          <View style={styles.membersSummaryLeft}>
-            <Swords size={18} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="body" style={{ fontWeight: '600' }}>
-              Match History
-            </ThemedText>
-          </View>
-          <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
-        </Pressable>
-
-        {/* Join/Leave actions */}
-        <View style={styles.actionBar}>
-          {isMember ? (
-            <Button
-              label="Leave Community"
-              variant="secondary"
-              icon={<LogOut size={16} color={theme.text} strokeWidth={2} />}
-              onPress={handleLeave}
-              buttonStyle={styles.fullWidthBtn}
-            />
-          ) : (
-            <Button
-              label={community.visibility === 'restricted' ? 'Request to Join' : 'Join Community'}
-              icon={<Plus size={16} color={theme.background} strokeWidth={2.5} />}
-              onPress={handleJoin}
-              buttonStyle={styles.fullWidthBtn}
-            />
-          )}
-        </View>
       </ScrollView>
 
       {/* Ping Modal */}
@@ -457,6 +556,7 @@ export default function CommunityDetailScreen() {
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
             </View>
+            
             <TextInput
               placeholder="Community name"
               placeholderTextColor={theme.textSecondary}
@@ -468,6 +568,7 @@ export default function CommunityDetailScreen() {
               ]}
               maxLength={60}
             />
+            
             <TextInput
               placeholder="Description (optional)"
               placeholderTextColor={theme.textSecondary}
@@ -481,6 +582,7 @@ export default function CommunityDetailScreen() {
               multiline
               maxLength={300}
             />
+            
             <View style={styles.visibilityToggle}>
               <Pressable
                 onPress={() => setEditVisibility('public')}
@@ -499,6 +601,7 @@ export default function CommunityDetailScreen() {
                   Public
                 </ThemedText>
               </Pressable>
+              
               <Pressable
                 onPress={() => setEditVisibility('restricted')}
                 style={[
@@ -517,16 +620,35 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
               </Pressable>
             </View>
+            
             <Button
               label="Save Changes"
               onPress={handleSaveEdit}
               loading={savingEdit}
               disabled={!editName.trim()}
             />
+
+            {/* Transferred advanced admin action to the bottom of edit modal */}
+            <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
+               <Shield size={14} color="#EF4444" strokeWidth={2} />
+               <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
+                 Transfer Admin Rights
+               </ThemedText>
+            </Pressable>
+
           </Pressable>
         </Pressable>
       </Modal>
 
+      <MatchDetailPopup
+        match={selectedMatch}
+        visible={popupVisible}
+        onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
+        currentUserId={user?.id}
+        onRefreshFeed={loadMatches}
+        hideSocial
+        hideDelete
+      />
     </View>
   );
 }
@@ -540,46 +662,58 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingBottom: Spacing.xxxl,
   },
+  
+  // Header Adjustments
+  headerRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingRight: Spacing.sm,
+  },
+  headerIcon: {
+    padding: Spacing.xs,
+  },
+
+
+
+  // Non-member Info Card
   infoCard: { gap: Spacing.sm },
   infoHeader: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-  },
-  badgesRow: {
-    flexDirection: 'row',
     gap: Spacing.sm,
-    marginTop: Spacing.xs,
   },
-  sportBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-  },
-  visibilityBadge: {
+  visibilityBadgeSmall: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
     paddingHorizontal: Spacing.sm,
     paddingVertical: 3,
     borderRadius: Radius.sm,
   },
-  description: { marginTop: Spacing.xs },
-  metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  adminActions: {
+  sportBadgeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
     gap: Spacing.sm,
   },
-  adminChip: {
+  sportBadgeSmall: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
+    gap: 4,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.sm,
     borderWidth: 1,
-    borderColor: '#2A2A2A40',
   },
-  section: { gap: Spacing.sm },
+  description: { marginTop: Spacing.xs },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
+
+  // Join Action
+  primaryActionRow: {
+    marginVertical: Spacing.xs,
+  },
+
+  // Admin Alerts
+  section: { gap: Spacing.sm, marginTop: Spacing.xs },
   sectionTitle: {
     fontWeight: '700',
     textTransform: 'uppercase',
@@ -604,42 +738,6 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  membersList: { gap: Spacing.sm },
-  membersSummaryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-  },
-  membersSummaryLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  memberCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
-  },
-  memberInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
-  memberDetails: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
-  roleBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-  },
-  removeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   avatar: {
     width: 36,
     height: 36,
@@ -648,30 +746,42 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: 16, fontWeight: '800' },
-  pingSection: { gap: Spacing.sm },
-  pingBtn: { marginTop: Spacing.xs },
-  pingsList: { gap: Spacing.sm },
-  pingCard: {
+
+  // Matches Section
+  recordMatchBar: {
     flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
-    padding: Spacing.md,
+    gap: Spacing.sm,
+    alignItems: 'center',
+  },
+  recordMatchButton: {
+    flex: 1,
+  },
+  pingButton: {
+    width: 48,
+    height: 48,
     borderRadius: Radius.md,
     borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
   },
-  actionBar: { marginTop: Spacing.md },
-  fullWidthBtn: { width: '100%' },
-  matchCard: { gap: Spacing.sm, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
-  matchDetail: {
+  pingDot: {
+    position: 'absolute',
+    top: 10,
+    right: 10,
+    width: 8,
+    height: 8,
+    borderRadius: Radius.full,
+    backgroundColor: '#EF4444',
+  },
+  viewAllLink: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  matchActions: {
-    flexDirection: 'row',
     justifyContent: 'center',
-    gap: Spacing.sm,
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
+    borderTopWidth: 1,
+    marginTop: -Spacing.sm,
   },
 
   // Modal styles
@@ -724,4 +834,12 @@ const styles = StyleSheet.create({
     borderRadius: Radius.md,
     borderWidth: 1,
   },
+  transferAdminLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
+  }
 });
