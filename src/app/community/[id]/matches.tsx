@@ -153,10 +153,9 @@ export default function CommunityMatchesScreen() {
       (m.opponent_id === user?.id || m.recorded_by === user?.id),
   );
 
-  // Approved: all approved and disputed matches
+  // Approved: only approved matches (disputed are hidden)
   const approvedMatches = matches.filter(
-    (m) =>
-      m.approval_status === 'approved' || m.approval_status === 'disputed',
+    (m) => m.approval_status === 'approved',
   );
 
   const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
