@@ -458,15 +458,13 @@ export default function CommunityDetailScreen() {
                 onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
                 buttonStyle={styles.recordMatchButton}
               />
-              {isAdmin && (
-                <Pressable
-                  onPress={() => setPingModalVisible(true)}
-                  style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-                >
-                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                  <View style={styles.pingDot} />
-                </Pressable>
-              )}
+              <Pressable
+                onPress={() => setPingModalVisible(true)}
+                style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+              >
+                <Megaphone size={20} color={theme.text} strokeWidth={2} />
+                <View style={styles.pingDot} />
+              </Pressable>
             </View>
 
             {/* Recent Matches */}
