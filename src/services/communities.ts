@@ -4,6 +4,7 @@ import type {
   CommunityJoinRequest,
   CommunityMatch,
   CommunityMember,
+  CommunityMemberRole,
   CreateCommunityInput,
   Ping,
   Sport,
@@ -64,6 +65,19 @@ export async function fetchMyCommunities(userId: string): Promise<Community[]> {
   }
 
   return communities;
+}
+
+export async function fetchMyCommunityMemberships(
+  userId: string,
+): Promise<{ community_id: string; role: CommunityMemberRole }[]> {
+  const { data, error } = await supabase
+    .from('community_members')
+    .select('community_id, role')
+    .eq('profile_id', userId)
+    .eq('approval_status', 'approved');
+
+  if (error) throw error;
+  return data ?? [];
 }
 
 export async function fetchCommunityById(id: string): Promise<Community | null> {

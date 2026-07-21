@@ -1,4 +1,4 @@
-import { useCallback, useLayoutEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
@@ -7,10 +7,11 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunities, useMyCommunities } from '@/hooks/useCommunities';
-import type { Sport } from '@/types';
+import { fetchMyCommunityMemberships } from '@/services/communities';
+import type { CommunityMemberRole, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 import { useNavigation, useRouter } from 'expo-router';
-import { Compass, Users, X } from 'lucide-react-native';
+import { Compass, ShieldCheck, Users, X } from 'lucide-react-native';
 
 const ALL_SPORTS = Object.keys(SPORT_LABELS) as Sport[];
 
@@ -25,6 +26,20 @@ export default function CommunitiesScreen() {
   const [discovering, setDiscovering] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
+  const [membershipMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
+
+  useEffect(() => {
+    if (!user?.id) return;
+    fetchMyCommunityMemberships(user.id)
+      .then((memberships) => {
+        const map: Record<string, CommunityMemberRole> = {};
+        for (const m of memberships) {
+          map[m.community_id] = m.role;
+        }
+        setMembershipMap(map);
+      })
+      .catch(console.error);
+  }, [user?.id]);
 
   const toggleDiscover = useCallback(() => {
     setDiscovering((prev) => !prev);
@@ -194,6 +209,34 @@ export default function CommunitiesScreen() {
                           {community.visibility === 'public' ? 'Public' : 'Private'}
                         </ThemedText>
                       </View>
+                      {discovering && membershipMap[community.id] && (
+                        <View style={[
+                          styles.metaBadge,
+                          styles.memberTag,
+                          {
+                            backgroundColor: membershipMap[community.id] === 'admin'
+                              ? '#F59E0B20'
+                              : '#3B82F620',
+                          },
+                        ]}>
+                          <ShieldCheck
+                            size={10}
+                            color={membershipMap[community.id] === 'admin' ? '#D97706' : '#2563EB'}
+                            strokeWidth={2.5}
+                          />
+                          <ThemedText
+                            variant="caption"
+                            style={{
+                              fontSize: 10,
+                              fontWeight: '700',
+                              textTransform: 'uppercase',
+                              color: membershipMap[community.id] === 'admin' ? '#D97706' : '#2563EB',
+                            }}
+                          >
+                            {membershipMap[community.id] === 'admin' ? 'Admin' : 'Member'}
+                          </ThemedText>
+                        </View>
+                      )}
                     </View>
                   </View>
                 </Card>
@@ -289,6 +332,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.sm,
     paddingVertical: 2,
     borderRadius: Radius.sm,
+  },
+  memberTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
   },
   metaBadgeText: {
     fontSize: 10,
