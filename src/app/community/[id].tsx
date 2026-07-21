@@ -7,6 +7,7 @@ import {
   Lock,
   LogOut,
   Megaphone,
+  MoreHorizontal,
   Pencil,
   Plus,
   Shield,
@@ -129,6 +130,9 @@ export default function CommunityDetailScreen() {
       is_liked_by_user: false,
     };
   }
+
+  // Header menu
+  const [headerMenuVisible, setHeaderMenuVisible] = useState(false);
 
   // Ping modal
   const [pingModalVisible, setPingModalVisible] = useState(false);
@@ -314,20 +318,14 @@ export default function CommunityDetailScreen() {
                 {community.name}
               </ThemedText>
             ),
-          headerRight: () => (
-            <View style={styles.headerRight}>
-              {isAdmin && (
-                <Pressable onPress={handleOpenEdit} hitSlop={12} style={styles.headerIcon}>
-                  <Pencil size={20} color={theme.text} />
+          headerRight: () =>
+            isMember ? (
+              <View>
+                <Pressable onPress={() => setHeaderMenuVisible(true)} hitSlop={12} style={styles.headerIcon}>
+                  <MoreHorizontal size={22} color={theme.text} strokeWidth={2} />
                 </Pressable>
-              )}
-              {isMember && (
-                <Pressable onPress={handleLeave} hitSlop={12} style={styles.headerIcon}>
-                  <LogOut size={20} color={theme.text} />
-                </Pressable>
-              )}
-            </View>
-          ),
+              </View>
+            ) : null,
         }}
       />
 
@@ -508,6 +506,32 @@ export default function CommunityDetailScreen() {
 
       </ScrollView>
 
+      {/* Header Dropdown Menu */}
+      <Modal transparent visible={headerMenuVisible} animationType="fade" onRequestClose={() => setHeaderMenuVisible(false)}>
+        <Pressable style={styles.dropdownBackdrop} onPress={() => setHeaderMenuVisible(false)}>
+          <View style={[styles.dropdown, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            {isAdmin && (
+              <Pressable
+                style={styles.dropdownItem}
+                onPress={() => { setHeaderMenuVisible(false); handleOpenEdit(); }}
+              >
+                <Pencil size={18} color={theme.text} strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600' }}>Edit Community</ThemedText>
+              </Pressable>
+            )}
+            {isMember && !isAdmin && (
+              <Pressable
+                style={styles.dropdownItem}
+                onPress={() => { setHeaderMenuVisible(false); handleLeave(); }}
+              >
+                <LogOut size={18} color="#EF4444" strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600', color: '#EF4444' }}>Leave Community</ThemedText>
+              </Pressable>
+            )}
+          </View>
+        </Pressable>
+      </Modal>
+
       {/* Ping Modal */}
       <Modal transparent visible={pingModalVisible} animationType="fade" onRequestClose={() => setPingModalVisible(false)}>
         <Pressable style={styles.modalBackdrop} onPress={() => setPingModalVisible(false)}>
@@ -661,18 +685,36 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.xxxl,
   },
   
-  // Header Adjustments
-  headerRight: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    paddingRight: Spacing.sm,
-  },
   headerIcon: {
     padding: Spacing.xs,
   },
 
-
+  // Header Dropdown
+  dropdownBackdrop: {
+    flex: 1,
+    justifyContent: 'flex-start',
+    alignItems: 'flex-end',
+    paddingTop: 90,
+    paddingRight: Spacing.md,
+  },
+  dropdown: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    paddingVertical: Spacing.xs,
+    minWidth: 180,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
 
   // Non-member Info Card
   infoCard: { gap: Spacing.sm },
