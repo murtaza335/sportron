@@ -342,8 +342,9 @@ export async function recordCommunityMatch(input: {
 
 export async function fetchCommunityMatches(
   communityId: string,
+  userId?: string,
 ): Promise<CommunityMatch[]> {
-  const { data, error } = await supabase
+  let query = supabase
     .from('community_matches')
     .select(`
       *,
@@ -353,6 +354,13 @@ export async function fetchCommunityMatches(
     `)
     .eq('community_id', communityId)
     .order('created_at', { ascending: false });
+
+  // Filter out pending matches that don't involve the current user
+  if (userId) {
+    query = query.or(`approval_status.neq.pending,recorded_by.eq.${userId},opponent_id.eq.${userId}`);
+  }
+
+  const { data, error } = await query;
 
   if (error) throw error;
   return data ?? [];

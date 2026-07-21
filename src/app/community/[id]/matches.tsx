@@ -1,11 +1,19 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Alert, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import {
+  ActivityIndicator,
+  Alert,
+  FlatList,
+  Pressable,
+  RefreshControl,
+  StyleSheet,
+  View,
+} from 'react-native';
 
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { ThemedText } from '@/components/ui/Text';
-import { MaxContentWidth, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -58,18 +66,19 @@ export default function CommunityMatchesScreen() {
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const data = await fetchCommunityMatches(id);
+      const data = await fetchCommunityMatches(id, user?.id);
       setMatches(data);
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -137,19 +146,20 @@ export default function CommunityMatchesScreen() {
     }
   };
 
-  const pending = matches.filter((m) => m.approval_status === 'pending');
-  const approved = matches.filter((m) => m.approval_status === 'approved');
-  const disputed = matches.filter((m) => m.approval_status === 'disputed');
+  // Pending: only matches where user is the opponent (needs to approve) or the recorder
+  const pendingMatches = matches.filter(
+    (m) =>
+      m.approval_status === 'pending' &&
+      (m.opponent_id === user?.id || m.recorded_by === user?.id),
+  );
 
-  const sections: { title: string; data: CommunityMatch[] }[] = [];
-  if (pending.length > 0) sections.push({ title: `Pending Approval (${pending.length})`, data: pending });
-  if (approved.length > 0) sections.push({ title: `Match History (${approved.length})`, data: approved });
-  if (disputed.length > 0) sections.push({ title: `Disputed (${disputed.length})`, data: disputed });
+  // Approved: all approved and disputed matches
+  const approvedMatches = matches.filter(
+    (m) =>
+      m.approval_status === 'approved' || m.approval_status === 'disputed',
+  );
 
-  const flatItems = sections.flatMap((section) => [
-    { type: 'header' as const, title: section.title, id: `h-${section.title}` },
-    ...section.data.map((m) => ({ type: 'match' as const, match: m, id: m.id })),
-  ]);
+  const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
 
   const selectedCM = selectedMatch
     ? matches.find((m) => m.id === selectedMatch.id)
@@ -161,40 +171,76 @@ export default function CommunityMatchesScreen() {
       {loading ? (
         <ActivityIndicator color={theme.text} style={styles.loader} />
       ) : (
-        <FlatList
-          data={flatItems}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.text}
-            />
-          }
-          renderItem={({ item }) => {
-            if (item.type === 'header') {
-              return (
-                <ThemedText variant="label" muted style={styles.sectionHeader}>
-                  {item.title}
-                </ThemedText>
-              );
+        <>
+          {/* Tabs */}
+          <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
+            <Pressable
+              style={[
+                styles.tab,
+                activeTab === 'approved' && { borderBottomColor: theme.text },
+              ]}
+              onPress={() => setActiveTab('approved')}
+            >
+              <ThemedText
+                variant="label"
+                style={[
+                  styles.tabText,
+                  activeTab === 'approved' && { color: theme.text },
+                  activeTab !== 'approved' && { color: theme.textSecondary },
+                ]}
+              >
+                Approved ({approvedMatches.length})
+              </ThemedText>
+            </Pressable>
+            <Pressable
+              style={[
+                styles.tab,
+                activeTab === 'pending' && { borderBottomColor: theme.text },
+              ]}
+              onPress={() => setActiveTab('pending')}
+            >
+              <ThemedText
+                variant="label"
+                style={[
+                  styles.tabText,
+                  activeTab === 'pending' && { color: theme.text },
+                  activeTab !== 'pending' && { color: theme.textSecondary },
+                ]}
+              >
+                Pending ({pendingMatches.length})
+              </ThemedText>
+            </Pressable>
+          </View>
+
+          {/* Match List */}
+          <FlatList
+            data={displayMatches}
+            keyExtractor={(item) => item.id}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.text}
+              />
             }
-            return (
+            renderItem={({ item }) => (
               <MatchCard
-                match={toMatchWithProfiles(item.match)}
+                match={toMatchWithProfiles(item)}
                 currentUserId={user?.id}
-                onPress={() => handleOpenPopup(item.match)}
+                onPress={() => handleOpenPopup(item)}
                 showYoursBadge={false}
               />
-            );
-          }}
-          ListEmptyComponent={
-            <ThemedText variant="caption" muted style={styles.empty}>
-              No matches recorded yet.
-            </ThemedText>
-          }
-        />
+            )}
+            ListEmptyComponent={
+              <ThemedText variant="caption" muted style={styles.empty}>
+                {activeTab === 'pending'
+                  ? 'No pending approvals for you.'
+                  : 'No approved matches yet.'}
+              </ThemedText>
+            }
+          />
+        </>
       )}
 
       <MatchDetailPopup
@@ -216,20 +262,32 @@ export default function CommunityMatchesScreen() {
 const styles = StyleSheet.create({
   safe: { flex: 1 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+    maxWidth: MaxContentWidth,
+    width: '100%',
+    alignSelf: 'center',
+    paddingHorizontal: Spacing.lg,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   list: {
     maxWidth: MaxContentWidth,
     width: '100%',
     alignSelf: 'center',
     padding: Spacing.lg,
     gap: Spacing.sm,
-  },
-  sectionHeader: {
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 12,
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
   },
   empty: { textAlign: 'center', paddingVertical: Spacing.xxl },
 });
