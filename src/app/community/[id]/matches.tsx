@@ -13,7 +13,7 @@ import {
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { ThemedText } from '@/components/ui/Text';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -78,7 +78,7 @@ export default function CommunityMatchesScreen() {
     } finally {
       setLoading(false);
     }
-  }, [id, user?.id]);
+  }, [id, user]);
 
   useFocusEffect(
     useCallback(() => {

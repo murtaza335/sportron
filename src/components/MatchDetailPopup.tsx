@@ -153,7 +153,7 @@ Animated.spring(translateY, {
         setNewCommentText('');
       }, 0);
     }
-  }, [visible, match?.id, match?.verification_status, hideSocial]);
+  }, [visible, match, hideSocial]);
 
   // Animate sheet
   useEffect(() => {
@@ -167,7 +167,7 @@ Animated.spring(translateY, {
     } else {
       translateY.setValue(SCREEN_HEIGHT);
     }
-  }, [visible]);
+  }, [visible, translateY]);
 
   if (!match) {
     return null;
