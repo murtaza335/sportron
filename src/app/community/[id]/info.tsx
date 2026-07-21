@@ -1,8 +1,9 @@
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import {
-  Bell,
+  AlignLeft,
   ChevronRight,
   Globe,
+  Info,
   Lock,
   Plus,
   Swords,
@@ -92,7 +93,7 @@ export default function CommunityInfoScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: 'Community Info' }} />
+      <Stack.Screen options={{ title: 'Community Details' }} />
 
       <ScrollView
         style={styles.scroll}
@@ -105,125 +106,107 @@ export default function CommunityInfoScreen() {
           />
         }
       >
-        {/* Sport Section */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionIconRow}>
-            <Swords size={18} color={theme.text} strokeWidth={2} />
-            <ThemedText variant="label" muted>Sport</ThemedText>
-          </View>
-          <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-            <ThemedText variant="body" style={{ fontWeight: '700' }}>
-              {SPORT_LABELS[community.sport] || community.sport}
-            </ThemedText>
-          </View>
-        </Card>
+        {/* Main Details Card */}
+        <Card style={styles.heroCard}>
+          {/* Header Badges */}
+          <View style={styles.tagsRow}>
+            {/* Sport Badge */}
+            <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <Swords size={14} color={theme.text} strokeWidth={2} />
+              <ThemedText variant="caption" style={styles.badgeText}>
+                {SPORT_LABELS[community.sport] || community.sport}
+              </ThemedText>
+            </View>
 
-        {/* About Section */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionIconRow}>
-            <Bell size={18} color={theme.text} strokeWidth={2} />
-            <ThemedText variant="label" muted>About</ThemedText>
-          </View>
-          <ThemedText variant="body" style={styles.aboutText}>
-            {community.description || 'No description provided.'}
-          </ThemedText>
-        </Card>
-
-        {/* Visibility Section */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionIconRow}>
-            {community.visibility === 'public' ? (
-              <Globe size={18} color="#10B981" strokeWidth={2} />
-            ) : (
-              <Lock size={18} color="#D97706" strokeWidth={2} />
-            )}
-            <ThemedText variant="label" muted>Visibility</ThemedText>
-          </View>
-          <View
-            style={[
-              styles.badge,
-              {
-                backgroundColor: community.visibility === 'public' ? '#10B98120' : '#D9770620',
-                borderColor: community.visibility === 'public' ? '#10B98140' : '#D9770640',
-              },
-            ]}
-          >
+            {/* Visibility Badge */}
             <View
               style={[
-                styles.visibilityDot,
-                { backgroundColor: community.visibility === 'public' ? '#10B981' : '#D97706' },
+                styles.badge,
+                {
+                  backgroundColor: community.visibility === 'public' ? '#10B9811A' : '#D977061A',
+                  borderColor: community.visibility === 'public' ? '#10B98140' : '#D9770640',
+                },
               ]}
-            />
-            <ThemedText
-              variant="body"
-              style={{
-                fontWeight: '700',
-                color: community.visibility === 'public' ? '#10B981' : '#D97706',
-              }}
             >
-              {community.visibility === 'public' ? 'Public' : 'Restricted'}
+              {community.visibility === 'public' ? (
+                <Globe size={14} color="#10B981" strokeWidth={2} />
+              ) : (
+                <Lock size={14} color="#D97706" strokeWidth={2} />
+              )}
+              <ThemedText
+                variant="caption"
+                style={[
+                  styles.badgeText,
+                  { color: community.visibility === 'public' ? '#10B981' : '#D97706' },
+                ]}
+              >
+                {community.visibility === 'public' ? 'Public' : 'Restricted'}
+              </ThemedText>
+            </View>
+          </View>
+
+          {/* About Section */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <AlignLeft size={16} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText variant="label" muted>About</ThemedText>
+            </View>
+            <ThemedText variant="body" style={styles.aboutText}>
+              {community.description || 'No description provided for this community.'}
             </ThemedText>
           </View>
-          <ThemedText variant="caption" muted style={styles.hintText}>
-            {community.visibility === 'public'
-              ? 'Anyone can join this community.'
-              : 'New members require admin approval to join.'}
-          </ThemedText>
-        </Card>
 
-        {/* Members Section */}
-        <Card style={styles.sectionCard}>
-          <View style={styles.sectionIconRow}>
-            <Users size={18} color={theme.text} strokeWidth={2} />
-            <ThemedText variant="label" muted>Members</ThemedText>
+          {/* Visibility Hint */}
+          <View style={styles.sectionContainer}>
+            <View style={styles.sectionHeader}>
+              <Info size={16} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText variant="label" muted>Access</ThemedText>
+            </View>
+            <ThemedText variant="caption" muted style={styles.hintText}>
+              {community.visibility === 'public'
+                ? 'Anyone can view content and join this community freely.'
+                : 'Membership requires approval from a community administrator.'}
+            </ThemedText>
           </View>
-          <ThemedText variant="heading" style={styles.memberCount}>
-            {community.member_count ?? 0}
-          </ThemedText>
-          <ThemedText variant="caption" muted>
-            {community.member_count === 1 ? 'member' : 'members'}
-          </ThemedText>
         </Card>
 
+        {/* Combined Members Tile */}
         <Pressable
           onPress={() => router.navigate(`/community/${id}/members`)}
-          style={[styles.navLink, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+          style={[styles.membersCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
         >
-          <View style={styles.navLinkLeft}>
-            <Users size={18} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="body" style={{ fontWeight: '600' }}>
-              View All Members
-            </ThemedText>
+          <View style={styles.membersLeft}>
+            <View style={[styles.iconContainer, { backgroundColor: theme.background }]}>
+              <Users size={20} color={theme.text} strokeWidth={2} />
+            </View>
+            <View>
+              <ThemedText variant="body" style={styles.memberTitle}>
+                Members
+              </ThemedText>
+              <ThemedText variant="caption" muted>
+                {community.member_count ?? 0} {community.member_count === 1 ? 'member' : 'members'} enrolled
+              </ThemedText>
+            </View>
           </View>
           <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
         </Pressable>
 
-        {/* Join Button - only shown to non-members */}
+        {/* CTA Section (Visible to non-members) */}
         {!isMember && (
-          <View style={styles.joinSection}>
+          <Card style={styles.joinCard}>
             <Button
               label={isRestricted ? 'Request to Join' : 'Join Community'}
-              icon={<Plus size={20} color={theme.background} strokeWidth={2.5} />}
+              icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
               onPress={handleJoin}
               buttonStyle={styles.joinButton}
             />
             <ThemedText variant="caption" muted style={styles.joinHint}>
               {isRestricted
-                ? 'Your request will be sent to the admin for approval.'
-                : 'You\'ll get instant access to this community.'}
+                ? 'Your request will be sent to the administrator for review.'
+                : 'You will gain instant access upon joining.'}
             </ThemedText>
-          </View>
+          </Card>
         )}
-
-        {/* Back to community link */}
-        <Pressable
-          onPress={() => router.back()}
-          style={styles.backLink}
-        >
-          <ThemedText variant="body" style={{ color: theme.textSecondary, fontWeight: '600', textAlign: 'center' }}>
-            Back to Community
-          </ThemedText>
-        </Pressable>
       </ScrollView>
     </View>
   );
@@ -238,63 +221,81 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingBottom: Spacing.xxxl,
   },
-  sectionCard: {
-    gap: Spacing.sm,
+
+  // Hero Card Styles
+  heroCard: {
+    gap: Spacing.lg,
+    padding: Spacing.lg,
   },
-  sectionIconRow: {
+  tagsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
+    flexWrap: 'wrap',
     gap: Spacing.sm,
   },
   badge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    alignSelf: 'flex-start',
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.full,
     borderWidth: 1,
   },
-  visibilityDot: {
-    width: 8,
-    height: 8,
-    borderRadius: Radius.full,
+  badgeText: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  sectionContainer: {
+    gap: Spacing.xs,
+  },
+  sectionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
   },
   aboutText: {
     lineHeight: 22,
+    marginTop: 2,
   },
   hintText: {
-    marginTop: Spacing.xs,
+    lineHeight: 18,
   },
-  memberCount: {
-    fontSize: 36,
-    lineHeight: 44,
-  },
-  joinSection: {
-    gap: Spacing.sm,
-    marginTop: Spacing.md,
-  },
-  joinButton: {
-    paddingVertical: Spacing.md,
-  },
-  joinHint: {
-    textAlign: 'center',
-  },
-  backLink: {
-    paddingVertical: Spacing.lg,
-  },
-  navLink: {
+
+  // Members Card Styles
+  membersCard: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     borderWidth: 1,
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     padding: Spacing.md,
   },
-  navLinkLeft: {
+  membersLeft: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  iconContainer: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  memberTitle: {
+    fontWeight: '700',
+  },
+
+  // Join Action Section
+  joinCard: {
+    gap: Spacing.sm,
+    padding: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  joinButton: {
+    width: '100%',
+  },
+  joinHint: {
+    textAlign: 'center',
   },
 });
