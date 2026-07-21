@@ -1,6 +1,44 @@
 export type UserRole = 'student' | 'teacher';
 export type MatchFormat = 'singles' | 'doubles';
 
+export type Sport =
+  | 'table_tennis'
+  | 'badminton'
+  | 'tennis'
+  | 'squash'
+  | 'pickleball'
+  | 'football'
+  | 'cricket'
+  | 'volleyball'
+  | 'handball'
+  | 'basketball'
+  | 'other';
+
+export const RACKET_SPORTS: Sport[] = ['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball'];
+export const TEAM_SPORTS: Sport[] = ['football', 'cricket', 'volleyball', 'handball', 'basketball'];
+
+export const SPORT_LABELS: Record<Sport, string> = {
+  table_tennis: 'Table Tennis',
+  badminton: 'Badminton',
+  tennis: 'Tennis',
+  squash: 'Squash',
+  pickleball: 'Pickleball',
+  football: 'Football',
+  cricket: 'Cricket',
+  volleyball: 'Volleyball',
+  handball: 'Handball',
+  basketball: 'Basketball',
+  other: 'Other',
+};
+
+export function isRacketSport(sport: Sport): boolean {
+  return RACKET_SPORTS.includes(sport);
+}
+
+export function isTeamSport(sport: Sport): boolean {
+  return TEAM_SPORTS.includes(sport);
+}
+
 export type Profile = {
   id: string;
   username: string;
@@ -51,6 +89,10 @@ export type Match = {
   opponent_partner_id: string | null;
   opponent_guest_name: string | null;
   match_format: MatchFormat;
+  sport: Sport;
+  custom_sport_name: string | null;
+  team_a_name: string | null;
+  team_b_name: string | null;
   player_score: number;
   opponent_score: number;
   is_public: boolean;
@@ -79,6 +121,10 @@ export type MatchComment = {
 
 export type CreateMatchInput = {
   matchFormat: MatchFormat;
+  sport: Sport;
+  customSportName?: string | null;
+  teamAName?: string | null;
+  teamBName?: string | null;
   playerPartnerId: string | null;
   opponentId: string | null;
   opponentPartnerId: string | null;
@@ -202,6 +248,10 @@ export type CommunityMatch = {
   player_partner_id: string | null;
   opponent_id: string;
   opponent_partner_id: string | null;
+  sport: Sport;
+  custom_sport_name: string | null;
+  team_a_name: string | null;
+  team_b_name: string | null;
   player_score: number;
   opponent_score: number;
   approval_status: 'pending' | 'approved' | 'disputed';

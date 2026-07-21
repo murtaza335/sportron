@@ -6,6 +6,7 @@ import type {
   CommunityMember,
   CreateCommunityInput,
   Ping,
+  Sport,
   UpdateCommunityInput,
 } from '@/types';
 
@@ -311,6 +312,10 @@ export async function recordCommunityMatch(input: {
   recorded_by: string;
   player_id: string;
   opponent_id: string;
+  sport: Sport;
+  custom_sport_name?: string | null;
+  team_a_name?: string | null;
+  team_b_name?: string | null;
   player_score: number;
   opponent_score: number;
 }): Promise<CommunityMatch> {
@@ -321,6 +326,10 @@ export async function recordCommunityMatch(input: {
       recorded_by: input.recorded_by,
       player_id: input.player_id,
       opponent_id: input.opponent_id,
+      sport: input.sport,
+      custom_sport_name: input.custom_sport_name?.trim() || null,
+      team_a_name: input.team_a_name?.trim() || null,
+      team_b_name: input.team_b_name?.trim() || null,
       player_score: input.player_score,
       opponent_score: input.opponent_score,
     })

@@ -22,7 +22,8 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addComment, deleteMatch, fetchComments, toggleLike, updateMatchVerificationStatus } from '@/services/matches';
-import type { MatchComment, MatchWithProfiles } from '@/types';
+import type { MatchComment, MatchWithProfiles, Sport } from '@/types';
+import { SPORT_LABELS } from '@/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
 
@@ -323,6 +324,8 @@ Animated.spring(translateY, {
             <View style={styles.header} {...panHandlers}>
               <View style={styles.headerTitle}>
                 <ThemedText variant="label" muted style={styles.formatLabel}>
+                  {SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport}
+                  {' · '}
                   {match.match_format} match
                 </ThemedText>
                 <View style={styles.visibilityRow}>

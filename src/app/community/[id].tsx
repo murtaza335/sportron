@@ -32,7 +32,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
-  recordCommunityMatch,
   joinCommunity,
   leaveCommunity,
   requestToJoinCommunity,
@@ -69,12 +68,7 @@ export default function CommunityDetailScreen() {
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
 
-  // Record match
-  const [recordModalVisible, setRecordModalVisible] = useState(false);
-  const [recordOpponentId, setRecordOpponentId] = useState<string | null>(null);
-  const [recordPlayerScore, setRecordPlayerScore] = useState('0');
-  const [recordOpponentScore, setRecordOpponentScore] = useState('0');
-  const [recordingMatch, setRecordingMatch] = useState(false);
+  // Record match — uses add-match.tsx with communityId param
 
   // Edit modal
   const [editModalVisible, setEditModalVisible] = useState(false);
@@ -210,36 +204,6 @@ export default function CommunityDetailScreen() {
       Alert.alert('Error', e?.message ?? 'Failed to send ping.');
     } finally {
       setSendingPing(false);
-    }
-  };
-
-  const handleRecordMatch = async () => {
-    if (!id || !user || !recordOpponentId) return;
-    const pScore = parseInt(recordPlayerScore, 10);
-    const oScore = parseInt(recordOpponentScore, 10);
-    if (isNaN(pScore) || isNaN(oScore)) {
-      Alert.alert('Invalid Score', 'Please enter valid numbers.');
-      return;
-    }
-    setRecordingMatch(true);
-    try {
-      await recordCommunityMatch({
-        community_id: id,
-        recorded_by: user.id,
-        player_id: user.id,
-        opponent_id: recordOpponentId,
-        player_score: pScore,
-        opponent_score: oScore,
-      });
-      setRecordModalVisible(false);
-      setRecordOpponentId(null);
-      setRecordPlayerScore('0');
-      setRecordOpponentScore('0');
-      Alert.alert('Match Recorded', 'Waiting for opponent approval.');
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to record match.');
-    } finally {
-      setRecordingMatch(false);
     }
   };
 
@@ -383,7 +347,7 @@ export default function CommunityDetailScreen() {
               label="Record Match"
               variant="secondary"
               icon={<Swords size={16} color={theme.text} strokeWidth={2} />}
-              onPress={() => setRecordModalVisible(true)}
+              onPress={() => router.navigate(`/add-match?communityId=${id}`)}
               buttonStyle={styles.fullWidthBtn}
             />
           </>
@@ -554,126 +518,6 @@ export default function CommunityDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Record Match Modal */}
-      <Modal transparent visible={recordModalVisible} animationType="fade" onRequestClose={() => setRecordModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setRecordModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Record Match</ThemedText>
-              <Pressable onPress={() => setRecordModalVisible(false)} hitSlop={16}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-
-            <ThemedText variant="label" muted>Opponent</ThemedText>
-            <OpponentPicker
-              communityId={id!}
-              currentUserId={user?.id}
-              selectedId={recordOpponentId}
-              onSelect={setRecordOpponentId}
-            />
-
-            <View style={styles.scoreRow}>
-              <View style={{ flex: 1 }}>
-                <ThemedText variant="label" muted style={{ marginBottom: Spacing.xs }}>Your Score</ThemedText>
-                <TextInput
-                  value={recordPlayerScore}
-                  onChangeText={setRecordPlayerScore}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.scoreInput,
-                    { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  ]}
-                />
-              </View>
-              <ThemedText variant="heading" style={{ marginTop: Spacing.lg }}>:</ThemedText>
-              <View style={{ flex: 1 }}>
-                <ThemedText variant="label" muted style={{ marginBottom: Spacing.xs }}>Opponent Score</ThemedText>
-                <TextInput
-                  value={recordOpponentScore}
-                  onChangeText={setRecordOpponentScore}
-                  keyboardType="number-pad"
-                  style={[
-                    styles.scoreInput,
-                    { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  ]}
-                />
-              </View>
-            </View>
-
-            <Button
-              label="Submit Match"
-              onPress={handleRecordMatch}
-              loading={recordingMatch}
-              disabled={!recordOpponentId}
-            />
-          </Pressable>
-        </Pressable>
-      </Modal>
-    </View>
-  );
-}
-
-function OpponentPicker({
-  communityId,
-  currentUserId,
-  selectedId,
-  onSelect,
-}: {
-  communityId: string;
-  currentUserId?: string;
-  selectedId: string | null;
-  onSelect: (id: string) => void;
-}) {
-  const theme = useTheme();
-  const [members, setMembers] = useState<CommunityMember[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { fetchCommunityMembers } = await import('@/services/communities');
-        const data = await fetchCommunityMembers(communityId);
-        if (!cancelled) setMembers(data.filter((m) => m.profile_id !== currentUserId));
-      } catch (e) {
-        console.error('Failed to load members:', e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [communityId, currentUserId]);
-
-  if (loading) return <ActivityIndicator color={theme.text} style={styles.smallLoader} />;
-
-  return (
-    <View style={styles.opponentList}>
-      {members.map((member) => (
-        <Pressable
-          key={member.profile_id}
-          onPress={() => onSelect(member.profile_id)}
-          style={[
-            styles.opponentOption,
-            {
-              backgroundColor: selectedId === member.profile_id ? theme.textSecondary + '20' : theme.backgroundElement,
-              borderColor: selectedId === member.profile_id ? theme.textSecondary : theme.border,
-            },
-          ]}
-        >
-          <View style={[styles.avatar, { backgroundColor: theme.textSecondary }]}>
-            <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-              {member.profile_id.charAt(0).toUpperCase()}
-            </ThemedText>
-          </View>
-          <ThemedText variant="body" style={{ fontWeight: '600', flex: 1 }}>
-            {member.profile_id.slice(0, 8)}
-          </ThemedText>
-          {selectedId === member.profile_id && (
-            <Check size={16} color="#10B981" strokeWidth={3} />
-          )}
-        </Pressable>
-      ))}
     </View>
   );
 }
@@ -797,29 +641,6 @@ const styles = StyleSheet.create({
   },
   actionBar: { marginTop: Spacing.md },
   fullWidthBtn: { width: '100%' },
-  smallLoader: { paddingVertical: Spacing.md },
-  scoreRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-  },
-  scoreInput: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    padding: Spacing.md,
-    fontSize: 20,
-    fontWeight: '700',
-    textAlign: 'center',
-  },
-  opponentList: { gap: Spacing.sm, maxHeight: 200 },
-  opponentOption: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.md,
-    padding: Spacing.md,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-  },
   matchCard: { gap: Spacing.sm, paddingVertical: Spacing.sm, paddingHorizontal: Spacing.md },
   matchDetail: {
     flexDirection: 'row',
