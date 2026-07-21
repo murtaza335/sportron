@@ -31,6 +31,13 @@ function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
   return match.opponent_guest_name ?? 'Guest';
 }
 
+function getOpponentCaptain(match: MatchWithProfiles) {
+  if (match.team_b_name && match.opponent?.username) {
+    return match.opponent.username;
+  }
+  return null;
+}
+
 function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
   if (match.team_a_name) return match.team_a_name;
 
@@ -52,6 +59,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
   const theme = useTheme();
   const playerName = getTeamAName(match, currentUserId);
   const opponentName = getOpponentName(match, currentUserId);
+  const opponentCaptain = getOpponentCaptain(match);
 
   const [liked, setLiked] = useState(match.is_liked_by_user);
   const [likesCount, setLikesCount] = useState(match.likes_count);
@@ -216,6 +224,11 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
             >
               {opponentName}
             </ThemedText>
+            {opponentCaptain && (
+              <ThemedText variant="caption" muted style={{ textAlign: 'right', fontSize: 11 }}>
+                {opponentCaptain}
+              </ThemedText>
+            )}
           </View>
         </View>
 

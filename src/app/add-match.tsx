@@ -116,7 +116,7 @@ export default function AddMatchScreen() {
             selection.opponent !== null &&
             selection.opponentPartner !== null)
       : isTeam
-        ? teamAName.trim().length > 0 && teamBName.trim().length > 0
+        ? selection.opponent !== null && teamAName.trim().length > 0 && teamBName.trim().length > 0
         : true) &&
     (playerScore > 0 || opponentScore > 0);
 
@@ -159,9 +159,9 @@ export default function AddMatchScreen() {
         teamAName: isTeam ? teamAName.trim() : null,
         teamBName: isTeam ? teamBName.trim() : null,
         playerPartnerId: isRacket && !isPlayerPartnerGuest ? selection.playerPartner?.id ?? null : null,
-        opponentId: isRacket && !isOpponentGuest ? selection.opponent?.id ?? null : null,
+        opponentId: (!isOpponentGuest) ? selection.opponent?.id ?? null : null,
         opponentPartnerId: isRacket && !isOpponentPartnerGuest ? selection.opponentPartner?.id ?? null : null,
-        opponentGuestName: isRacket && (isOpponentGuest || isOpponentPartnerGuest) ? 'Guest' : null,
+        opponentGuestName: (isRacket && (isOpponentGuest || isOpponentPartnerGuest)) ? 'Guest' : null,
         playerScore,
         opponentScore,
         isPublic,
@@ -281,6 +281,25 @@ return (
                     style={[styles.textInputField, { color: theme.text }]}
                   />
                 </View>
+              </View>
+
+              {/* Opponent Captain / Representative */}
+              <View style={styles.section}>
+                <ThemedText variant="label" muted style={styles.sectionLabel}>Opponent Captain</ThemedText>
+                {isCommunityMatch && (
+                  <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs, marginBottom: Spacing.xs }}>
+                    Select the captain or representative of the opposing team.
+                  </ThemedText>
+                )}
+                <MatchLineupSelector
+                  profiles={isCommunityMatch ? communityProfiles : profiles}
+                  currentUserName={profile?.username ?? 'You'}
+                  format="singles"
+                  selection={{ playerPartner: null, opponent: selection.opponent, opponentPartner: null }}
+                  onChange={(_slot, selectedProfile) =>
+                    setSelection((current) => ({ ...current, opponent: selectedProfile }))
+                  }
+                />
               </View>
             </>
           )}
