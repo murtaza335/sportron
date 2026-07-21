@@ -206,53 +206,58 @@ return (
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
 
-          {/* Sport Picker */}
-          <View style={styles.section}>
-            <ThemedText variant="label" muted style={styles.sectionLabel}>Sport</ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
-              {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
-                'football', 'cricket', 'volleyball', 'handball', 'basketball',
-                'other'] as Sport[]).map((s) => {
-                const selected = s === sport;
-                return (
-                  <Pressable
-                    key={s}
-                    onPress={() => setSport(s)}
-                    style={[
-                      styles.sportPill,
-                      { borderColor: theme.border },
-                      selected && { backgroundColor: theme.text, borderColor: theme.text },
-                    ]}
-                  >
-                    <ThemedText
-                      variant="caption"
-                      style={[
-                        styles.sportPillText,
-                        selected && { color: theme.background },
-                      ]}
-                    >
-                      {SPORT_LABELS[s]}
-                    </ThemedText>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
-
-          {/* Custom sport name for "other" */}
-          {sport === 'other' && (
-            <View style={styles.section}>
-              <ThemedText variant="label" muted style={styles.sectionLabel}>Sport Name</ThemedText>
-              <View style={[styles.textInput, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                <TextInput
-                  value={customSportName}
-                  onChangeText={setCustomSportName}
-                  placeholder="e.g. Ultimate Frisbee"
-                  placeholderTextColor={theme.textSecondary}
-                  style={[styles.textInputField, { color: theme.text }]}
-                />
+          {/* Sport Picker (hidden for community matches — auto-set from community) */}
+          {!isCommunityMatch && (
+            <>
+              <View style={styles.section}>
+                <ThemedText variant="label" muted style={styles.sectionLabel}>Sport</ThemedText>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
+                  {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
+                    'football', 'cricket', 'volleyball', 'handball', 'basketball',
+                    'other'] as Sport[]).map((s) => {
+                    const selected = s === sport;
+                    return (
+                      <Pressable
+                        key={s}
+                        onPress={() => setSport(s)}
+                        style={[
+                          styles.sportPill,
+                          { borderColor: theme.border },
+                          selected && { backgroundColor: theme.text, borderColor: theme.text },
+                        ]}
+                      >
+                        <ThemedText
+                          variant="caption"
+                          style={[
+                            styles.sportPillText,
+                            selected && { color: theme.background },
+                          ]}
+                        >
+                          {SPORT_LABELS[s]}
+                        </ThemedText>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
               </View>
-            </View>
+
+              {/* Custom sport name for "other" */}
+              {sport === 'other' && (
+                <View style={styles.section}>
+                  <ThemedText variant="label" muted style={styles.sectionLabel}>Sport Name</ThemedText>
+                  <View style={[styles.textInput, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                    <TextInput
+                      value={customSportName}
+                      onChangeText={setCustomSportName}
+                      placeholder="Enter sport name"
+                      placeholderTextColor={theme.textSecondary}
+                      style={[styles.textInputField, { color: theme.text }]}
+                      maxLength={40}
+                    />
+                  </View>
+                </View>
+              )}
+            </>
           )}
 
           {/* Team names for team sports */}

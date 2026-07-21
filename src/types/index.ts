@@ -188,6 +188,7 @@ export type Community = {
   description: string | null;
   image_url: string | null;
   visibility: CommunityVisibility;
+  sport: Sport;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -213,6 +214,7 @@ export type CreateCommunityInput = {
   name: string;
   description?: string;
   visibility: CommunityVisibility;
+  sport: Sport;
 };
 
 export type UpdateCommunityInput = {

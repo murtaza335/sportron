@@ -87,6 +87,7 @@ create table if not exists public.communities (
   name text not null,
   description text,
   image_url text,
+  sport text not null default 'table_tennis',
   visibility text not null default 'public'
     check (visibility in ('public', 'restricted')),
   created_by uuid not null references public.profiles(id) on delete cascade,

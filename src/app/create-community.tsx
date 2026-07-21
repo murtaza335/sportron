@@ -19,7 +19,8 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { createCommunity } from '@/services/communities';
-import type { CommunityVisibility } from '@/types';
+import type { CommunityVisibility, Sport } from '@/types';
+import { SPORT_LABELS } from '@/types';
 
 export default function CreateCommunityScreen() {
   const theme = useTheme();
@@ -28,6 +29,7 @@ export default function CreateCommunityScreen() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [sport, setSport] = useState<Sport>('table_tennis');
   const [visibility, setVisibility] = useState<CommunityVisibility>('public');
   const [saving, setSaving] = useState(false);
 
@@ -41,6 +43,7 @@ export default function CreateCommunityScreen() {
         name: name.trim(),
         description: description.trim() || undefined,
         visibility,
+        sport,
       });
       router.back();
     } catch (e) {
@@ -114,6 +117,40 @@ export default function CreateCommunityScreen() {
               ]}
               maxLength={300}
             />
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
+              Sport
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
+              {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
+                'football', 'cricket', 'volleyball', 'handball', 'basketball',
+                'other'] as Sport[]).map((s) => {
+                const selected = s === sport;
+                return (
+                  <Pressable
+                    key={s}
+                    onPress={() => setSport(s)}
+                    style={[
+                      styles.sportPill,
+                      { borderColor: theme.border },
+                      selected && { backgroundColor: theme.text, borderColor: theme.text },
+                    ]}
+                  >
+                    <ThemedText
+                      variant="caption"
+                      style={[
+                        styles.sportPillText,
+                        selected && { color: theme.background },
+                      ]}
+                    >
+                      {SPORT_LABELS[s]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
           </View>
 
           <View style={styles.field}>
@@ -257,6 +294,20 @@ const styles = StyleSheet.create({
     padding: Spacing.md,
     gap: Spacing.xs,
     alignItems: 'center',
+  },
+  sportPicker: {
+    flexDirection: 'row',
+  },
+  sportPill: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    marginRight: Spacing.sm,
+  },
+  sportPillText: {
+    fontWeight: '700',
+    fontSize: 13,
   },
   submit: {
     marginTop: Spacing.md,
