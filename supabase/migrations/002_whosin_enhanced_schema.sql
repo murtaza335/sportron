@@ -130,6 +130,10 @@ create table if not exists public.community_matches (
   player_partner_id uuid references public.profiles(id) on delete set null,
   opponent_id uuid not null references public.profiles(id) on delete cascade,
   opponent_partner_id uuid references public.profiles(id) on delete set null,
+  sport text not null default 'table_tennis',
+  custom_sport_name text,
+  team_a_name text,
+  team_b_name text,
   player_score int not null default 0 check (player_score >= 0),
   opponent_score int not null default 0 check (opponent_score >= 0),
   approval_status text not null default 'pending'
