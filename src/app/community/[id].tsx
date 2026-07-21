@@ -20,7 +20,6 @@ import {
   Plus,
   Shield,
   Swords,
-  ThumbsUp,
   Users,
   X,
 } from 'lucide-react-native';
@@ -33,8 +32,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
-  approveCommunityMatch,
-  disputeCommunityMatch,
   recordCommunityMatch,
   joinCommunity,
   leaveCommunity,
@@ -46,7 +43,6 @@ import {
 } from '@/services/communities';
 import type {
   CommunityJoinRequest,
-  CommunityMatch,
   CommunityMember,
   CommunityVisibility,
 } from '@/types';
@@ -247,37 +243,6 @@ export default function CommunityDetailScreen() {
     }
   };
 
-  const handleApproveMatch = async (matchId: string) => {
-    try {
-      await approveCommunityMatch(matchId);
-      refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to approve match.');
-    }
-  };
-
-  const handleDisputeMatch = async (matchId: string) => {
-    Alert.alert(
-      'Dispute Match',
-      'Are you sure you want to dispute this match? It will not count toward the leaderboard.',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Dispute',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await disputeCommunityMatch(matchId);
-              refresh();
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to dispute match.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -438,13 +403,19 @@ export default function CommunityDetailScreen() {
           <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
         </Pressable>
 
-        {/* Match History */}
-        <MatchHistoryList
-          communityId={id!}
-          currentUserId={user?.id}
-          onApprove={handleApproveMatch}
-          onDispute={handleDisputeMatch}
-        />
+        {/* Match History — summary with navigation */}
+        <Pressable
+          onPress={() => router.navigate(`/community/${id}/matches`)}
+          style={[styles.membersSummaryCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+        >
+          <View style={styles.membersSummaryLeft}>
+            <Swords size={18} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="body" style={{ fontWeight: '600' }}>
+              Match History
+            </ThemedText>
+          </View>
+          <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
+        </Pressable>
 
         {/* Join/Leave actions */}
         <View style={styles.actionBar}>
@@ -703,132 +674,6 @@ function OpponentPicker({
           )}
         </Pressable>
       ))}
-    </View>
-  );
-}
-
-function MatchHistoryList({
-  communityId,
-  currentUserId,
-  onApprove,
-  onDispute,
-}: {
-  communityId: string;
-  currentUserId?: string;
-  onApprove: (matchId: string) => void;
-  onDispute: (matchId: string) => void;
-}) {
-  const theme = useTheme();
-  const [matches, setMatches] = useState<CommunityMatch[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  useEffect(() => {
-    let cancelled = false;
-    (async () => {
-      try {
-        const { fetchCommunityMatches } = await import('@/services/communities');
-        const data = await fetchCommunityMatches(communityId);
-        if (!cancelled) setMatches(data);
-      } catch (e) {
-        console.error('Failed to load matches:', e);
-      } finally {
-        if (!cancelled) setLoading(false);
-      }
-    })();
-    return () => { cancelled = true; };
-  }, [communityId]);
-
-  const pendingMatches = matches.filter((m) => m.approval_status === 'pending');
-  const approvedMatches = matches.filter((m) => m.approval_status === 'approved');
-  const disputedMatches = matches.filter((m) => m.approval_status === 'disputed');
-
-  if (loading) return <ActivityIndicator color={theme.text} style={styles.smallLoader} />;
-  if (matches.length === 0) return null;
-
-  return (
-    <View style={styles.section}>
-      {/* Pending — needs approval from opponent */}
-      {pendingMatches.length > 0 && (
-        <>
-          <ThemedText variant="label" muted style={styles.sectionTitle}>
-            Pending Approval ({pendingMatches.length})
-          </ThemedText>
-          {pendingMatches.map((match) => {
-            const isOpponent = match.opponent_id === currentUserId;
-            const isRecorder = match.recorded_by === currentUserId;
-            return (
-              <Card key={match.id} style={styles.matchCard}>
-                <View style={styles.matchDetail}>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {match.player?.username ?? match.player_id.slice(0, 8)}
-                  </ThemedText>
-                  <ThemedText variant="body">
-                    {match.player_score} : {match.opponent_score}
-                  </ThemedText>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {match.opponent?.username ?? match.opponent_id.slice(0, 8)}
-                  </ThemedText>
-                </View>
-                {isOpponent && (
-                  <View style={styles.matchActions}>
-                    <Pressable
-                      onPress={() => onApprove(match.id)}
-                      style={[styles.actionChip, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}
-                    >
-                      <ThumbsUp size={14} color="#10B981" strokeWidth={3} />
-                    </Pressable>
-                    <Pressable
-                      onPress={() => onDispute(match.id)}
-                      style={[styles.actionChip, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}
-                    >
-                      <X size={14} color="#EF4444" strokeWidth={3} />
-                    </Pressable>
-                  </View>
-                )}
-                {isRecorder && !isOpponent && (
-                  <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                    Waiting for opponent to approve
-                  </ThemedText>
-                )}
-              </Card>
-            );
-          })}
-        </>
-      )}
-
-      {/* Approved */}
-      {approvedMatches.length > 0 && (
-        <>
-          <ThemedText variant="label" muted style={styles.sectionTitle}>
-            Match History ({approvedMatches.length})
-          </ThemedText>
-          {approvedMatches.slice(0, 20).map((match) => (
-            <Card key={match.id} style={styles.matchCard}>
-              <View style={styles.matchDetail}>
-                <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                  {match.player?.username ?? match.player_id.slice(0, 8)}
-                </ThemedText>
-                <ThemedText variant="heading">
-                  {match.player_score} : {match.opponent_score}
-                </ThemedText>
-                <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                  {match.opponent?.username ?? match.opponent_id.slice(0, 8)}
-                </ThemedText>
-              </View>
-              <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                {new Date(match.created_at).toLocaleDateString()}
-              </ThemedText>
-            </Card>
-          ))}
-        </>
-      )}
-
-      {/* Disputed */}
-      {disputedMatches.length > 0 && (
-        <ThemedText variant="caption" muted style={{ textAlign: 'center', paddingVertical: Spacing.sm }}>
-          {disputedMatches.length} disputed match{disputedMatches.length > 1 ? 'es' : ''} (not counted)
-        </ThemedText>
-      )}
     </View>
   );
 }

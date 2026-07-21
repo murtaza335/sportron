@@ -32,6 +32,11 @@ type MatchDetailPopupProps = {
   onClose: () => void;
   currentUserId?: string;
   onRefreshFeed?: () => void;
+  onApprove?: (matchId: string) => Promise<void>;
+  onDispute?: (matchId: string) => Promise<void>;
+  hideSocial?: boolean;
+  hideDelete?: boolean;
+  recordedByName?: string;
 };
 
 function getInitials(name: string) {
@@ -62,6 +67,11 @@ export function MatchDetailPopup({
   onClose,
   currentUserId,
   onRefreshFeed,
+  onApprove,
+  onDispute,
+  hideSocial,
+  hideDelete,
+  recordedByName,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
@@ -122,26 +132,27 @@ Animated.spring(translateY, {
         setVerificationStatus(match.verification_status);
       }, 0);
 
-      const loadComments = async () => {
-        setLoadingComments(true);
-        try {
-          const data = await fetchComments(match.id);
-          setComments(data);
-        } catch (error) {
-          console.error('Failed to load comments:', error);
-        } finally {
-          setLoadingComments(false);
-        }
-      };
-
-      loadComments();
+      if (!hideSocial) {
+        const loadComments = async () => {
+          setLoadingComments(true);
+          try {
+            const data = await fetchComments(match.id);
+            setComments(data);
+          } catch (error) {
+            console.error('Failed to load comments:', error);
+          } finally {
+            setLoadingComments(false);
+          }
+        };
+        loadComments();
+      }
     } else {
       setTimeout(() => {
         setComments([]);
         setNewCommentText('');
       }, 0);
     }
-  }, [visible, match?.id, match?.verification_status]);
+  }, [visible, match?.id, match?.verification_status, hideSocial]);
 
   // Animate sheet
   useEffect(() => {
@@ -193,6 +204,7 @@ Animated.spring(translateY, {
   }
 
   const getCreatorName = () => {
+    if (recordedByName) return recordedByName;
     if (match.player?.id === match.created_by) return match.player.username;
     if (match.playerPartner?.id === match.created_by) return match.playerPartner.username;
     if (match.opponent?.id === match.created_by) return match.opponent.username;
@@ -236,7 +248,13 @@ Animated.spring(translateY, {
     if (!match) return;
     setUpdatingStatus(true);
     try {
-      await updateMatchVerificationStatus(match.id, status, currentUserId!);
+      if (status === 'verified' && onApprove) {
+        await onApprove(match.id);
+      } else if (status === 'disputed' && onDispute) {
+        await onDispute(match.id);
+      } else {
+        await updateMatchVerificationStatus(match.id, status, currentUserId!);
+      }
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch (error) {
@@ -519,7 +537,7 @@ Animated.spring(translateY, {
                 </View>
               </View>
 
-              {canDelete && (
+              {!hideDelete && canDelete && (
                 <>
                   <Divider spacing={Spacing.sm} />
                   <Pressable
@@ -535,62 +553,66 @@ Animated.spring(translateY, {
                 </>
               )}
 
-              <Divider spacing={Spacing.sm} />
+              {!hideSocial && (
+                <>
+                  <Divider spacing={Spacing.sm} />
 
-              {/* Social Header (Likes Count and Comments Header) */}
-              <View style={styles.sectionHeader}>
-                <ThemedText variant="label" style={styles.sectionTitle}>
-                  Comments ({comments.length})
-                </ThemedText>
-                <Pressable onPress={handleLike} style={styles.likeActionBtn} hitSlop={8}>
-                  <Heart
-                    size={16}
-                    color={liked ? '#EF4444' : theme.textSecondary}
-                    fill={liked ? '#EF4444' : 'none'}
-                  />
-                  <ThemedText variant="caption" style={[styles.likeText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
-                    {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                  </ThemedText>
-                </Pressable>
-              </View>
+                  {/* Social Header (Likes Count and Comments Header) */}
+                  <View style={styles.sectionHeader}>
+                    <ThemedText variant="label" style={styles.sectionTitle}>
+                      Comments ({comments.length})
+                    </ThemedText>
+                    <Pressable onPress={handleLike} style={styles.likeActionBtn} hitSlop={8}>
+                      <Heart
+                        size={16}
+                        color={liked ? '#EF4444' : theme.textSecondary}
+                        fill={liked ? '#EF4444' : 'none'}
+                      />
+                      <ThemedText variant="caption" style={[styles.likeText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
+                        {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+                      </ThemedText>
+                    </Pressable>
+                  </View>
 
-              {/* Comments List */}
-              {loadingComments ? (
-                <ActivityIndicator color={theme.text} style={styles.loader} />
-              ) : comments.length === 0 ? (
-                <ThemedText variant="caption" muted style={styles.emptyComments}>
-                  No comments yet. Be the first to comment!
-                </ThemedText>
-              ) : (
-                <View style={styles.commentsContainer}>
-                  {comments.map((comment) => (
-                    <View key={comment.id} style={styles.commentRow}>
-                      <View style={[styles.commentAvatar, { backgroundColor: theme.textSecondary }]}>
-                        <ThemedText style={[styles.avatarText, { fontSize: 10, color: theme.background }]}>
-                          {getInitials(comment.profile?.username ?? '?')}
-                        </ThemedText>
-                      </View>
-                      <View style={[styles.commentBody, { backgroundColor: theme.backgroundElement }]}>
-                        <View style={styles.commentMeta}>
-                          <ThemedText variant="caption" style={styles.commentAuthor}>
-                            {comment.profile?.username ?? 'Player'}
-                          </ThemedText>
-                          <ThemedText variant="caption" muted style={styles.commentTime}>
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </ThemedText>
+                  {/* Comments List */}
+                  {loadingComments ? (
+                    <ActivityIndicator color={theme.text} style={styles.loader} />
+                  ) : comments.length === 0 ? (
+                    <ThemedText variant="caption" muted style={styles.emptyComments}>
+                      No comments yet. Be the first to comment!
+                    </ThemedText>
+                  ) : (
+                    <View style={styles.commentsContainer}>
+                      {comments.map((comment) => (
+                        <View key={comment.id} style={styles.commentRow}>
+                          <View style={[styles.commentAvatar, { backgroundColor: theme.textSecondary }]}>
+                            <ThemedText style={[styles.avatarText, { fontSize: 10, color: theme.background }]}>
+                              {getInitials(comment.profile?.username ?? '?')}
+                            </ThemedText>
+                          </View>
+                          <View style={[styles.commentBody, { backgroundColor: theme.backgroundElement }]}>
+                            <View style={styles.commentMeta}>
+                              <ThemedText variant="caption" style={styles.commentAuthor}>
+                                {comment.profile?.username ?? 'Player'}
+                              </ThemedText>
+                              <ThemedText variant="caption" muted style={styles.commentTime}>
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </ThemedText>
+                            </View>
+                            <ThemedText variant="body" style={styles.commentContent}>
+                              {comment.content}
+                            </ThemedText>
+                          </View>
                         </View>
-                        <ThemedText variant="body" style={styles.commentContent}>
-                          {comment.content}
-                        </ThemedText>
-                      </View>
+                      ))}
                     </View>
-                  ))}
-                </View>
+                  )}
+                </>
               )}
             </ScrollView>
 
             {/* Sticky Comment Form at the bottom of the Sheet */}
-            {currentUserId && (
+            {!hideSocial && currentUserId && (
               <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
                 <TextInput
                   value={newCommentText}
