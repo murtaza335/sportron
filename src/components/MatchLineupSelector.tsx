@@ -171,6 +171,7 @@ export function MatchLineupSelector({
       const guestProfile: GuestProfile = {
         id: `guest-${activeSlot}`,
         username: 'Guest',
+        display_name: null,
         role: 'student' as UserRole,
         isGuest: true,
         bio: null,
@@ -183,6 +184,7 @@ export function MatchLineupSelector({
           match_liked: true,
           match_commented: true,
         },
+        deleted_at: null,
         created_at: '',
         updated_at: '',
       };
@@ -223,6 +225,7 @@ export function MatchLineupSelector({
               profile={{
                 id: 'current-user',
                 username: currentUserName,
+                display_name: null,
                 bio: null,
                 role: 'student',
                 avatar_url: null,
@@ -234,6 +237,7 @@ export function MatchLineupSelector({
                   match_liked: true,
                   match_commented: true,
                 },
+                deleted_at: null,
                 created_at: '',
                 updated_at: '',
               }}

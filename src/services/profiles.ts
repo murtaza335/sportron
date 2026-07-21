@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateProfileInput, Profile, NotificationType } from '@/types';
+import type { CreateProfileInput, Profile } from '@/types';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -175,7 +175,7 @@ export async function removeFCMToken(userId: string, token: string): Promise<voi
 }
 
 export async function softDeleteAccount(userId: string): Promise<void> {
-  const defaultPrefs: Record<NotificationType, boolean> = {
+  const defaultPrefs: Profile['notification_preferences'] = {
     match_pending: false,
     match_approved: false,
     match_rejected: false,

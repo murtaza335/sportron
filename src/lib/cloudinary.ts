@@ -59,7 +59,7 @@ export async function uploadImageFromUri(
           try {
             const data = JSON.parse(xhr.responseText);
             resolve(data.secure_url);
-          } catch (e) {
+          } catch {
             reject(new Error('Failed to parse response'));
           }
         } else {

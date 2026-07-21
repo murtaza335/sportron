@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateMatchInput, Match, MatchStats, MatchWithProfiles, MatchComment, MatchFormat } from '@/types';
+import type { CreateMatchInput, Match, MatchStats, MatchWithProfiles, MatchComment, MatchFormat, Sport } from '@/types';
 import { fetchProfile } from './profiles';
 import { notifyMatchPending, notifyMatchApproved, notifyMatchRejected, notifyMatchLiked, notifyMatchCommented } from './notifications';
 
@@ -16,6 +16,8 @@ type MatchRow = Match & {
     | null;
   likes: { profile_id: string }[] | null;
   comments: { id: string }[] | null;
+  team_a_name: string | null;
+  team_b_name: string | null;
 };
 
 function normalizeMatch(row: MatchRow, currentUserId?: string): MatchWithProfiles {
@@ -40,6 +42,10 @@ function normalizeMatch(row: MatchRow, currentUserId?: string): MatchWithProfile
     opponent_partner_id: row.opponent_partner_id,
     opponent_guest_name: row.opponent_guest_name,
     match_format: row.match_format,
+    sport: row.sport,
+    custom_sport_name: row.custom_sport_name,
+    team_a_name: row.team_a_name ?? null,
+    team_b_name: row.team_b_name ?? null,
     player_score: row.player_score,
     opponent_score: row.opponent_score,
     is_public: row.is_public,
@@ -117,6 +123,10 @@ export async function createMatch(userId: string, input: CreateMatchInput): Prom
       opponent_partner_id: input.opponentPartnerId,
       opponent_guest_name: input.opponentGuestName?.trim() || null,
       match_format: input.matchFormat,
+      sport: input.sport,
+      custom_sport_name: input.customSportName?.trim() || null,
+      team_a_name: input.teamAName?.trim() || null,
+      team_b_name: input.teamBName?.trim() || null,
       player_score: input.playerScore,
       opponent_score: input.opponentScore,
       is_public: input.isPublic,
@@ -391,6 +401,10 @@ export async function fetchPendingApprovalMatches(userId: string): Promise<Match
     opponent_partner_id: string | null;
     opponent_guest_name: string | null;
     match_format: MatchFormat;
+    sport: Sport;
+    custom_sport_name: string | null;
+    team_a_name: string | null;
+    team_b_name: string | null;
     player_score: number;
     opponent_score: number;
     is_public: boolean;

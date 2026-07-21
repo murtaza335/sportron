@@ -7,7 +7,8 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { toggleLike } from '@/services/matches';
-import type { MatchWithProfiles } from '@/types';
+import type { MatchWithProfiles, Sport } from '@/types';
+import { SPORT_LABELS } from '@/types';
 
 type MatchCardProps = {
   match: MatchWithProfiles;
@@ -17,6 +18,8 @@ type MatchCardProps = {
 };
 
 function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
+  if (match.team_b_name) return match.team_b_name;
+
   const op1 = match.opponent?.id === currentUserId ? 'You' : match.opponent?.username;
   const op2 = match.opponentPartner?.id === currentUserId ? 'You' : match.opponentPartner?.username;
   const opponentNames = [op1, op2].filter(Boolean);
@@ -28,7 +31,16 @@ function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
   return match.opponent_guest_name ?? 'Guest';
 }
 
+function getOpponentCaptain(match: MatchWithProfiles) {
+  if (match.team_b_name && match.opponent?.username) {
+    return match.opponent.username;
+  }
+  return null;
+}
+
 function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
+  if (match.team_a_name) return match.team_a_name;
+
   const p1 = match.player?.id === currentUserId ? 'You' : (match.player?.username ?? 'Player A');
   const p2 = match.playerPartner?.id === currentUserId ? 'You' : match.playerPartner?.username;
   return [p1, p2].filter(Boolean).join(' + ');
@@ -47,6 +59,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
   const theme = useTheme();
   const playerName = getTeamAName(match, currentUserId);
   const opponentName = getOpponentName(match, currentUserId);
+  const opponentCaptain = getOpponentCaptain(match);
 
   const [liked, setLiked] = useState(match.is_liked_by_user);
   const [likesCount, setLikesCount] = useState(match.likes_count);
@@ -119,6 +132,15 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
           </View>
 
           <View style={styles.badges}>
+            <ThemedText
+              variant="caption"
+              style={[
+                styles.badge,
+                { backgroundColor: theme.backgroundElement, color: theme.textSecondary }
+              ]}
+            >
+              {SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport}
+            </ThemedText>
             <ThemedText
               variant="caption"
               style={[
@@ -202,6 +224,11 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
             >
               {opponentName}
             </ThemedText>
+            {opponentCaptain && (
+              <ThemedText variant="caption" muted style={{ textAlign: 'right', fontSize: 11 }}>
+                {opponentCaptain}
+              </ThemedText>
+            )}
           </View>
         </View>
 

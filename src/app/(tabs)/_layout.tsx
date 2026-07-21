@@ -1,27 +1,10 @@
 import { router, Tabs } from 'expo-router';
-import { Bell, Clock, Home, User } from 'lucide-react-native';
+import { Bell, Clock, Plus, User, Users } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
-import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
-
-function HomeHeaderTitle() {
-  const { profile } = useAuth();
-  const theme = useTheme();
-
-  return (
-    <View style={{ gap: 2 }}>
-      <Text style={{ fontSize: 14, fontWeight: '700', color: theme.text, opacity: 0.7 }}>
-        Welcome back
-      </Text>
-      <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 }}>
-        {profile?.username ?? 'Player'}
-      </Text>
-    </View>
-  );
-}
 
 function DefaultHeaderTitle({ title }: { title: string }) {
   const theme = useTheme();
@@ -53,6 +36,7 @@ export default function TabLayout() {
         headerShadowVisible: false, // <-- ADD THIS to completely remove the header border/shadow
         headerStyle: commonHeaderStyle,
         headerTintColor: theme.text,
+        headerTitleAlign: 'center',
         headerTitleStyle: { fontWeight: '800', fontSize: 22, letterSpacing: -0.3 },
         headerTitleContainerStyle: { paddingBottom: Platform.OS === 'ios' ? 4 : 0 },
         headerRight: () => (
@@ -104,16 +88,60 @@ export default function TabLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: 'Home',
-          headerTitle: () => <HomeHeaderTitle />,
-          tabBarIcon: ({ color, size }) => <Home size={size + 2} color={color} strokeWidth={2.4} />,
+          title: 'Communities',
+          headerTitle: () => <DefaultHeaderTitle title="Communities" />,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.navigate('/create-community')}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+              hitSlop={12}
+              accessibilityLabel="Create community"
+              accessibilityRole="button"
+            >
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.backgroundElement,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}>
+                <Plus size={18} color={theme.text} strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          ),
+          tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
         }}
       />
       <Tabs.Screen
         name="history"
         options={{
-          title: 'History',
-          headerTitle: () => <DefaultHeaderTitle title="History" />,
+          title: 'Sessions',
+          headerTitle: () => <DefaultHeaderTitle title="Find a Match" />,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.navigate('/create-session')}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+              hitSlop={12}
+              accessibilityLabel="Create session"
+              accessibilityRole="button"
+            >
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.backgroundElement,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}>
+                <Plus size={18} color={theme.text} strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          ),
           tabBarIcon: ({ color, size }) => <Clock size={size} color={color} strokeWidth={2.2} />,
         }}
       />

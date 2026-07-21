@@ -1,9 +1,48 @@
 export type UserRole = 'student' | 'teacher';
 export type MatchFormat = 'singles' | 'doubles';
 
+export type Sport =
+  | 'table_tennis'
+  | 'badminton'
+  | 'tennis'
+  | 'squash'
+  | 'pickleball'
+  | 'football'
+  | 'cricket'
+  | 'volleyball'
+  | 'handball'
+  | 'basketball'
+  | 'other';
+
+export const RACKET_SPORTS: Sport[] = ['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball'];
+export const TEAM_SPORTS: Sport[] = ['football', 'cricket', 'volleyball', 'handball', 'basketball'];
+
+export const SPORT_LABELS: Record<Sport, string> = {
+  table_tennis: 'Table Tennis',
+  badminton: 'Badminton',
+  tennis: 'Tennis',
+  squash: 'Squash',
+  pickleball: 'Pickleball',
+  football: 'Football',
+  cricket: 'Cricket',
+  volleyball: 'Volleyball',
+  handball: 'Handball',
+  basketball: 'Basketball',
+  other: 'Other',
+};
+
+export function isRacketSport(sport: Sport): boolean {
+  return RACKET_SPORTS.includes(sport);
+}
+
+export function isTeamSport(sport: Sport): boolean {
+  return TEAM_SPORTS.includes(sport);
+}
+
 export type Profile = {
   id: string;
   username: string;
+  display_name: string | null;
   bio: string | null;
   role: UserRole;
   avatar_url: string | null;
@@ -23,6 +62,7 @@ export type Profile = {
 export type GuestProfile = {
   id: string;
   username: string;
+  display_name: null;
   role: string;
   isGuest: true;
   bio: null;
@@ -49,6 +89,10 @@ export type Match = {
   opponent_partner_id: string | null;
   opponent_guest_name: string | null;
   match_format: MatchFormat;
+  sport: Sport;
+  custom_sport_name: string | null;
+  team_a_name: string | null;
+  team_b_name: string | null;
   player_score: number;
   opponent_score: number;
   is_public: boolean;
@@ -77,6 +121,10 @@ export type MatchComment = {
 
 export type CreateMatchInput = {
   matchFormat: MatchFormat;
+  sport: Sport;
+  customSportName?: string | null;
+  teamAName?: string | null;
+  teamBName?: string | null;
   playerPartnerId: string | null;
   opponentId: string | null;
   opponentPartnerId: string | null;
@@ -104,7 +152,22 @@ export type NotificationType =
   | 'match_approved'
   | 'match_rejected'
   | 'match_liked'
-  | 'match_commented';
+  | 'match_commented'
+  | 'session_application'
+  | 'session_accepted'
+  | 'session_rejected'
+  | 'session_reminder'
+  | 'feedback_prompt'
+  | 'ping'
+  | 'join_request'
+  | 'join_approved'
+  | 'join_rejected'
+  | 'match_approval_request'
+  | 'match_approved_community'
+  | 'match_disputed'
+  | 'member_removed'
+  | 'community_deleted'
+  | 'admin_transferred';
 
 export type InAppNotification = {
   id: string;
@@ -115,4 +178,135 @@ export type InAppNotification = {
   data: Record<string, unknown> | null;
   read: boolean;
   created_at: string;
+};
+
+export type CommunityVisibility = 'public' | 'restricted';
+
+export type Community = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  visibility: CommunityVisibility;
+  sport: Sport;
+  created_by: string;
+  created_at: string;
+  updated_at: string;
+  member_count?: number;
+};
+
+export type CommunityMemberRole = 'admin' | 'member';
+
+export type CommunityMember = {
+  community_id: string;
+  profile_id: string;
+  role: CommunityMemberRole;
+  approval_status: 'approved' | 'pending' | 'rejected';
+  matches_played: number;
+  wins: number;
+  losses: number;
+  win_ratio: number;
+  joined_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
+};
+
+export type CreateCommunityInput = {
+  name: string;
+  description?: string;
+  visibility: CommunityVisibility;
+  sport: Sport;
+};
+
+export type UpdateCommunityInput = {
+  name?: string;
+  description?: string | null;
+  visibility?: CommunityVisibility;
+};
+
+export type CommunityJoinRequest = {
+  id: string;
+  community_id: string;
+  user_id: string;
+  status: 'pending' | 'approved' | 'rejected';
+  created_at: string;
+  updated_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
+export type Ping = {
+  id: string;
+  community_id: string;
+  sender_id: string;
+  message: string;
+  created_at: string;
+  sender?: Pick<Profile, 'id' | 'username'> | null;
+};
+
+export type CommunityMatch = {
+  id: string;
+  community_id: string;
+  recorded_by: string;
+  player_id: string;
+  player_partner_id: string | null;
+  opponent_id: string;
+  opponent_partner_id: string | null;
+  sport: Sport;
+  custom_sport_name: string | null;
+  team_a_name: string | null;
+  team_b_name: string | null;
+  player_score: number;
+  opponent_score: number;
+  approval_status: 'pending' | 'approved' | 'disputed';
+  created_at: string;
+  updated_at: string;
+  recorder?: Pick<Profile, 'id' | 'username'> | null;
+  player?: Pick<Profile, 'id' | 'username'> | null;
+  opponent?: Pick<Profile, 'id' | 'username'> | null;
+};
+
+export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelled';
+
+export type Session = {
+  id: string;
+  created_by: string;
+  sport: string;
+  location: string;
+  date_time: string;
+  max_participants: number;
+  description: string | null;
+  status: SessionStatus;
+  created_at: string;
+  updated_at: string;
+  creator?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  commitment_count?: number;
+  my_commitment?: Pick<Commitment, 'id' | 'status'> | null;
+};
+
+export type CreateSessionInput = {
+  sport: string;
+  location: string;
+  date_time: string;
+  max_participants: number;
+  description?: string;
+};
+
+export type CommitmentStatus = 'pending' | 'accepted' | 'rejected' | 'left';
+export type FeedbackStatus = 'showed_up' | 'no_show';
+
+export type Commitment = {
+  id: string;
+  session_id: string;
+  user_id: string;
+  status: CommitmentStatus;
+  feedback_status: FeedbackStatus | null;
+  feedback_provided_by: string | null;
+  created_at: string;
+  updated_at: string;
+  profile?: {
+    id: string;
+    username: string;
+    avatar_url: string | null;
+    completed_sessions?: number;
+    total_committed_sessions?: number;
+  } | null;
 };
