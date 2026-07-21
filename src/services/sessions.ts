@@ -25,7 +25,7 @@ function normalizeSession(
     creator: row.creator,
     commitment_count: acceptedCount ?? 0,
     my_commitment: currentUserId
-      ? (row.commitments?.find((c) => c.user_id === currentUserId) ?? null)
+      ? ((row.commitments?.find((c) => c.user_id === currentUserId) as Pick<Commitment, 'id' | 'status'> | undefined) ?? null)
       : null,
   };
 }
@@ -229,7 +229,7 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
     .eq('status', 'accepted');
 
   if (countError) throw countError;
-  if (count > 0) {
+  if (count && count > 0) {
     throw new Error(
       `Cannot delete session — ${count} participant${count > 1 ? 's have' : ' has'} already been accepted.`,
     );

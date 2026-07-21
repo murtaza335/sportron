@@ -87,7 +87,7 @@ export default function CommunityDetailScreen() {
     } finally {
       setMatchesLoading(false);
     }
-  }, [id, user?.id]);
+  }, [id, user]);
 
   useFocusEffect(
     useCallback(() => {
