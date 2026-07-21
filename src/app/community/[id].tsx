@@ -28,6 +28,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
+import { SPORT_LABELS } from '@/types';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
@@ -266,6 +267,14 @@ export default function CommunityDetailScreen() {
             </View>
           </View>
 
+          <View style={styles.badgesRow}>
+            <View style={[styles.sportBadge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
+                {SPORT_LABELS[community.sport] || community.sport}
+              </ThemedText>
+            </View>
+          </View>
+
           {community.description && (
             <ThemedText variant="body" muted style={styles.description}>
               {community.description}
@@ -347,7 +356,7 @@ export default function CommunityDetailScreen() {
               label="Record Match"
               variant="secondary"
               icon={<Swords size={16} color={theme.text} strokeWidth={2} />}
-              onPress={() => router.navigate(`/add-match?communityId=${id}`)}
+              onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
               buttonStyle={styles.fullWidthBtn}
             />
           </>
@@ -536,6 +545,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+  },
+  badgesRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.xs,
+  },
+  sportBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
   },
   visibilityBadge: {
     paddingHorizontal: Spacing.sm,

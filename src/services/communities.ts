@@ -21,6 +21,7 @@ function normalizeCommunity(row: CommunityRow): Community {
     description: row.description,
     image_url: row.image_url,
     visibility: row.visibility,
+    sport: row.sport,
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
@@ -69,6 +70,7 @@ export async function createCommunity(
       name: input.name.trim(),
       description: input.description?.trim() || null,
       visibility: input.visibility,
+      sport: input.sport,
       created_by: userId,
     })
     .select()
