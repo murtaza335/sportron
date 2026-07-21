@@ -36,6 +36,7 @@ export default function TabLayout() {
         headerShadowVisible: false, // <-- ADD THIS to completely remove the header border/shadow
         headerStyle: commonHeaderStyle,
         headerTintColor: theme.text,
+        headerTitleAlign: 'center',
         headerTitleStyle: { fontWeight: '800', fontSize: 22, letterSpacing: -0.3 },
         headerTitleContainerStyle: { paddingBottom: Platform.OS === 'ios' ? 4 : 0 },
         headerRight: () => (
@@ -89,6 +90,28 @@ export default function TabLayout() {
         options={{
           title: 'Communities',
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
+          headerLeft: () => (
+            <Pressable
+              onPress={() => router.navigate('/create-community')}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+              hitSlop={12}
+              accessibilityLabel="Create community"
+              accessibilityRole="button"
+            >
+              <View style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: theme.backgroundElement,
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 1,
+                borderColor: theme.border,
+              }}>
+                <Plus size={18} color={theme.text} strokeWidth={2.5} />
+              </View>
+            </Pressable>
+          ),
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
         }}
       />
