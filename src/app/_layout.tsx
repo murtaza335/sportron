@@ -121,6 +121,14 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="discover"
+          options={{
+            headerShown: true,
+            title: 'Discover',
+            animation: 'slide_from_right',
+          }}
+        />
+        <Stack.Screen
           name="create-session"
           options={{
             presentation: 'fullScreenModal',
