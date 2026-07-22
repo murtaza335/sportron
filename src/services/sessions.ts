@@ -1,5 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput } from '@/types';
+import { fetchProfile } from './profiles';
+import {
+  notifySessionApplication,
+  notifySessionAccepted,
+  notifySessionRejected,
+} from './notifications';
 
 type SessionRow = Session & {
   creator: { id: string; username: string; avatar_url: string | null } | null;
@@ -156,29 +162,89 @@ export async function commitToSession(
     .single();
 
   if (error) throw error;
+
+  try {
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('created_by')
+      .eq('id', sessionId)
+      .single();
+
+    if (session && session.created_by !== userId) {
+      const applicant = await fetchProfile(userId);
+      await notifySessionApplication(
+        session.created_by,
+        sessionId,
+        applicant?.username ?? 'Someone',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send session application notification:', e);
+  }
+
   return data;
 }
 
 export async function approveCommitment(
   commitmentId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: commitment } = await supabase
+    .from('commitments')
+    .select('session_id, user_id')
+    .eq('id', commitmentId)
+    .single();
+
+  if (!commitment) throw new Error('Commitment not found');
+
   const { error } = await supabase
     .from('commitments')
     .update({ status: 'accepted' })
     .eq('id', commitmentId);
 
   if (error) throw error;
+
+  try {
+    const actor = await fetchProfile(actorId);
+    await notifySessionAccepted(
+      commitment.user_id,
+      commitment.session_id,
+      actor?.username ?? 'Session host',
+    );
+  } catch (e) {
+    console.error('Failed to send session accepted notification:', e);
+  }
 }
 
 export async function rejectCommitment(
   commitmentId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: commitment } = await supabase
+    .from('commitments')
+    .select('session_id, user_id')
+    .eq('id', commitmentId)
+    .single();
+
+  if (!commitment) throw new Error('Commitment not found');
+
   const { error } = await supabase
     .from('commitments')
     .update({ status: 'rejected' })
     .eq('id', commitmentId);
 
   if (error) throw error;
+
+  try {
+    const actor = await fetchProfile(actorId);
+    await notifySessionRejected(
+      commitment.user_id,
+      commitment.session_id,
+      actor?.username ?? 'Session host',
+    );
+  } catch (e) {
+    console.error('Failed to send session rejected notification:', e);
+  }
 }
 
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {

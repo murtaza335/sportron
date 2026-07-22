@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
-import type { CreateProfileInput, Profile } from '@/types';
+import type { CreateProfileInput, NotificationPreferences, Profile } from '@/types';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
@@ -90,7 +91,7 @@ export async function updateProfile(
 
 export async function updateNotificationPreferences(
   userId: string,
-  preferences: Partial<Profile['notification_preferences']>
+  preferences: Partial<NotificationPreferences>
 ): Promise<Profile> {
   const { data: existingProfile, error: fetchError } = await supabase
     .from('profiles')
@@ -102,13 +103,7 @@ export async function updateNotificationPreferences(
     throw fetchError;
   }
 
-  const currentPrefs = existingProfile?.notification_preferences || {
-    match_pending: true,
-    match_approved: true,
-    match_rejected: true,
-    match_liked: true,
-    match_commented: true,
-  };
+  const currentPrefs = existingProfile?.notification_preferences || { ...DEFAULT_NOTIFICATION_PREFERENCES };
 
   const updatedPrefs = { ...currentPrefs, ...preferences };
 
@@ -175,13 +170,12 @@ export async function removeFCMToken(userId: string, token: string): Promise<voi
 }
 
 export async function softDeleteAccount(userId: string): Promise<void> {
-  const defaultPrefs: Profile['notification_preferences'] = {
-    match_pending: false,
-    match_approved: false,
-    match_rejected: false,
-    match_liked: false,
-    match_commented: false,
-  };
+  const defaultPrefs: NotificationPreferences = {
+    ...DEFAULT_NOTIFICATION_PREFERENCES,
+    ...Object.fromEntries(
+      Object.keys(DEFAULT_NOTIFICATION_PREFERENCES).map((k) => [k, false]),
+    ),
+  } as NotificationPreferences;
 
   const { error } = await supabase
     .from('profiles')

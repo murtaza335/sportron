@@ -5,7 +5,7 @@ import { useCallback, useEffect, useState } from 'react';
 export interface Notification {
   id: string;
   user_id: string;
-  type: 'match_pending' | 'match_approved' | 'match_rejected' | 'match_liked' | 'match_commented';
+  type: string;
   title: string;
   body: string;
   data: Record<string, unknown>;

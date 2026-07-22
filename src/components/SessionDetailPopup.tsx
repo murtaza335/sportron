@@ -206,7 +206,7 @@ export function SessionDetailPopup({
     if (!id || !uid) return;
     setApprovingId(commitmentId);
     try {
-      await approveCommitment(commitmentId);
+      await approveCommitment(commitmentId, uid);
       setReloadKey((k) => k + 1);
       const sessionData = await fetchSessionById(id, uid);
       setSession(sessionData);
@@ -221,9 +221,11 @@ export function SessionDetailPopup({
   };
 
   const handleReject = async (commitmentId: string) => {
+    const uid = currentUserId;
+    if (!uid) return;
     setApprovingId(commitmentId);
     try {
-      await rejectCommitment(commitmentId);
+      await rejectCommitment(commitmentId, uid);
       setReloadKey((k) => k + 1);
       onRefreshFeed?.();
     } catch (e) {

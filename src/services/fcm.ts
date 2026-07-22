@@ -9,7 +9,24 @@ export type NotificationType =
   | 'match_approved'
   | 'match_rejected'
   | 'match_liked'
-  | 'match_commented';
+  | 'match_commented'
+  | 'session_application'
+  | 'session_accepted'
+  | 'session_rejected'
+  | 'session_reminder'
+  | 'feedback_prompt'
+  | 'ping'
+  | 'join_request'
+  | 'join_approved'
+  | 'join_rejected'
+  | 'match_approval_request'
+  | 'match_approved_community'
+  | 'match_disputed'
+  | 'member_removed'
+  | 'admin_transferred'
+  | 'community_match_pending'
+  | 'community_match_approved'
+  | 'community_match_disputed';
 
 export interface NotificationData {
   type: NotificationType;
@@ -17,6 +34,9 @@ export interface NotificationData {
   senderId?: string;
   senderName?: string;
   commentId?: string;
+  sessionId?: string;
+  communityId?: string;
+  message?: string;
 }
 
 Notifications.setNotificationHandler({
