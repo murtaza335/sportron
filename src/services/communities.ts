@@ -531,7 +531,9 @@ export async function recordCommunityMatch(input: {
 export async function fetchCommunityMatches(
   communityId: string,
   userId?: string,
-): Promise<CommunityMatch[]> {
+  page?: number,
+  pageSize?: number,
+): Promise<{ data: CommunityMatch[]; hasMore: boolean }> {
   let query = supabase
     .from('community_matches')
     .select(`
@@ -548,10 +550,20 @@ export async function fetchCommunityMatches(
     query = query.or(`approval_status.neq.pending,recorded_by.eq.${userId},opponent_id.eq.${userId}`);
   }
 
+  if (page && pageSize) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+  }
+
   const { data, error } = await query;
 
   if (error) throw error;
-  return data ?? [];
+
+  const matches = data ?? [];
+  const hasMore = page && pageSize ? matches.length === pageSize : false;
+
+  return { data: matches, hasMore };
 }
 
 export async function approveCommunityMatch(

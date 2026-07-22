@@ -3,7 +3,6 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useState } from 'react';
 import {
   Check,
-  ChevronRight,
   Globe,
   Image as ImageIcon,
   Lock,
@@ -78,28 +77,56 @@ export default function CommunityDetailScreen() {
   // Matches
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchesPage, setMatchesPage] = useState(1);
+  const [hasMoreMatches, setHasMoreMatches] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
 
-  const loadMatches = useCallback(async () => {
+  const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
     try {
-      const data = await fetchCommunityMatches(id, user?.id);
-      setMatches(data);
+      const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
+      if (append) {
+        setMatches((prev) => [...prev, ...data]);
+      } else {
+        setMatches(data);
+      }
+      setHasMoreMatches(hasMore);
+      setMatchesPage(page);
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
       setMatchesLoading(false);
+      setLoadingMore(false);
     }
   }, [id, user]);
 
   useFocusEffect(
     useCallback(() => {
-      loadMatches();
+      setMatchesPage(1);
+      setHasMoreMatches(false);
+      setMatchesLoading(true);
+      loadMatches(1);
     }, [loadMatches]),
   );
 
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMoreMatches) return;
+    setLoadingMore(true);
+    await loadMatches(matchesPage + 1, true);
+  };
+
   const approvedMatches = matches.filter((m) => m.approval_status === 'approved');
+
+  const pendingMatches = matches.filter(
+    (m) =>
+      m.approval_status === 'pending' &&
+      (m.opponent_id === user?.id || m.recorded_by === user?.id),
+  );
+
+  const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
 
   function toMatchWithProfiles(cm: CommunityMatch): MatchWithProfiles {
     return {
@@ -379,10 +406,10 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
+          refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={() => { refresh(); loadMatches(); }}
+            onRefresh={() => { refresh(); setMatchesLoading(true); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
             tintColor={theme.text}
           />
         }
@@ -512,12 +539,52 @@ export default function CommunityDetailScreen() {
               </Pressable>
             </View>
 
-            {/* Recent Matches */}
+            {/* Tabs */}
+            <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
+              <Pressable
+                style={[
+                  styles.tab,
+                  activeTab === 'approved' && { borderBottomColor: theme.text },
+                ]}
+                onPress={() => setActiveTab('approved')}
+              >
+                <ThemedText
+                  variant="label"
+                  style={[
+                    styles.tabText,
+                    activeTab === 'approved' && { color: theme.text },
+                    activeTab !== 'approved' && { color: theme.textSecondary },
+                  ]}
+                >
+                  Approved ({approvedMatches.length})
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tab,
+                  activeTab === 'pending' && { borderBottomColor: theme.text },
+                ]}
+                onPress={() => setActiveTab('pending')}
+              >
+                <ThemedText
+                  variant="label"
+                  style={[
+                    styles.tabText,
+                    activeTab === 'pending' && { color: theme.text },
+                    activeTab !== 'pending' && { color: theme.textSecondary },
+                  ]}
+                >
+                  Pending ({pendingMatches.length})
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            {/* Match List */}
             {matchesLoading ? (
               <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
-            ) : approvedMatches.length > 0 ? (
+            ) : displayMatches.length > 0 ? (
               <>
-                {approvedMatches.slice(0, 5).map((cm) => (
+                {displayMatches.map((cm) => (
                   <MatchCard
                     key={cm.id}
                     match={toMatchWithProfiles(cm)}
@@ -529,22 +596,28 @@ export default function CommunityDetailScreen() {
                     showYoursBadge={false}
                   />
                 ))}
-                {approvedMatches.length > 5 && (
+                {activeTab === 'approved' && hasMoreMatches && (
                   <Pressable
-                    onPress={() => router.navigate(`/community/${id}/matches`)}
-                    style={[styles.viewAllLink, { borderColor: theme.border }]}
+                    onPress={handleLoadMore}
+                    style={[styles.loadMoreButton, { borderColor: theme.border }]}
+                    disabled={loadingMore}
                   >
-                    <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
-                      View All ({approvedMatches.length})
-                    </ThemedText>
-                    <ChevronRight size={16} color={theme.textSecondary} strokeWidth={2} />
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={theme.textSecondary} />
+                    ) : (
+                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
+                        Load More
+                      </ThemedText>
+                    )}
                   </Pressable>
                 )}
               </>
             ) : (
               <Card>
                 <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                  No matches recorded yet. Be the first to record one!
+                  {activeTab === 'pending'
+                    ? 'No pending approvals for you.'
+                    : 'No matches recorded yet. Be the first to record one!'}
                 </ThemedText>
               </Card>
             )}
@@ -851,6 +924,22 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '800' },
 
   // Matches Section
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   recordMatchBar: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -876,6 +965,14 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.full,
     backgroundColor: '#EF4444',
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   viewAllLink: {
     flexDirection: 'row',
