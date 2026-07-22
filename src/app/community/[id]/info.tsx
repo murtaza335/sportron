@@ -5,6 +5,8 @@ import {
   Globe,
   Info,
   Lock,
+  LogOut,
+  Pencil,
   Plus,
   Swords,
   Users,
@@ -28,6 +30,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
   joinCommunity,
+  leaveCommunity,
   requestToJoinCommunity,
 } from '@/services/communities';
 import { SPORT_LABELS } from '@/types';
@@ -71,6 +74,34 @@ export default function CommunityInfoScreen() {
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to join.');
     }
+  };
+
+  const handleLeave = () => {
+    if (!id || !user) return;
+    Alert.alert(
+      'Leave Community',
+      'Are you sure you want to leave this community?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveCommunity(id, user.id);
+              setMembership(null);
+              refresh();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to leave.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleEdit = () => {
+    router.navigate({ pathname: `/community/${id}`, params: { edit: 'true' } });
   };
 
   if (loading) {
@@ -207,6 +238,30 @@ export default function CommunityInfoScreen() {
             </ThemedText>
           </Card>
         )}
+
+        {/* Member Actions */}
+        {isMember && (
+          <View style={styles.memberActions}>
+            {membership?.role === 'admin' && (
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                onPress={handleEdit}
+              >
+                <Pencil size={18} color={theme.text} strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600' }}>Edit Community</ThemedText>
+              </Pressable>
+            )}
+            {membership?.role !== 'admin' && (
+              <Pressable
+                style={[styles.actionButton, { backgroundColor: theme.backgroundElement, borderColor: '#EF444440' }]}
+                onPress={handleLeave}
+              >
+                <LogOut size={18} color="#EF4444" strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600', color: '#EF4444' }}>Leave Community</ThemedText>
+              </Pressable>
+            )}
+          </View>
+        )}
       </ScrollView>
     </View>
   );
@@ -297,5 +352,21 @@ const styles = StyleSheet.create({
   },
   joinHint: {
     textAlign: 'center',
+  },
+
+  // Member Action Buttons
+  memberActions: {
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  actionButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.lg,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
   },
 });
