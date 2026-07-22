@@ -376,7 +376,12 @@ export default function CommunityDetailScreen() {
         options={{
           headerTitle: () =>
             isMember ? (
-              <Pressable onPress={() => router.navigate(`/community/${id}/info`)}>
+              <Pressable
+                onPress={() => router.navigate(`/community/${id}/info`)}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.5 : 1,
+                })}
+              >
                 <ThemedText
                   style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
                   numberOfLines={1}
