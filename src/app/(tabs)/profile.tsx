@@ -12,6 +12,7 @@ import { signOut } from '@/services/auth';
 import { updateProfile, removeFCMToken, updateNotificationPreferences } from '@/services/profiles';
 import { useTheme } from '@/hooks/use-theme';
 import { useFCM } from '@/hooks/useFCM';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
@@ -50,8 +51,10 @@ export default function ProfileScreen() {
     if (profile?.id) {
       try {
         const newPrefs = value
-          ? { match_pending: true, match_approved: true, match_rejected: true, match_liked: true, match_commented: true }
-          : { match_pending: false, match_approved: false, match_rejected: false, match_liked: false, match_commented: false };
+          ? { ...DEFAULT_NOTIFICATION_PREFERENCES }
+          : Object.fromEntries(
+              Object.keys(DEFAULT_NOTIFICATION_PREFERENCES).map((k) => [k, false]),
+            ) as Record<string, boolean>;
         await updateNotificationPreferences(profile.id, newPrefs);
       } catch {
         // silently fail — preferences sync is best-effort

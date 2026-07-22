@@ -26,7 +26,7 @@ import { createMatch } from '@/services/matches';
 import { fetchAllProfiles } from '@/services/profiles';
 import { fetchCommunityMembers, recordCommunityMatch } from '@/services/communities';
 import type { MatchFormat, Profile, GuestProfile, Sport, CommunityMember } from '@/types';
-import { SPORT_LABELS, isRacketSport, isTeamSport } from '@/types';
+import { DEFAULT_NOTIFICATION_PREFERENCES, SPORT_LABELS, isRacketSport, isTeamSport } from '@/types';
 
 type SelectionState = {
   playerPartner: Profile | GuestProfile | null;
@@ -76,13 +76,7 @@ export default function AddMatchScreen() {
           role: 'student' as const,
           avatar_url: m.profile?.avatar_url ?? null,
           fcm_tokens: [],
-          notification_preferences: {
-            match_pending: true,
-            match_approved: true,
-            match_rejected: true,
-            match_liked: true,
-            match_commented: true,
-          },
+          notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
           deleted_at: null,
           created_at: '',
           updated_at: '',

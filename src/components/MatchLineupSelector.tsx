@@ -13,6 +13,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MatchFormat, Profile, UserRole, GuestProfile } from '@/types';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
 
@@ -177,13 +178,7 @@ export function MatchLineupSelector({
         bio: null,
         avatar_url: null,
         fcm_tokens: [],
-        notification_preferences: {
-          match_pending: true,
-          match_approved: true,
-          match_rejected: true,
-          match_liked: true,
-          match_commented: true,
-        },
+        notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
         deleted_at: null,
         created_at: '',
         updated_at: '',
@@ -230,13 +225,7 @@ export function MatchLineupSelector({
                 role: 'student',
                 avatar_url: null,
                 fcm_tokens: [],
-                notification_preferences: {
-                  match_pending: true,
-                  match_approved: true,
-                  match_rejected: true,
-                  match_liked: true,
-                  match_commented: true,
-                },
+                notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
                 deleted_at: null,
                 created_at: '',
                 updated_at: '',

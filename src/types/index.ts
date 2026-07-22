@@ -47,16 +47,35 @@ export type Profile = {
   role: UserRole;
   avatar_url: string | null;
   fcm_tokens: string[];
-  notification_preferences: {
-    match_pending: boolean;
-    match_approved: boolean;
-    match_rejected: boolean;
-    match_liked: boolean;
-    match_commented: boolean;
-  };
+  notification_preferences: NotificationPreferences;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+};
+
+export type NotificationPreferences = {
+  match_pending: boolean;
+  match_approved: boolean;
+  match_rejected: boolean;
+  match_liked: boolean;
+  match_commented: boolean;
+  session_application: boolean;
+  session_accepted: boolean;
+  session_rejected: boolean;
+  session_reminder: boolean;
+  feedback_prompt: boolean;
+  ping: boolean;
+  join_request: boolean;
+  join_approved: boolean;
+  join_rejected: boolean;
+  match_approval_request: boolean;
+  match_approved_community: boolean;
+  match_disputed: boolean;
+  member_removed: boolean;
+  admin_transferred: boolean;
+  community_match_pending: boolean;
+  community_match_approved: boolean;
+  community_match_disputed: boolean;
 };
 
 export type GuestProfile = {
@@ -68,13 +87,7 @@ export type GuestProfile = {
   bio: null;
   avatar_url: null;
   fcm_tokens: string[];
-  notification_preferences: {
-    match_pending: boolean;
-    match_approved: boolean;
-    match_rejected: boolean;
-    match_liked: boolean;
-    match_commented: boolean;
-  };
+  notification_preferences: NotificationPreferences;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
@@ -141,6 +154,31 @@ export type CreateProfileInput = {
   avatarUrl?: string;
 };
 
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  match_pending: true,
+  match_approved: true,
+  match_rejected: true,
+  match_liked: true,
+  match_commented: true,
+  session_application: true,
+  session_accepted: true,
+  session_rejected: true,
+  session_reminder: true,
+  feedback_prompt: true,
+  ping: true,
+  join_request: true,
+  join_approved: true,
+  join_rejected: true,
+  match_approval_request: true,
+  match_approved_community: true,
+  match_disputed: true,
+  member_removed: true,
+  admin_transferred: true,
+  community_match_pending: true,
+  community_match_approved: true,
+  community_match_disputed: true,
+};
+
 export type MatchStats = {
   total: number;
   wins: number;
@@ -166,8 +204,10 @@ export type NotificationType =
   | 'match_approved_community'
   | 'match_disputed'
   | 'member_removed'
-  | 'community_deleted'
-  | 'admin_transferred';
+  | 'admin_transferred'
+  | 'community_match_pending'
+  | 'community_match_approved'
+  | 'community_match_disputed';
 
 export type InAppNotification = {
   id: string;

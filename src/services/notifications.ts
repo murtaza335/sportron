@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase';
+import type { NotificationType } from '@/types';
 
 const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
@@ -20,13 +21,6 @@ async function triggerFcmPush(userId: string, title: string, body: string, data?
     // fire-and-forget: silently ignore FCM failures
   }
 }
-
-export type NotificationType =
-  | 'match_pending'
-  | 'match_approved'
-  | 'match_rejected'
-  | 'match_liked'
-  | 'match_commented';
 
 export interface CreateNotificationInput {
   userId: string;
@@ -84,6 +78,20 @@ export async function createNotification(input: CreateNotificationInput): Promis
   return Array.isArray(data) ? data[0] : data;
 }
 
+export async function createNotificationForMultipleUsers(
+  userIds: string[],
+  type: NotificationType,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
+  await Promise.allSettled(
+    userIds.map((userId) =>
+      createNotification({ userId, type, title, body, data })
+    )
+  );
+}
+
 export async function markNotificationRead(notificationId: string): Promise<void> {
   const { error } = await supabase
     .from('in_app_notifications')
@@ -118,7 +126,7 @@ export async function deleteNotification(notificationId: string): Promise<void> 
   }
 }
 
-// Helper functions to create specific notification types
+// Match notifications
 export async function notifyMatchPending(opponentId: string, matchId: string, creatorName: string): Promise<void> {
   await createNotification({
     userId: opponentId,
@@ -166,5 +174,147 @@ export async function notifyMatchCommented(ownerId: string, matchId: string, com
     title: 'New Comment on Your Match',
     body: `${commenterName} commented on your match`,
     data: { matchId, commentId },
+  });
+}
+
+// Session notifications
+export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string): Promise<void> {
+  await createNotification({
+    userId: sessionCreatorId,
+    type: 'session_application',
+    title: 'New Session Applicant',
+    body: `${applicantName} applied to your session`,
+    data: { sessionId },
+  });
+}
+
+export async function notifySessionAccepted(applicantId: string, sessionId: string, creatorName: string): Promise<void> {
+  await createNotification({
+    userId: applicantId,
+    type: 'session_accepted',
+    title: 'Session Application Accepted',
+    body: `${creatorName} accepted you into the session`,
+    data: { sessionId },
+  });
+}
+
+export async function notifySessionRejected(applicantId: string, sessionId: string, creatorName: string): Promise<void> {
+  await createNotification({
+    userId: applicantId,
+    type: 'session_rejected',
+    title: 'Session Application Declined',
+    body: `${creatorName} declined your session application`,
+    data: { sessionId },
+  });
+}
+
+export async function notifySessionReminder(userId: string, sessionId: string, sessionLocation: string, sessionTime: string): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'session_reminder',
+    title: 'Upcoming Session Reminder',
+    body: `Your session at ${sessionLocation} is scheduled for ${sessionTime}`,
+    data: { sessionId },
+  });
+}
+
+export async function notifyFeedbackPrompt(userId: string, sessionId: string): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'feedback_prompt',
+    title: 'Session Feedback',
+    body: 'Please provide feedback for your recent session',
+    data: { sessionId },
+  });
+}
+
+// Community notifications
+export async function notifyJoinRequest(adminIds: string[], communityId: string, communityName: string, requesterName: string): Promise<void> {
+  await createNotificationForMultipleUsers(
+    adminIds,
+    'join_request',
+    'New Join Request',
+    `${requesterName} wants to join ${communityName}`,
+    { communityId },
+  );
+}
+
+export async function notifyJoinApproved(userId: string, communityId: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'join_approved',
+    title: 'Join Request Approved',
+    body: `You were accepted into ${communityName}`,
+    data: { communityId },
+  });
+}
+
+export async function notifyJoinRejected(userId: string, communityId: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'join_rejected',
+    title: 'Join Request Declined',
+    body: `Your request to join ${communityName} was declined`,
+    data: { communityId },
+  });
+}
+
+export async function notifyPing(communityMemberIds: string[], communityId: string, communityName: string, senderName: string, message: string): Promise<void> {
+  await createNotificationForMultipleUsers(
+    communityMemberIds,
+    'ping',
+    `Ping from ${communityName}`,
+    `${senderName}: ${message}`,
+    { communityId, message, senderName },
+  );
+}
+
+export async function notifyCommunityMatchPending(opponentId: string, communityMatchId: string, recorderName: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId: opponentId,
+    type: 'community_match_pending',
+    title: 'Match Pending Approval',
+    body: `${recorderName} recorded a match in ${communityName} for your approval`,
+    data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyCommunityMatchApproved(recorderId: string, communityMatchId: string, opponentName: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId: recorderId,
+    type: 'community_match_approved',
+    title: 'Match Approved',
+    body: `${opponentName} approved the match in ${communityName}`,
+    data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyCommunityMatchDisputed(recorderId: string, communityMatchId: string, opponentName: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId: recorderId,
+    type: 'community_match_disputed',
+    title: 'Match Disputed',
+    body: `${opponentName} disputed the match in ${communityName}`,
+    data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyMemberRemoved(userId: string, communityId: string, communityName: string): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'member_removed',
+    title: 'Removed from Community',
+    body: `You were removed from ${communityName}`,
+    data: { communityId },
+  });
+}
+
+export async function notifyAdminTransferred(newAdminId: string, communityId: string, communityName: string, previousAdminName: string): Promise<void> {
+  await createNotification({
+    userId: newAdminId,
+    type: 'admin_transferred',
+    title: 'Admin Rights Transferred',
+    body: `${previousAdminName} transferred admin rights to you in ${communityName}`,
+    data: { communityId },
   });
 }

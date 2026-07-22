@@ -10,6 +10,18 @@ import type {
   Sport,
   UpdateCommunityInput,
 } from '@/types';
+import { fetchProfile } from './profiles';
+import {
+  notifyJoinRequest,
+  notifyJoinApproved,
+  notifyJoinRejected,
+  notifyPing,
+  notifyMemberRemoved,
+  notifyAdminTransferred,
+  notifyCommunityMatchPending,
+  notifyCommunityMatchApproved,
+  notifyCommunityMatchDisputed,
+} from './notifications';
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
@@ -210,6 +222,35 @@ export async function requestToJoinCommunity(
     });
 
   if (error) throw error;
+
+  try {
+    const requester = await fetchProfile(userId);
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const { data: admins } = await supabase
+        .from('community_members')
+        .select('profile_id')
+        .eq('community_id', communityId)
+        .eq('role', 'admin');
+
+      const adminIds = (admins ?? []).map((a) => a.profile_id);
+      if (adminIds.length > 0) {
+        await notifyJoinRequest(
+          adminIds,
+          communityId,
+          community.name,
+          requester?.username ?? 'Someone',
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send join request notification:', e);
+  }
 }
 
 export async function cancelJoinRequest(communityId: string, userId: string): Promise<void> {
@@ -243,6 +284,20 @@ export async function removeMember(
     .eq('profile_id', profileId);
 
   if (error) throw error;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      await notifyMemberRemoved(profileId, communityId, community.name);
+    }
+  } catch (e) {
+    console.error('Failed to send removal notification:', e);
+  }
 }
 
 export async function transferAdmin(
@@ -265,6 +320,26 @@ export async function transferAdmin(
     .eq('profile_id', newAdminId);
 
   if (promoteError) throw promoteError;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const currentUser = await fetchProfile(currentUserId);
+      await notifyAdminTransferred(
+        newAdminId,
+        communityId,
+        community.name,
+        currentUser?.username ?? 'Previous admin',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send admin transfer notification:', e);
+  }
 }
 
 export async function fetchJoinRequests(
@@ -288,6 +363,14 @@ export async function respondToJoinRequest(
   requestId: string,
   status: 'approved' | 'rejected',
 ): Promise<void> {
+  const { data: request, error: fetchError } = await supabase
+    .from('community_join_requests')
+    .select('community_id, user_id')
+    .eq('id', requestId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
   const { error } = await supabase
     .from('community_join_requests')
     .update({ status })
@@ -296,14 +379,6 @@ export async function respondToJoinRequest(
   if (error) throw error;
 
   if (status === 'approved') {
-    const { data: request, error: fetchError } = await supabase
-      .from('community_join_requests')
-      .select('community_id, user_id')
-      .eq('id', requestId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
     const { error: memberError } = await supabase
       .from('community_members')
       .insert({
@@ -314,6 +389,24 @@ export async function respondToJoinRequest(
       });
 
     if (memberError) throw memberError;
+  }
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', request.community_id)
+      .single();
+
+    if (community) {
+      if (status === 'approved') {
+        await notifyJoinApproved(request.user_id, request.community_id, community.name);
+      } else {
+        await notifyJoinRejected(request.user_id, request.community_id, community.name);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send join response notification:', e);
   }
 }
 
@@ -331,6 +424,37 @@ export async function sendPing(
     });
 
   if (error) throw error;
+
+  try {
+    const sender = await fetchProfile(senderId);
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const { data: members } = await supabase
+        .from('community_members')
+        .select('profile_id')
+        .eq('community_id', communityId)
+        .eq('approval_status', 'approved')
+        .neq('profile_id', senderId);
+
+      const memberIds = (members ?? []).map((m) => m.profile_id);
+      if (memberIds.length > 0) {
+        await notifyPing(
+          memberIds,
+          communityId,
+          community.name,
+          sender?.username ?? 'Someone',
+          message.trim(),
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send ping notifications:', e);
+  }
 }
 
 export async function fetchPings(communityId: string): Promise<Ping[]> {
@@ -378,6 +502,29 @@ export async function recordCommunityMatch(input: {
     .single();
 
   if (error) throw error;
+
+  try {
+    if (input.opponent_id !== input.recorded_by) {
+      const recorder = await fetchProfile(input.recorded_by);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', input.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchPending(
+          input.opponent_id,
+          data.id,
+          recorder?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send community match notification:', e);
+  }
+
   return data;
 }
 
@@ -409,22 +556,84 @@ export async function fetchCommunityMatches(
 
 export async function approveCommunityMatch(
   matchId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: match } = await supabase
+    .from('community_matches')
+    .select('recorded_by, community_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) throw new Error('Match not found');
+
   const { error } = await supabase
     .from('community_matches')
     .update({ approval_status: 'approved' })
     .eq('id', matchId);
 
   if (error) throw error;
+
+  try {
+    if (match.recorded_by !== actorId) {
+      const actor = await fetchProfile(actorId);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', match.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchApproved(
+          match.recorded_by,
+          matchId,
+          actor?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send match approval notification:', e);
+  }
 }
 
 export async function disputeCommunityMatch(
   matchId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: match } = await supabase
+    .from('community_matches')
+    .select('recorded_by, community_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) throw new Error('Match not found');
+
   const { error } = await supabase
     .from('community_matches')
     .update({ approval_status: 'disputed' })
     .eq('id', matchId);
 
   if (error) throw error;
+
+  try {
+    if (match.recorded_by !== actorId) {
+      const actor = await fetchProfile(actorId);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', match.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchDisputed(
+          match.recorded_by,
+          matchId,
+          actor?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send match dispute notification:', e);
+  }
 }

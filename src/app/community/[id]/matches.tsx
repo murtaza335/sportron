@@ -104,7 +104,7 @@ export default function CommunityMatchesScreen() {
 
   const handleApprove = async (matchId: string) => {
     try {
-      await approveCommunityMatch(matchId);
+      await approveCommunityMatch(matchId, user?.id ?? '');
       setMatches((prev) =>
         prev.map((m) =>
           m.id === matchId ? { ...m, approval_status: 'approved' } : m,
@@ -117,7 +117,7 @@ export default function CommunityMatchesScreen() {
 
   const handleDispute = async (matchId: string) => {
     try {
-      await disputeCommunityMatch(matchId);
+      await disputeCommunityMatch(matchId, user?.id ?? '');
       setMatches((prev) =>
         prev.map((m) =>
           m.id === matchId ? { ...m, approval_status: 'disputed' } : m,
