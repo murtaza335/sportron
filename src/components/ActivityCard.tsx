@@ -1,11 +1,13 @@
-import { Alert, Pressable, View } from 'react-native';
-import { Bell, Check, Swords, UserPlus, X } from 'lucide-react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { Bell, Check, CheckCircle, Swords, UserPlus, X, XCircle } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/date';
+import { supabase } from '@/lib/supabase';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
 import { updateMatchVerificationStatus } from '@/services/matches';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
@@ -19,7 +21,6 @@ interface ActivityCardProps {
 function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
   switch (type) {
     case 'session_application':
-      return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
     case 'join_request':
       return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
     case 'match_pending':
@@ -33,84 +34,119 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
 
 function getAcceptLabel(type: string): string {
   switch (type) {
-    case 'session_application':
-      return 'Accept';
-    case 'join_request':
-      return 'Approve';
-    case 'match_pending':
-    case 'community_match_pending':
-    case 'match_approval_request':
-      return 'Accept';
-    default:
-      return 'Accept';
+    case 'join_request': return 'Approve';
+    default: return 'Accept';
   }
 }
 
 function getDeclineLabel(type: string): string {
   switch (type) {
-    case 'session_application':
-      return 'Decline';
-    case 'join_request':
-      return 'Reject';
-    case 'match_pending':
-    case 'community_match_pending':
-    case 'match_approval_request':
-      return 'Decline';
-    default:
-      return 'Decline';
+    case 'join_request': return 'Reject';
+    default: return 'Decline';
   }
 }
+
+const ACTION_TYPES = [
+  'session_application',
+  'join_request',
+  'match_pending',
+  'match_approval_request',
+  'community_match_pending',
+];
 
 export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   const theme = useTheme();
   const { user } = useAuth();
-  const isActionType = [
-    'session_application',
-    'join_request',
-    'match_pending',
-    'match_approval_request',
-    'community_match_pending',
-  ].includes(notification.type);
+  const [actionResult, setActionResult] = useState<'accepted' | 'declined' | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [sessionInfo, setSessionInfo] = useState<{ sport: string; location: string } | null>(null);
+
+  const isActionType = ACTION_TYPES.includes(notification.type);
+  const data = notification.data ?? {};
+
+  useEffect(() => {
+    if (notification.type === 'session_application') {
+      const sessionId = data.sessionId as string;
+      if (!sessionId) return;
+      supabase
+        .from('sessions')
+        .select('sport, location')
+        .eq('id', sessionId)
+        .single()
+        .then(({ data: s }) => {
+          if (s) setSessionInfo(s);
+        })
+        .catch(() => {});
+    }
+  }, [notification.type, data.sessionId]);
+
+  const applicantName = notification.type === 'session_application'
+    ? notification.body.replace(' applied to your session', '').trim()
+    : null;
+
+  const displayBody = (): string => {
+    switch (notification.type) {
+      case 'session_application':
+        if (sessionInfo) {
+          return `wanna let ${applicantName} in ${sessionInfo.sport} at ${sessionInfo.location}?`;
+        }
+        return `wanna let ${applicantName ?? 'someone'} in your session?`;
+      case 'join_request':
+        return notification.body;
+      case 'match_pending':
+        return notification.body;
+      case 'community_match_pending':
+        return notification.body;
+      default:
+        return notification.body;
+    }
+  };
+
+  const markRead = async () => {
+    try {
+      await supabase
+        .from('in_app_notifications')
+        .update({ read: true })
+        .eq('id', notification.id);
+    } catch {
+      // fire-and-forget
+    }
+  };
 
   const handleAccept = async () => {
-    if (!user?.id) return;
-    const data = notification.data ?? {};
+    if (!user?.id || actionLoading) return;
+    setActionLoading(true);
     try {
       switch (notification.type) {
         case 'match_pending': {
           const matchId = data.matchId as string;
-          if (!matchId) { Alert.alert('Error', 'Match not found'); return; }
+          if (!matchId) throw new Error('Match not found');
           await updateMatchVerificationStatus(matchId, 'verified', user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'community_match_pending': {
           const matchId = data.matchId as string;
-          if (!matchId) { Alert.alert('Error', 'Match not found'); return; }
+          if (!matchId) throw new Error('Match not found');
           await approveCommunityMatch(matchId, user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'session_application': {
           const sessionId = data.sessionId as string;
-          if (!sessionId) { Alert.alert('Error', 'Session not found'); return; }
-          const { supabase } = await import('@/lib/supabase');
+          if (!sessionId) throw new Error('Session not found');
           const { data: commitments } = await supabase
             .from('commitments')
-            .select('id, user_id')
+            .select('id')
             .eq('session_id', sessionId)
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
             .limit(1);
-          if (!commitments?.length) { Alert.alert('No pending requests'); return; }
+          if (!commitments?.length) throw new Error('No pending requests');
           await approveCommitment(commitments[0].id, user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'join_request': {
           const communityId = data.communityId as string;
-          if (!communityId) { Alert.alert('Error', 'Community not found'); return; }
-          const { supabase } = await import('@/lib/supabase');
+          if (!communityId) throw new Error('Community not found');
           const { data: requests } = await supabase
             .from('community_join_requests')
             .select('id')
@@ -118,40 +154,41 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
             .limit(1);
-          if (!requests?.length) { Alert.alert('No pending requests'); return; }
+          if (!requests?.length) throw new Error('No pending requests');
           await respondToJoinRequest(requests[0].id, 'approved');
-          onComplete();
-          return;
+          break;
         }
       }
+      setActionResult('accepted');
+      await markRead();
+      onComplete();
     } catch (err) {
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setActionLoading(false);
     }
   };
 
   const handleDecline = async () => {
-    if (!user?.id) return;
-    const data = notification.data ?? {};
+    if (!user?.id || actionLoading) return;
+    setActionLoading(true);
     try {
       switch (notification.type) {
         case 'match_pending': {
           const matchId = data.matchId as string;
-          if (!matchId) { Alert.alert('Error', 'Match not found'); return; }
+          if (!matchId) throw new Error('Match not found');
           await updateMatchVerificationStatus(matchId, 'disputed', user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'community_match_pending': {
           const matchId = data.matchId as string;
-          if (!matchId) { Alert.alert('Error', 'Match not found'); return; }
+          if (!matchId) throw new Error('Match not found');
           await disputeCommunityMatch(matchId, user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'session_application': {
           const sessionId = data.sessionId as string;
-          if (!sessionId) { Alert.alert('Error', 'Session not found'); return; }
-          const { supabase } = await import('@/lib/supabase');
+          if (!sessionId) throw new Error('Session not found');
           const { data: commitments } = await supabase
             .from('commitments')
             .select('id')
@@ -159,15 +196,13 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
             .limit(1);
-          if (!commitments?.length) { Alert.alert('No pending requests'); return; }
+          if (!commitments?.length) throw new Error('No pending requests');
           await rejectCommitment(commitments[0].id, user.id);
-          onComplete();
-          return;
+          break;
         }
         case 'join_request': {
           const communityId = data.communityId as string;
-          if (!communityId) { Alert.alert('Error', 'Community not found'); return; }
-          const { supabase } = await import('@/lib/supabase');
+          if (!communityId) throw new Error('Community not found');
           const { data: requests } = await supabase
             .from('community_join_requests')
             .select('id')
@@ -175,14 +210,18 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
             .eq('status', 'pending')
             .order('created_at', { ascending: true })
             .limit(1);
-          if (!requests?.length) { Alert.alert('No pending requests'); return; }
+          if (!requests?.length) throw new Error('No pending requests');
           await respondToJoinRequest(requests[0].id, 'rejected');
-          onComplete();
-          return;
+          break;
         }
       }
+      setActionResult('declined');
+      await markRead();
+      onComplete();
     } catch (err) {
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
+    } finally {
+      setActionLoading(false);
     }
   };
 
@@ -210,20 +249,17 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         </View>
         <View style={{ flex: 1, gap: 2 }}>
           <ThemedText
-            variant="label"
-            style={{ fontWeight: '700', fontSize: 14, lineHeight: 20, textTransform: 'none', letterSpacing: 0 }}
-            numberOfLines={1}
+            variant="body"
+            style={{ fontWeight: '600', fontSize: 15, lineHeight: 22 }}
+            numberOfLines={3}
           >
-            {notification.title}
-          </ThemedText>
-          <ThemedText variant="caption" muted style={{ fontSize: 13, lineHeight: 18 }} numberOfLines={2}>
-            {notification.body}
+            {displayBody()}
           </ThemedText>
           <ThemedText variant="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
             {formatRelativeTime(notification.created_at)}
           </ThemedText>
         </View>
-        {!notification.read && (
+        {!notification.read && !actionResult && (
           <View style={{
             width: 8,
             height: 8,
@@ -235,47 +271,71 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       </View>
 
       {isActionType && (
-        <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md, marginLeft: 52 }}>
-          <Pressable
-            onPress={handleAccept}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingVertical: Spacing.sm,
-              paddingHorizontal: Spacing.md,
-              borderRadius: Radius.sm,
-              backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
-              borderWidth: 1,
-              borderColor: theme.border,
-            })}
-            hitSlop={8}
-          >
-            <Check size={16} color={theme.text} strokeWidth={2.5} />
-            <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
-              {getAcceptLabel(notification.type)}
-            </ThemedText>
-          </Pressable>
-          <Pressable
-            onPress={handleDecline}
-            style={({ pressed }) => ({
-              flexDirection: 'row',
-              alignItems: 'center',
-              gap: 6,
-              paddingVertical: Spacing.sm,
-              paddingHorizontal: Spacing.md,
-              borderRadius: Radius.sm,
-              backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
-              borderWidth: 1,
-              borderColor: theme.border,
-            })}
-            hitSlop={8}
-          >
-            <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
-            <ThemedText variant="caption" muted style={{ fontWeight: '700', fontSize: 13 }}>
-              {getDeclineLabel(notification.type)}
-            </ThemedText>
-          </Pressable>
+        <View style={{ marginTop: Spacing.md, marginLeft: 52 }}>
+          {actionResult === 'accepted' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <CheckCircle size={16} color="#16A34A" strokeWidth={2.5} />
+              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: '#16A34A' }}>
+                {getAcceptLabel(notification.type)}ed
+              </ThemedText>
+            </View>
+          ) : actionResult === 'declined' ? (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <XCircle size={16} color="#DC2626" strokeWidth={2.5} />
+              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: '#DC2626' }}>
+                {getDeclineLabel(notification.type)}ed
+              </ThemedText>
+            </View>
+          ) : actionLoading ? (
+            <ActivityIndicator size="small" color={theme.text} />
+          ) : (
+            <View style={{ flexDirection: 'row', gap: Spacing.sm }}>
+              <Pressable
+                onPress={handleAccept}
+                disabled={actionLoading}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: Spacing.sm,
+                  paddingHorizontal: Spacing.md,
+                  borderRadius: Radius.sm,
+                  backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  opacity: actionLoading ? 0.5 : 1,
+                })}
+                hitSlop={8}
+              >
+                <Check size={16} color={theme.text} strokeWidth={2.5} />
+                <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13 }}>
+                  {getAcceptLabel(notification.type)}
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                onPress={handleDecline}
+                disabled={actionLoading}
+                style={({ pressed }) => ({
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  gap: 6,
+                  paddingVertical: Spacing.sm,
+                  paddingHorizontal: Spacing.md,
+                  borderRadius: Radius.sm,
+                  backgroundColor: pressed ? theme.backgroundSelected : 'transparent',
+                  borderWidth: 1,
+                  borderColor: theme.border,
+                  opacity: actionLoading ? 0.5 : 1,
+                })}
+                hitSlop={8}
+              >
+                <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
+                <ThemedText variant="caption" muted style={{ fontWeight: '700', fontSize: 13 }}>
+                  {getDeclineLabel(notification.type)}
+                </ThemedText>
+              </Pressable>
+            </View>
+          )}
         </View>
       )}
     </View>
