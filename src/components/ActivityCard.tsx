@@ -165,116 +165,105 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     }
   };
 
+  const doAction = async (action: 'accepted' | 'declined'): Promise<void> => {
+    switch (notification.type) {
+      case 'match_pending': {
+        const matchId = data.matchId as string;
+        if (!matchId) throw new Error('Match not found');
+        if (action === 'accepted') {
+          await updateMatchVerificationStatus(matchId, 'verified', user.id!);
+        } else {
+          await updateMatchVerificationStatus(matchId, 'disputed', user.id!);
+        }
+        return;
+      }
+      case 'community_match_pending': {
+        const matchId = data.matchId as string;
+        if (!matchId) throw new Error('Match not found');
+        if (action === 'accepted') {
+          await approveCommunityMatch(matchId, user.id!);
+        } else {
+          await disputeCommunityMatch(matchId, user.id!);
+        }
+        return;
+      }
+      case 'session_application': {
+        const sessionId = data.sessionId as string;
+        if (!sessionId) throw new Error('Session not found');
+        const { data: commitments, error: ce } = await supabase
+          .from('commitments')
+          .select('id')
+          .eq('session_id', sessionId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (ce) throw ce;
+        if (!commitments?.length) throw new Error('No pending requests');
+        if (action === 'accepted') {
+          await approveCommitment(commitments[0].id, user.id!);
+        } else {
+          await rejectCommitment(commitments[0].id, user.id!);
+        }
+        return;
+      }
+      case 'join_request': {
+        const communityId = data.communityId as string;
+        if (!communityId) throw new Error('Community not found');
+        const { data: requests, error: re } = await supabase
+          .from('community_join_requests')
+          .select('id')
+          .eq('community_id', communityId)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: true })
+          .limit(1);
+        if (re) throw re;
+        if (!requests?.length) throw new Error('No pending requests');
+        await respondToJoinRequest(requests[0].id, action === 'accepted' ? 'approved' : 'rejected');
+        return;
+      }
+    }
+  };
+
   const handleAccept = async () => {
     if (!user?.id || actionLoading) return;
     setActionLoading(true);
     try {
-      switch (notification.type) {
-        case 'match_pending': {
-          const matchId = data.matchId as string;
-          if (!matchId) throw new Error('Match not found');
-          await updateMatchVerificationStatus(matchId, 'verified', user.id);
-          break;
-        }
-        case 'community_match_pending': {
-          const matchId = data.matchId as string;
-          if (!matchId) throw new Error('Match not found');
-          await approveCommunityMatch(matchId, user.id);
-          break;
-        }
-        case 'session_application': {
-          const sessionId = data.sessionId as string;
-          if (!sessionId) throw new Error('Session not found');
-          const { data: commitments } = await supabase
-            .from('commitments')
-            .select('id')
-            .eq('session_id', sessionId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (!commitments?.length) throw new Error('No pending requests');
-          await approveCommitment(commitments[0].id, user.id);
-          break;
-        }
-        case 'join_request': {
-          const communityId = data.communityId as string;
-          if (!communityId) throw new Error('Community not found');
-          const { data: requests } = await supabase
-            .from('community_join_requests')
-            .select('id')
-            .eq('community_id', communityId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (!requests?.length) throw new Error('No pending requests');
-          await respondToJoinRequest(requests[0].id, 'approved');
-          break;
-        }
-      }
-      setActionResult('accepted');
-      await resolveNotification('accepted');
-      onComplete();
+      await doAction('accepted');
     } catch (err) {
+      console.error('Accept action failed:', err);
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
       setActionLoading(false);
+      return;
     }
+    setActionResult('accepted');
+    try {
+      await resolveNotification('accepted');
+    } catch (e) {
+      console.error('resolve notif failed:', e);
+    }
+    setActionLoading(false);
+    onComplete();
   };
 
   const handleDecline = async () => {
     if (!user?.id || actionLoading) return;
     setActionLoading(true);
     try {
-      switch (notification.type) {
-        case 'match_pending': {
-          const matchId = data.matchId as string;
-          if (!matchId) throw new Error('Match not found');
-          await updateMatchVerificationStatus(matchId, 'disputed', user.id);
-          break;
-        }
-        case 'community_match_pending': {
-          const matchId = data.matchId as string;
-          if (!matchId) throw new Error('Match not found');
-          await disputeCommunityMatch(matchId, user.id);
-          break;
-        }
-        case 'session_application': {
-          const sessionId = data.sessionId as string;
-          if (!sessionId) throw new Error('Session not found');
-          const { data: commitments } = await supabase
-            .from('commitments')
-            .select('id')
-            .eq('session_id', sessionId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (!commitments?.length) throw new Error('No pending requests');
-          await rejectCommitment(commitments[0].id, user.id);
-          break;
-        }
-        case 'join_request': {
-          const communityId = data.communityId as string;
-          if (!communityId) throw new Error('Community not found');
-          const { data: requests } = await supabase
-            .from('community_join_requests')
-            .select('id')
-            .eq('community_id', communityId)
-            .eq('status', 'pending')
-            .order('created_at', { ascending: true })
-            .limit(1);
-          if (!requests?.length) throw new Error('No pending requests');
-          await respondToJoinRequest(requests[0].id, 'rejected');
-          break;
-        }
-      }
-      setActionResult('declined');
-      await resolveNotification('declined');
-      onComplete();
+      await doAction('declined');
     } catch (err) {
+      console.error('Decline action failed:', err);
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
-    } finally {
       setActionLoading(false);
+      return;
     }
+    setActionResult('declined');
+    try {
+      await resolveNotification('declined');
+    } catch (e) {
+      console.error('resolve notif failed:', e);
+    }
+    setActionLoading(false);
+    onComplete();
   };
 
   const isDark = theme.resolvedColorScheme === 'dark';

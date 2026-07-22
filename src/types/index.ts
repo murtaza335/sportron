@@ -62,6 +62,7 @@ export type NotificationPreferences = {
   session_application: boolean;
   session_accepted: boolean;
   session_rejected: boolean;
+  session_left: boolean;
   session_reminder: boolean;
   feedback_prompt: boolean;
   ping: boolean;
@@ -163,6 +164,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   session_application: true,
   session_accepted: true,
   session_rejected: true,
+  session_left: true,
   session_reminder: true,
   feedback_prompt: true,
   ping: true,
@@ -194,6 +196,7 @@ export type NotificationType =
   | 'session_application'
   | 'session_accepted'
   | 'session_rejected'
+  | 'session_left'
   | 'session_reminder'
   | 'feedback_prompt'
   | 'ping'

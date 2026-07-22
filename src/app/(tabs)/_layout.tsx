@@ -4,6 +4,7 @@ import { Platform, Pressable, Text, View } from 'react-native';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useNotifications } from '@/hooks/useNotifications';
 
 function DefaultHeaderTitle({ title }: { title: string }) {
   const theme = useTheme();
@@ -17,6 +18,7 @@ function DefaultHeaderTitle({ title }: { title: string }) {
 
 export default function TabLayout() {
   const theme = useTheme();
+  const { unreadCount } = useNotifications();
 
   const commonHeaderStyle = {
     backgroundColor: theme.background,
@@ -122,6 +124,17 @@ export default function TabLayout() {
           tabBarIcon: ({ color, size }) => (
             <View style={{ position: 'relative', paddingBottom: 2 }}>
               <Activity size={size} color={color} strokeWidth={2.2} />
+              {unreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -6,
+                  width: 10,
+                  height: 10,
+                  borderRadius: 5,
+                  backgroundColor: '#DC2626',
+                }} />
+              )}
             </View>
           ),
         }}
