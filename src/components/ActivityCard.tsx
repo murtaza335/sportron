@@ -11,7 +11,21 @@ import { supabase } from '@/lib/supabase';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
 import { updateMatchVerificationStatus } from '@/services/matches';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
-import type { InAppNotification } from '@/types';
+import type { InAppNotification, NotificationType } from '@/types';
+
+const ACCEPTED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
+  session_application: 'session_accepted',
+  join_request: 'join_approved',
+  match_pending: 'match_approved',
+  community_match_pending: 'community_match_approved',
+};
+
+const DECLINED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
+  session_application: 'session_rejected',
+  join_request: 'join_rejected',
+  match_pending: 'match_rejected',
+  community_match_pending: 'community_match_disputed',
+};
 
 interface ActivityCardProps {
   notification: InAppNotification;
@@ -80,17 +94,15 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     }
   }, [notification.type, data.sessionId]);
 
-  const applicantName = notification.type === 'session_application'
-    ? notification.body.replace(' applied to your session', '').trim()
-    : null;
-
   const displayBody = (): string => {
     switch (notification.type) {
-      case 'session_application':
+      case 'session_application': {
+        const name = notification.body.replace(' applied to your session', '').trim();
         if (sessionInfo) {
-          return `wanna let ${applicantName} in ${sessionInfo.sport} at ${sessionInfo.location}?`;
+          return `wanna let ${name} in ${sessionInfo.sport} at ${sessionInfo.location}?`;
         }
-        return `wanna let ${applicantName ?? 'someone'} in your session?`;
+        return `wanna let ${name || 'someone'} in your session?`;
+      }
       case 'join_request':
         return notification.body;
       case 'match_pending':
@@ -102,11 +114,51 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     }
   };
 
-  const markRead = async () => {
+  const applicantName = notification.type === 'session_application'
+    ? notification.body.replace(' applied to your session', '').trim()
+    : null;
+
+  let communityName: string | null = null;
+  if (notification.type === 'join_request') {
+    const match = notification.body.match(/wants to join (.+)$/);
+    communityName = match ? match[1].trim() : null;
+  }
+
+  const finalBody = (action: 'accepted' | 'declined'): string => {
+    switch (notification.type) {
+      case 'session_application': {
+        const name = applicantName ?? 'Someone';
+        return action === 'accepted'
+          ? `You accepted ${name} into your session`
+          : `You declined ${name} from your session`;
+      }
+      case 'join_request': {
+        const community = communityName ?? 'the community';
+        return action === 'accepted'
+          ? `You approved a request to join ${community}`
+          : `You rejected a request to join ${community}`;
+      }
+      case 'match_pending':
+        return action === 'accepted'
+          ? 'You accepted a match result'
+          : 'You disputed a match result';
+      case 'community_match_pending':
+        return action === 'accepted'
+          ? 'You approved a community match'
+          : 'You disputed a community match';
+      default:
+        return notification.body;
+    }
+  };
+
+  const resolveNotification = async (action: 'accepted' | 'declined') => {
+    const newType = action === 'accepted'
+      ? ACCEPTED_TYPE_MAP[notification.type]
+      : DECLINED_TYPE_MAP[notification.type];
     try {
       await supabase
         .from('in_app_notifications')
-        .update({ read: true })
+        .update({ type: newType, read: true, body: finalBody(action) })
         .eq('id', notification.id);
     } catch {
       // fire-and-forget
@@ -160,7 +212,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         }
       }
       setActionResult('accepted');
-      await markRead();
+      await resolveNotification('accepted');
       onComplete();
     } catch (err) {
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
@@ -216,7 +268,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         }
       }
       setActionResult('declined');
-      await markRead();
+      await resolveNotification('declined');
       onComplete();
     } catch (err) {
       Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
