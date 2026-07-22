@@ -82,14 +82,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="notifications"
-          options={{
-            headerShown: true,
-            title: 'Notifications',
-            animation: 'slide_from_right',
-          }}
-        />
-        <Stack.Screen
           name="settings"
           options={{
             headerShown: true,
