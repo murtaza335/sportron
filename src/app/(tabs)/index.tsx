@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
@@ -18,6 +19,7 @@ const ALL_SPORTS = Object.keys(SPORT_LABELS) as Sport[];
 export default function CommunitiesScreen() {
   const theme = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { communities: myCommunities, loading: myLoading, refreshing: myRefreshing, refresh: myRefresh } = useMyCommunities(user?.id);
   const { communities: allCommunities, loading: allLoading, refreshing: allRefreshing, refresh: allRefresh } = useCommunities();
 
@@ -151,7 +153,7 @@ export default function CommunitiesScreen() {
 
       <ScrollView
         style={styles.flex}
-        contentContainerStyle={styles.container}
+        contentContainerStyle={[styles.container, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         refreshControl={
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.text} />
         }

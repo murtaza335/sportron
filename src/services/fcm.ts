@@ -180,8 +180,38 @@ export function setupNotificationListeners(
 
 export async function setupBackgroundMessageHandler(): Promise<void> {
   messaging().setBackgroundMessageHandler(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-    console.log('Background message received:', remoteMessage);
+    // System auto-handles notification payloads in background — only schedule
+    // a local notification for data-only messages to avoid duplicates.
+    if (remoteMessage.notification) return;
+
+    const parsed = parseRemoteMessageForLocal(remoteMessage);
+    if (parsed) {
+      await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
+    }
   });
+}
+
+export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes.RemoteMessage): { title: string; body: string; data: NotificationData } | null {
+  const notification = remoteMessage.notification;
+  const data = remoteMessage.data as Record<string, string> | undefined;
+
+  const title = notification?.title ?? data?.title ?? 'Notification';
+  const body = notification?.body ?? data?.body ?? '';
+
+  if (!title && !body) return null;
+
+  const parsedData: NotificationData = {
+    type: (data?.type as NotificationType) || 'match_liked',
+    matchId: data?.matchId,
+    senderId: data?.senderId,
+    senderName: data?.senderName,
+    commentId: data?.commentId,
+    sessionId: data?.sessionId,
+    communityId: data?.communityId,
+    message: data?.message,
+  };
+
+  return { title, body, data: parsedData };
 }
 
 export function setupForegroundMessageHandler(

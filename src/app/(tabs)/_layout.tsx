@@ -1,6 +1,7 @@
 import { router, Tabs } from 'expo-router';
 import { Activity, Clock, Plus, User, Users } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -19,6 +20,7 @@ function DefaultHeaderTitle({ title }: { title: string }) {
 export default function TabLayout() {
   const theme = useTheme();
   const { unreadCount } = useNotifications();
+  const insets = useSafeAreaInsets();
 
   const commonHeaderStyle = {
     backgroundColor: theme.background,
@@ -44,9 +46,9 @@ export default function TabLayout() {
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
-          height: Platform.OS === 'ios' ? 88 : 72,
+          height: Platform.OS === 'ios' ? 88 : 56 + Math.max(insets.bottom, Spacing.md),
           paddingTop: Spacing.sm,
-          paddingBottom: Platform.OS === 'ios' ? 28 : Spacing.md,
+          paddingBottom: Platform.OS === 'ios' ? 28 : Math.max(insets.bottom, Spacing.md),
         },
         tabBarLabelStyle: {
           fontSize: 11,

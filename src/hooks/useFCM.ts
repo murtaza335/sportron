@@ -12,6 +12,7 @@ import {
   getNotificationPermissions,
   scheduleLocalNotification,
   parseNotificationResponseData,
+  parseRemoteMessageForLocal,
   NotificationData,
   NotificationType,
 } from '@/services/fcm';
@@ -79,8 +80,11 @@ export function useFCM() {
     try {
       await setupBackgroundMessageHandler();
 
-      const unsubscribeForeground = setupForegroundMessageHandler((remoteMessage) => {
-        console.log('Foreground FCM message:', remoteMessage);
+      const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
+        const parsed = parseRemoteMessageForLocal(remoteMessage);
+        if (parsed) {
+          await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
+        }
       });
 
       const unsubscribeTokenRefresh = setupTokenRefreshListener(async (token) => {
