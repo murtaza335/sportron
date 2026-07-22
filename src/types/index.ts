@@ -215,12 +215,14 @@ export type CreateCommunityInput = {
   description?: string;
   visibility: CommunityVisibility;
   sport: Sport;
+  image_url?: string;
 };
 
 export type UpdateCommunityInput = {
   name?: string;
   description?: string | null;
   visibility?: CommunityVisibility;
+  image_url?: string | null;
 };
 
 export type CommunityJoinRequest = {
