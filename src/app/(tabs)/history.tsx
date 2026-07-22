@@ -8,6 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, Clock, MapPin, Users } from 'lucide-react-native';
 
 import { SessionDetailPopup } from '@/components/SessionDetailPopup';
@@ -38,6 +39,7 @@ function formatSessionTime(dateString: string) {
 export default function SessionsScreen() {
   const theme = useTheme();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { sessions, loading, refreshing, refresh } = useSessions(user?.id);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -59,7 +61,7 @@ export default function SessionsScreen() {
           <FlatList
             data={sessions}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={styles.list}
+            contentContainerStyle={[styles.list, { paddingBottom: Spacing.xxxl + Math.max(insets.bottom, 56) }]}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl

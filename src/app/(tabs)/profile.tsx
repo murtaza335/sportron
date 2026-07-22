@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
@@ -21,6 +22,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { colorScheme, setTheme } = useTheme();
   const { profile, refreshProfile, user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { requestPermissions } = useFCM();
   const [editing, setEditing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -111,7 +113,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Spacing.xxl + Math.max(insets.bottom, 56) }]}>
         {!editing ? (
           <View style={styles.summary}>
             <View style={styles.avatarContainer}>
