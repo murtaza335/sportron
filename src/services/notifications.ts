@@ -208,6 +208,16 @@ export async function notifySessionRejected(applicantId: string, sessionId: stri
   });
 }
 
+export async function notifySessionLeft(sessionCreatorId: string, sessionId: string, leaverName: string): Promise<void> {
+  await createNotification({
+    userId: sessionCreatorId,
+    type: 'session_left',
+    title: 'Participant Left',
+    body: `${leaverName} left your session`,
+    data: { sessionId },
+  });
+}
+
 export async function notifySessionReminder(userId: string, sessionId: string, sessionLocation: string, sessionTime: string): Promise<void> {
   await createNotification({
     userId,

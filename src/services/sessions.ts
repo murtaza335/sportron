@@ -5,6 +5,7 @@ import {
   notifySessionApplication,
   notifySessionAccepted,
   notifySessionRejected,
+  notifySessionLeft,
 } from './notifications';
 
 type SessionRow = Session & {
@@ -151,6 +152,22 @@ export async function commitToSession(
   sessionId: string,
   userId: string,
 ): Promise<Commitment> {
+  const { data: sessionRow, error: sessionError } = await supabase
+    .from('sessions')
+    .select('date_time, created_by')
+    .eq('id', sessionId)
+    .single();
+
+  if (sessionError) throw sessionError;
+  if (!sessionRow) throw new Error('Session not found');
+
+  const conflicts = await checkTimeConflicts(userId, sessionRow.date_time);
+  if (conflicts.length > 0) {
+    throw new Error(
+      `You already have a session within 30 minutes of this one: ${conflicts[0].sport} at ${conflicts[0].location}`,
+    );
+  }
+
   const { data, error } = await supabase
     .from('commitments')
     .insert({
@@ -164,16 +181,10 @@ export async function commitToSession(
   if (error) throw error;
 
   try {
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('created_by')
-      .eq('id', sessionId)
-      .single();
-
-    if (session && session.created_by !== userId) {
+    if (sessionRow.created_by !== userId) {
       const applicant = await fetchProfile(userId);
       await notifySessionApplication(
-        session.created_by,
+        sessionRow.created_by,
         sessionId,
         applicant?.username ?? 'Someone',
       );
@@ -248,6 +259,14 @@ export async function rejectCommitment(
 }
 
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {
+  const { data: session } = await supabase
+    .from('sessions')
+    .select('created_by')
+    .eq('id', sessionId)
+    .single();
+
+  if (!session) throw new Error('Session not found');
+
   const { error } = await supabase
     .from('commitments')
     .update({ status: 'left' })
@@ -256,6 +275,19 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
     .in('status', ['pending', 'accepted']);
 
   if (error) throw error;
+
+  try {
+    if (session.created_by !== userId) {
+      const leaver = await fetchProfile(userId);
+      await notifySessionLeft(
+        session.created_by,
+        sessionId,
+        leaver?.username ?? 'Someone',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send session left notification:', e);
+  }
 }
 
 export async function fetchUserSessions(
