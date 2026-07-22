@@ -108,6 +108,7 @@ export async function createCommunity(
       description: input.description?.trim() || null,
       visibility: input.visibility,
       sport: input.sport,
+      image_url: input.image_url || null,
       created_by: userId,
     })
     .select()
@@ -137,6 +138,7 @@ export async function updateCommunity(
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
+  if (input.image_url !== undefined) updates.image_url = input.image_url;
 
   const { error } = await supabase
     .from('communities')

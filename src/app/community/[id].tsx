@@ -1,9 +1,11 @@
+import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useState } from 'react';
 import {
   Check,
   ChevronRight,
   Globe,
+  Image as ImageIcon,
   Lock,
   LogOut,
   Megaphone,
@@ -18,6 +20,7 @@ import {
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -33,6 +36,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
+import { uploadImageFromUri } from '@/lib/cloudinary';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
@@ -144,6 +148,8 @@ export default function CommunityDetailScreen() {
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
   const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
+  const [editImageUri, setEditImageUri] = useState<string | null>(null);
+  const [uploadingEditImage, setUploadingEditImage] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
 
   const handleJoin = async () => {
@@ -201,17 +207,57 @@ export default function CommunityDetailScreen() {
     setEditName(community.name);
     setEditDescription(community.description ?? '');
     setEditVisibility(community.visibility);
+    setEditImageUri(community.image_url ?? null);
     setEditModalVisible(true);
+  };
+
+  const pickEditImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert('Permission required', 'Please grant permission to access your photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditImageUri(result.assets[0].uri);
+    }
+  };
+
+  const removeEditImage = () => {
+    setEditImageUri(null);
   };
 
   const handleSaveEdit = async () => {
     if (!id || !editName.trim()) return;
     setSavingEdit(true);
     try {
+      let imageUrl: string | null | undefined = undefined;
+      if (editImageUri !== (community?.image_url ?? null)) {
+        if (editImageUri) {
+          setUploadingEditImage(true);
+          const uploaded = await uploadImageFromUri(editImageUri);
+          if (!uploaded) {
+            Alert.alert('Error', 'Failed to upload image.');
+            setSavingEdit(false);
+            setUploadingEditImage(false);
+            return;
+          }
+          imageUrl = uploaded;
+          setUploadingEditImage(false);
+        } else {
+          imageUrl = null;
+        }
+      }
       await updateCommunity(id, {
         name: editName.trim(),
         description: editDescription.trim() || null,
         visibility: editVisibility,
+        image_url: imageUrl,
       });
       setEditModalVisible(false);
       refresh();
@@ -219,6 +265,7 @@ export default function CommunityDetailScreen() {
       Alert.alert('Error', e?.message ?? 'Failed to update.');
     } finally {
       setSavingEdit(false);
+      setUploadingEditImage(false);
     }
   };
 
@@ -578,6 +625,22 @@ export default function CommunityDetailScreen() {
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
             </View>
+
+            <Pressable onPress={pickEditImage} style={[styles.editImagePicker, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+              {editImageUri ? (
+                <>
+                  <Image source={{ uri: editImageUri }} style={[styles.editImagePreview, { backgroundColor: theme.border }]} resizeMode="cover" />
+                  <Pressable onPress={removeEditImage} style={[styles.editImageRemove, { backgroundColor: theme.background }]} hitSlop={12}>
+                    <X size={12} color={theme.text} strokeWidth={2.5} />
+                  </Pressable>
+                </>
+              ) : (
+                <View style={styles.editImagePlaceholder}>
+                  <ImageIcon size={24} color={theme.textSecondary} strokeWidth={1.5} />
+                  <ThemedText variant="caption" muted>Tap to add cover image</ThemedText>
+                </View>
+              )}
+            </Pressable>
             
             <TextInput
               placeholder="Community name"
@@ -646,8 +709,8 @@ export default function CommunityDetailScreen() {
             <Button
               label="Save Changes"
               onPress={handleSaveEdit}
-              loading={savingEdit}
-              disabled={!editName.trim()}
+              loading={savingEdit || uploadingEditImage}
+              disabled={!editName.trim() || uploadingEditImage}
             />
 
             {/* Transferred advanced admin action to the bottom of edit modal */}
@@ -844,6 +907,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  editImagePicker: {
+    width: '100%',
+    height: 120,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePreview: {
+    width: '100%',
+    height: 120,
+  },
+  editImageRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
   },
   pingInput: {
     borderRadius: Radius.md,
