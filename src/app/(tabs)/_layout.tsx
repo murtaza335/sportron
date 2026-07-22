@@ -1,5 +1,5 @@
 import { router, Tabs } from 'expo-router';
-import { Activity, Clock, Plus, User, Users } from 'lucide-react-native';
+import { Activity, Plus, Swords, User, Users } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -115,7 +115,7 @@ export default function TabLayout() {
               </View>
             </Pressable>
           ),
-          tabBarIcon: ({ color, size }) => <Clock size={size} color={color} strokeWidth={2.2} />,
+          tabBarIcon: ({ color, size }) => <Swords size={size} color={color} strokeWidth={2.2} />,
         }}
       />
       <Tabs.Screen
