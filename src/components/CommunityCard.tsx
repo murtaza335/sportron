@@ -21,7 +21,7 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
 
   return (
     <Pressable
-      onPress={() => router.push(`/community/${community.id}`)}
+      onPress={() => router.push(`/community/${community.id}?communityName=${encodeURIComponent(community.name)}`)}
       style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
     >
       <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.border }]}>

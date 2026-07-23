@@ -55,7 +55,7 @@ import type {
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id, edit } = useLocalSearchParams<{ id: string; edit?: string }>();
+  const { id, edit, communityName } = useLocalSearchParams<{ id: string; edit?: string; communityName?: string }>();
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -70,6 +70,7 @@ export default function CommunityDetailScreen() {
 
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
+  const optimisticTitle = community?.name || communityName || '';
 
   // Matches
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
@@ -324,10 +325,19 @@ export default function CommunityDetailScreen() {
     }
   };
 
+  const headerRight = () => null;
+  const headerTitle = optimisticTitle
+    ? () => (
+        <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
+          {optimisticTitle}
+        </ThemedText>
+      )
+    : undefined;
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
+        <Stack.Screen options={{ headerTitle, headerRight }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -336,7 +346,7 @@ export default function CommunityDetailScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
+        <Stack.Screen options={{ headerTitle, headerRight }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -359,7 +369,7 @@ export default function CommunityDetailScreen() {
                   style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
                   numberOfLines={1}
                 >
-                  {community.name}
+                  {optimisticTitle}
                 </ThemedText>
               </Pressable>
             ) : (
@@ -367,7 +377,7 @@ export default function CommunityDetailScreen() {
                 style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
                 numberOfLines={1}
               >
-                {community.name}
+                {optimisticTitle}
               </ThemedText>
             ),
           headerRight: () =>
