@@ -269,14 +269,24 @@ export async function notifyJoinRejected(userId: string, communityId: string, co
   });
 }
 
-export async function notifyPing(communityMemberIds: string[], communityId: string, communityName: string, senderName: string, message: string): Promise<void> {
+export async function notifyPing(communityMemberIds: string[], communityId: string, communityName: string, senderName: string, message: string, pingId?: string): Promise<void> {
   await createNotificationForMultipleUsers(
     communityMemberIds,
     'ping',
     `Ping from ${communityName}`,
-    `${senderName}: ${message}`,
-    { communityId, message, senderName },
+    `${senderName}: ${message} — tap to reply`,
+    { communityId, message, senderName, pingId },
   );
+}
+
+export async function notifyPingResponse(senderId: string, pingId: string, communityId: string, respondentName: string, response: 'coming' | 'busy', message: string): Promise<void> {
+  await createNotification({
+    userId: senderId,
+    type: 'ping_response',
+    title: response === 'coming' ? 'Coming!' : 'Busy',
+    body: `${respondentName} is ${response === 'coming' ? 'coming' : 'busy'} — "${message}"`,
+    data: { pingId, communityId, respondentName, response, message },
+  });
 }
 
 export async function notifyCommunityMatchPending(opponentId: string, communityMatchId: string, recorderName: string, communityName: string): Promise<void> {
