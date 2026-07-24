@@ -1,6 +1,6 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { CalendarDays, Clock, X } from 'lucide-react-native';
+import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
   Alert,
@@ -41,6 +41,13 @@ export default function CreateSessionScreen() {
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<{ sport: string; date_time: string; location: string }[]>([]);
 
+  const EXPIRE_OPTIONS = [
+    { label: '15 min', value: 15 },
+    { label: '30 min', value: 30 },
+    { label: '1 hr', value: 60 },
+  ];
+  const [expireIndex, setExpireIndex] = useState(1); // 30 min default
+
   const canSave =
     sport.trim().length > 0 &&
     location.trim().length > 0 &&
@@ -78,6 +85,7 @@ export default function CreateSessionScreen() {
         date_time: dateTime,
         max_participants: parseInt(maxParticipants, 10) || 2,
         description: description.trim() || undefined,
+        expireAfterMinutes: EXPIRE_OPTIONS[expireIndex].value,
       };
 
       await createSession(user.id, input);
@@ -302,6 +310,42 @@ export default function CreateSessionScreen() {
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
+              Expire After
+            </ThemedText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.expireRow}
+            >
+              {EXPIRE_OPTIONS.map((opt, idx) => (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setExpireIndex(idx)}
+                  style={[
+                    styles.expireChip,
+                    {
+                      backgroundColor: idx === expireIndex ? theme.text : theme.backgroundElement,
+                      borderColor: idx === expireIndex ? theme.text : theme.border,
+                    },
+                  ]}
+                >
+                  <Timer size={12} color={idx === expireIndex ? theme.background : theme.textSecondary} strokeWidth={2} />
+                  <ThemedText
+                    variant="caption"
+                    style={{
+                      color: idx === expireIndex ? theme.background : theme.textSecondary,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {opt.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
             <TextInput
@@ -394,6 +438,19 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: Spacing.md,
+  },
+  expireRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  expireChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    borderWidth: 1,
   },
   conflictCard: {
     backgroundColor: '#FEF2F2',
