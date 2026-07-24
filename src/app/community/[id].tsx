@@ -1,15 +1,12 @@
-import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Check,
   Globe,
-  Image as ImageIcon,
   Lock,
   Megaphone,
   MoreHorizontal,
   Plus,
-  Shield,
   Swords,
   Users,
   X,
@@ -17,7 +14,6 @@ import {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -33,7 +29,6 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { uploadImageFromUri } from '@/lib/cloudinary';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
@@ -43,19 +38,16 @@ import {
   requestToJoinCommunity,
   respondToJoinRequest,
   sendPing,
-  transferAdmin,
-  updateCommunity,
 } from '@/services/communities';
 import type {
   CommunityJoinRequest,
   CommunityMatch,
-  CommunityVisibility,
   MatchWithProfiles,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id, edit, communityName } = useLocalSearchParams<{ id: string; edit?: string; communityName?: string }>();
+  const { id, communityName } = useLocalSearchParams<{ id: string; communityName?: string }>();
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -165,15 +157,6 @@ export default function CommunityDetailScreen() {
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
 
-  // Edit modal
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
-  const [editImageUri, setEditImageUri] = useState<string | null>(null);
-  const [uploadingEditImage, setUploadingEditImage] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
-
   const handleJoin = async () => {
     if (!id || !user) return;
     try {
@@ -197,103 +180,6 @@ export default function CommunityDetailScreen() {
       refresh();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to join.');
-    }
-  };
-
-  const editTriggeredRef = useRef(false);
-  useEffect(() => {
-    if (edit === 'true' && community && !editTriggeredRef.current) {
-      editTriggeredRef.current = true;
-      setEditName(community.name);
-      setEditDescription(community.description ?? '');
-      setEditVisibility(community.visibility);
-      setEditImageUri(community.image_url ?? null);
-      setEditModalVisible(true);
-    }
-  }, [edit, community]);
-
-  const pickEditImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setEditImageUri(result.assets[0].uri);
-    }
-  };
-
-  const removeEditImage = () => {
-    setEditImageUri(null);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!id || !editName.trim()) return;
-    setSavingEdit(true);
-    try {
-      let imageUrl: string | null | undefined = undefined;
-      if (editImageUri !== (community?.image_url ?? null)) {
-        if (editImageUri) {
-          setUploadingEditImage(true);
-          const uploaded = await uploadImageFromUri(editImageUri);
-          if (!uploaded) {
-            Alert.alert('Error', 'Failed to upload image.');
-            setSavingEdit(false);
-            setUploadingEditImage(false);
-            return;
-          }
-          imageUrl = uploaded;
-          setUploadingEditImage(false);
-        } else {
-          imageUrl = null;
-        }
-      }
-      await updateCommunity(id, {
-        name: editName.trim(),
-        description: editDescription.trim() || null,
-        visibility: editVisibility,
-        image_url: imageUrl,
-      });
-      setEditModalVisible(false);
-      refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to update.');
-    } finally {
-      setSavingEdit(false);
-      setUploadingEditImage(false);
-    }
-  };
-
-  const handleTransferAdmin = () => {
-    if (!id) return;
-    if (Alert.prompt) {
-      Alert.prompt(
-        'Transfer Admin',
-        'Enter the username of the new admin:',
-        async (text) => {
-          if (!text.trim()) return;
-          try {
-            await transferAdmin(id, user!.id, text.trim());
-            setMembership((prev) => prev ? { ...prev, role: 'member' } : null);
-            setEditModalVisible(false);
-            refresh();
-            Alert.alert('Done', 'Admin rights transferred.');
-          } catch (e: any) {
-            Alert.alert('Error', e?.message ?? 'Failed to transfer.');
-          }
-        },
-      );
-    } else {
-      Alert.alert(
-        'Transfer Admin',
-        'Transfer admin by username: feature available on iOS.',
-      );
     }
   };
 
@@ -646,116 +532,6 @@ export default function CommunityDetailScreen() {
               loading={sendingPing}
               disabled={!pingMessage.trim()}
             />
-          </Pressable>
-        </Pressable>
-      </Modal>
-
-      {/* Edit Modal */}
-      <Modal transparent visible={editModalVisible} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Edit Community</ThemedText>
-              <Pressable onPress={() => setEditModalVisible(false)} hitSlop={16}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-
-            <Pressable onPress={pickEditImage} style={[styles.editImagePicker, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-              {editImageUri ? (
-                <>
-                  <Image source={{ uri: editImageUri }} style={[styles.editImagePreview, { backgroundColor: theme.border }]} resizeMode="cover" />
-                  <Pressable onPress={removeEditImage} style={[styles.editImageRemove, { backgroundColor: theme.background }]} hitSlop={12}>
-                    <X size={12} color={theme.text} strokeWidth={2.5} />
-                  </Pressable>
-                </>
-              ) : (
-                <View style={styles.editImagePlaceholder}>
-                  <ImageIcon size={24} color={theme.textSecondary} strokeWidth={1.5} />
-                  <ThemedText variant="caption" muted>Tap to add cover image</ThemedText>
-                </View>
-              )}
-            </Pressable>
-            
-            <TextInput
-              placeholder="Community name"
-              placeholderTextColor={theme.textSecondary}
-              value={editName}
-              onChangeText={setEditName}
-              style={[
-                styles.editInput,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              maxLength={60}
-            />
-            
-            <TextInput
-              placeholder="Description (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={editDescription}
-              onChangeText={setEditDescription}
-              style={[
-                styles.editInput,
-                styles.editInputMultiline,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              multiline
-              maxLength={300}
-            />
-            
-            <View style={styles.visibilityToggle}>
-              <Pressable
-                onPress={() => setEditVisibility('public')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'public' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'public' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Public
-                </ThemedText>
-              </Pressable>
-              
-              <Pressable
-                onPress={() => setEditVisibility('restricted')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'restricted' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'restricted' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Restricted
-                </ThemedText>
-              </Pressable>
-            </View>
-            
-            <Button
-              label="Save Changes"
-              onPress={handleSaveEdit}
-              loading={savingEdit || uploadingEditImage}
-              disabled={!editName.trim() || uploadingEditImage}
-            />
-
-            {/* Transferred advanced admin action to the bottom of edit modal */}
-            <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
-               <Shield size={14} color="#EF4444" strokeWidth={2} />
-               <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
-                 Transfer Admin Rights
-               </ThemedText>
-            </Pressable>
-
           </Pressable>
         </Pressable>
       </Modal>

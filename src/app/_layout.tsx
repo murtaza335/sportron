@@ -70,7 +70,7 @@ function RootNavigator() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FCMInitializer />
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false, animationDuration: 200, contentStyle: { backgroundColor: theme.background } }}>
+      <Stack screenOptions={{ headerShown: false, animationDuration: 50, contentStyle: { backgroundColor: theme.background } }}>
         <Stack.Screen name="login" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
@@ -79,7 +79,7 @@ function RootNavigator() {
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
-            animationDuration: 200,
+            animationDuration: 50,
           }}
         />
         <Stack.Screen
@@ -88,7 +88,7 @@ function RootNavigator() {
             headerShown: true,
             title: 'Settings',
             animation: 'slide_from_right',
-            animationDuration: 200,
+            animationDuration: 50,
             headerShadowVisible: false,
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
@@ -99,7 +99,7 @@ function RootNavigator() {
             headerShown: true,
             title: 'Community',
             animation: 'slide_from_right',
-            animationDuration: 200,
+            animationDuration: 50,
             headerShadowVisible: false,
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
@@ -110,7 +110,7 @@ function RootNavigator() {
             headerShown: true,
             title: 'Members',
             animation: 'slide_from_right',
-            animationDuration: 200,
+            animationDuration: 50,
             headerShadowVisible: false,
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
@@ -121,7 +121,7 @@ function RootNavigator() {
             headerShown: true,
             title: 'Community Info',
             animation: 'slide_from_right',
-            animationDuration: 200,
+            animationDuration: 50,
             headerShadowVisible: false,
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
@@ -131,7 +131,7 @@ function RootNavigator() {
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
-            animationDuration: 200,
+            animationDuration: 50,
           }}
         />
         <Stack.Screen
@@ -140,7 +140,7 @@ function RootNavigator() {
             headerShown: true,
             title: 'Discover',
             animation: 'slide_from_right',
-            animationDuration: 200,
+            animationDuration: 50,
             headerShadowVisible: false,
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
@@ -150,7 +150,28 @@ function RootNavigator() {
           options={{
             presentation: 'fullScreenModal',
             animation: 'slide_from_bottom',
-            animationDuration: 200,
+            animationDuration: 50,
+          }}
+        />
+        <Stack.Screen
+          name="notifications"
+          options={{
+            headerShown: true,
+            title: 'Notifications',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { elevation: 0, shadowOpacity: 0 },
+          }}
+        />
+        <Stack.Screen
+          name="profile/[id]"
+          options={{
+            headerShown: true,
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
         />
       </Stack>
