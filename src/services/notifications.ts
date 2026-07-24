@@ -328,3 +328,18 @@ export async function notifyAdminTransferred(newAdminId: string, communityId: st
     data: { communityId },
   });
 }
+
+export async function notifyPromotedToAdmin(
+  userId: string,
+  communityId: string,
+  communityName: string,
+  actorName: string,
+): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'admin_promoted',
+    title: 'Promoted to Admin',
+    body: `${actorName} made you an admin in ${communityName}`,
+    data: { communityId },
+  });
+}

@@ -17,6 +17,7 @@ import {
   notifyJoinRejected,
   notifyPing,
   notifyMemberRemoved,
+  notifyPromotedToAdmin,
   notifyAdminTransferred,
   notifyCommunityMatchPending,
   notifyCommunityMatchApproved,
@@ -647,5 +648,39 @@ export async function disputeCommunityMatch(
     }
   } catch (e) {
     console.error('Failed to send match dispute notification:', e);
+  }
+}
+
+export async function promoteToAdmin(
+  communityId: string,
+  targetUserId: string,
+  actorId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_members')
+    .update({ role: 'admin' })
+    .eq('community_id', communityId)
+    .eq('profile_id', targetUserId);
+
+  if (error) throw error;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const actor = await fetchProfile(actorId);
+      await notifyPromotedToAdmin(
+        targetUserId,
+        communityId,
+        community.name,
+        actor?.username ?? 'An admin',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send promotion notification:', e);
   }
 }
