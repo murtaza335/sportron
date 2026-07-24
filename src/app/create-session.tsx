@@ -20,7 +20,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { checkTimeConflicts, createSession } from '@/services/sessions';
+import { checkTimeConflicts, createSession, MAX_SESSION_FUTURE_DATE } from '@/services/sessions';
 import type { CreateSessionInput } from '@/types';
 
 export default function CreateSessionScreen() {
@@ -40,6 +40,8 @@ export default function CreateSessionScreen() {
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<{ sport: string; date_time: string; location: string }[]>([]);
+
+  const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
 
   const EXPIRE_OPTIONS = [
     { label: '15 min', value: 15 },
@@ -63,6 +65,13 @@ export default function CreateSessionScreen() {
       selectedTime.getHours(),
       selectedTime.getMinutes(),
     ).toISOString();
+
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    if (new Date(dateTime) > maxDate) {
+      Alert.alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -213,6 +222,7 @@ export default function CreateSessionScreen() {
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   minimumDate={new Date()}
+                  maximumDate={MAX_DATE}
                   onChange={(event: DateTimePickerEvent, date?: Date) => {
                     // Always close the picker on Android when an action occurs ('set' or 'dismissed')
                     if (Platform.OS === 'android') {
