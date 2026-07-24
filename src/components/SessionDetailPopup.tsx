@@ -272,7 +272,7 @@ export function SessionDetailPopup({
   const hasAcceptedParticipants = acceptedCommitments.length > 0;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
+    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
       <View style={styles.backdrop}>
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
 

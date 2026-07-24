@@ -79,21 +79,6 @@ export type NotificationPreferences = {
   community_match_disputed: boolean;
 };
 
-export type GuestProfile = {
-  id: string;
-  username: string;
-  display_name: null;
-  role: string;
-  isGuest: true;
-  bio: null;
-  avatar_url: null;
-  fcm_tokens: string[];
-  notification_preferences: NotificationPreferences;
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
-};
-
 export type Match = {
   id: string;
   created_by: string;
@@ -142,7 +127,6 @@ export type CreateMatchInput = {
   playerPartnerId: string | null;
   opponentId: string | null;
   opponentPartnerId: string | null;
-  opponentGuestName: string | null;
   playerScore: number;
   opponentScore: number;
   isPublic: boolean;

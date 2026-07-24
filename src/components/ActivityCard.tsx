@@ -74,6 +74,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   const [actionResult, setActionResult] = useState<'accepted' | 'declined' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<{ sport: string; location: string } | null>(null);
+  const [sessionInfoLoading, setSessionInfoLoading] = useState(notification.type === 'session_application');
 
   const isActionType = ACTION_TYPES.includes(notification.type);
   const data = notification.data ?? {};
@@ -90,7 +91,8 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         .then(({ data: s }) => {
           if (s) setSessionInfo(s);
         })
-        .catch(() => {});
+        .catch(() => {})
+        .finally(() => setSessionInfoLoading(false));
     }
   }, [notification.type, data.sessionId]);
 
@@ -289,13 +291,20 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           {getIcon(notification.type, theme)}
         </View>
         <View style={{ flex: 1, gap: 2 }}>
-          <ThemedText
-            variant="body"
-            style={{ fontWeight: '600', fontSize: 15, lineHeight: 22 }}
-            numberOfLines={3}
-          >
-            {displayBody()}
-          </ThemedText>
+          {sessionInfoLoading ? (
+            <View style={{ gap: 6 }}>
+              <View style={{ height: 14, width: '85%', borderRadius: 4, backgroundColor: theme.backgroundElement }} />
+              <View style={{ height: 14, width: '60%', borderRadius: 4, backgroundColor: theme.backgroundElement }} />
+            </View>
+          ) : (
+            <ThemedText
+              variant="body"
+              style={{ fontWeight: '600', fontSize: 15, lineHeight: 22 }}
+              numberOfLines={3}
+            >
+              {displayBody()}
+            </ThemedText>
+          )}
           <ThemedText variant="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
             {formatRelativeTime(notification.created_at)}
           </ThemedText>
