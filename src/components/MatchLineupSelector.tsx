@@ -12,6 +12,7 @@ import {
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import type { MatchFormat, Profile } from '@/types';
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
