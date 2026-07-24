@@ -43,6 +43,7 @@ const NOTIFICATION_SECTIONS: { title: string; items: { type: NotificationType; l
       { type: 'join_approved', label: 'Join Approved', description: 'When your join request is accepted' },
       { type: 'join_rejected', label: 'Join Rejected', description: 'When your join request is declined' },
       { type: 'ping', label: 'Pings', description: 'When someone pings the community' },
+      { type: 'ping_response', label: 'Ping Responses', description: 'When someone responds to your ping' },
       { type: 'member_removed', label: 'Member Removed', description: 'When you are removed from a community' },
       { type: 'admin_transferred', label: 'Admin Transfer', description: 'When admin rights are transferred to you' },
     ],

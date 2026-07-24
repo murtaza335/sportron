@@ -16,6 +16,7 @@ export type NotificationType =
   | 'session_reminder'
   | 'feedback_prompt'
   | 'ping'
+  | 'ping_response'
   | 'join_request'
   | 'join_approved'
   | 'join_rejected'
@@ -24,6 +25,7 @@ export type NotificationType =
   | 'match_disputed'
   | 'member_removed'
   | 'admin_transferred'
+  | 'admin_promoted'
   | 'community_match_pending'
   | 'community_match_approved'
   | 'community_match_disputed';
@@ -36,7 +38,10 @@ export interface NotificationData {
   commentId?: string;
   sessionId?: string;
   communityId?: string;
+  pingId?: string;
   message?: string;
+  response?: string;
+  respondentName?: string;
 }
 
 Notifications.setNotificationHandler({
@@ -208,7 +213,10 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     commentId: data?.commentId,
     sessionId: data?.sessionId,
     communityId: data?.communityId,
+    pingId: data?.pingId,
     message: data?.message,
+    response: data?.response,
+    respondentName: data?.respondentName,
   };
 
   return { title, body, data: parsedData };

@@ -1,7 +1,8 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
+  CheckCircle,
   Globe,
   Lock,
   Megaphone,
@@ -10,10 +11,12 @@ import {
   Swords,
   Users,
   X,
+  XCircle,
 } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -34,15 +37,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
   fetchCommunityMatches,
+  fetchPingResponses,
   joinCommunity,
   requestToJoinCommunity,
   respondToJoinRequest,
   sendPing,
 } from '@/services/communities';
+import { supabase } from '@/lib/supabase';
 import type {
   CommunityJoinRequest,
   CommunityMatch,
   MatchWithProfiles,
+  PingResponse,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
@@ -63,6 +69,11 @@ export default function CommunityDetailScreen() {
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
   const optimisticTitle = community?.name || communityName || '';
+
+  // Ping responses
+  const [lastPingId, setLastPingId] = useState<string | null>(null);
+  const [pingResponses, setPingResponses] = useState<PingResponse[]>([]);
+  const pingResponsesRef = useRef<PingResponse[]>([]);
 
   // Matches
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
@@ -200,9 +211,13 @@ export default function CommunityDetailScreen() {
     if (!id || !user || !pingMessage.trim()) return;
     setSendingPing(true);
     try {
-      await sendPing(id, user.id, pingMessage.trim());
+      const pingId = await sendPing(id, user.id, pingMessage.trim());
+      setLastPingId(pingId);
       setPingMessage('');
       setPingModalVisible(false);
+      const responses = await fetchPingResponses(pingId);
+      setPingResponses(responses);
+      pingResponsesRef.current = responses;
       Alert.alert('Ping Sent', 'Notification sent to all members.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to send ping.');
@@ -210,6 +225,28 @@ export default function CommunityDetailScreen() {
       setSendingPing(false);
     }
   };
+
+  // Realtime subscription for ping responses
+  useEffect(() => {
+    if (!id || !lastPingId) return;
+    const channel = supabase
+      .channel(`ping-responses-${lastPingId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'ping_responses',
+        filter: `ping_id=eq.${lastPingId}`,
+      }, (payload) => {
+        const newResponse = payload.new as PingResponse;
+        setPingResponses((prev) => {
+          if (prev.some((r) => r.id === newResponse.id)) return prev;
+          return [...prev, newResponse];
+        });
+        pingResponsesRef.current = [...pingResponsesRef.current, newResponse];
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, lastPingId]);
 
   const headerRight = () => null;
   const headerTitle = optimisticTitle
@@ -412,6 +449,46 @@ export default function CommunityDetailScreen() {
                 <View style={styles.pingDot} />
               </Pressable>
             </View>
+
+            {/* Ping Responses */}
+            {lastPingId && pingResponses.length > 0 && (
+              <View style={[styles.pingResponsesSection, { borderColor: theme.border }]}>
+                <ThemedText variant="label" muted style={{ fontSize: 11 }}>
+                  Ping Responses ({pingResponses.length})
+                </ThemedText>
+                {pingResponses.map((r) => (
+                  <View key={r.id} style={styles.pingResponseRow}>
+                    <View style={[styles.pingResponseAvatar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                      {r.respondent?.avatar_url ? (
+                        <Image source={{ uri: r.respondent.avatar_url }} style={styles.pingResponseAvatarImage} />
+                      ) : (
+                        <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
+                          {(r.respondent?.username ?? '?').charAt(0).toUpperCase()}
+                        </ThemedText>
+                      )}
+                    </View>
+                    <ThemedText variant="body" style={{ flex: 1, fontWeight: '500' }}>
+                      {r.respondent?.username ?? 'Someone'}
+                    </ThemedText>
+                    {r.response === 'coming' ? (
+                      <View style={[styles.responseBadge, { backgroundColor: '#10B98120' }]}>
+                        <CheckCircle size={12} color="#10B981" strokeWidth={2.5} />
+                        <ThemedText variant="caption" style={{ color: '#10B981', fontWeight: '700', fontSize: 11 }}>
+                          Coming
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <View style={[styles.responseBadge, { backgroundColor: '#EF444420' }]}>
+                        <XCircle size={12} color="#EF4444" strokeWidth={2.5} />
+                        <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '700', fontSize: 11 }}>
+                          Busy
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
 
             {/* Tabs */}
             <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
@@ -676,6 +753,39 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.full,
     backgroundColor: '#EF4444',
+  },
+  pingResponsesSection: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  pingResponseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  pingResponseAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  pingResponseAvatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+  },
+  responseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
   },
   loadMoreButton: {
     alignItems: 'center',

@@ -174,6 +174,17 @@ function RootNavigator() {
             headerStyle: { elevation: 0, shadowOpacity: 0 },
           }}
         />
+        <Stack.Screen
+          name="ping-response"
+          options={{
+            headerShown: true,
+            title: 'Ping Reply',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { elevation: 0, shadowOpacity: 0 },
+          }}
+        />
       </Stack>
     </View>
   );
