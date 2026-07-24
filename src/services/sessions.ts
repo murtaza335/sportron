@@ -110,12 +110,33 @@ export async function fetchSessionById(
   return data ? normalizeSession(data as SessionRow, currentUserId, acceptedCount) : null;
 }
 
+// Maximum session duration: 1 week in minutes
+export const MAX_SESSION_DURATION_MINUTES = 7 * 24 * 60; // 10080 minutes
+
+// Maximum future date for session: end of day, 7 days from now (inclusive)
+const now = new Date();
+const maxDate = new Date(now);
+maxDate.setDate(maxDate.getDate() + 7);
+maxDate.setHours(23, 59, 59, 999);
+export const MAX_SESSION_FUTURE_DATE = maxDate.toISOString();
+
 export async function createSession(
   userId: string,
   input: CreateSessionInput,
 ): Promise<Session> {
   const expireAfter = input.expireAfterMinutes ?? 30;
-  const expiresAt = new Date(new Date(input.date_time).getTime() + expireAfter * 60 * 1000).toISOString();
+
+  if (expireAfter > MAX_SESSION_DURATION_MINUTES) {
+    throw new Error(`Session duration cannot exceed 1 week (${MAX_SESSION_DURATION_MINUTES} minutes)`);
+  }
+
+  const sessionDate = new Date(input.date_time);
+  const maxFutureDate = new Date(MAX_SESSION_FUTURE_DATE);
+  if (sessionDate > maxFutureDate) {
+    throw new Error('Session cannot be scheduled more than 1 week in the future');
+  }
+
+  const expiresAt = new Date(sessionDate.getTime() + expireAfter * 60 * 1000).toISOString();
 
   const { data, error } = await supabase
     .from('sessions')
