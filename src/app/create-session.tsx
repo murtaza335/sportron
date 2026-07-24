@@ -1,7 +1,7 @@
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -34,6 +34,8 @@ export default function CreateSessionScreen() {
   const [selectedTime, setSelectedTime] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
   const [showTimePicker, setShowTimePicker] = useState(false);
+  const datePickerDismissedAt = useRef(0);
+  const timePickerDismissedAt = useRef(0);
   const [maxParticipants, setMaxParticipants] = useState('2');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -175,7 +177,10 @@ export default function CreateSessionScreen() {
                 Date
               </ThemedText>
               <Pressable
-                onPress={() => setShowDatePicker(true)}
+                onPress={() => {
+                  if (Date.now() - datePickerDismissedAt.current < 600) return;
+                  setShowDatePicker(true);
+                }}
                 style={[
                   styles.input,
                   styles.pickerButton,
@@ -200,8 +205,15 @@ export default function CreateSessionScreen() {
                   mode="date"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
                   minimumDate={new Date()}
-                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
-                    setShowDatePicker(Platform.OS !== 'ios');
+                  onChange={(event: DateTimePickerEvent, date?: Date) => {
+                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                    if (Platform.OS === 'android') {
+                      setShowDatePicker(false);
+                      datePickerDismissedAt.current = Date.now();
+                    }
+
+                    if (event.type === 'dismissed') return;
+
                     if (date) setSelectedDate(date);
                   }}
                 />
@@ -212,7 +224,10 @@ export default function CreateSessionScreen() {
                 Time
               </ThemedText>
               <Pressable
-                onPress={() => setShowTimePicker(true)}
+                onPress={() => {
+                  if (Date.now() - timePickerDismissedAt.current < 600) return;
+                  setShowTimePicker(true);
+                }}
                 style={[
                   styles.input,
                   styles.pickerButton,
@@ -235,8 +250,15 @@ export default function CreateSessionScreen() {
                   value={selectedTime}
                   mode="time"
                   display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
-                    setShowTimePicker(Platform.OS !== 'ios');
+                  onChange={(event: DateTimePickerEvent, date?: Date) => {
+                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                    if (Platform.OS === 'android') {
+                      setShowTimePicker(false);
+                      timePickerDismissedAt.current = Date.now();
+                    }
+
+                    if (event.type === 'dismissed') return;
+
                     if (date) setSelectedTime(date);
                   }}
                 />
