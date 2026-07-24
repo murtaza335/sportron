@@ -1,5 +1,5 @@
 import { useFocusEffect } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -9,7 +9,7 @@ import {
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, Clock, MapPin, Users } from 'lucide-react-native';
+import { Calendar, Clock, MapPin, Timer, Users } from 'lucide-react-native';
 
 import { SessionDetailPopup } from '@/components/SessionDetailPopup';
 import { Card } from '@/components/ui/Card';
@@ -19,6 +19,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useSessions } from '@/hooks/useSessions';
 import type { Session } from '@/types';
+import { getRemainingTime } from '@/services/sessions';
 
 function formatSessionDate(dateString: string) {
   const date = new Date(dateString);
@@ -45,6 +46,13 @@ export default function SessionsScreen() {
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSessionData, setSelectedSessionData] = useState<Partial<Session> | null>(null);
   const [detailVisible, setDetailVisible] = useState(false);
+
+  // Countdown ticker — re-renders every 30s to update "closes in X" labels
+  const [, setTick] = useState(0);
+  useEffect(() => {
+    const id = setInterval(() => setTick((t) => t + 1), 30000);
+    return () => clearInterval(id);
+  }, []);
 
   useFocusEffect(
     useCallback(() => {
@@ -97,7 +105,7 @@ export default function SessionsScreen() {
               >
                 <Card style={styles.sessionCard}>
                   <View style={styles.cardTop}>
-                    <ThemedText variant="heading" style={styles.sportName}>
+                    <ThemedText variant="heading" style={styles.sportName} numberOfLines={1}>
                       {item.sport}
                     </ThemedText>
                     <View
@@ -148,6 +156,17 @@ export default function SessionsScreen() {
 
                   <View style={styles.cardFooter}>
                     <View style={styles.footerLeft}>
+                      {item.expires_at && (
+                        <View style={[styles.expiryBadge, { backgroundColor: '#D9770620' }]}>
+                          <Timer size={12} color="#D97706" strokeWidth={2} />
+                          <ThemedText
+                            variant="caption"
+                            style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
+                          >
+                            {getRemainingTime(item.expires_at)}
+                          </ThemedText>
+                        </View>
+                      )}
                       <Users size={14} color={theme.textSecondary} strokeWidth={2} />
                       <ThemedText variant="caption" muted>
                         {item.commitment_count ?? 0} / {item.max_participants}
@@ -229,10 +248,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+    gap: Spacing.xs,
   },
   sportName: {
     fontSize: 20,
     fontWeight: '800',
+    flexShrink: 1,
+  },
+  expiryBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,

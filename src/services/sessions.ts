@@ -24,6 +24,7 @@ function normalizeSession(
     sport: row.sport,
     location: row.location,
     date_time: row.date_time,
+    expires_at: row.expires_at,
     max_participants: row.max_participants,
     description: row.description,
     status: row.status,
@@ -52,6 +53,8 @@ async function fetchAcceptedCounts(sessionIds: string[]): Promise<Record<string,
 }
 
 export async function fetchOpenSessions(currentUserId?: string): Promise<Session[]> {
+  await closeExpiredSessions();
+
   const { data, error } = await supabase
     .from('sessions')
     .select(
@@ -79,6 +82,8 @@ export async function fetchSessionById(
   id: string,
   currentUserId?: string,
 ): Promise<Session | null> {
+  await closeExpiredSessions();
+
   const { data, error } = await supabase
     .from('sessions')
     .select(
@@ -109,6 +114,9 @@ export async function createSession(
   userId: string,
   input: CreateSessionInput,
 ): Promise<Session> {
+  const expireAfter = input.expireAfterMinutes ?? 30;
+  const expiresAt = new Date(new Date(input.date_time).getTime() + expireAfter * 60 * 1000).toISOString();
+
   const { data, error } = await supabase
     .from('sessions')
     .insert({
@@ -119,6 +127,7 @@ export async function createSession(
       max_participants: input.max_participants,
       description: input.description?.trim() || null,
       status: 'open',
+      expires_at: expiresAt,
     })
     .select()
     .single();
@@ -293,6 +302,8 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
 export async function fetchUserSessions(
   userId: string,
 ): Promise<Session[]> {
+  await closeExpiredSessions();
+
   const { data, error } = await supabase
     .from('sessions')
     .select(
@@ -395,4 +406,29 @@ export async function checkTimeConflicts(
   return (conflicts ?? []).map((row) =>
     normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
   );
+}
+
+export async function closeExpiredSessions(): Promise<void> {
+  const { error } = await supabase.rpc('close_expired_sessions');
+  if (error) console.error('Failed to close expired sessions:', error);
+}
+
+export function getRemainingTime(expiresAt: string | null): string {
+  if (!expiresAt) return '';
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return 'Expired';
+
+  const minutes = Math.floor(diff / 60000);
+  const hours = Math.floor(minutes / 60);
+  const days = Math.floor(hours / 24);
+
+  if (days > 0) {
+    const remHours = hours % 24;
+    return `closes in ${days}d ${remHours}hr`;
+  }
+  if (hours > 0) {
+    const remMins = minutes % 60;
+    return `closes in ${hours}hr ${remMins}min`;
+  }
+  return `closes in ${minutes}min`;
 }

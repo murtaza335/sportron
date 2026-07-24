@@ -315,6 +315,7 @@ export type Session = {
   sport: string;
   location: string;
   date_time: string;
+  expires_at: string | null;
   max_participants: number;
   description: string | null;
   status: SessionStatus;
@@ -331,6 +332,7 @@ export type CreateSessionInput = {
   date_time: string;
   max_participants: number;
   description?: string;
+  expireAfterMinutes?: number;
 };
 
 export type CommitmentStatus = 'pending' | 'accepted' | 'rejected' | 'left';
