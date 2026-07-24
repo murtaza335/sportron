@@ -1,0 +1,139 @@
+import { router, Stack, useLocalSearchParams } from 'expo-router';
+import { useEffect, useState } from 'react';
+import {
+  ActivityIndicator,
+  Image,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  View,
+} from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
+import { X } from 'lucide-react-native';
+
+import { Card } from '@/components/ui/Card';
+import { ThemedText } from '@/components/ui/Text';
+import { Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { fetchProfile } from '@/services/profiles';
+import type { Profile } from '@/types';
+
+export default function PublicProfileScreen() {
+  const { id } = useLocalSearchParams<{ id: string }>();
+  const theme = useTheme();
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!id) return;
+    fetchProfile(id)
+      .then(setProfile)
+      .catch(console.error)
+      .finally(() => setLoading(false));
+  }, [id]);
+
+  return (
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <Stack.Screen
+        options={{
+          headerShown: true,
+          title: profile?.username ?? 'Profile',
+          headerRight: () => (
+            <Pressable onPress={() => router.back()} hitSlop={12}>
+              <X size={22} color={theme.text} strokeWidth={2} />
+            </Pressable>
+          ),
+        }}
+      />
+      {loading ? (
+        <ActivityIndicator color={theme.text} style={styles.loader} />
+      ) : !profile ? (
+        <View style={styles.loader}>
+          <ThemedText muted>User not found</ThemedText>
+        </View>
+      ) : (
+        <ScrollView contentContainerStyle={styles.content}>
+          <View style={styles.headerSection}>
+            <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
+              {profile.avatar_url ? (
+                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
+              ) : (
+                <ThemedText style={[styles.avatarInitial, { color: theme.textSecondary }]}>
+                  {(profile.username ?? '?').charAt(0).toUpperCase()}
+                </ThemedText>
+              )}
+            </View>
+            <ThemedText variant="hero" style={styles.username}>
+              {profile.username}
+            </ThemedText>
+            {profile.display_name && (
+              <ThemedText variant="body" muted style={styles.displayName}>
+                {profile.display_name}
+              </ThemedText>
+            )}
+            {profile.role && (
+              <View style={[styles.roleBadge, { backgroundColor: '#3B82F620' }]}>
+                <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700' }}>
+                  {profile.role === 'student' ? 'Student' : 'Teacher'}
+                </ThemedText>
+              </View>
+            )}
+          </View>
+
+          {profile.bio && (
+            <Card style={styles.bioCard}>
+              <ThemedText variant="body">{profile.bio}</ThemedText>
+            </Card>
+          )}
+        </ScrollView>
+      )}
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: { flex: 1 },
+  loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
+  content: {
+    alignItems: 'center',
+    padding: Spacing.lg,
+    gap: Spacing.lg,
+  },
+  headerSection: {
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  avatar: {
+    width: 96,
+    height: 96,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    overflow: 'hidden',
+    marginBottom: Spacing.xs,
+  },
+  avatarImage: {
+    width: 96,
+    height: 96,
+    borderRadius: Radius.full,
+  },
+  avatarInitial: {
+    fontSize: 36,
+    fontWeight: '800',
+  },
+  username: {
+    fontWeight: '800',
+    textAlign: 'center',
+  },
+  displayName: {
+    textAlign: 'center',
+  },
+  roleBadge: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: Radius.sm,
+  },
+  bioCard: {
+    width: '100%',
+  },
+});

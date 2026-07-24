@@ -192,6 +192,7 @@ export type NotificationType =
   | 'match_disputed'
   | 'member_removed'
   | 'admin_transferred'
+  | 'admin_promoted'
   | 'community_match_pending'
   | 'community_match_approved'
   | 'community_match_disputed';

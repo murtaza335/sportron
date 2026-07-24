@@ -1,22 +1,24 @@
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   FlatList,
+  Modal,
+  Platform,
   Pressable,
   RefreshControl,
   StyleSheet,
   View,
 } from 'react-native';
-import { X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ui/Text';
-import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import {
   fetchCommunityMembers,
+  promoteToAdmin,
   removeMember,
 } from '@/services/communities';
 import type { CommunityMember } from '@/types';
@@ -31,6 +33,22 @@ export default function CommunityMembersScreen() {
 
   const isAdmin = members.some(
     (m) => m.profile_id === user?.id && m.role === 'admin',
+  );
+
+  const sortedMembers = useMemo(
+    () =>
+      [...members].sort((a, b) => {
+        const aIsMe = a.profile_id === user?.id;
+        const bIsMe = b.profile_id === user?.id;
+        if (aIsMe) return -1;
+        if (bIsMe) return 1;
+        const aIsAdmin = a.role === 'admin';
+        const bIsAdmin = b.role === 'admin';
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return 0;
+      }),
+    [members, user?.id],
   );
 
   const load = useCallback(async () => {
@@ -57,10 +75,14 @@ export default function CommunityMembersScreen() {
     setRefreshing(false);
   };
 
+  // Context menu state
+  const [contextMember, setContextMember] = useState<CommunityMember | null>(null);
+
   const handleRemove = (member: CommunityMember) => {
+    setContextMember(null);
     Alert.alert(
       'Remove Member',
-      `Remove this member from the community?`,
+      `Remove ${member.profile?.username || 'this member'} from the community?`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -79,6 +101,21 @@ export default function CommunityMembersScreen() {
     );
   };
 
+  const handleMakeAdmin = async (member: CommunityMember) => {
+    setContextMember(null);
+    try {
+      await promoteToAdmin(id!, member.profile_id, user!.id);
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.profile_id === member.profile_id ? { ...m, role: 'admin' } : m,
+        ),
+      );
+      Alert.alert('Done', `${member.profile?.username || 'User'} is now an admin.`);
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to promote member.');
+    }
+  };
+
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <Stack.Screen options={{ title: 'Members' }} />
@@ -86,7 +123,7 @@ export default function CommunityMembersScreen() {
         <ActivityIndicator color={theme.text} style={styles.loader} />
       ) : (
         <FlatList
-          data={members}
+          data={sortedMembers}
           keyExtractor={(item) => item.profile_id}
           contentContainerStyle={styles.list}
           refreshControl={
@@ -97,61 +134,44 @@ export default function CommunityMembersScreen() {
             />
           }
           renderItem={({ item }) => (
-            <View
-              style={[
-                styles.memberCard,
-                { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+            <Pressable
+              onPress={() => router.push(`/profile/${item.profile_id}`)}
+              onLongPress={() => {
+                if (isAdmin && item.profile_id !== user?.id) {
+                  setContextMember(item);
+                }
+              }}
+              style={({ pressed }) => [
+                styles.memberRow,
+                { borderBottomColor: theme.border },
+                pressed && { opacity: 0.6 },
               ]}
             >
-              <View style={styles.memberInfo}>
-                <View
-                  style={[
-                    styles.avatar,
-                    { backgroundColor: item.role === 'admin' ? '#D97706' : theme.textSecondary },
-                  ]}
-                >
-                  <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
-                    {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </View>
-                <View>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {item.profile_id === user?.id
-                      ? 'You'
-                      : item.profile?.username ?? item.profile_id.slice(0, 8)}
-                  </ThemedText>
-                  {isAdmin && item.profile?.display_name && item.profile_id !== user?.id && (
-                    <ThemedText variant="caption" muted>
-                      {item.profile.display_name}
-                    </ThemedText>
-                  )}
-                  <View style={styles.roleRow}>
-                    {item.role === 'admin' && (
-                      <ThemedText
-                        variant="caption"
-                        style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
-                      >
-                        Admin
-                      </ThemedText>
-                    )}
-                    {item.profile_id === user?.id && item.role === 'member' && (
-                      <ThemedText variant="caption" muted style={{ fontSize: 10 }}>
-                        You
-                      </ThemedText>
-                    )}
-                  </View>
-                </View>
+              <View style={[styles.avatar, { backgroundColor: item.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
+                <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
+                  {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
+                </ThemedText>
               </View>
-              {isAdmin && item.profile_id !== user?.id && (
-                <Pressable
-                  onPress={() => handleRemove(item)}
-                  hitSlop={12}
-                  style={[styles.removeBtn, { backgroundColor: '#DC262615' }]}
-                >
-                  <X size={14} color="#DC2626" strokeWidth={3} />
-                </Pressable>
+              <View style={styles.memberInfo}>
+                <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                  {item.profile_id === user?.id
+                    ? 'You'
+                    : item.profile?.username ?? item.profile_id.slice(0, 8)}
+                </ThemedText>
+                {item.profile?.display_name && (
+                  <ThemedText variant="caption" muted numberOfLines={1}>
+                    {item.profile.display_name}
+                  </ThemedText>
+                )}
+              </View>
+              {item.role === 'admin' && (
+                <View style={[styles.roleBadge, { backgroundColor: '#D9770620' }]}>
+                  <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                    Admin
+                  </ThemedText>
+                </View>
               )}
-            </View>
+            </Pressable>
           )}
           ListEmptyComponent={
             <ThemedText variant="caption" muted style={styles.empty}>
@@ -160,6 +180,52 @@ export default function CommunityMembersScreen() {
           }
         />
       )}
+
+      {/* Context Menu Modal */}
+      <Modal
+        transparent
+        visible={!!contextMember}
+        animationType="fade"
+        onRequestClose={() => setContextMember(null)}
+      >
+        <Pressable style={styles.backdrop} onPress={() => setContextMember(null)}>
+          <Pressable style={[styles.contextSheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            <View style={styles.contextHandle} />
+            <ThemedText variant="heading" style={styles.contextTitle}>
+              {contextMember?.profile?.username ?? 'Member'}
+            </ThemedText>
+
+            <Pressable
+              style={[styles.contextOption, { borderBottomColor: theme.border }]}
+              onPress={() => contextMember && handleMakeAdmin(contextMember)}
+            >
+              <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                Make admin
+              </ThemedText>
+              <ThemedText variant="caption" muted>Promote this member to admin</ThemedText>
+            </Pressable>
+
+            <Pressable
+              style={styles.contextOption}
+              onPress={() => contextMember && handleRemove(contextMember)}
+            >
+              <ThemedText variant="body" style={{ color: '#EF4444', fontWeight: '600' }}>
+                Remove from community
+              </ThemedText>
+              <ThemedText variant="caption" muted>Kick this member out</ThemedText>
+            </Pressable>
+
+            <Pressable
+              onPress={() => setContextMember(null)}
+              style={[styles.contextCancel, { borderTopColor: theme.border }]}
+            >
+              <ThemedText variant="body" style={{ color: theme.textSecondary, fontWeight: '600' }}>
+                Cancel
+              </ThemedText>
+            </Pressable>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -168,22 +234,15 @@ const styles = StyleSheet.create({
   safe: { flex: 1 },
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: {
-    maxWidth: MaxContentWidth,
-    width: '100%',
-    alignSelf: 'center',
-    padding: Spacing.lg,
-    gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
   },
-  memberCard: {
+  memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    padding: Spacing.md,
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  memberInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
-  roleRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   avatar: {
     width: 40,
     height: 40,
@@ -192,12 +251,52 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   avatarText: { fontSize: 16, fontWeight: '800' },
-  removeBtn: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+  memberInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  roleBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
   },
   empty: { textAlign: 'center', paddingVertical: Spacing.xxl },
+  backdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  contextSheet: {
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    borderTopWidth: 1,
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
+    gap: Spacing.sm,
+  },
+  contextHandle: {
+    width: 36,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: 'rgba(128,128,128,0.3)',
+    alignSelf: 'center',
+    marginTop: Spacing.sm,
+    marginBottom: Spacing.xs,
+  },
+  contextTitle: {
+    marginBottom: Spacing.sm,
+  },
+  contextOption: {
+    paddingVertical: Spacing.md,
+    gap: 2,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  contextCancel: {
+    alignItems: 'center',
+    paddingVertical: Spacing.md,
+    marginTop: Spacing.sm,
+    borderTopWidth: StyleSheet.hairlineWidth,
+  },
 });
