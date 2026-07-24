@@ -12,15 +12,14 @@ import {
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { MatchFormat, Profile, UserRole, GuestProfile } from '@/types';
-import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
+import type { MatchFormat, Profile } from '@/types';
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
 
 type LineupSelection = {
-  playerPartner: Profile | GuestProfile | null;
-  opponent: Profile | GuestProfile | null;
-  opponentPartner: Profile | GuestProfile | null;
+  playerPartner: Profile | null;
+  opponent: Profile | null;
+  opponentPartner: Profile | null;
 };
 
 type MatchLineupSelectorProps = {
@@ -28,12 +27,12 @@ type MatchLineupSelectorProps = {
   currentUserName: string;
   format: MatchFormat;
   selection: LineupSelection;
-  onChange: (slot: TeamSlot, profile: Profile | GuestProfile | null) => void;
+  onChange: (slot: TeamSlot, profile: Profile | null) => void;
 };
 
 type SlotCardProps = {
   label: string;
-  profile: Profile | GuestProfile | null;
+  profile: Profile | null;
   helperText: string;
   onPress?: () => void;
   onDelete?: () => void;
@@ -151,11 +150,11 @@ export function MatchLineupSelector({
     );
   }, [selection.playerPartner?.id, selection.opponent?.id, selection.opponentPartner?.id]);
 
-  const availableProfiles = useMemo<(Profile | GuestProfile)[]>(() => {
+  const availableProfiles = useMemo<Profile[]>(() => {
     const normalized = query.trim().toLowerCase();
     const activeSelection = activeSlot ? selection[activeSlot] : null;
 
-    const filtered = profiles.filter((profile) => {
+    return profiles.filter((profile) => {
       if (selectedIds.has(profile.id) && activeSelection?.id !== profile.id) {
         return false;
       }
@@ -166,30 +165,6 @@ export function MatchLineupSelector({
 
       return profile.username.toLowerCase().includes(normalized);
     });
-
-    // Add "Guest" option for partner and opponent slots
-    if (activeSlot === 'playerPartner' || activeSlot === 'opponent' || activeSlot === 'opponentPartner') {
-      const guestProfile: GuestProfile = {
-        id: `guest-${activeSlot}`,
-        username: 'Guest',
-        display_name: null,
-        role: 'student' as UserRole,
-        isGuest: true,
-        bio: null,
-        avatar_url: null,
-        fcm_tokens: [],
-        notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
-        deleted_at: null,
-        created_at: '',
-        updated_at: '',
-      };
-      return [
-        guestProfile,
-        ...filtered,
-      ];
-    }
-
-    return filtered;
   }, [activeSlot, profiles, query, selectedIds, selection]);
 
   const closePicker = () => {
@@ -290,7 +265,7 @@ export function MatchLineupSelector({
         </ThemedText> */}
       </View>
 
-      <Modal animationType="slide" transparent visible={activeSlot !== null} onRequestClose={closePicker}>
+      <Modal animationType="none" transparent visible={activeSlot !== null} onRequestClose={closePicker}>
         <View style={styles.modalBackdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={closePicker} />
 
@@ -329,24 +304,14 @@ export function MatchLineupSelector({
               keyboardShouldPersistTaps="handled"
               contentContainerStyle={styles.list}
               renderItem={({ item }) => {
-                const isGuest = 'isGuest' in item && item.isGuest === true;
                 const isSelected = activeSlot ? selection[activeSlot]?.id === item.id : false;
 
                 return (
                   <Pressable
                     onPress={() => {
-                      if (!activeSlot) {
-                        return;
-                      }
-
-                      if (isGuest) {
-                        // Pass guest profile directly - one step
-                        onChange(activeSlot, item);
-                        closePicker();
-                      } else {
-                        onChange(activeSlot, item);
-                        closePicker();
-                      }
+                      if (!activeSlot) return;
+                      onChange(activeSlot, item);
+                      closePicker();
                     }}
                     style={({ pressed }) => [
                       styles.playerRow,
@@ -354,9 +319,9 @@ export function MatchLineupSelector({
                       pressed && styles.pressed,
                       isSelected && { backgroundColor: theme.backgroundElement },
                     ]}>
-                    <View style={[styles.avatarSmall, { backgroundColor: isGuest ? '#6B7280' : theme.text }]}>
+                    <View style={[styles.avatarSmall, { backgroundColor: theme.text }]}>
                       <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {isGuest ? '+' : (getInitials(item.username) || '?')}
+                        {getInitials(item.username) || '?'}
                       </ThemedText>
                     </View>
                     <View style={styles.playerMeta}>
@@ -364,10 +329,10 @@ export function MatchLineupSelector({
                         {item.username}
                       </ThemedText>
                       <ThemedText variant="caption" muted>
-                        {isGuest ? 'Add unregistered player' : item.role}
+                        {item.role}
                       </ThemedText>
                     </View>
-                    {isSelected && !isGuest && <Check size={18} color={theme.text} />}
+                    {isSelected && <Check size={18} color={theme.text} />}
                   </Pressable>
                 );
               }}

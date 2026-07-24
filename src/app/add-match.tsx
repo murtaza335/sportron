@@ -25,13 +25,13 @@ import { useTheme } from '@/hooks/use-theme';
 import { createMatch } from '@/services/matches';
 import { fetchAllProfiles } from '@/services/profiles';
 import { fetchCommunityMembers, recordCommunityMatch } from '@/services/communities';
-import type { MatchFormat, Profile, GuestProfile, Sport, CommunityMember } from '@/types';
+import type { MatchFormat, Profile, Sport, CommunityMember } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES, SPORT_LABELS, isRacketSport, isTeamSport } from '@/types';
 
 type SelectionState = {
-  playerPartner: Profile | GuestProfile | null;
-  opponent: Profile | GuestProfile | null;
-  opponentPartner: Profile | GuestProfile | null;
+  playerPartner: Profile | null;
+  opponent: Profile | null;
+  opponentPartner: Profile | null;
 };
 
 export default function AddMatchScreen() {
@@ -122,7 +122,7 @@ export default function AddMatchScreen() {
     try {
       if (isCommunityMatch && communityId) {
         const opponent = selection.opponent;
-        if (!opponent || opponent.id.startsWith('guest-')) {
+        if (!opponent) {
           Alert.alert('Invalid Opponent', 'Please select a community member as opponent.');
           setSaving(false);
           return;
@@ -144,20 +144,15 @@ export default function AddMatchScreen() {
         return;
       }
 
-      const isOpponentGuest = selection.opponent?.id?.startsWith('guest-');
-      const isOpponentPartnerGuest = selection.opponentPartner?.id?.startsWith('guest-');
-      const isPlayerPartnerGuest = selection.playerPartner?.id?.startsWith('guest-');
-
       await createMatch(user.id, {
         matchFormat: isRacket ? matchFormat : 'singles',
         sport,
         customSportName: sport === 'other' ? customSportName.trim() : null,
         teamAName: isTeam ? teamAName.trim() : null,
         teamBName: isTeam ? teamBName.trim() : null,
-        playerPartnerId: isRacket && !isPlayerPartnerGuest ? selection.playerPartner?.id ?? null : null,
-        opponentId: (!isOpponentGuest) ? selection.opponent?.id ?? null : null,
-        opponentPartnerId: isRacket && !isOpponentPartnerGuest ? selection.opponentPartner?.id ?? null : null,
-        opponentGuestName: (isRacket && (isOpponentGuest || isOpponentPartnerGuest)) ? 'Guest' : null,
+        playerPartnerId: isRacket ? selection.playerPartner?.id ?? null : null,
+        opponentId: selection.opponent?.id ?? null,
+        opponentPartnerId: isRacket ? selection.opponentPartner?.id ?? null : null,
         playerScore,
         opponentScore,
         isPublic,

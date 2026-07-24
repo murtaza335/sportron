@@ -16,21 +16,16 @@ import type { Profile } from '@/types';
 type OpponentSelectorProps = {
   profiles: Profile[];
   selectedId: string | null;
-  guestName: string;
   onSelectProfile: (profile: Profile | null) => void;
-  onGuestNameChange: (name: string) => void;
 };
 
 export function OpponentSelector({
   profiles,
   selectedId,
-  guestName,
   onSelectProfile,
-  onGuestNameChange,
 }: OpponentSelectorProps) {
   const theme = useTheme();
   const [query, setQuery] = useState('');
-  const [useGuest, setUseGuest] = useState(Boolean(guestName));
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -41,11 +36,6 @@ export function OpponentSelector({
       profile.username.toLowerCase().includes(normalized),
     );
   }, [profiles, query]);
-
-  const handleGuestToggle = () => {
-    setUseGuest(true);
-    onSelectProfile(null);
-  };
 
   return (
     <View style={styles.container}>
@@ -69,28 +59,11 @@ export function OpponentSelector({
         keyExtractor={(item) => item.id}
         style={styles.list}
         keyboardShouldPersistTaps="handled"
-        ListHeaderComponent={
-          <Pressable
-            onPress={handleGuestToggle}
-            style={[
-              styles.row,
-              { borderColor: theme.border },
-              useGuest && !selectedId && { backgroundColor: theme.backgroundElement },
-            ]}>
-            <ThemedText variant="body" style={{ fontWeight: '600' }}>
-              Guest player
-            </ThemedText>
-            {useGuest && !selectedId ? <Check size={18} color={theme.text} /> : null}
-          </Pressable>
-        }
         renderItem={({ item }) => {
           const selected = selectedId === item.id;
           return (
             <Pressable
-              onPress={() => {
-                setUseGuest(false);
-                onSelectProfile(item);
-              }}
+              onPress={() => onSelectProfile(item)}
               style={[
                 styles.row,
                 { borderColor: theme.border },
@@ -114,23 +87,6 @@ export function OpponentSelector({
           </ThemedText>
         }
       />
-
-      {(useGuest || guestName) && !selectedId ? (
-        <TextInput
-          value={guestName}
-          onChangeText={onGuestNameChange}
-          placeholder="Enter guest player name"
-          placeholderTextColor={theme.textSecondary}
-          style={[
-            styles.guestInput,
-            {
-              color: theme.text,
-              borderColor: theme.border,
-              backgroundColor: theme.background,
-            },
-          ]}
-        />
-      ) : null}
     </View>
   );
 }
@@ -164,13 +120,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     paddingHorizontal: Spacing.sm,
     borderBottomWidth: 1,
-  },
-  guestInput: {
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
-    fontSize: 16,
   },
   empty: {
     paddingVertical: Spacing.lg,

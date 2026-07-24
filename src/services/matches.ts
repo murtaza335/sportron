@@ -121,7 +121,7 @@ export async function createMatch(userId: string, input: CreateMatchInput): Prom
       player_partner_id: input.playerPartnerId,
       opponent_id: input.opponentId,
       opponent_partner_id: input.opponentPartnerId,
-      opponent_guest_name: input.opponentGuestName?.trim() || null,
+      opponent_guest_name: null,
       match_format: input.matchFormat,
       sport: input.sport,
       custom_sport_name: input.customSportName?.trim() || null,

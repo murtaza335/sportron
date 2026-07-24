@@ -1,5 +1,6 @@
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { X } from 'lucide-react-native';
+import { CalendarDays, Clock, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Alert,
@@ -22,13 +23,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { checkTimeConflicts, createSession } from '@/services/sessions';
 import type { CreateSessionInput } from '@/types';
 
-function formatDateTime(dateStr: string, timeStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const [hh, mm] = timeStr.split(':').map(Number);
-  const date = new Date(y, m - 1, d, hh, mm);
-  return date.toISOString();
-}
-
 export default function CreateSessionScreen() {
   const theme = useTheme();
   const router = useRouter();
@@ -36,8 +30,10 @@ export default function CreateSessionScreen() {
 
   const [sport, setSport] = useState('');
   const [location, setLocation] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
   const [maxParticipants, setMaxParticipants] = useState('2');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
@@ -46,14 +42,18 @@ export default function CreateSessionScreen() {
   const canSave =
     sport.trim().length > 0 &&
     location.trim().length > 0 &&
-    date.trim().length > 0 &&
-    time.trim().length > 0 &&
     !saving;
 
   const handleCreate = async () => {
     if (!user?.id || !canSave) return;
 
-    const dateTime = formatDateTime(date, time);
+    const dateTime = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+      selectedTime.getHours(),
+      selectedTime.getMinutes(),
+    ).toISOString();
 
     setSaving(true);
     try {
@@ -172,45 +172,90 @@ export default function CreateSessionScreen() {
           <View style={styles.row}>
             <View style={[styles.field, { flex: 1 }]}>
               <ThemedText variant="label" muted style={styles.label}>
-                Date (YYYY-MM-DD)
+                Date
               </ThemedText>
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="e.g. 2026-07-25"
-                placeholderTextColor={theme.textSecondary}
+              <Pressable
+                onPress={() => setShowDatePicker(true)}
                 style={[
                   styles.input,
+                  styles.pickerButton,
                   {
-                    color: theme.text,
                     backgroundColor: theme.backgroundElement,
                     borderColor: theme.border,
                   },
                 ]}
-                keyboardType="numbers-and-punctuation"
-              />
+              >
+                <CalendarDays size={18} color={theme.textSecondary} />
+                <ThemedText variant="body">
+                  {selectedDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </ThemedText>
+              </Pressable>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  minimumDate={new Date()}
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    setShowDatePicker(Platform.OS !== 'ios');
+                    if (date) setSelectedDate(date);
+                  }}
+                />
+              )}
             </View>
             <View style={[styles.field, { flex: 1 }]}>
               <ThemedText variant="label" muted style={styles.label}>
-                Time (HH:MM)
+                Time
               </ThemedText>
-              <TextInput
-                value={time}
-                onChangeText={setTime}
-                placeholder="e.g. 14:00"
-                placeholderTextColor={theme.textSecondary}
+              <Pressable
+                onPress={() => setShowTimePicker(true)}
                 style={[
                   styles.input,
+                  styles.pickerButton,
                   {
-                    color: theme.text,
                     backgroundColor: theme.backgroundElement,
                     borderColor: theme.border,
                   },
                 ]}
-                keyboardType="numbers-and-punctuation"
-              />
+              >
+                <Clock size={18} color={theme.textSecondary} />
+                <ThemedText variant="body">
+                  {selectedTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </ThemedText>
+              </Pressable>
+              {showTimePicker && (
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(_event: DateTimePickerEvent, date?: Date) => {
+                    setShowTimePicker(Platform.OS !== 'ios');
+                    if (date) setSelectedTime(date);
+                  }}
+                />
+              )}
             </View>
           </View>
+          {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+            <Pressable
+              onPress={() => {
+                setShowDatePicker(false);
+                setShowTimePicker(false);
+              }}
+              style={styles.doneButton}
+            >
+              <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '600' }}>
+                Done
+              </ThemedText>
+            </Pressable>
+          )}
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
@@ -315,6 +360,15 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  doneButton: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
   },
   submit: {
     marginTop: Spacing.md,
