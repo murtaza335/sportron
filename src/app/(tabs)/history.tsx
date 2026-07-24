@@ -72,17 +72,19 @@ export default function SessionsScreen() {
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
-              <View style={styles.empty}>
-                <View style={styles.emptyIcon}>
-                  <Calendar size={48} color={theme.textSecondary} strokeWidth={1.5} />
+              !refreshing ? (
+                <View style={styles.empty}>
+                  <View style={styles.emptyIcon}>
+                    <Calendar size={48} color={theme.textSecondary} strokeWidth={1.5} />
+                  </View>
+                  <ThemedText variant="body" muted style={styles.emptyText}>
+                    No open sessions yet
+                  </ThemedText>
+                  <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                    Be the first to post a session!
+                  </ThemedText>
                 </View>
-                <ThemedText variant="body" muted style={styles.emptyText}>
-                  No open sessions yet
-                </ThemedText>
-                <ThemedText variant="caption" muted style={styles.emptySubtext}>
-                  Be the first to post a session!
-                </ThemedText>
-              </View>
+              ) : null
             }
             renderItem={({ item }) => (
               <Pressable
