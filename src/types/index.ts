@@ -198,7 +198,10 @@ export type NotificationType =
   | 'admin_promoted'
   | 'community_match_pending'
   | 'community_match_approved'
-  | 'community_match_disputed';
+  | 'community_match_disputed'
+  | 'community_invite'
+  | 'community_invite_accepted'
+  | 'community_invite_rejected';
 
 export type InAppNotification = {
   id: string;
@@ -264,6 +267,19 @@ export type CommunityJoinRequest = {
   created_at: string;
   updated_at: string;
   profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
+export type CommunityInvite = {
+  id: string;
+  community_id: string;
+  invited_by: string;
+  invitee_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  updated_at: string;
+  community?: Pick<Community, 'id' | 'name' | 'image_url'> | null;
+  inviter?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  invitee?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
 };
 
 export type Ping = {

@@ -13,6 +13,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
+import { InviteMemberModal } from '@/components/InviteMemberModal';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -30,16 +31,19 @@ export default function CommunityMembersScreen() {
   const [members, setMembers] = useState<CommunityMember[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [showInviteModal, setShowInviteModal] = useState(false);
 
   const isAdmin = members.some(
     (m) => m.profile_id === user?.id && m.role === 'admin',
   );
 
+  const userId = user?.id;
+
   const sortedMembers = useMemo(
     () =>
       [...members].sort((a, b) => {
-        const aIsMe = a.profile_id === user?.id;
-        const bIsMe = b.profile_id === user?.id;
+        const aIsMe = a.profile_id === userId;
+        const bIsMe = b.profile_id === userId;
         if (aIsMe) return -1;
         if (bIsMe) return 1;
         const aIsAdmin = a.role === 'admin';
@@ -48,7 +52,7 @@ export default function CommunityMembersScreen() {
         if (!aIsAdmin && bIsAdmin) return 1;
         return 0;
       }),
-    [members, user?.id],
+    [members, userId],
   );
 
   const load = useCallback(async () => {
@@ -73,6 +77,11 @@ export default function CommunityMembersScreen() {
     setRefreshing(true);
     await load();
     setRefreshing(false);
+  };
+
+  const handleInviteComplete = async () => {
+    setShowInviteModal(false);
+    await load();
   };
 
   // Context menu state
@@ -104,7 +113,7 @@ export default function CommunityMembersScreen() {
   const handleMakeAdmin = async (member: CommunityMember) => {
     setContextMember(null);
     try {
-      await promoteToAdmin(id!, member.profile_id, user!.id);
+      await promoteToAdmin(id!, member.profile_id, userId!);
       setMembers((prev) =>
         prev.map((m) =>
           m.profile_id === member.profile_id ? { ...m, role: 'admin' } : m,
@@ -122,63 +131,76 @@ export default function CommunityMembersScreen() {
       {loading ? (
         <ActivityIndicator color={theme.text} style={styles.loader} />
       ) : (
-        <FlatList
-          data={sortedMembers}
-          keyExtractor={(item) => item.profile_id}
-          contentContainerStyle={styles.list}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              tintColor={theme.text}
-            />
-          }
-          renderItem={({ item }) => (
-            <Pressable
-              onPress={() => router.push(`/profile/${item.profile_id}`)}
-              onLongPress={() => {
-                if (isAdmin && item.profile_id !== user?.id) {
-                  setContextMember(item);
-                }
-              }}
-              style={({ pressed }) => [
-                styles.memberRow,
-                { borderBottomColor: theme.border },
-                pressed && { opacity: 0.6 },
-              ]}
-            >
-              <View style={[styles.avatar, { backgroundColor: item.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
-                <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
-                  {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
+        <>
+          <FlatList
+            data={sortedMembers}
+            keyExtractor={(item) => item.profile_id}
+            contentContainerStyle={styles.list}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                tintColor={theme.text}
+              />
+            }
+            ListHeaderComponent={isAdmin ? (
+              <Pressable
+                onPress={() => setShowInviteModal(true)}
+                style={styles.inviteButton}
+                hitSlop={8}
+              >
+                <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '700' }}>
+                  + Invite Member by Username
                 </ThemedText>
-              </View>
-              <View style={styles.memberInfo}>
-                <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                  {item.profile_id === user?.id
-                    ? 'You'
-                    : item.profile?.username ?? item.profile_id.slice(0, 8)}
-                </ThemedText>
-                {item.profile?.display_name && (
-                  <ThemedText variant="caption" muted numberOfLines={1}>
-                    {item.profile.display_name}
-                  </ThemedText>
-                )}
-              </View>
-              {item.role === 'admin' && (
-                <View style={[styles.roleBadge, { backgroundColor: '#D9770620' }]}>
-                  <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
-                    Admin
+              </Pressable>
+            ) : null}
+            renderItem={({ item }) => (
+              <Pressable
+                onPress={() => router.push(`/profile/${item.profile_id}`)}
+                onLongPress={() => {
+                  if (isAdmin && item.profile_id !== userId) {
+                    setContextMember(item);
+                  }
+                }}
+                style={({ pressed }) => [
+                  styles.memberRow,
+                  { borderBottomColor: theme.border },
+                  pressed && { opacity: 0.6 },
+                ]}
+              >
+                <View style={[styles.avatar, { backgroundColor: item.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
+                  <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
+                    {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
                   </ThemedText>
                 </View>
-              )}
-            </Pressable>
-          )}
-          ListEmptyComponent={
-            <ThemedText variant="caption" muted style={styles.empty}>
-              No members found.
-            </ThemedText>
-          }
-        />
+                <View style={styles.memberInfo}>
+                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                    {item.profile_id === userId
+                      ? 'You'
+                      : item.profile?.username ?? item.profile_id.slice(0, 8)}
+                  </ThemedText>
+                  {item.profile?.display_name && (
+                    <ThemedText variant="caption" muted numberOfLines={1}>
+                      {item.profile.display_name}
+                    </ThemedText>
+                  )}
+                </View>
+                {item.role === 'admin' && (
+                  <View style={[styles.roleBadge, { backgroundColor: '#D9770620' }]}>
+                    <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                      Admin
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+            )}
+            ListEmptyComponent={
+              <ThemedText variant="caption" muted style={styles.empty}>
+                No members found.
+              </ThemedText>
+            }
+          />
+        </>
       )}
 
       {/* Context Menu Modal */}
@@ -226,6 +248,15 @@ export default function CommunityMembersScreen() {
           </Pressable>
         </Pressable>
       </Modal>
+
+      {/* Invite Member Modal */}
+      <InviteMemberModal
+        communityId={id!}
+        adminId={userId!}
+        visible={showInviteModal}
+        onClose={() => setShowInviteModal(false)}
+        onSuccess={handleInviteComplete}
+      />
     </View>
   );
 }
@@ -235,6 +266,13 @@ const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   list: {
     paddingHorizontal: Spacing.lg,
+  },
+  inviteButton: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    alignItems: 'center',
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: 'rgba(128,128,128,0.2)',
   },
   memberRow: {
     flexDirection: 'row',

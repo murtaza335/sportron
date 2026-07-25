@@ -437,10 +437,10 @@ export default function CommunityInfoScreen() {
           <ThemedText variant="label" muted style={styles.sectionLabel}>
             {sortedMembers.length} Member{sortedMembers.length !== 1 ? 's' : ''}
           </ThemedText>
-          {hasMoreMembers && (
+          {(hasMoreMembers || isAdmin) && (
             <Pressable onPress={() => router.navigate(`/community/${id}/members`)}>
               <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '600' }}>
-                View All
+                {isAdmin ? 'View All Members' : 'View All'}
               </ThemedText>
             </Pressable>
           )}
@@ -502,7 +502,7 @@ export default function CommunityInfoScreen() {
                 )}
               </Pressable>
             ))}
-            {hasMoreMembers && (
+            {(hasMoreMembers || isAdmin) && (
               <Pressable
                 onPress={() => router.navigate(`/community/${id}/members`)}
                 style={styles.viewAllRow}

@@ -353,3 +353,35 @@ export async function notifyPromotedToAdmin(
     data: { communityId },
   });
 }
+
+export async function notifyCommunityInvite(
+  inviteeId: string,
+  communityId: string,
+  communityName: string,
+  inviterName: string,
+  inviteId: string,
+): Promise<void> {
+  await createNotification({
+    userId: inviteeId,
+    type: 'community_invite',
+    title: 'Community Invitation',
+    body: `${inviterName} invited you to join ${communityName}`,
+    data: { communityId, inviteId },
+  });
+}
+
+export async function notifyCommunityInviteResponse(
+  inviterId: string,
+  communityId: string,
+  communityName: string,
+  inviteeName: string,
+  accepted: boolean,
+): Promise<void> {
+  await createNotification({
+    userId: inviterId,
+    type: accepted ? 'community_invite_accepted' : 'community_invite_rejected',
+    title: accepted ? 'Invitation Accepted' : 'Invitation Declined',
+    body: `${inviteeName} ${accepted ? 'accepted' : 'declined'} your invitation to ${communityName}`,
+    data: { communityId },
+  });
+}
