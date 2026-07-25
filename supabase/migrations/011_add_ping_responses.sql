@@ -62,5 +62,8 @@ CHECK (type IN (
   'community_match_pending',
   'community_match_approved',
   'community_match_disputed',
-  'admin_promoted'
+  'admin_promoted',
+  'community_invite',
+  'community_invite_accepted',
+  'community_invite_rejected'
 ));
