@@ -1,21 +1,30 @@
-import { router, Stack, useLocalSearchParams } from 'expo-router';
+import * as ImagePicker from 'expo-image-picker';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { uploadImageFromUri } from '@/lib/cloudinary';
 import {
-  AlignLeft,
   ChevronRight,
   Globe,
-  Info,
+  Image as ImageIcon,
   Lock,
+  LogOut,
+  Pencil,
   Plus,
-  Swords,
-  Users,
+  Shield,
+  Trash2,
+  User,
+  X,
 } from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
+  Image,
+  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
+  TextInput,
   View,
 } from 'react-native';
 
@@ -27,9 +36,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
+  deleteCommunity,
+  fetchCommunityMembers,
   joinCommunity,
+  leaveCommunity,
+  promoteToAdmin,
+  removeMember,
   requestToJoinCommunity,
+  transferAdmin,
+  updateCommunity,
 } from '@/services/communities';
+import { fetchProfile } from '@/services/profiles';
+import type { CommunityMember, CommunityVisibility, Profile } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityInfoScreen() {
@@ -44,8 +62,150 @@ export default function CommunityInfoScreen() {
     setMembership,
   } = useCommunity(id ?? '', user?.id);
 
+  const [members, setMembers] = useState<CommunityMember[]>([]);
+  const [membersLoading, setMembersLoading] = useState(true);
+  const [creator, setCreator] = useState<Profile | null>(null);
+
+  // Edit modal
+  const [editModalVisible, setEditModalVisible] = useState(false);
+  const [editName, setEditName] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
+  const [editImageUri, setEditImageUri] = useState<string | null>(null);
+  const [uploadingEditImage, setUploadingEditImage] = useState(false);
+  const [savingEdit, setSavingEdit] = useState(false);
+
+  const loadMembers = useCallback(async () => {
+    if (!id) return;
+    try {
+      const data = await fetchCommunityMembers(id);
+      setMembers(data);
+    } catch (e) {
+      console.error('Failed to load members:', e);
+    } finally {
+      setMembersLoading(false);
+    }
+  }, [id]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadMembers();
+    }, [loadMembers]),
+  );
+
   const isMember = !!membership;
+  const isAdmin = membership?.role === 'admin';
   const isRestricted = community?.visibility === 'restricted';
+
+  const sortedMembers = useMemo(
+    () =>
+      [...members].sort((a, b) => {
+        const aIsMe = a.profile_id === user?.id;
+        const bIsMe = b.profile_id === user?.id;
+        if (aIsMe) return -1;
+        if (bIsMe) return 1;
+        const aIsAdmin = a.role === 'admin';
+        const bIsAdmin = b.role === 'admin';
+        if (aIsAdmin && !bIsAdmin) return -1;
+        if (!aIsAdmin && bIsAdmin) return 1;
+        return 0;
+      }),
+    [members, user?.id],
+  );
+
+  const displayMembers = sortedMembers.slice(0, 10);
+  const hasMoreMembers = sortedMembers.length > 10;
+
+  useEffect(() => {
+    if (community?.created_by) {
+      fetchProfile(community.created_by).then(setCreator).catch(console.error);
+    }
+  }, [community?.created_by]);
+
+  const pickEditImage = async () => {
+    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    if (!permissionResult.granted) {
+      Alert.alert('Permission required', 'Please grant permission to access your photos.');
+      return;
+    }
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ['images'],
+      allowsEditing: true,
+      aspect: [16, 9],
+      quality: 0.8,
+    });
+    if (!result.canceled && result.assets[0]) {
+      setEditImageUri(result.assets[0].uri);
+    }
+  };
+
+  const removeEditImage = () => {
+    setEditImageUri(null);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!id || !editName.trim()) return;
+    setSavingEdit(true);
+    try {
+      let imageUrl: string | null | undefined = undefined;
+      if (editImageUri !== (community?.image_url ?? null)) {
+        if (editImageUri) {
+          setUploadingEditImage(true);
+          const uploaded = await uploadImageFromUri(editImageUri);
+          if (!uploaded) {
+            Alert.alert('Error', 'Failed to upload image.');
+            setSavingEdit(false);
+            setUploadingEditImage(false);
+            return;
+          }
+          imageUrl = uploaded;
+          setUploadingEditImage(false);
+        } else {
+          imageUrl = null;
+        }
+      }
+      await updateCommunity(id, {
+        name: editName.trim(),
+        description: editDescription.trim() || null,
+        visibility: editVisibility,
+        image_url: imageUrl,
+      });
+      setEditModalVisible(false);
+      refresh();
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to update.');
+    } finally {
+      setSavingEdit(false);
+      setUploadingEditImage(false);
+    }
+  };
+
+  const handleTransferAdmin = () => {
+    if (!id) return;
+    if (Alert.prompt) {
+      Alert.prompt(
+        'Transfer Admin',
+        'Enter the username of the new admin:',
+        async (text) => {
+          if (!text.trim()) return;
+          try {
+            await transferAdmin(id, user!.id, text.trim());
+            setMembership(null);
+            setEditModalVisible(false);
+            refresh();
+            Alert.alert('Done', 'Admin rights transferred.');
+          } catch (e: any) {
+            Alert.alert('Error', e?.message ?? 'Failed to transfer.');
+          }
+        },
+      );
+    } else {
+      Alert.alert(
+        'Transfer Admin',
+        'Transfer admin by username: feature available on iOS.',
+      );
+    }
+  };
 
   const handleJoin = async () => {
     if (!id || !user) return;
@@ -73,10 +233,102 @@ export default function CommunityInfoScreen() {
     }
   };
 
+  const handleLeave = () => {
+    if (!id || !user) return;
+    Alert.alert(
+      'Leave Community',
+      'Are you sure you want to leave this community?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Leave',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await leaveCommunity(id, user.id);
+              setMembership(null);
+              refresh();
+              router.back();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to leave.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleDelete = () => {
+    if (!id) return;
+    Alert.alert(
+      'Delete Community',
+      'This action cannot be undone. All matches, members, and data will be permanently removed.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteCommunity(id);
+              router.back();
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to delete community.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
+  const handleEdit = () => {
+    if (!community) return;
+    setEditName(community.name);
+    setEditDescription(community.description ?? '');
+    setEditVisibility(community.visibility);
+    setEditImageUri(community.image_url ?? null);
+    setEditModalVisible(true);
+  };
+
+  const handleMakeAdmin = async (member: CommunityMember) => {
+    try {
+      await promoteToAdmin(id!, member.profile_id, user!.id);
+      setMembers((prev) =>
+        prev.map((m) =>
+          m.profile_id === member.profile_id ? { ...m, role: 'admin' } : m,
+        ),
+      );
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to promote member.');
+    }
+  };
+
+  const handleRemove = (member: CommunityMember) => {
+    Alert.alert(
+      'Remove Member',
+      `Remove ${member.profile?.username || 'this member'} from the community?`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Remove',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await removeMember(id!, member.profile_id);
+              setMembers((prev) => prev.filter((m) => m.profile_id !== member.profile_id));
+            } catch (e: any) {
+              Alert.alert('Error', e?.message ?? 'Failed to remove member.');
+            }
+          },
+        },
+      ],
+    );
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community Info' }} />
+        <Stack.Screen options={{ title: '' }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -85,7 +337,7 @@ export default function CommunityInfoScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community Info' }} />
+        <Stack.Screen options={{ title: '' }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -93,7 +345,7 @@ export default function CommunityInfoScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: 'Community Details' }} />
+      <Stack.Screen options={{ title: '' }} />
 
       <ScrollView
         style={styles.scroll}
@@ -106,108 +358,325 @@ export default function CommunityInfoScreen() {
           />
         }
       >
-        {/* Main Details Card */}
-        <Card style={styles.heroCard}>
-          {/* Header Badges */}
-          <View style={styles.tagsRow}>
-            {/* Sport Badge */}
-            <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-              <Swords size={14} color={theme.text} strokeWidth={2} />
-              <ThemedText variant="caption" style={styles.badgeText}>
-                {SPORT_LABELS[community.sport] || community.sport}
-              </ThemedText>
-            </View>
-
-            {/* Visibility Badge */}
-            <View
-              style={[
-                styles.badge,
-                {
-                  backgroundColor: community.visibility === 'public' ? '#10B9811A' : '#D977061A',
-                  borderColor: community.visibility === 'public' ? '#10B98140' : '#D9770640',
-                },
-              ]}
-            >
-              {community.visibility === 'public' ? (
-                <Globe size={14} color="#10B981" strokeWidth={2} />
-              ) : (
-                <Lock size={14} color="#D97706" strokeWidth={2} />
-              )}
-              <ThemedText
-                variant="caption"
-                style={[
-                  styles.badgeText,
-                  { color: community.visibility === 'public' ? '#10B981' : '#D97706' },
-                ]}
-              >
-                {community.visibility === 'public' ? 'Public' : 'Restricted'}
-              </ThemedText>
-            </View>
+        {/* Cover Image */}
+        {community.image_url ? (
+          <View style={styles.coverContainer}>
+            <Image source={{ uri: community.image_url }} style={styles.coverImage} resizeMode="cover" />
+            <View style={[styles.coverOverlay, { backgroundColor: theme.background }]} />
           </View>
+        ) : (
+          <View style={[styles.coverPlaceholder, { backgroundColor: theme.backgroundElement }]}>
+            <ImageIcon size={40} color={theme.textSecondary} strokeWidth={1.5} />
+          </View>
+        )}
 
-          {/* About Section */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <AlignLeft size={16} color={theme.textSecondary} strokeWidth={2} />
-              <ThemedText variant="label" muted>About</ThemedText>
-            </View>
-            <ThemedText variant="body" style={styles.aboutText}>
-              {community.description || 'No description provided for this community.'}
+        {/* Group Info Header */}
+        <View style={styles.groupHeader}>
+          <View style={[styles.groupAvatar, { backgroundColor: theme.textSecondary }]}>
+            <ThemedText style={styles.groupAvatarText}>
+              {community.name.charAt(0).toUpperCase()}
             </ThemedText>
           </View>
+          <ThemedText variant="heading" style={styles.groupName}>
+            {community.name}
+          </ThemedText>
+          <ThemedText variant="caption" muted>
+            {SPORT_LABELS[community.sport] || community.sport} &bull; {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
+          </ThemedText>
+        </View>
 
-          {/* Visibility Hint */}
-          <View style={styles.sectionContainer}>
-            <View style={styles.sectionHeader}>
-              <Info size={16} color={theme.textSecondary} strokeWidth={2} />
-              <ThemedText variant="label" muted>Access</ThemedText>
-            </View>
-            <ThemedText variant="caption" muted style={styles.hintText}>
-              {community.visibility === 'public'
-                ? 'Anyone can view content and join this community freely.'
-                : 'Membership requires approval from a community administrator.'}
+        {/* Badge Row */}
+        <View style={styles.badgeRow}>
+          {/* <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+            <Swords size={14} color={theme.text} strokeWidth={2} />
+            <ThemedText variant="caption" style={styles.badgeText}>
+              {SPORT_LABELS[community.sport] || community.sport}
+            </ThemedText>
+          </View> */}
+          <View
+            style={[
+              styles.badge,
+              {
+                backgroundColor: community.visibility === 'public' ? '#10B9811A' : '#D977061A',
+                borderColor: community.visibility === 'public' ? '#10B98140' : '#D9770640',
+              },
+            ]}
+          >
+            {community.visibility === 'public' ? (
+              <Globe size={14} color="#10B981" strokeWidth={2} />
+            ) : (
+              <Lock size={14} color="#D97706" strokeWidth={2} />
+            )}
+            <ThemedText
+              variant="caption"
+              style={[
+                styles.badgeText,
+                { color: community.visibility === 'public' ? '#10B981' : '#D97706' },
+              ]}
+            >
+              {community.visibility === 'public' ? 'Public' : 'Restricted'}
+            </ThemedText>
+          </View>
+        </View>
+
+        {/* Description + Creator */}
+        <Card style={styles.sectionCard}>
+          <ThemedText variant="body" style={styles.descriptionText}>
+            {community.description || 'No description provided.'}
+          </ThemedText>
+          <View style={styles.creatorRow}>
+            <User size={14} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="caption" muted>
+              Created by {creator?.username || '...'}
             </ThemedText>
           </View>
         </Card>
 
-        {/* Combined Members Tile */}
-        <Pressable
-          onPress={() => router.navigate(`/community/${id}/members`)}
-          style={[styles.membersCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-        >
-          <View style={styles.membersLeft}>
-            <View style={[styles.iconContainer, { backgroundColor: theme.background }]}>
-              <Users size={20} color={theme.text} strokeWidth={2} />
-            </View>
-            <View>
-              <ThemedText variant="body" style={styles.memberTitle}>
-                Members
+        {/* Members Section */}
+        <View style={styles.sectionHeaderRow}>
+          <ThemedText variant="label" muted style={styles.sectionLabel}>
+            {sortedMembers.length} Member{sortedMembers.length !== 1 ? 's' : ''}
+          </ThemedText>
+          {(hasMoreMembers || isAdmin) && (
+            <Pressable onPress={() => router.navigate(`/community/${id}/members`)}>
+              <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '600' }}>
+                {isAdmin ? 'View All Members' : 'View All'}
               </ThemedText>
-              <ThemedText variant="caption" muted>
-                {community.member_count ?? 0} {community.member_count === 1 ? 'member' : 'members'} enrolled
-              </ThemedText>
-            </View>
-          </View>
-          <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
-        </Pressable>
+            </Pressable>
+          )}
+        </View>
 
-        {/* CTA Section (Visible to non-members) */}
+        {membersLoading ? (
+          <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.md }} />
+        ) : (
+          <Card style={styles.membersCard}>
+            {displayMembers.map((member) => (
+              <Pressable
+                key={member.profile_id}
+                onPress={() => router.push(`/profile/${member.profile_id}`)}
+                onLongPress={() => {
+                  if (isAdmin && member.profile_id !== user?.id) {
+                    Alert.alert(
+                      member.profile?.username || 'Member',
+                      undefined,
+                      [
+                        {
+                          text: 'Make Admin',
+                          onPress: () => handleMakeAdmin(member),
+                        },
+                        {
+                          text: 'Remove',
+                          style: 'destructive',
+                          onPress: () => handleRemove(member),
+                        },
+                        { text: 'Cancel', style: 'cancel' },
+                      ],
+                    );
+                  }
+                }}
+                style={[styles.memberRow, { borderBottomColor: theme.border }]}
+              >
+                <View style={[styles.memberAvatar, { backgroundColor: member.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
+                  <ThemedText style={styles.memberAvatarText}>
+                    {(member.profile?.username ?? '?').charAt(0).toUpperCase()}
+                  </ThemedText>
+                </View>
+                <View style={styles.memberInfo}>
+                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                    {member.profile_id === user?.id
+                      ? 'You'
+                      : member.profile?.username ?? member.profile_id.slice(0, 8)}
+                  </ThemedText>
+                  {member.profile?.display_name && (
+                    <ThemedText variant="caption" muted numberOfLines={1}>
+                      {member.profile.display_name}
+                    </ThemedText>
+                  )}
+                </View>
+                {member.role === 'admin' && (
+                  <View style={[styles.adminBadge, { backgroundColor: '#D9770620' }]}>
+                    <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                      Admin
+                    </ThemedText>
+                  </View>
+                )}
+              </Pressable>
+            ))}
+            {(hasMoreMembers || isAdmin) && (
+              <Pressable
+                onPress={() => router.navigate(`/community/${id}/members`)}
+                style={styles.viewAllRow}
+              >
+                <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '600' }}>
+                  View All Members
+                </ThemedText>
+                <ChevronRight size={16} color="#3B82F6" strokeWidth={2} />
+              </Pressable>
+            )}
+          </Card>
+        )}
+
+        {/* Non-member: Join */}
         {!isMember && (
-          <Card style={styles.joinCard}>
+          <View style={styles.actionSection}>
             <Button
               label={isRestricted ? 'Request to Join' : 'Join Community'}
               icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
               onPress={handleJoin}
-              buttonStyle={styles.joinButton}
+              buttonStyle={styles.actionButton}
             />
-            <ThemedText variant="caption" muted style={styles.joinHint}>
-              {isRestricted
-                ? 'Your request will be sent to the administrator for review.'
-                : 'You will gain instant access upon joining.'}
-            </ThemedText>
-          </Card>
+          </View>
+        )}
+
+        {/* Member: Edit + Leave */}
+        {isMember && (
+          <View style={styles.actionSection}>
+            {isAdmin && (
+              <>
+                <Pressable
+                  style={[styles.settingRow, { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  onPress={handleEdit}
+                >
+                  <Pencil size={20} color={theme.text} strokeWidth={2} />
+                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1 }}>
+                    Edit Community
+                  </ThemedText>
+                  <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
+                </Pressable>
+                <Pressable
+                  style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
+                  onPress={handleDelete}
+                >
+                  <Trash2 size={20} color="#EF4444" strokeWidth={2} />
+                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: '#EF4444' }}>
+                    Delete Community
+                  </ThemedText>
+                </Pressable>
+              </>
+            )}
+            {!isAdmin && (
+              <Pressable
+                style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
+                onPress={handleLeave}
+              >
+                <LogOut size={20} color="#EF4444" strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: '#EF4444' }}>
+                  Leave Community
+                </ThemedText>
+              </Pressable>
+            )}
+          </View>
         )}
       </ScrollView>
+
+      {/* Edit Modal */}
+      <Modal transparent visible={editModalVisible} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
+        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalVisible(false)}>
+          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+            <View style={styles.modalHeader}>
+              <ThemedText variant="heading">Edit Community</ThemedText>
+              <Pressable onPress={() => setEditModalVisible(false)} hitSlop={16}>
+                <X size={18} color={theme.text} strokeWidth={2.5} />
+              </Pressable>
+            </View>
+
+            <Pressable onPress={pickEditImage} style={[styles.editImagePicker, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+              {editImageUri ? (
+                <>
+                  <Image source={{ uri: editImageUri }} style={[styles.editImagePreview, { backgroundColor: theme.border }]} resizeMode="cover" />
+                  <Pressable onPress={removeEditImage} style={[styles.editImageRemove, { backgroundColor: theme.background }]} hitSlop={12}>
+                    <X size={12} color={theme.text} strokeWidth={2.5} />
+                  </Pressable>
+                </>
+              ) : (
+                <View style={styles.editImagePlaceholder}>
+                  <ImageIcon size={24} color={theme.textSecondary} strokeWidth={1.5} />
+                  <ThemedText variant="caption" muted>Tap to add cover image</ThemedText>
+                </View>
+              )}
+            </Pressable>
+            
+            <TextInput
+              placeholder="Community name"
+              placeholderTextColor={theme.textSecondary}
+              value={editName}
+              onChangeText={setEditName}
+              style={[
+                styles.editInput,
+                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              maxLength={60}
+            />
+            
+            <TextInput
+              placeholder="Description (optional)"
+              placeholderTextColor={theme.textSecondary}
+              value={editDescription}
+              onChangeText={setEditDescription}
+              style={[
+                styles.editInput,
+                styles.editInputMultiline,
+                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              multiline
+              maxLength={300}
+            />
+            
+            <View style={styles.visibilityToggle}>
+              <Pressable
+                onPress={() => setEditVisibility('public')}
+                style={[
+                  styles.visibilityOption,
+                  {
+                    backgroundColor: editVisibility === 'public' ? theme.textSecondary + '20' : 'transparent',
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <ThemedText
+                  variant="body"
+                  style={editVisibility === 'public' ? { fontWeight: '700' } : { fontWeight: '400' }}
+                >
+                  Public
+                </ThemedText>
+              </Pressable>
+              
+              <Pressable
+                onPress={() => setEditVisibility('restricted')}
+                style={[
+                  styles.visibilityOption,
+                  {
+                    backgroundColor: editVisibility === 'restricted' ? theme.textSecondary + '20' : 'transparent',
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <ThemedText
+                  variant="body"
+                  style={editVisibility === 'restricted' ? { fontWeight: '700' } : { fontWeight: '400' }}
+                >
+                  Restricted
+                </ThemedText>
+              </Pressable>
+            </View>
+            
+            <Button
+              label="Save Changes"
+              onPress={handleSaveEdit}
+              loading={savingEdit || uploadingEditImage}
+              disabled={!editName.trim() || uploadingEditImage}
+            />
+
+            <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
+               <Shield size={14} color="#EF4444" strokeWidth={2} />
+               <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
+                 Transfer Admin Rights
+               </ThemedText>
+            </Pressable>
+
+          </Pressable>
+        </Pressable>
+      </Modal>
     </View>
   );
 }
@@ -217,20 +686,68 @@ const styles = StyleSheet.create({
   loader: { flex: 1, justifyContent: 'center', alignItems: 'center' },
   scroll: { flex: 1 },
   scrollContent: {
-    padding: Spacing.lg,
-    gap: Spacing.md,
     paddingBottom: Spacing.xxxl,
   },
 
-  // Hero Card Styles
-  heroCard: {
-    gap: Spacing.lg,
-    padding: Spacing.lg,
+  // Cover
+  coverContainer: {
+    height: 160,
+    position: 'relative',
   },
-  tagsRow: {
+  coverImage: {
+    width: '100%',
+    height: 160,
+  },
+  coverOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 24,
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+  },
+  coverPlaceholder: {
+    height: 120,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+
+  // Group Header
+  groupHeader: {
+    alignItems: 'center',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    marginTop: -32,
+  },
+  groupAvatar: {
+    width: 64,
+    height: 64,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 3,
+    borderColor: '#fff',
+  },
+  groupAvatarText: {
+    fontSize: 28,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  groupName: {
+    fontWeight: '800',
+    textAlign: 'center',
+    marginTop: Spacing.xs,
+  },
+
+  // Badge Row
+  badgeRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    justifyContent: 'center',
     gap: Spacing.sm,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
+    paddingBottom: Spacing.md,
   },
   badge: {
     flexDirection: 'row',
@@ -245,57 +762,177 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontSize: 12,
   },
-  sectionContainer: {
-    gap: Spacing.xs,
+
+  // Description Card
+  sectionCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    gap: Spacing.md,
+    padding: Spacing.md,
   },
-  sectionHeader: {
+  descriptionText: {
+    lineHeight: 22,
+  },
+  creatorRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
   },
-  aboutText: {
-    lineHeight: 22,
-    marginTop: 2,
-  },
-  hintText: {
-    lineHeight: 18,
-  },
 
-  // Members Card Styles
-  membersCard: {
+  // Members Section
+  sectionHeaderRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
   },
-  membersLeft: {
+  sectionLabel: {
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontSize: 12,
+  },
+  membersCard: {
+    marginHorizontal: Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    gap: 0,
+  },
+  memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  iconContainer: {
+  memberAvatar: {
     width: 40,
     height: 40,
-    borderRadius: Radius.md,
-    justifyContent: 'center',
+    borderRadius: Radius.full,
     alignItems: 'center',
+    justifyContent: 'center',
   },
-  memberTitle: {
-    fontWeight: '700',
+  memberAvatarText: {
+    fontSize: 16,
+    fontWeight: '800',
+    color: '#fff',
+  },
+  memberInfo: {
+    flex: 1,
+    gap: 2,
+  },
+  adminBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+  },
+  viewAllRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    paddingVertical: Spacing.md,
   },
 
-  // Join Action Section
-  joinCard: {
+  // Action Section
+  actionSection: {
     gap: Spacing.sm,
-    padding: Spacing.md,
-    marginTop: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
-  joinButton: {
+  actionButton: {
     width: '100%',
   },
-  joinHint: {
-    textAlign: 'center',
+
+  // Setting Rows
+  settingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+
+  // Edit Modal Styles
+  modalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.45)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 400,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  editImagePicker: {
+    width: '100%',
+    height: 120,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePreview: {
+    width: '100%',
+    height: 120,
+  },
+  editImageRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+  },
+  editInput: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    fontSize: 15,
+  },
+  editInputMultiline: {
+    minHeight: 80,
+    textAlignVertical: 'top',
+  },
+  visibilityToggle: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  visibilityOption: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+  },
+  transferAdminLink: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.md,
+    paddingVertical: Spacing.sm,
   },
 });

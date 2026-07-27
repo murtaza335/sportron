@@ -9,7 +9,26 @@ export type NotificationType =
   | 'match_approved'
   | 'match_rejected'
   | 'match_liked'
-  | 'match_commented';
+  | 'match_commented'
+  | 'session_application'
+  | 'session_accepted'
+  | 'session_rejected'
+  | 'session_reminder'
+  | 'feedback_prompt'
+  | 'ping'
+  | 'ping_response'
+  | 'join_request'
+  | 'join_approved'
+  | 'join_rejected'
+  | 'match_approval_request'
+  | 'match_approved_community'
+  | 'match_disputed'
+  | 'member_removed'
+  | 'admin_transferred'
+  | 'admin_promoted'
+  | 'community_match_pending'
+  | 'community_match_approved'
+  | 'community_match_disputed';
 
 export interface NotificationData {
   type: NotificationType;
@@ -17,6 +36,12 @@ export interface NotificationData {
   senderId?: string;
   senderName?: string;
   commentId?: string;
+  sessionId?: string;
+  communityId?: string;
+  pingId?: string;
+  message?: string;
+  response?: string;
+  respondentName?: string;
 }
 
 Notifications.setNotificationHandler({
@@ -160,8 +185,41 @@ export function setupNotificationListeners(
 
 export async function setupBackgroundMessageHandler(): Promise<void> {
   messaging().setBackgroundMessageHandler(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-    console.log('Background message received:', remoteMessage);
+    // System auto-handles notification payloads in background — only schedule
+    // a local notification for data-only messages to avoid duplicates.
+    if (remoteMessage.notification) return;
+
+    const parsed = parseRemoteMessageForLocal(remoteMessage);
+    if (parsed) {
+      await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
+    }
   });
+}
+
+export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes.RemoteMessage): { title: string; body: string; data: NotificationData } | null {
+  const notification = remoteMessage.notification;
+  const data = remoteMessage.data as Record<string, string> | undefined;
+
+  const title = notification?.title ?? data?.title ?? 'Notification';
+  const body = notification?.body ?? data?.body ?? '';
+
+  if (!title && !body) return null;
+
+  const parsedData: NotificationData = {
+    type: (data?.type as NotificationType) || 'match_liked',
+    matchId: data?.matchId,
+    senderId: data?.senderId,
+    senderName: data?.senderName,
+    commentId: data?.commentId,
+    sessionId: data?.sessionId,
+    communityId: data?.communityId,
+    pingId: data?.pingId,
+    message: data?.message,
+    response: data?.response,
+    respondentName: data?.respondentName,
+  };
+
+  return { title, body, data: parsedData };
 }
 
 export function setupForegroundMessageHandler(

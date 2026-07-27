@@ -1,23 +1,22 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
-  ChevronRight,
+  CheckCircle,
   Globe,
   Lock,
-  LogOut,
   Megaphone,
   MoreHorizontal,
-  Pencil,
   Plus,
-  Shield,
   Swords,
   Users,
   X,
+  XCircle,
 } from 'lucide-react-native';
 import {
   ActivityIndicator,
   Alert,
+  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -38,24 +37,23 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
   fetchCommunityMatches,
+  fetchPingResponses,
   joinCommunity,
-  leaveCommunity,
   requestToJoinCommunity,
   respondToJoinRequest,
   sendPing,
-  transferAdmin,
-  updateCommunity,
 } from '@/services/communities';
+import { supabase } from '@/lib/supabase';
 import type {
   CommunityJoinRequest,
   CommunityMatch,
-  CommunityVisibility,
   MatchWithProfiles,
+  PingResponse,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id } = useLocalSearchParams<{ id: string }>();
+  const { id, communityName } = useLocalSearchParams<{ id: string; communityName?: string }>();
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -70,32 +68,66 @@ export default function CommunityDetailScreen() {
 
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
+  const optimisticTitle = community?.name || communityName || '';
+
+  // Ping responses
+  const [lastPingId, setLastPingId] = useState<string | null>(null);
+  const [pingResponses, setPingResponses] = useState<PingResponse[]>([]);
+  const pingResponsesRef = useRef<PingResponse[]>([]);
 
   // Matches
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
   const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchesPage, setMatchesPage] = useState(1);
+  const [hasMoreMatches, setHasMoreMatches] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
+  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
 
-  const loadMatches = useCallback(async () => {
+  const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
     try {
-      const data = await fetchCommunityMatches(id, user?.id);
-      setMatches(data);
+      const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
+      if (append) {
+        setMatches((prev) => [...prev, ...data]);
+      } else {
+        setMatches(data);
+      }
+      setHasMoreMatches(hasMore);
+      setMatchesPage(page);
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
       setMatchesLoading(false);
+      setLoadingMore(false);
     }
   }, [id, user]);
 
   useFocusEffect(
     useCallback(() => {
-      loadMatches();
+      setMatchesPage(1);
+      setHasMoreMatches(false);
+      setMatchesLoading(true);
+      loadMatches(1);
     }, [loadMatches]),
   );
 
+  const handleLoadMore = async () => {
+    if (loadingMore || !hasMoreMatches) return;
+    setLoadingMore(true);
+    await loadMatches(matchesPage + 1, true);
+  };
+
   const approvedMatches = matches.filter((m) => m.approval_status === 'approved');
+
+  const pendingMatches = matches.filter(
+    (m) =>
+      m.approval_status === 'pending' &&
+      (m.opponent_id === user?.id || m.recorded_by === user?.id),
+  );
+
+  const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
 
   function toMatchWithProfiles(cm: CommunityMatch): MatchWithProfiles {
     return {
@@ -131,20 +163,10 @@ export default function CommunityDetailScreen() {
     };
   }
 
-  // Header menu
-  const [headerMenuVisible, setHeaderMenuVisible] = useState(false);
-
   // Ping modal
   const [pingModalVisible, setPingModalVisible] = useState(false);
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
-
-  // Edit modal
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
-  const [savingEdit, setSavingEdit] = useState(false);
 
   const handleJoin = async () => {
     if (!id || !user) return;
@@ -172,83 +194,6 @@ export default function CommunityDetailScreen() {
     }
   };
 
-  const handleLeave = () => {
-    if (!id || !user) return;
-    Alert.alert(
-      'Leave Community',
-      'Are you sure you want to leave this community?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Leave',
-          style: 'destructive',
-          onPress: async () => {
-            try {
-              await leaveCommunity(id, user.id);
-              setMembership(null);
-              refresh();
-            } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to leave.');
-            }
-          },
-        },
-      ],
-    );
-  };
-
-  const handleOpenEdit = () => {
-    if (!community) return;
-    setEditName(community.name);
-    setEditDescription(community.description ?? '');
-    setEditVisibility(community.visibility);
-    setEditModalVisible(true);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!id || !editName.trim()) return;
-    setSavingEdit(true);
-    try {
-      await updateCommunity(id, {
-        name: editName.trim(),
-        description: editDescription.trim() || null,
-        visibility: editVisibility,
-      });
-      setEditModalVisible(false);
-      refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to update.');
-    } finally {
-      setSavingEdit(false);
-    }
-  };
-
-  const handleTransferAdmin = () => {
-    if (!id) return;
-    if (Alert.prompt) {
-      Alert.prompt(
-        'Transfer Admin',
-        'Enter the username of the new admin:',
-        async (text) => {
-          if (!text.trim()) return;
-          try {
-            await transferAdmin(id, user!.id, text.trim());
-            setMembership((prev) => prev ? { ...prev, role: 'member' } : null);
-            setEditModalVisible(false);
-            refresh();
-            Alert.alert('Done', 'Admin rights transferred.');
-          } catch (e: any) {
-            Alert.alert('Error', e?.message ?? 'Failed to transfer.');
-          }
-        },
-      );
-    } else {
-      Alert.alert(
-        'Transfer Admin',
-        'Transfer admin by username: feature available on iOS.',
-      );
-    }
-  };
-
   const handleRespondToRequest = async (
     request: CommunityJoinRequest,
     status: 'approved' | 'rejected',
@@ -266,9 +211,13 @@ export default function CommunityDetailScreen() {
     if (!id || !user || !pingMessage.trim()) return;
     setSendingPing(true);
     try {
-      await sendPing(id, user.id, pingMessage.trim());
+      const pingId = await sendPing(id, user.id, pingMessage.trim());
+      setLastPingId(pingId);
       setPingMessage('');
       setPingModalVisible(false);
+      const responses = await fetchPingResponses(pingId);
+      setPingResponses(responses);
+      pingResponsesRef.current = responses;
       Alert.alert('Ping Sent', 'Notification sent to all members.');
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to send ping.');
@@ -277,10 +226,41 @@ export default function CommunityDetailScreen() {
     }
   };
 
+  // Realtime subscription for ping responses
+  useEffect(() => {
+    if (!id || !lastPingId) return;
+    const channel = supabase
+      .channel(`ping-responses-${lastPingId}`)
+      .on('postgres_changes', {
+        event: 'INSERT',
+        schema: 'public',
+        table: 'ping_responses',
+        filter: `ping_id=eq.${lastPingId}`,
+      }, (payload) => {
+        const newResponse = payload.new as PingResponse;
+        setPingResponses((prev) => {
+          if (prev.some((r) => r.id === newResponse.id)) return prev;
+          return [...prev, newResponse];
+        });
+        pingResponsesRef.current = [...pingResponsesRef.current, newResponse];
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [id, lastPingId]);
+
+  const headerRight = () => null;
+  const headerTitle = optimisticTitle
+    ? () => (
+        <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
+          {optimisticTitle}
+        </ThemedText>
+      )
+    : undefined;
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
+        <Stack.Screen options={{ headerTitle, headerRight }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -289,7 +269,7 @@ export default function CommunityDetailScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: 'Community', headerRight: () => null }} />
+        <Stack.Screen options={{ headerTitle, headerRight }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -302,12 +282,17 @@ export default function CommunityDetailScreen() {
         options={{
           headerTitle: () =>
             isMember ? (
-              <Pressable onPress={() => router.navigate(`/community/${id}/info`)}>
+              <Pressable
+                onPress={() => router.navigate(`/community/${id}/info`)}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.5 : 1,
+                })}
+              >
                 <ThemedText
                   style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
                   numberOfLines={1}
                 >
-                  {community.name}
+                  {optimisticTitle}
                 </ThemedText>
               </Pressable>
             ) : (
@@ -315,13 +300,13 @@ export default function CommunityDetailScreen() {
                 style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }}
                 numberOfLines={1}
               >
-                {community.name}
+                {optimisticTitle}
               </ThemedText>
             ),
           headerRight: () =>
             isMember ? (
               <View>
-                <Pressable onPress={() => setHeaderMenuVisible(true)} hitSlop={12} style={styles.headerIcon}>
+                <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={styles.headerIcon}>
                   <MoreHorizontal size={22} color={theme.text} strokeWidth={2} />
                 </Pressable>
               </View>
@@ -332,10 +317,10 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-        refreshControl={
+          refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={() => { refresh(); loadMatches(); }}
+            onRefresh={() => { refresh(); setMatchesLoading(true); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
             tintColor={theme.text}
           />
         }
@@ -465,12 +450,92 @@ export default function CommunityDetailScreen() {
               </Pressable>
             </View>
 
-            {/* Recent Matches */}
+            {/* Ping Responses */}
+            {lastPingId && pingResponses.length > 0 && (
+              <View style={[styles.pingResponsesSection, { borderColor: theme.border }]}>
+                <ThemedText variant="label" muted style={{ fontSize: 11 }}>
+                  Ping Responses ({pingResponses.length})
+                </ThemedText>
+                {pingResponses.map((r) => (
+                  <View key={r.id} style={styles.pingResponseRow}>
+                    <View style={[styles.pingResponseAvatar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                      {r.respondent?.avatar_url ? (
+                        <Image source={{ uri: r.respondent.avatar_url }} style={styles.pingResponseAvatarImage} />
+                      ) : (
+                        <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
+                          {(r.respondent?.username ?? '?').charAt(0).toUpperCase()}
+                        </ThemedText>
+                      )}
+                    </View>
+                    <ThemedText variant="body" style={{ flex: 1, fontWeight: '500' }}>
+                      {r.respondent?.username ?? 'Someone'}
+                    </ThemedText>
+                    {r.response === 'coming' ? (
+                      <View style={[styles.responseBadge, { backgroundColor: '#10B98120' }]}>
+                        <CheckCircle size={12} color="#10B981" strokeWidth={2.5} />
+                        <ThemedText variant="caption" style={{ color: '#10B981', fontWeight: '700', fontSize: 11 }}>
+                          Coming
+                        </ThemedText>
+                      </View>
+                    ) : (
+                      <View style={[styles.responseBadge, { backgroundColor: '#EF444420' }]}>
+                        <XCircle size={12} color="#EF4444" strokeWidth={2.5} />
+                        <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '700', fontSize: 11 }}>
+                          Busy
+                        </ThemedText>
+                      </View>
+                    )}
+                  </View>
+                ))}
+              </View>
+            )}
+
+            {/* Tabs */}
+            <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
+              <Pressable
+                style={[
+                  styles.tab,
+                  activeTab === 'approved' && { borderBottomColor: theme.text },
+                ]}
+                onPress={() => setActiveTab('approved')}
+              >
+                <ThemedText
+                  variant="label"
+                  style={[
+                    styles.tabText,
+                    activeTab === 'approved' && { color: theme.text },
+                    activeTab !== 'approved' && { color: theme.textSecondary },
+                  ]}
+                >
+                  Approved ({approvedMatches.length})
+                </ThemedText>
+              </Pressable>
+              <Pressable
+                style={[
+                  styles.tab,
+                  activeTab === 'pending' && { borderBottomColor: theme.text },
+                ]}
+                onPress={() => setActiveTab('pending')}
+              >
+                <ThemedText
+                  variant="label"
+                  style={[
+                    styles.tabText,
+                    activeTab === 'pending' && { color: theme.text },
+                    activeTab !== 'pending' && { color: theme.textSecondary },
+                  ]}
+                >
+                  Pending ({pendingMatches.length})
+                </ThemedText>
+              </Pressable>
+            </View>
+
+            {/* Match List */}
             {matchesLoading ? (
               <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
-            ) : approvedMatches.length > 0 ? (
+            ) : displayMatches.length > 0 ? (
               <>
-                {approvedMatches.slice(0, 5).map((cm) => (
+                {displayMatches.map((cm) => (
                   <MatchCard
                     key={cm.id}
                     match={toMatchWithProfiles(cm)}
@@ -482,22 +547,28 @@ export default function CommunityDetailScreen() {
                     showYoursBadge={false}
                   />
                 ))}
-                {approvedMatches.length > 5 && (
+                {activeTab === 'approved' && hasMoreMatches && (
                   <Pressable
-                    onPress={() => router.navigate(`/community/${id}/matches`)}
-                    style={[styles.viewAllLink, { borderColor: theme.border }]}
+                    onPress={handleLoadMore}
+                    style={[styles.loadMoreButton, { borderColor: theme.border }]}
+                    disabled={loadingMore}
                   >
-                    <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
-                      View All ({approvedMatches.length})
-                    </ThemedText>
-                    <ChevronRight size={16} color={theme.textSecondary} strokeWidth={2} />
+                    {loadingMore ? (
+                      <ActivityIndicator size="small" color={theme.textSecondary} />
+                    ) : (
+                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
+                        Load More
+                      </ThemedText>
+                    )}
                   </Pressable>
                 )}
               </>
             ) : (
               <Card>
                 <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                  No matches recorded yet. Be the first to record one!
+                  {activeTab === 'pending'
+                    ? 'No pending approvals for you.'
+                    : 'No matches recorded yet. Be the first to record one!'}
                 </ThemedText>
               </Card>
             )}
@@ -505,32 +576,6 @@ export default function CommunityDetailScreen() {
         )}
 
       </ScrollView>
-
-      {/* Header Dropdown Menu */}
-      <Modal transparent visible={headerMenuVisible} animationType="fade" onRequestClose={() => setHeaderMenuVisible(false)}>
-        <Pressable style={styles.dropdownBackdrop} onPress={() => setHeaderMenuVisible(false)}>
-          <View style={[styles.dropdown, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            {isAdmin && (
-              <Pressable
-                style={styles.dropdownItem}
-                onPress={() => { setHeaderMenuVisible(false); handleOpenEdit(); }}
-              >
-                <Pencil size={18} color={theme.text} strokeWidth={2} />
-                <ThemedText variant="body" style={{ fontWeight: '600' }}>Edit Community</ThemedText>
-              </Pressable>
-            )}
-            {isMember && !isAdmin && (
-              <Pressable
-                style={styles.dropdownItem}
-                onPress={() => { setHeaderMenuVisible(false); handleLeave(); }}
-              >
-                <LogOut size={18} color="#EF4444" strokeWidth={2} />
-                <ThemedText variant="body" style={{ fontWeight: '600', color: '#EF4444' }}>Leave Community</ThemedText>
-              </Pressable>
-            )}
-          </View>
-        </Pressable>
-      </Modal>
 
       {/* Ping Modal */}
       <Modal transparent visible={pingModalVisible} animationType="fade" onRequestClose={() => setPingModalVisible(false)}>
@@ -568,100 +613,6 @@ export default function CommunityDetailScreen() {
         </Pressable>
       </Modal>
 
-      {/* Edit Modal */}
-      <Modal transparent visible={editModalVisible} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Edit Community</ThemedText>
-              <Pressable onPress={() => setEditModalVisible(false)} hitSlop={16}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-            
-            <TextInput
-              placeholder="Community name"
-              placeholderTextColor={theme.textSecondary}
-              value={editName}
-              onChangeText={setEditName}
-              style={[
-                styles.editInput,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              maxLength={60}
-            />
-            
-            <TextInput
-              placeholder="Description (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={editDescription}
-              onChangeText={setEditDescription}
-              style={[
-                styles.editInput,
-                styles.editInputMultiline,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              multiline
-              maxLength={300}
-            />
-            
-            <View style={styles.visibilityToggle}>
-              <Pressable
-                onPress={() => setEditVisibility('public')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'public' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'public' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Public
-                </ThemedText>
-              </Pressable>
-              
-              <Pressable
-                onPress={() => setEditVisibility('restricted')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'restricted' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'restricted' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Restricted
-                </ThemedText>
-              </Pressable>
-            </View>
-            
-            <Button
-              label="Save Changes"
-              onPress={handleSaveEdit}
-              loading={savingEdit}
-              disabled={!editName.trim()}
-            />
-
-            {/* Transferred advanced admin action to the bottom of edit modal */}
-            <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
-               <Shield size={14} color="#EF4444" strokeWidth={2} />
-               <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
-                 Transfer Admin Rights
-               </ThemedText>
-            </Pressable>
-
-          </Pressable>
-        </Pressable>
-      </Modal>
-
       <MatchDetailPopup
         match={selectedMatch}
         visible={popupVisible}
@@ -687,33 +638,6 @@ const styles = StyleSheet.create({
   
   headerIcon: {
     padding: Spacing.xs,
-  },
-
-  // Header Dropdown
-  dropdownBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-start',
-    alignItems: 'flex-end',
-    paddingTop: 90,
-    paddingRight: Spacing.md,
-  },
-  dropdown: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    paddingVertical: Spacing.xs,
-    minWidth: 180,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  dropdownItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
   },
 
   // Non-member Info Card
@@ -788,6 +712,22 @@ const styles = StyleSheet.create({
   avatarText: { fontSize: 16, fontWeight: '800' },
 
   // Matches Section
+  tabsContainer: {
+    flexDirection: 'row',
+    borderBottomWidth: 1,
+  },
+  tab: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderBottomWidth: 2,
+    borderBottomColor: 'transparent',
+  },
+  tabText: {
+    fontSize: 14,
+    fontWeight: '700',
+  },
   recordMatchBar: {
     flexDirection: 'row',
     gap: Spacing.sm,
@@ -813,6 +753,47 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.full,
     backgroundColor: '#EF4444',
+  },
+  pingResponsesSection: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    gap: Spacing.sm,
+  },
+  pingResponseRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  pingResponseAvatar: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 1,
+    overflow: 'hidden',
+  },
+  pingResponseAvatarImage: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+  },
+  responseBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: 2,
+    paddingHorizontal: Spacing.sm,
+    borderRadius: Radius.sm,
+  },
+  loadMoreButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
   },
   viewAllLink: {
     flexDirection: 'row',
@@ -844,6 +825,35 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
+  },
+  editImagePicker: {
+    width: '100%',
+    height: 120,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    borderStyle: 'dashed',
+    overflow: 'hidden',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePreview: {
+    width: '100%',
+    height: 120,
+  },
+  editImageRemove: {
+    position: 'absolute',
+    top: 6,
+    right: 6,
+    width: 24,
+    height: 24,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  editImagePlaceholder: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.xs,
   },
   pingInput: {
     borderRadius: Radius.md,

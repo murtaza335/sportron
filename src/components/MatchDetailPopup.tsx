@@ -295,7 +295,7 @@ Animated.spring(translateY, {
     <Modal
       transparent
       visible={visible}
-      animationType="fade"
+      animationType="none"
       onRequestClose={onClose}
     >
       <KeyboardAvoidingView

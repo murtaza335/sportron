@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
@@ -12,6 +13,7 @@ import { signOut } from '@/services/auth';
 import { updateProfile, removeFCMToken, updateNotificationPreferences } from '@/services/profiles';
 import { useTheme } from '@/hooks/use-theme';
 import { useFCM } from '@/hooks/useFCM';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
@@ -20,6 +22,7 @@ export default function ProfileScreen() {
   const theme = useTheme();
   const { colorScheme, setTheme } = useTheme();
   const { profile, refreshProfile, user } = useAuth();
+  const insets = useSafeAreaInsets();
   const { requestPermissions } = useFCM();
   const [editing, setEditing] = useState(false);
   const [signingOut, setSigningOut] = useState(false);
@@ -50,8 +53,10 @@ export default function ProfileScreen() {
     if (profile?.id) {
       try {
         const newPrefs = value
-          ? { match_pending: true, match_approved: true, match_rejected: true, match_liked: true, match_commented: true }
-          : { match_pending: false, match_approved: false, match_rejected: false, match_liked: false, match_commented: false };
+          ? { ...DEFAULT_NOTIFICATION_PREFERENCES }
+          : Object.fromEntries(
+              Object.keys(DEFAULT_NOTIFICATION_PREFERENCES).map((k) => [k, false]),
+            ) as Record<string, boolean>;
         await updateNotificationPreferences(profile.id, newPrefs);
       } catch {
         // silently fail — preferences sync is best-effort
@@ -108,7 +113,7 @@ export default function ProfileScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <ScrollView contentContainerStyle={styles.content}>
+      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Spacing.xxl + Math.max(insets.bottom, 56) }]}>
         {!editing ? (
           <View style={styles.summary}>
             <View style={styles.avatarContainer}>

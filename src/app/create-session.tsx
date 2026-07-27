@@ -1,6 +1,7 @@
+import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
-import { X } from 'lucide-react-native';
-import { useState } from 'react';
+import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
+import { useRef, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -19,15 +20,8 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { checkTimeConflicts, createSession } from '@/services/sessions';
+import { checkTimeConflicts, createSession, MAX_SESSION_FUTURE_DATE } from '@/services/sessions';
 import type { CreateSessionInput } from '@/types';
-
-function formatDateTime(dateStr: string, timeStr: string): string {
-  const [y, m, d] = dateStr.split('-').map(Number);
-  const [hh, mm] = timeStr.split(':').map(Number);
-  const date = new Date(y, m - 1, d, hh, mm);
-  return date.toISOString();
-}
 
 export default function CreateSessionScreen() {
   const theme = useTheme();
@@ -36,24 +30,48 @@ export default function CreateSessionScreen() {
 
   const [sport, setSport] = useState('');
   const [location, setLocation] = useState('');
-  const [date, setDate] = useState('');
-  const [time, setTime] = useState('');
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [selectedTime, setSelectedTime] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
+  const [showTimePicker, setShowTimePicker] = useState(false);
+  const datePickerDismissedAt = useRef(0);
+  const timePickerDismissedAt = useRef(0);
   const [maxParticipants, setMaxParticipants] = useState('2');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<{ sport: string; date_time: string; location: string }[]>([]);
 
+  const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
+
+  const EXPIRE_OPTIONS = [
+    { label: '15 min', value: 15 },
+    { label: '30 min', value: 30 },
+    { label: '1 hr', value: 60 },
+  ];
+  const [expireIndex, setExpireIndex] = useState(1); // 30 min default
+
   const canSave =
     sport.trim().length > 0 &&
     location.trim().length > 0 &&
-    date.trim().length > 0 &&
-    time.trim().length > 0 &&
     !saving;
 
   const handleCreate = async () => {
     if (!user?.id || !canSave) return;
 
-    const dateTime = formatDateTime(date, time);
+    const dateTime = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+      selectedTime.getHours(),
+      selectedTime.getMinutes(),
+    ).toISOString();
+
+    const maxDate = new Date();
+    maxDate.setDate(maxDate.getDate() + 7);
+    if (new Date(dateTime) > maxDate) {
+      Alert.alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
+      return;
+    }
 
     setSaving(true);
     try {
@@ -76,6 +94,7 @@ export default function CreateSessionScreen() {
         date_time: dateTime,
         max_participants: parseInt(maxParticipants, 10) || 2,
         description: description.trim() || undefined,
+        expireAfterMinutes: EXPIRE_OPTIONS[expireIndex].value,
       };
 
       await createSession(user.id, input);
@@ -172,45 +191,111 @@ export default function CreateSessionScreen() {
           <View style={styles.row}>
             <View style={[styles.field, { flex: 1 }]}>
               <ThemedText variant="label" muted style={styles.label}>
-                Date (YYYY-MM-DD)
+                Date
               </ThemedText>
-              <TextInput
-                value={date}
-                onChangeText={setDate}
-                placeholder="e.g. 2026-07-25"
-                placeholderTextColor={theme.textSecondary}
+              <Pressable
+                onPress={() => {
+                  if (Date.now() - datePickerDismissedAt.current < 600) return;
+                  setShowDatePicker(true);
+                }}
                 style={[
                   styles.input,
+                  styles.pickerButton,
                   {
-                    color: theme.text,
                     backgroundColor: theme.backgroundElement,
                     borderColor: theme.border,
                   },
                 ]}
-                keyboardType="numbers-and-punctuation"
-              />
+              >
+                <CalendarDays size={18} color={theme.textSecondary} />
+                <ThemedText variant="body">
+                  {selectedDate.toLocaleDateString('en-US', {
+                    month: 'short',
+                    day: 'numeric',
+                    year: 'numeric',
+                  })}
+                </ThemedText>
+              </Pressable>
+              {showDatePicker && (
+                <DateTimePicker
+                  value={selectedDate}
+                  mode="date"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  minimumDate={new Date()}
+                  maximumDate={MAX_DATE}
+                  onChange={(event: DateTimePickerEvent, date?: Date) => {
+                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                    if (Platform.OS === 'android') {
+                      setShowDatePicker(false);
+                      datePickerDismissedAt.current = Date.now();
+                    }
+
+                    if (event.type === 'dismissed') return;
+
+                    if (date) setSelectedDate(date);
+                  }}
+                />
+              )}
             </View>
             <View style={[styles.field, { flex: 1 }]}>
               <ThemedText variant="label" muted style={styles.label}>
-                Time (HH:MM)
+                Time
               </ThemedText>
-              <TextInput
-                value={time}
-                onChangeText={setTime}
-                placeholder="e.g. 14:00"
-                placeholderTextColor={theme.textSecondary}
+              <Pressable
+                onPress={() => {
+                  if (Date.now() - timePickerDismissedAt.current < 600) return;
+                  setShowTimePicker(true);
+                }}
                 style={[
                   styles.input,
+                  styles.pickerButton,
                   {
-                    color: theme.text,
                     backgroundColor: theme.backgroundElement,
                     borderColor: theme.border,
                   },
                 ]}
-                keyboardType="numbers-and-punctuation"
-              />
+              >
+                <Clock size={18} color={theme.textSecondary} />
+                <ThemedText variant="body">
+                  {selectedTime.toLocaleTimeString('en-US', {
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  })}
+                </ThemedText>
+              </Pressable>
+              {showTimePicker && (
+                <DateTimePicker
+                  value={selectedTime}
+                  mode="time"
+                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                  onChange={(event: DateTimePickerEvent, date?: Date) => {
+                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                    if (Platform.OS === 'android') {
+                      setShowTimePicker(false);
+                      timePickerDismissedAt.current = Date.now();
+                    }
+
+                    if (event.type === 'dismissed') return;
+
+                    if (date) setSelectedTime(date);
+                  }}
+                />
+              )}
             </View>
           </View>
+          {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
+            <Pressable
+              onPress={() => {
+                setShowDatePicker(false);
+                setShowTimePicker(false);
+              }}
+              style={styles.doneButton}
+            >
+              <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '600' }}>
+                Done
+              </ThemedText>
+            </Pressable>
+          )}
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
@@ -231,6 +316,42 @@ export default function CreateSessionScreen() {
               ]}
               keyboardType="number-pad"
             />
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
+              Expire After
+            </ThemedText>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.expireRow}
+            >
+              {EXPIRE_OPTIONS.map((opt, idx) => (
+                <Pressable
+                  key={opt.value}
+                  onPress={() => setExpireIndex(idx)}
+                  style={[
+                    styles.expireChip,
+                    {
+                      backgroundColor: idx === expireIndex ? theme.text : theme.backgroundElement,
+                      borderColor: idx === expireIndex ? theme.text : theme.border,
+                    },
+                  ]}
+                >
+                  <Timer size={12} color={idx === expireIndex ? theme.background : theme.textSecondary} strokeWidth={2} />
+                  <ThemedText
+                    variant="caption"
+                    style={{
+                      color: idx === expireIndex ? theme.background : theme.textSecondary,
+                      fontWeight: '700',
+                    }}
+                  >
+                    {opt.label}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
           </View>
 
           <View style={styles.field}>
@@ -316,8 +437,30 @@ const styles = StyleSheet.create({
     minHeight: 80,
     textAlignVertical: 'top',
   },
+  pickerButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  doneButton: {
+    alignItems: 'center',
+    paddingVertical: Spacing.sm,
+  },
   submit: {
     marginTop: Spacing.md,
+  },
+  expireRow: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+  },
+  expireChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    paddingVertical: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    borderWidth: 1,
   },
   conflictCard: {
     backgroundColor: '#FEF2F2',

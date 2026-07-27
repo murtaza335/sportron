@@ -1,15 +1,33 @@
 import { supabase } from '@/lib/supabase';
 import type {
   Community,
+  CommunityInvite,
   CommunityJoinRequest,
   CommunityMatch,
   CommunityMember,
   CommunityMemberRole,
   CreateCommunityInput,
   Ping,
+  PingResponse,
   Sport,
   UpdateCommunityInput,
 } from '@/types';
+import { fetchProfile } from './profiles';
+import {
+  notifyJoinRequest,
+  notifyJoinApproved,
+  notifyJoinRejected,
+  notifyPing,
+  notifyPingResponse,
+  notifyMemberRemoved,
+  notifyPromotedToAdmin,
+  notifyAdminTransferred,
+  notifyCommunityMatchPending,
+  notifyCommunityMatchApproved,
+  notifyCommunityMatchDisputed,
+  notifyCommunityInvite,
+  notifyCommunityInviteResponse,
+} from './notifications';
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
@@ -108,6 +126,7 @@ export async function createCommunity(
       description: input.description?.trim() || null,
       visibility: input.visibility,
       sport: input.sport,
+      image_url: input.image_url || null,
       created_by: userId,
     })
     .select()
@@ -137,6 +156,7 @@ export async function updateCommunity(
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
+  if (input.image_url !== undefined) updates.image_url = input.image_url;
 
   const { error } = await supabase
     .from('communities')
@@ -208,6 +228,35 @@ export async function requestToJoinCommunity(
     });
 
   if (error) throw error;
+
+  try {
+    const requester = await fetchProfile(userId);
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const { data: admins } = await supabase
+        .from('community_members')
+        .select('profile_id')
+        .eq('community_id', communityId)
+        .eq('role', 'admin');
+
+      const adminIds = (admins ?? []).map((a) => a.profile_id);
+      if (adminIds.length > 0) {
+        await notifyJoinRequest(
+          adminIds,
+          communityId,
+          community.name,
+          requester?.username ?? 'Someone',
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send join request notification:', e);
+  }
 }
 
 export async function cancelJoinRequest(communityId: string, userId: string): Promise<void> {
@@ -241,6 +290,20 @@ export async function removeMember(
     .eq('profile_id', profileId);
 
   if (error) throw error;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      await notifyMemberRemoved(profileId, communityId, community.name);
+    }
+  } catch (e) {
+    console.error('Failed to send removal notification:', e);
+  }
 }
 
 export async function transferAdmin(
@@ -263,6 +326,26 @@ export async function transferAdmin(
     .eq('profile_id', newAdminId);
 
   if (promoteError) throw promoteError;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const currentUser = await fetchProfile(currentUserId);
+      await notifyAdminTransferred(
+        newAdminId,
+        communityId,
+        community.name,
+        currentUser?.username ?? 'Previous admin',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send admin transfer notification:', e);
+  }
 }
 
 export async function fetchJoinRequests(
@@ -286,6 +369,14 @@ export async function respondToJoinRequest(
   requestId: string,
   status: 'approved' | 'rejected',
 ): Promise<void> {
+  const { data: request, error: fetchError } = await supabase
+    .from('community_join_requests')
+    .select('community_id, user_id')
+    .eq('id', requestId)
+    .single();
+
+  if (fetchError) throw fetchError;
+
   const { error } = await supabase
     .from('community_join_requests')
     .update({ status })
@@ -294,14 +385,6 @@ export async function respondToJoinRequest(
   if (error) throw error;
 
   if (status === 'approved') {
-    const { data: request, error: fetchError } = await supabase
-      .from('community_join_requests')
-      .select('community_id, user_id')
-      .eq('id', requestId)
-      .single();
-
-    if (fetchError) throw fetchError;
-
     const { error: memberError } = await supabase
       .from('community_members')
       .insert({
@@ -313,22 +396,76 @@ export async function respondToJoinRequest(
 
     if (memberError) throw memberError;
   }
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', request.community_id)
+      .single();
+
+    if (community) {
+      if (status === 'approved') {
+        await notifyJoinApproved(request.user_id, request.community_id, community.name);
+      } else {
+        await notifyJoinRejected(request.user_id, request.community_id, community.name);
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send join response notification:', e);
+  }
 }
 
 export async function sendPing(
   communityId: string,
   senderId: string,
   message: string,
-): Promise<void> {
-  const { error } = await supabase
+): Promise<string> {
+  const { data: ping, error } = await supabase
     .from('pings')
     .insert({
       community_id: communityId,
       sender_id: senderId,
       message: message.trim(),
-    });
+    })
+    .select('id')
+    .single();
 
   if (error) throw error;
+
+  try {
+    const sender = await fetchProfile(senderId);
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const { data: members } = await supabase
+        .from('community_members')
+        .select('profile_id')
+        .eq('community_id', communityId)
+        .eq('approval_status', 'approved')
+        .neq('profile_id', senderId);
+
+      const memberIds = (members ?? []).map((m) => m.profile_id);
+      if (memberIds.length > 0) {
+        await notifyPing(
+          memberIds,
+          communityId,
+          community.name,
+          sender?.username ?? 'Someone',
+          message.trim(),
+          ping.id,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send ping notifications:', e);
+  }
+
+  return ping.id;
 }
 
 export async function fetchPings(communityId: string): Promise<Ping[]> {
@@ -341,6 +478,60 @@ export async function fetchPings(communityId: string): Promise<Ping[]> {
     .eq('community_id', communityId)
     .order('created_at', { ascending: false })
     .limit(50);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function respondToPing(
+  pingId: string,
+  communityId: string,
+  respondentId: string,
+  response: 'coming' | 'busy',
+): Promise<void> {
+  const { error } = await supabase
+    .from('ping_responses')
+    .insert({
+      ping_id: pingId,
+      community_id: communityId,
+      respondent_id: respondentId,
+      response,
+    });
+
+  if (error) throw error;
+
+  try {
+    const respondent = await fetchProfile(respondentId);
+    const { data: ping } = await supabase
+      .from('pings')
+      .select('sender_id, message')
+      .eq('id', pingId)
+      .single();
+
+    if (ping && respondent) {
+      await notifyPingResponse(
+        ping.sender_id,
+        pingId,
+        communityId,
+        respondent?.username ?? 'Someone',
+        response,
+        ping.message,
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send ping response notification:', e);
+  }
+}
+
+export async function fetchPingResponses(pingId: string): Promise<PingResponse[]> {
+  const { data, error } = await supabase
+    .from('ping_responses')
+    .select(`
+      *,
+      respondent:respondent_id(id, username, display_name, avatar_url)
+    `)
+    .eq('ping_id', pingId)
+    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data ?? [];
@@ -376,13 +567,38 @@ export async function recordCommunityMatch(input: {
     .single();
 
   if (error) throw error;
+
+  try {
+    if (input.opponent_id !== input.recorded_by) {
+      const recorder = await fetchProfile(input.recorded_by);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', input.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchPending(
+          input.opponent_id,
+          data.id,
+          recorder?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send community match notification:', e);
+  }
+
   return data;
 }
 
 export async function fetchCommunityMatches(
   communityId: string,
   userId?: string,
-): Promise<CommunityMatch[]> {
+  page?: number,
+  pageSize?: number,
+): Promise<{ data: CommunityMatch[]; hasMore: boolean }> {
   let query = supabase
     .from('community_matches')
     .select(`
@@ -399,30 +615,445 @@ export async function fetchCommunityMatches(
     query = query.or(`approval_status.neq.pending,recorded_by.eq.${userId},opponent_id.eq.${userId}`);
   }
 
+  if (page && pageSize) {
+    const from = (page - 1) * pageSize;
+    const to = from + pageSize - 1;
+    query = query.range(from, to);
+  }
+
   const { data, error } = await query;
 
   if (error) throw error;
-  return data ?? [];
+
+  const matches = data ?? [];
+  const hasMore = page && pageSize ? matches.length === pageSize : false;
+
+  return { data: matches, hasMore };
 }
 
 export async function approveCommunityMatch(
   matchId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: match } = await supabase
+    .from('community_matches')
+    .select('recorded_by, community_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) throw new Error('Match not found');
+
   const { error } = await supabase
     .from('community_matches')
     .update({ approval_status: 'approved' })
     .eq('id', matchId);
 
   if (error) throw error;
+
+  try {
+    if (match.recorded_by !== actorId) {
+      const actor = await fetchProfile(actorId);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', match.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchApproved(
+          match.recorded_by,
+          matchId,
+          actor?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send match approval notification:', e);
+  }
 }
 
 export async function disputeCommunityMatch(
   matchId: string,
+  actorId: string,
 ): Promise<void> {
+  const { data: match } = await supabase
+    .from('community_matches')
+    .select('recorded_by, community_id')
+    .eq('id', matchId)
+    .single();
+
+  if (!match) throw new Error('Match not found');
+
   const { error } = await supabase
     .from('community_matches')
     .update({ approval_status: 'disputed' })
     .eq('id', matchId);
+
+  if (error) throw error;
+
+  try {
+    if (match.recorded_by !== actorId) {
+      const actor = await fetchProfile(actorId);
+      const { data: community } = await supabase
+        .from('communities')
+        .select('name')
+        .eq('id', match.community_id)
+        .single();
+
+      if (community) {
+        await notifyCommunityMatchDisputed(
+          match.recorded_by,
+          matchId,
+          actor?.username ?? 'Someone',
+          community.name,
+        );
+      }
+    }
+  } catch (e) {
+    console.error('Failed to send match dispute notification:', e);
+  }
+}
+
+export async function promoteToAdmin(
+  communityId: string,
+  targetUserId: string,
+  actorId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_members')
+    .update({ role: 'admin' })
+    .eq('community_id', communityId)
+    .eq('profile_id', targetUserId);
+
+  if (error) throw error;
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const actor = await fetchProfile(actorId);
+      await notifyPromotedToAdmin(
+        targetUserId,
+        communityId,
+        community.name,
+        actor?.username ?? 'An admin',
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send promotion notification:', e);
+  }
+}
+
+type InviteRow = CommunityInvite & {
+  community: Pick<Community, 'id' | 'name' | 'image_url'> | null;
+  inviter: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  invitee: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
+function normalizeInvite(row: InviteRow): CommunityInvite {
+  return {
+    id: row.id,
+    community_id: row.community_id,
+    invited_by: row.invited_by,
+    invitee_id: row.invitee_id,
+    status: row.status,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+    community: row.community,
+    inviter: row.inviter,
+    invitee: row.invitee,
+  };
+}
+
+export async function inviteMemberByUsername(
+  communityId: string,
+  adminId: string,
+  username: string,
+): Promise<CommunityInvite> {
+  const { data: profile, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .eq('username', username.toLowerCase())
+    .single();
+
+  if (profileError) {
+    if (profileError.code === 'PGRST116') {
+      throw new Error('User not found');
+    }
+    throw profileError;
+  }
+
+  const inviteeId = profile.id;
+
+  if (inviteeId === adminId) {
+    throw new Error('You cannot invite yourself');
+  }
+
+  const { data, error } = await supabase.rpc('create_community_invite', {
+    p_community_id: communityId,
+    p_invited_by: adminId,
+    p_invitee_id: inviteeId,
+  });
+
+  if (error) {
+    if (error.message.includes('already a member')) {
+      throw new Error('User is already a member of this community');
+    }
+    if (error.message.includes('pending join request')) {
+      throw new Error('User already has a pending join request');
+    }
+    if (error.message.includes('pending invite')) {
+      throw new Error('User already has a pending invite');
+    }
+    throw error;
+  }
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  const admin = await fetchProfile(adminId);
+
+  if (community && admin) {
+    await notifyCommunityInvite(inviteeId, communityId, community.name, admin.username, data.id);
+  }
+
+  return {
+    ...data,
+    community: { id: communityId, name: community?.name ?? '', image_url: community?.image_url ?? null },
+    inviter: { id: adminId, username: admin.username, avatar_url: admin.avatar_url },
+    invitee: { id: inviteeId, username: profile.username, avatar_url: null },
+  };
+}
+
+export async function fetchPendingInvites(
+  communityId: string,
+): Promise<CommunityInvite[]> {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      community:community_id(id, name, image_url),
+      inviter:invited_by(id, username, avatar_url),
+      invitee:invitee_id(id, username, avatar_url)
+    `)
+    .eq('community_id', communityId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(normalizeInvite);
+}
+
+export async function fetchMyPendingInvites(userId: string): Promise<CommunityInvite[]> {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      community:community_id(id, name, image_url),
+      inviter:invited_by(id, username, avatar_url),
+      invitee:invitee_id(id, username, avatar_url)
+    `)
+    .eq('invitee_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return (data ?? []).map(normalizeInvite);
+}
+
+export async function respondToInvite(
+  inviteId: string,
+  status: 'accepted' | 'rejected',
+): Promise<void> {
+  const { data: invite, error: fetchError } = await supabase
+    .from('community_invites')
+    .select('community_id, invited_by, invitee_id')
+    .eq('id', inviteId)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!invite) throw new Error('Invite not found');
+
+  const { error } = await supabase
+    .from('community_invites')
+    .update({ status })
+    .eq('id', inviteId)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+
+  if (status === 'accepted') {
+    const { error: memberError } = await supabase
+      .from('community_members')
+      .insert({
+        community_id: invite.community_id,
+        profile_id: invite.invitee_id,
+        role: 'member',
+        approval_status: 'approved',
+      });
+
+    if (memberError) throw memberError;
+  }
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', invite.community_id)
+    .single();
+
+  const invitee = await fetchProfile(invite.invitee_id);
+
+  if (community && invitee) {
+    await notifyCommunityInviteResponse(
+      invite.invited_by,
+      invite.community_id,
+      community.name,
+      invitee.username,
+      status === 'accepted',
+    );
+  }
+}
+
+export async function cancelInvite(inviteId: string, adminId: string): Promise<void> {
+  const { error } = await supabase
+    .from('community_invites')
+    .delete()
+    .eq('id', inviteId)
+    .eq('invited_by', adminId)
+    .eq('status', 'pending');
+
+  if (error) throw error;
+}
+
+export async function inviteToCommunity(
+  communityId: string,
+  invitedBy: string,
+  inviteeId: string,
+): Promise<CommunityInvite> {
+  const { data, error } = await supabase.rpc('create_community_invite', {
+    p_community_id: communityId,
+    p_invited_by: invitedBy,
+    p_invitee_id: inviteeId,
+  });
+
+  if (error) throw error;
+
+  const invite = data[0];
+
+  try {
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', communityId)
+      .single();
+
+    if (community) {
+      const inviter = await fetchProfile(invitedBy);
+      await notifyCommunityInvite(
+        inviteeId,
+        communityId,
+        community.name,
+        inviter?.username ?? 'Someone',
+        invite.id,
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send community invite notification:', e);
+  }
+
+  return invite;
+}
+
+export async function fetchCommunityInvites(
+  communityId: string,
+): Promise<CommunityInvite[]> {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      community:communities(id, name, image_url),
+      inviter:profiles!community_invites_invited_by_fkey(id, username, avatar_url),
+      invitee:profiles!community_invites_invitee_id_fkey(id, username, avatar_url)
+    `)
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function fetchUserPendingInvites(userId: string): Promise<CommunityInvite[]> {
+  const { data, error } = await supabase
+    .from('community_invites')
+    .select(`
+      *,
+      community:communities(id, name, image_url),
+      inviter:profiles!community_invites_invited_by_fkey(id, username, avatar_url),
+      invitee:profiles!community_invites_invitee_id_fkey(id, username, avatar_url)
+    `)
+    .eq('invitee_id', userId)
+    .eq('status', 'pending')
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function respondToCommunityInvite(
+  inviteId: string,
+  userId: string,
+  accept: boolean,
+): Promise<{ community_id: string; invited_by: string; invitee_id: string }> {
+  const { data, error } = await supabase.rpc('respond_to_community_invite', {
+    p_invite_id: inviteId,
+    p_user_id: userId,
+    p_accept: accept,
+  });
+
+  if (error) throw error;
+
+  try {
+    const invite = data as { community_id: string; invited_by: string; invitee_id: string };
+    const { data: community } = await supabase
+      .from('communities')
+      .select('name')
+      .eq('id', invite.community_id)
+      .single();
+
+    if (community) {
+      const invitee = await fetchProfile(userId);
+      await notifyCommunityInviteResponse(
+        invite.invited_by,
+        invite.community_id,
+        community.name,
+        invitee?.username ?? 'Someone',
+        accept,
+      );
+    }
+  } catch (e) {
+    console.error('Failed to send invite response notification:', e);
+  }
+
+  return data as { community_id: string; invited_by: string; invitee_id: string };
+}
+
+export async function cancelCommunityInvite(
+  inviteId: string,
+  adminId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('community_invites')
+    .delete()
+    .eq('id', inviteId)
+    .eq('invited_by', adminId);
 
   if (error) throw error;
 }

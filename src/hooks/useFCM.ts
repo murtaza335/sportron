@@ -1,5 +1,6 @@
 import { useEffect, useCallback, useState } from 'react';
 import * as Notifications from 'expo-notifications';
+import { router } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import {
@@ -12,6 +13,7 @@ import {
   getNotificationPermissions,
   scheduleLocalNotification,
   parseNotificationResponseData,
+  parseRemoteMessageForLocal,
   NotificationData,
   NotificationType,
 } from '@/services/fcm';
@@ -30,14 +32,42 @@ export function useFCM() {
         case 'match_pending':
         case 'match_approved':
         case 'match_rejected':
+        case 'match_liked':
+        case 'match_commented':
+        case 'community_match_pending':
+        case 'community_match_approved':
+        case 'community_match_disputed':
           if (data.matchId) {
             console.log('Navigate to match:', data.matchId);
           }
           break;
-        case 'match_liked':
-        case 'match_commented':
-          if (data.matchId) {
-            console.log('Navigate to match:', data.matchId);
+        case 'session_application':
+        case 'session_accepted':
+        case 'session_rejected':
+        case 'session_reminder':
+          if (data.sessionId) {
+            console.log('Navigate to session:', data.sessionId);
+          }
+          break;
+        case 'ping':
+          if (data.pingId && data.communityId) {
+            const params = new URLSearchParams({
+              pingId: data.pingId,
+              communityId: data.communityId,
+              message: data.message ?? '',
+              senderName: data.senderName ?? 'Someone',
+            });
+            router.push(`/ping-response?${params.toString()}`);
+          }
+          break;
+        case 'ping_response':
+        case 'join_request':
+        case 'join_approved':
+        case 'join_rejected':
+        case 'member_removed':
+        case 'admin_transferred':
+          if (data.communityId) {
+            console.log('Navigate to community:', data.communityId);
           }
           break;
         default:
@@ -62,8 +92,11 @@ export function useFCM() {
     try {
       await setupBackgroundMessageHandler();
 
-      const unsubscribeForeground = setupForegroundMessageHandler((remoteMessage) => {
-        console.log('Foreground FCM message:', remoteMessage);
+      const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
+        const parsed = parseRemoteMessageForLocal(remoteMessage);
+        if (parsed) {
+          await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
+        }
       });
 
       const unsubscribeTokenRefresh = setupTokenRefreshListener(async (token) => {
@@ -141,6 +174,25 @@ export function useFCM() {
       match_rejected: 'Match Rejected',
       match_liked: 'New Like on Your Match',
       match_commented: 'New Comment on Your Match',
+      session_application: 'New Session Applicant',
+      session_accepted: 'Session Application Accepted',
+      session_rejected: 'Session Application Declined',
+      session_reminder: 'Upcoming Session Reminder',
+      feedback_prompt: 'Session Feedback',
+      ping: 'Ping from Community',
+      ping_response: 'Ping Response',
+      join_request: 'New Join Request',
+      join_approved: 'Join Request Approved',
+      join_rejected: 'Join Request Declined',
+      match_approval_request: 'Match Approval Request',
+      match_approved_community: 'Match Approved',
+      match_disputed: 'Match Disputed',
+      member_removed: 'Removed from Community',
+      admin_transferred: 'Admin Rights Transferred',
+      admin_promoted: 'Promoted to Admin',
+      community_match_pending: 'Match Pending Approval',
+      community_match_approved: 'Match Approved',
+      community_match_disputed: 'Match Disputed',
     };
 
     const notificationBodies: Record<NotificationType, string> = {
@@ -149,6 +201,25 @@ export function useFCM() {
       match_rejected: 'Your match was disputed',
       match_liked: `${profile?.username || 'Someone'} liked your match`,
       match_commented: `${profile?.username || 'Someone'} commented on your match`,
+      session_application: `${profile?.username || 'Someone'} applied to your session`,
+      session_accepted: 'You were accepted into the session',
+      session_rejected: 'Your session application was declined',
+      session_reminder: 'Your session is coming up soon',
+      feedback_prompt: 'Please provide feedback for your session',
+      ping: `${profile?.username || 'Someone'} pinged the community`,
+      ping_response: `${profile?.username || 'Someone'} responded to your ping`,
+      join_request: `${profile?.username || 'Someone'} wants to join your community`,
+      join_approved: 'You were accepted into the community',
+      join_rejected: 'Your request to join was declined',
+      match_approval_request: 'A match needs your approval',
+      match_approved_community: 'Your match was approved',
+      match_disputed: 'Your match was disputed',
+      member_removed: 'You were removed from the community',
+      admin_transferred: 'Admin rights were transferred to you',
+      admin_promoted: `You were promoted to admin by ${profile?.username || 'an admin'}`,
+      community_match_pending: 'A community match needs your approval',
+      community_match_approved: 'Your community match was approved',
+      community_match_disputed: 'Your community match was disputed',
     };
 
     await scheduleLocalNotification(

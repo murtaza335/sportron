@@ -47,37 +47,37 @@ export type Profile = {
   role: UserRole;
   avatar_url: string | null;
   fcm_tokens: string[];
-  notification_preferences: {
-    match_pending: boolean;
-    match_approved: boolean;
-    match_rejected: boolean;
-    match_liked: boolean;
-    match_commented: boolean;
-  };
+  notification_preferences: NotificationPreferences;
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
 };
 
-export type GuestProfile = {
-  id: string;
-  username: string;
-  display_name: null;
-  role: string;
-  isGuest: true;
-  bio: null;
-  avatar_url: null;
-  fcm_tokens: string[];
-  notification_preferences: {
-    match_pending: boolean;
-    match_approved: boolean;
-    match_rejected: boolean;
-    match_liked: boolean;
-    match_commented: boolean;
-  };
-  deleted_at: string | null;
-  created_at: string;
-  updated_at: string;
+export type NotificationPreferences = {
+  match_pending: boolean;
+  match_approved: boolean;
+  match_rejected: boolean;
+  match_liked: boolean;
+  match_commented: boolean;
+  session_application: boolean;
+  session_accepted: boolean;
+  session_rejected: boolean;
+  session_left: boolean;
+  session_reminder: boolean;
+  feedback_prompt: boolean;
+  ping: boolean;
+  ping_response: boolean;
+  join_request: boolean;
+  join_approved: boolean;
+  join_rejected: boolean;
+  match_approval_request: boolean;
+  match_approved_community: boolean;
+  match_disputed: boolean;
+  member_removed: boolean;
+  admin_transferred: boolean;
+  community_match_pending: boolean;
+  community_match_approved: boolean;
+  community_match_disputed: boolean;
 };
 
 export type Match = {
@@ -128,7 +128,6 @@ export type CreateMatchInput = {
   playerPartnerId: string | null;
   opponentId: string | null;
   opponentPartnerId: string | null;
-  opponentGuestName: string | null;
   playerScore: number;
   opponentScore: number;
   isPublic: boolean;
@@ -139,6 +138,33 @@ export type CreateProfileInput = {
   bio?: string;
   role: UserRole;
   avatarUrl?: string;
+};
+
+export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
+  match_pending: true,
+  match_approved: true,
+  match_rejected: true,
+  match_liked: true,
+  match_commented: true,
+  session_application: true,
+  session_accepted: true,
+  session_rejected: true,
+  session_left: true,
+  session_reminder: true,
+  feedback_prompt: true,
+  ping: true,
+  ping_response: true,
+  join_request: true,
+  join_approved: true,
+  join_rejected: true,
+  match_approval_request: true,
+  match_approved_community: true,
+  match_disputed: true,
+  member_removed: true,
+  admin_transferred: true,
+  community_match_pending: true,
+  community_match_approved: true,
+  community_match_disputed: true,
 };
 
 export type MatchStats = {
@@ -156,9 +182,11 @@ export type NotificationType =
   | 'session_application'
   | 'session_accepted'
   | 'session_rejected'
+  | 'session_left'
   | 'session_reminder'
   | 'feedback_prompt'
   | 'ping'
+  | 'ping_response'
   | 'join_request'
   | 'join_approved'
   | 'join_rejected'
@@ -166,8 +194,14 @@ export type NotificationType =
   | 'match_approved_community'
   | 'match_disputed'
   | 'member_removed'
-  | 'community_deleted'
-  | 'admin_transferred';
+  | 'admin_transferred'
+  | 'admin_promoted'
+  | 'community_match_pending'
+  | 'community_match_approved'
+  | 'community_match_disputed'
+  | 'community_invite'
+  | 'community_invite_accepted'
+  | 'community_invite_rejected';
 
 export type InAppNotification = {
   id: string;
@@ -215,12 +249,14 @@ export type CreateCommunityInput = {
   description?: string;
   visibility: CommunityVisibility;
   sport: Sport;
+  image_url?: string;
 };
 
 export type UpdateCommunityInput = {
   name?: string;
   description?: string | null;
   visibility?: CommunityVisibility;
+  image_url?: string | null;
 };
 
 export type CommunityJoinRequest = {
@@ -233,6 +269,19 @@ export type CommunityJoinRequest = {
   profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
 };
 
+export type CommunityInvite = {
+  id: string;
+  community_id: string;
+  invited_by: string;
+  invitee_id: string;
+  status: 'pending' | 'accepted' | 'rejected';
+  created_at: string;
+  updated_at: string;
+  community?: Pick<Community, 'id' | 'name' | 'image_url'> | null;
+  inviter?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  invitee?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
 export type Ping = {
   id: string;
   community_id: string;
@@ -240,6 +289,16 @@ export type Ping = {
   message: string;
   created_at: string;
   sender?: Pick<Profile, 'id' | 'username'> | null;
+};
+
+export type PingResponse = {
+  id: string;
+  ping_id: string;
+  community_id: string;
+  respondent_id: string;
+  response: 'coming' | 'busy';
+  created_at: string;
+  respondent?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
 };
 
 export type CommunityMatch = {
@@ -272,6 +331,7 @@ export type Session = {
   sport: string;
   location: string;
   date_time: string;
+  expires_at: string | null;
   max_participants: number;
   description: string | null;
   status: SessionStatus;
@@ -288,6 +348,7 @@ export type CreateSessionInput = {
   date_time: string;
   max_participants: number;
   description?: string;
+  expireAfterMinutes?: number;
 };
 
 export type CommitmentStatus = 'pending' | 'accepted' | 'rejected' | 'left';
