@@ -14,7 +14,6 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MatchLineupSelector } from '@/components/MatchLineupSelector';
-import { PrivacyToggle } from '@/components/PrivacyToggle';
 import { ScoreCounter } from '@/components/ScoreCounter';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -22,11 +21,9 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { createMatch } from '@/services/matches';
-import { fetchAllProfiles } from '@/services/profiles';
 import { fetchCommunityMembers, recordCommunityMatch } from '@/services/communities';
 import type { MatchFormat, Profile, Sport, CommunityMember } from '@/types';
-import { DEFAULT_NOTIFICATION_PREFERENCES, SPORT_LABELS, isRacketSport, isTeamSport } from '@/types';
+import { DEFAULT_NOTIFICATION_PREFERENCES, isRacketSport, isTeamSport } from '@/types';
 
 type SelectionState = {
   playerPartner: Profile | null;
@@ -41,19 +38,12 @@ export default function AddMatchScreen() {
   const { communityId, sport: sportParam } = useLocalSearchParams<{ communityId?: string; sport?: Sport }>();
   const { user, profile } = useAuth();
 
-  const isCommunityMatch = !!communityId;
-
-  const [profiles, setProfiles] = useState<Profile[]>([]);
   const [communityMembers, setCommunityMembers] = useState<CommunityMember[]>([]);
-  const [sport, setSport] = useState<Sport>(
-    isCommunityMatch && sportParam ? sportParam : 'table_tennis'
-  );
-  const [customSportName, setCustomSportName] = useState('');
+  const [sport] = useState<Sport>(sportParam ?? 'table_tennis');
+  const [customSportName] = useState('');
   const [teamAName, setTeamAName] = useState('');
   const [teamBName, setTeamBName] = useState('');
-  const [matchFormat, setMatchFormat] = useState<MatchFormat>(
-    isCommunityMatch ? 'singles' : 'doubles'
-  );
+  const [matchFormat, setMatchFormat] = useState<MatchFormat>('singles');
   const [selection, setSelection] = useState<SelectionState>({
     playerPartner: null,
     opponent: null,
@@ -61,7 +51,6 @@ export default function AddMatchScreen() {
   });
   const [playerScore, setPlayerScore] = useState(0);
   const [opponentScore, setOpponentScore] = useState(0);
-  const [isPublic, setIsPublic] = useState(true);
   const [saving, setSaving] = useState(false);
 
   // Build community member profiles for the opponent selector
@@ -88,18 +77,14 @@ export default function AddMatchScreen() {
   useEffect(() => {
     let cancelled = false;
 
-    if (isCommunityMatch && communityId) {
+    if (communityId) {
       fetchCommunityMembers(communityId)
         .then((data) => { if (!cancelled) setCommunityMembers(data); })
         .catch((error) => console.error('Failed to load community members:', error));
-    } else {
-      fetchAllProfiles(user?.id)
-        .then((data) => { if (!cancelled) setProfiles(data); })
-        .catch((error) => console.error('Failed to load profiles:', error));
     }
 
     return () => { cancelled = true; };
-  }, [user?.id, communityId, isCommunityMatch]);
+  }, [communityId]);
 
   const isRacket = isRacketSport(sport);
   const isTeam = isTeamSport(sport);
@@ -119,45 +104,31 @@ export default function AddMatchScreen() {
 
   const handleSave = async () => {
     if (!user?.id || !canSave) return;
+    if (!communityId) {
+      Alert.alert('Error', 'Matches can only be recorded within a community.');
+      return;
+    }
     setSaving(true);
     try {
-      if (isCommunityMatch && communityId) {
-        const opponent = selection.opponent;
-        if (!opponent) {
-          Alert.alert('Invalid Opponent', 'Please select a community member as opponent.');
-          setSaving(false);
-          return;
-        }
-        await recordCommunityMatch({
-          community_id: communityId,
-          recorded_by: user.id,
-          player_id: user.id,
-          opponent_id: opponent.id,
-          sport,
-          custom_sport_name: sport === 'other' ? customSportName.trim() : null,
-          team_a_name: isTeam ? teamAName.trim() : null,
-          team_b_name: isTeam ? teamBName.trim() : null,
-          player_score: playerScore,
-          opponent_score: opponentScore,
-        });
-        Alert.alert('Match Recorded', 'Waiting for opponent approval.');
-        router.back();
+      const opponent = selection.opponent;
+      if (!opponent) {
+        Alert.alert('Invalid Opponent', 'Please select a community member as opponent.');
+        setSaving(false);
         return;
       }
-
-      await createMatch(user.id, {
-        matchFormat: isRacket ? matchFormat : 'singles',
+      await recordCommunityMatch({
+        community_id: communityId,
+        recorded_by: user.id,
+        player_id: user.id,
+        opponent_id: opponent.id,
         sport,
-        customSportName: sport === 'other' ? customSportName.trim() : null,
-        teamAName: isTeam ? teamAName.trim() : null,
-        teamBName: isTeam ? teamBName.trim() : null,
-        playerPartnerId: isRacket ? selection.playerPartner?.id ?? null : null,
-        opponentId: selection.opponent?.id ?? null,
-        opponentPartnerId: isRacket ? selection.opponentPartner?.id ?? null : null,
-        playerScore,
-        opponentScore,
-        isPublic,
+        custom_sport_name: sport === 'other' ? customSportName.trim() : null,
+        team_a_name: isTeam ? teamAName.trim() : null,
+        team_b_name: isTeam ? teamBName.trim() : null,
+        player_score: playerScore,
+        opponent_score: opponentScore,
       });
+      Alert.alert('Match Recorded', 'Waiting for opponent approval.');
       router.back();
     } catch (error) {
       Alert.alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
@@ -177,7 +148,7 @@ return (
           <Pressable onPress={() => router.back()} hitSlop={16} style={styles.headerAction}>
             <X size={24} color={theme.text} strokeWidth={2} />
           </Pressable>
-          <ThemedText variant="heading" style={styles.title}>{isCommunityMatch ? 'Record Match' : 'New Match'}</ThemedText>
+          <ThemedText variant="heading" style={styles.title}>Record Match</ThemedText>
           <Pressable
             onPress={handleSave}
             hitSlop={16}
@@ -197,60 +168,6 @@ return (
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
-
-          {/* Sport Picker (hidden for community matches — auto-set from community) */}
-          {!isCommunityMatch && (
-            <>
-              <View style={styles.section}>
-                <ThemedText variant="label" muted style={styles.sectionLabel}>Sport</ThemedText>
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
-                  {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
-                    'football', 'cricket', 'volleyball', 'handball', 'basketball',
-                    'other'] as Sport[]).map((s) => {
-                    const selected = s === sport;
-                    return (
-                      <Pressable
-                        key={s}
-                        onPress={() => setSport(s)}
-                        style={[
-                          styles.sportPill,
-                          { borderColor: theme.border },
-                          selected && { backgroundColor: theme.text, borderColor: theme.text },
-                        ]}
-                      >
-                        <ThemedText
-                          variant="caption"
-                          style={[
-                            styles.sportPillText,
-                            selected && { color: theme.background },
-                          ]}
-                        >
-                          {SPORT_LABELS[s]}
-                        </ThemedText>
-                      </Pressable>
-                    );
-                  })}
-                </ScrollView>
-              </View>
-
-              {/* Custom sport name for "other" */}
-              {sport === 'other' && (
-                <View style={styles.section}>
-                  <ThemedText variant="label" muted style={styles.sectionLabel}>Sport Name</ThemedText>
-                  <View style={[styles.textInput, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                    <TextInput
-                      value={customSportName}
-                      onChangeText={setCustomSportName}
-                      placeholder="Enter sport name"
-                      placeholderTextColor={theme.textSecondary}
-                      style={[styles.textInputField, { color: theme.text }]}
-                      maxLength={40}
-                    />
-                  </View>
-                </View>
-              )}
-            </>
-          )}
 
           {/* Team names for team sports */}
           {isTeam && (
@@ -283,13 +200,11 @@ return (
               {/* Opponent Captain / Representative */}
               <View style={styles.section}>
                 <ThemedText variant="label" muted style={styles.sectionLabel}>Opponent Captain</ThemedText>
-                {isCommunityMatch && (
-                  <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs, marginBottom: Spacing.xs }}>
-                    Select the captain or representative of the opposing team.
-                  </ThemedText>
-                )}
+                <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs, marginBottom: Spacing.xs }}>
+                  Select the captain or representative of the opposing team.
+                </ThemedText>
                 <MatchLineupSelector
-                  profiles={isCommunityMatch ? communityProfiles : profiles}
+                  profiles={communityProfiles}
                   currentUserName={profile?.username ?? 'You'}
                   format="singles"
                   selection={{ playerPartner: null, opponent: selection.opponent, opponentPartner: null }}
@@ -325,13 +240,11 @@ return (
 
               {/* Lineup Selector */}
               <View style={styles.section}>
-                {isCommunityMatch && (
-                  <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs, marginBottom: Spacing.xs }}>
-                    Opponent list is limited to community members.
-                  </ThemedText>
-                )}
+                <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs, marginBottom: Spacing.xs }}>
+                  Opponent list is limited to community members.
+                </ThemedText>
                 <MatchLineupSelector
-                  profiles={isCommunityMatch ? communityProfiles : profiles}
+                  profiles={communityProfiles}
                   currentUserName={profile?.username ?? 'You'}
                   format={matchFormat}
                   selection={selection}
@@ -367,19 +280,12 @@ return (
             </View>
           </View>
 
-          {/* Visibility (hidden for community matches) */}
-          {!isCommunityMatch && (
-            <View style={styles.section}>
-              <ThemedText variant="label" muted style={styles.sectionLabel}>Visibility</ThemedText>
-              <PrivacyToggle isPublic={isPublic} onChange={setIsPublic} />
-            </View>
-          )}
         </ScrollView>
 
         {/* Footer Save Button */}
         <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: Math.max(Spacing.md, insets.bottom) }]}>
           <Button
-            label={saving ? 'Saving...' : isCommunityMatch ? 'Submit Match' : 'Save Match'}
+            label={saving ? 'Saving...' : 'Submit Match'}
             disabled={!canSave || saving}
             onPress={handleSave}
             variant="primary"
@@ -431,20 +337,6 @@ const styles = StyleSheet.create({
     letterSpacing: 0.8,
     fontSize: 12,
     marginLeft: Spacing.xs,
-  },
-  sportPicker: {
-    flexDirection: 'row',
-  },
-  sportPill: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.full,
-    borderWidth: 1,
-    marginRight: Spacing.sm,
-  },
-  sportPillText: {
-    fontWeight: '700',
-    fontSize: 13,
   },
   textInput: {
     borderWidth: 1,

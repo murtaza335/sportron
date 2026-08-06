@@ -145,7 +145,7 @@ export default function CommunityDetailScreen() {
       opponent_id: cm.opponent_id,
       opponent_partner_id: cm.opponent_partner_id,
       opponent_guest_name: null,
-      match_format: 'singles',
+      match_format: cm.player_partner_id || cm.opponent_partner_id ? 'doubles' : 'singles',
       sport: cm.sport,
       custom_sport_name: cm.custom_sport_name,
       team_a_name: cm.team_a_name,
@@ -161,12 +161,12 @@ export default function CommunityDetailScreen() {
             : 'pending',
       created_at: cm.created_at,
       player: cm.player ?? null,
-      playerPartner: null,
+      playerPartner: cm.playerPartner ?? null,
       opponent: cm.opponent ?? null,
-      opponentPartner: null,
-      likes_count: 0,
-      comments_count: 0,
-      is_liked_by_user: false,
+      opponentPartner: cm.opponentPartner ?? null,
+      likes_count: cm.likes_count ?? 0,
+      comments_count: cm.comments_count ?? 0,
+      is_liked_by_user: cm.is_liked_by_user ?? false,
     };
   }
 
@@ -623,8 +623,6 @@ export default function CommunityDetailScreen() {
         onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
-        hideSocial
-        hideDelete
       />
     </View>
   );
