@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Alert, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Search, UserPlus, X } from 'lucide-react-native';
+import { Search, UserCheck, UserPlus, X } from 'lucide-react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchAllProfiles } from '@/services/profiles';
-import { inviteMemberByUsername } from '@/services/communities';
+import { fetchJoinRequests, fetchPendingInvites, inviteMemberByUsername } from '@/services/communities';
 import type { Profile } from '@/types';
 
 interface InviteMemberModalProps {
@@ -32,7 +32,31 @@ export function InviteMemberModal({
   const [loading, setLoading] = useState(false);
   const [inviting, setInviting] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [invitedIds, setInvitedIds] = useState<Set<string>>(new Set());
+  const [pendingRequestIds, setPendingRequestIds] = useState<Set<string>>(new Set());
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  const loadPendingState = useCallback(async () => {
+    try {
+      const [invites, joinRequests] = await Promise.all([
+        fetchPendingInvites(communityId),
+        fetchJoinRequests(communityId),
+      ]);
+      setInvitedIds(new Set(invites.map((i) => i.invitee_id)));
+      setPendingRequestIds(new Set(joinRequests.map((r) => r.user_id)));
+    } catch (err) {
+      console.error('Failed to load pending invites:', err);
+    }
+  }, [communityId]);
+
+  useEffect(() => {
+    if (visible) {
+      loadPendingState();
+    } else {
+      setInvitedIds(new Set());
+      setPendingRequestIds(new Set());
+    }
+  }, [visible, loadPendingState]);
 
   const loadProfiles = useCallback(async (query: string) => {
     if (!query.trim()) {
@@ -92,12 +116,13 @@ export function InviteMemberModal({
     );
   }, [debouncedSearchQuery, profiles]);
 
-  const handleInvite = async (username: string) => {
-    setInviting(username);
+  const handleInvite = async (profile: Profile) => {
+    setInviting(profile.username);
     setError(null);
     try {
-      await inviteMemberByUsername(communityId, adminId, username);
-      Alert.alert('Invite Sent', `Invitation sent to @${username}`);
+      await inviteMemberByUsername(communityId, adminId, profile.username);
+      setInvitedIds((prev) => new Set(prev).add(profile.id));
+      Alert.alert('Invite Sent', `Invitation sent to @${profile.username}`);
       onSuccess();
       onClose();
     } catch (err) {
@@ -172,36 +197,60 @@ export function InviteMemberModal({
                   </ThemedText>
                 </View>
               ) : (
-                filteredProfiles.map((profile) => (
-                  <Pressable
-                    key={profile.id}
-                    onPress={() => handleInvite(profile.username)}
-                    disabled={inviting === profile.username}
-                    style={({ pressed }) => [
-                      styles.userRow,
-                      { backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement },
-                    ]}
-                    hitSlop={8}
-                  >
-                    <View style={styles.userInfo}>
-                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
-                        @{profile.username}
-                      </ThemedText>
-                      {profile.display_name && (
-                        <ThemedText variant="caption" muted style={{ marginTop: 2 }}>
-                          {profile.display_name}
+                filteredProfiles.map((profile) => {
+                  const isInvited = invitedIds.has(profile.id);
+                  const isPendingRequest = pendingRequestIds.has(profile.id);
+                  const isDisabled = isInvited || isPendingRequest;
+                  return (
+                    <Pressable
+                      key={profile.id}
+                      onPress={() => handleInvite(profile)}
+                      disabled={inviting === profile.username || isDisabled}
+                      style={({ pressed }) => [
+                        styles.userRow,
+                        {
+                          backgroundColor: pressed
+                            ? theme.backgroundSelected
+                            : theme.backgroundElement,
+                          opacity: isDisabled ? 0.55 : 1,
+                        },
+                      ]}
+                      hitSlop={8}
+                    >
+                      <View style={styles.userInfo}>
+                        <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
+                          @{profile.username}
                         </ThemedText>
+                        {profile.display_name && (
+                          <ThemedText variant="caption" muted style={{ marginTop: 2 }}>
+                            {profile.display_name}
+                          </ThemedText>
+                        )}
+                      </View>
+                      {inviting === profile.username ? (
+                        <ThemedText variant="caption" style={{ fontWeight: '600', color: '#3B82F6' }}>
+                          Sending...
+                        </ThemedText>
+                      ) : isInvited ? (
+                        <View style={styles.invitedBadge}>
+                          <UserCheck size={16} color={theme.textSecondary} strokeWidth={2.2} />
+                          <ThemedText variant="caption" muted style={{ fontWeight: '700', fontSize: 13 }}>
+                            Invited
+                          </ThemedText>
+                        </View>
+                      ) : isPendingRequest ? (
+                        <View style={styles.invitedBadge}>
+                          <UserCheck size={16} color={theme.textSecondary} strokeWidth={2.2} />
+                          <ThemedText variant="caption" muted style={{ fontWeight: '700', fontSize: 13 }}>
+                            Pending
+                          </ThemedText>
+                        </View>
+                      ) : (
+                        <UserPlus size={20} color={theme.text} strokeWidth={2.2} />
                       )}
-                    </View>
-                    {inviting === profile.username ? (
-                      <ThemedText variant="caption" style={{ fontWeight: '600', color: '#3B82F6' }}>
-                        Sending...
-                      </ThemedText>
-                    ) : (
-                      <UserPlus size={20} color={theme.text} strokeWidth={2.2} />
-                    )}
-                  </Pressable>
-                ))
+                    </Pressable>
+                  );
+                })
               )
             ) : (
               <View style={styles.empty}>
@@ -280,6 +329,11 @@ const styles = StyleSheet.create({
     borderColor: 'transparent',
   },
   userInfo: { flex: 1 },
+  invitedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
   empty: {
     flex: 1,
     alignItems: 'center',

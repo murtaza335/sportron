@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Check,
   CheckCircle,
+  Clock,
   Globe,
   Lock,
   Megaphone,
@@ -60,6 +61,8 @@ export default function CommunityDetailScreen() {
     community,
     membership,
     joinRequests,
+    myPendingInvite,
+    myJoinRequest,
     loading,
     refresh,
     setMembership,
@@ -69,6 +72,13 @@ export default function CommunityDetailScreen() {
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
   const optimisticTitle = community?.name || communityName || '';
+
+  const joinAction = (() => {
+    if (myPendingInvite) return { label: 'Invitation Pending', disabled: true } as const;
+    if (myJoinRequest) return { label: 'Request Pending', disabled: true } as const;
+    if (community?.visibility === 'restricted') return { label: 'Request to Join', disabled: false } as const;
+    return { label: 'Join Community', disabled: false } as const;
+  })();
 
   // Ping responses
   const [lastPingId, setLastPingId] = useState<string | null>(null);
@@ -391,9 +401,16 @@ export default function CommunityDetailScreen() {
 
             <View style={styles.primaryActionRow}>
               <Button
-                label={community.visibility === 'restricted' ? 'Request to Join' : 'Join Community'}
-                icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
+                label={joinAction.label}
+                icon={
+                  joinAction.disabled ? (
+                    <Clock size={18} color={theme.background} strokeWidth={2.5} />
+                  ) : (
+                    <Plus size={18} color={theme.background} strokeWidth={2.5} />
+                  )
+                }
                 onPress={handleJoin}
+                disabled={joinAction.disabled}
                 buttonStyle={{ flex: 1 }}
               />
             </View>

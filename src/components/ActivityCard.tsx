@@ -211,11 +211,16 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       case 'join_request': {
         const communityId = data.communityId as string;
         if (!communityId) throw new Error('Community not found');
-        const { data: requests, error: re } = await supabase
+        const requesterId = data.requesterId as string | undefined;
+        let query = supabase
           .from('community_join_requests')
           .select('id')
           .eq('community_id', communityId)
-          .eq('status', 'pending')
+          .eq('status', 'pending');
+        if (requesterId) {
+          query = query.eq('user_id', requesterId);
+        }
+        const { data: requests, error: re } = await query
           .order('created_at', { ascending: true })
           .limit(1);
         if (re) throw re;
