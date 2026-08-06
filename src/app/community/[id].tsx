@@ -257,10 +257,16 @@ export default function CommunityDetailScreen() {
       )
     : undefined;
 
+  const themedHeader = {
+    headerStyle: { backgroundColor: theme.background },
+    headerShadowVisible: false,
+    headerTintColor: theme.text,
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ headerTitle, headerRight }} />
+        <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -269,7 +275,7 @@ export default function CommunityDetailScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ headerTitle, headerRight }} />
+        <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -280,6 +286,7 @@ export default function CommunityDetailScreen() {
       {/* Header Actions */}
       <Stack.Screen
         options={{
+          ...themedHeader,
           headerTitle: () =>
             isMember ? (
               <Pressable
