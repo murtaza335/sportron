@@ -55,7 +55,6 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
       *,
       member_count:community_members(count)
     `)
-    .eq('visibility', 'public')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
@@ -251,6 +250,7 @@ export async function requestToJoinCommunity(
           communityId,
           community.name,
           requester?.username ?? 'Someone',
+          userId,
         );
       }
     }
@@ -363,6 +363,22 @@ export async function fetchJoinRequests(
 
   if (error) throw error;
   return data ?? [];
+}
+
+export async function fetchMyJoinRequest(
+  communityId: string,
+  userId: string,
+): Promise<CommunityJoinRequest | null> {
+  const { data, error } = await supabase
+    .from('community_join_requests')
+    .select('*')
+    .eq('community_id', communityId)
+    .eq('user_id', userId)
+    .eq('status', 'pending')
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
 }
 
 export async function respondToJoinRequest(

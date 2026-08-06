@@ -3,6 +3,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import {
   ChevronRight,
+  Clock,
   Globe,
   Image as ImageIcon,
   Lock,
@@ -57,6 +58,8 @@ export default function CommunityInfoScreen() {
   const {
     community,
     membership,
+    myPendingInvite,
+    myJoinRequest,
     loading,
     refresh,
     setMembership,
@@ -526,9 +529,16 @@ export default function CommunityInfoScreen() {
         {!isMember && (
           <View style={styles.actionSection}>
             <Button
-              label={isRestricted ? 'Request to Join' : 'Join Community'}
-              icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
+              label={myPendingInvite ? 'Invitation Pending' : myJoinRequest ? 'Request Pending' : isRestricted ? 'Request to Join' : 'Join Community'}
+              icon={
+                myPendingInvite || myJoinRequest ? (
+                  <Clock size={18} color={theme.background} strokeWidth={2.5} />
+                ) : (
+                  <Plus size={18} color={theme.background} strokeWidth={2.5} />
+                )
+              }
               onPress={handleJoin}
+              disabled={!!myPendingInvite || !!myJoinRequest}
               buttonStyle={styles.actionButton}
             />
           </View>

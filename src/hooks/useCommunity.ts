@@ -5,24 +5,32 @@ import {
   fetchCommunityById,
   fetchCommunityMember,
   fetchJoinRequests,
+  fetchMyJoinRequest,
+  fetchUserPendingInvites,
 } from '@/services/communities';
-import type { Community, CommunityJoinRequest, CommunityMember } from '@/types';
+import type { Community, CommunityInvite, CommunityJoinRequest, CommunityMember } from '@/types';
 
 export function useCommunity(id: string, userId?: string) {
   const [community, setCommunity] = useState<Community | null>(null);
   const [membership, setMembership] = useState<CommunityMember | null>(null);
   const [joinRequests, setJoinRequests] = useState<CommunityJoinRequest[]>([]);
+  const [myPendingInvite, setMyPendingInvite] = useState<CommunityInvite | null>(null);
+  const [myJoinRequest, setMyJoinRequest] = useState<CommunityJoinRequest | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
     if (!id) return;
     try {
-      const [communityData, memberData] = await Promise.all([
+      const [communityData, memberData, invites, ownRequest] = await Promise.all([
         fetchCommunityById(id),
         userId ? fetchCommunityMember(id, userId) : Promise.resolve(null),
+        userId ? fetchUserPendingInvites(userId) : Promise.resolve([]),
+        userId ? fetchMyJoinRequest(id, userId) : Promise.resolve(null),
       ]);
       setCommunity(communityData);
       setMembership(memberData);
+      setMyPendingInvite(invites.find((i) => i.community_id === id) ?? null);
+      setMyJoinRequest(ownRequest);
 
       if (memberData?.role === 'admin') {
         const requests = await fetchJoinRequests(id);
@@ -52,6 +60,8 @@ export function useCommunity(id: string, userId?: string) {
     community,
     membership,
     joinRequests,
+    myPendingInvite,
+    myJoinRequest,
     loading,
     refresh,
     setMembership,

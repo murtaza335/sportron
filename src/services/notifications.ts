@@ -239,13 +239,19 @@ export async function notifyFeedbackPrompt(userId: string, sessionId: string): P
 }
 
 // Community notifications
-export async function notifyJoinRequest(adminIds: string[], communityId: string, communityName: string, requesterName: string): Promise<void> {
+export async function notifyJoinRequest(
+  adminIds: string[],
+  communityId: string,
+  communityName: string,
+  requesterName: string,
+  requesterId: string,
+): Promise<void> {
   await createNotificationForMultipleUsers(
     adminIds,
     'join_request',
     'New Join Request',
     `${requesterName} wants to join ${communityName}`,
-    { communityId },
+    { communityId, requesterId },
   );
 }
 
