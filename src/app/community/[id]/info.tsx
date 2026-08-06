@@ -325,10 +325,16 @@ export default function CommunityInfoScreen() {
     );
   };
 
+  const themedHeader = {
+    headerStyle: { backgroundColor: theme.background },
+    headerShadowVisible: false,
+    headerTintColor: theme.text,
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: '' }} />
+        <Stack.Screen options={{ title: '', ...themedHeader }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -337,7 +343,7 @@ export default function CommunityInfoScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: '' }} />
+        <Stack.Screen options={{ title: '', ...themedHeader }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -345,7 +351,7 @@ export default function CommunityInfoScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen options={{ title: '', ...themedHeader }} />
 
       <ScrollView
         style={styles.scroll}
