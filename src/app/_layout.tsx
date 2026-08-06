@@ -70,7 +70,14 @@ function RootNavigator() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <FCMInitializer />
       <StatusBar style="auto" />
-      <Stack screenOptions={{ headerShown: false, animationDuration: 50, contentStyle: { backgroundColor: theme.background } }}>
+      <Stack screenOptions={{
+        headerShown: false,
+        animationDuration: 50,
+        contentStyle: { backgroundColor: theme.background },
+        headerStyle: { backgroundColor: theme.background },
+        headerTintColor: theme.text,
+        headerTitleStyle: { color: theme.text, fontWeight: '600' },
+      }}>
         <Stack.Screen name="login" />
         <Stack.Screen name="onboarding" />
         <Stack.Screen name="(tabs)" />
@@ -90,7 +97,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -101,7 +108,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -112,7 +119,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -123,7 +130,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -142,7 +149,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -161,7 +168,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -171,7 +178,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
         <Stack.Screen
@@ -182,7 +189,7 @@ function RootNavigator() {
             animation: 'slide_from_right',
             animationDuration: 50,
             headerShadowVisible: false,
-            headerStyle: { elevation: 0, shadowOpacity: 0 },
+            headerStyle: { backgroundColor: theme.background },
           }}
         />
       </Stack>

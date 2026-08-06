@@ -46,7 +46,7 @@ export default function PingResponseScreen() {
           title: 'Ping Response',
           animation: 'slide_from_right',
           headerShadowVisible: false,
-          headerStyle: { elevation: 0, shadowOpacity: 0 },
+          headerStyle: { backgroundColor: theme.background },
         }}
       />
 
