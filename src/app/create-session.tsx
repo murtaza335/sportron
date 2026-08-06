@@ -12,7 +12,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -27,6 +27,7 @@ export default function CreateSessionScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [sport, setSport] = useState('');
   const [location, setLocation] = useState('');
@@ -123,7 +124,7 @@ export default function CreateSessionScreen() {
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + Spacing.xxl }]}
           keyboardShouldPersistTaps="handled"
         >
           {conflicts.length > 0 && (

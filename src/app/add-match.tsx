@@ -11,7 +11,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { MatchLineupSelector } from '@/components/MatchLineupSelector';
 import { PrivacyToggle } from '@/components/PrivacyToggle';
@@ -37,6 +37,7 @@ type SelectionState = {
 export default function AddMatchScreen() {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
   const { communityId, sport: sportParam } = useLocalSearchParams<{ communityId?: string; sport?: Sport }>();
   const { user, profile } = useAuth();
 
@@ -166,7 +167,7 @@ export default function AddMatchScreen() {
   };
 
 return (
-    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
+    <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -376,7 +377,7 @@ return (
         </ScrollView>
 
         {/* Footer Save Button */}
-        <View style={[styles.footer, { borderTopColor: theme.border }]}>
+        <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: Math.max(Spacing.md, insets.bottom) }]}>
           <Button
             label={saving ? 'Saving...' : isCommunityMatch ? 'Submit Match' : 'Save Match'}
             disabled={!canSave || saving}
