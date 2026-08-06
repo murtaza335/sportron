@@ -1,8 +1,8 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Check,
   CheckCircle,
+  ChevronRight,
   Clock,
   Globe,
   Lock,
@@ -41,12 +41,10 @@ import {
   fetchPingResponses,
   joinCommunity,
   requestToJoinCommunity,
-  respondToJoinRequest,
   sendPing,
 } from '@/services/communities';
 import { supabase } from '@/lib/supabase';
 import type {
-  CommunityJoinRequest,
   CommunityMatch,
   MatchWithProfiles,
   PingResponse,
@@ -66,7 +64,6 @@ export default function CommunityDetailScreen() {
     loading,
     refresh,
     setMembership,
-    setJoinRequests,
   } = useCommunity(id ?? '', user?.id);
 
   const isAdmin = membership?.role === 'admin';
@@ -201,19 +198,6 @@ export default function CommunityDetailScreen() {
       refresh();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to join.');
-    }
-  };
-
-  const handleRespondToRequest = async (
-    request: CommunityJoinRequest,
-    status: 'approved' | 'rejected',
-  ) => {
-    try {
-      await respondToJoinRequest(request.id, status);
-      setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
-      if (status === 'approved') refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to respond.');
     }
   };
 
@@ -417,41 +401,37 @@ export default function CommunityDetailScreen() {
           </>
         )}
 
-        {/* 3. Join Requests (Admin Only Alerts) */}
-        {isAdmin && joinRequests.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText variant="label" muted style={styles.sectionTitle}>
-              Join Requests ({joinRequests.length})
-            </ThemedText>
-            {joinRequests.map((req) => (
-              <Card key={req.id} style={styles.requestCard}>
-                <View style={styles.requestInfo}>
-                  <View style={[styles.avatar, { backgroundColor: theme.textSecondary }]}>
-                    <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                      {(req.profile?.username ?? '?').charAt(0).toUpperCase()}
-                    </ThemedText>
-                  </View>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {req.profile?.username ?? 'Unknown'}
+        {/* 3. Join Requests link (Admin only) */}
+        {isAdmin && (
+          <Pressable
+            onPress={() => id && router.navigate(`/community/${id}/join-requests`)}
+            style={({ pressed }) => [
+              styles.joinRequestsLink,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+            hitSlop={4}
+          >
+            <View style={styles.joinRequestsLinkLeft}>
+              <Users size={18} color={theme.text} strokeWidth={2} />
+              <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                Join Requests
+              </ThemedText>
+            </View>
+            <View style={styles.joinRequestsLinkRight}>
+              {joinRequests.length > 0 && (
+                <View style={[styles.requestCountBadge, { backgroundColor: '#DC2626' }]}>
+                  <ThemedText style={styles.requestCountText}>
+                    {joinRequests.length > 99 ? '99+' : joinRequests.length}
                   </ThemedText>
                 </View>
-                <View style={styles.requestActions}>
-                  <Pressable
-                    onPress={() => handleRespondToRequest(req, 'approved')}
-                    style={[styles.actionChip, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}
-                  >
-                    <Check size={14} color="#10B981" strokeWidth={3} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleRespondToRequest(req, 'rejected')}
-                    style={[styles.actionChip, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}
-                  >
-                    <X size={14} color="#EF4444" strokeWidth={3} />
-                  </Pressable>
-                </View>
-              </Card>
-            ))}
-          </View>
+              )}
+              <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
+            </View>
+          </Pressable>
         )}
 
         {/* 4. Matches Section */}
@@ -700,40 +680,41 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.xs,
   },
 
-  // Admin Alerts
+  // Join Requests link
   section: { gap: Spacing.sm, marginTop: Spacing.xs },
-  sectionTitle: {
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 12,
-    marginLeft: Spacing.xs,
-  },
-  requestCard: {
+  joinRequestsLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  requestInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
-  requestActions: { flexDirection: 'row', gap: Spacing.xs },
-  actionChip: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
     borderWidth: 1,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
+  joinRequestsLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  joinRequestsLinkRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  requestCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  avatarText: { fontSize: 16, fontWeight: '800' },
+  requestCountText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
 
   // Matches Section
   tabsContainer: {
