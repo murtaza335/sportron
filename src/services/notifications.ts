@@ -325,6 +325,26 @@ export async function notifyCommunityMatchDisputed(recorderId: string, community
   });
 }
 
+export async function notifyCommunityMatchLiked(ownerId: string, communityMatchId: string, likerName: string): Promise<void> {
+  await createNotification({
+    userId: ownerId,
+    type: 'match_liked',
+    title: 'New Like on Your Match',
+    body: `${likerName} liked your match`,
+    data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyCommunityMatchCommented(ownerId: string, communityMatchId: string, commenterName: string, commentId: string): Promise<void> {
+  await createNotification({
+    userId: ownerId,
+    type: 'match_commented',
+    title: 'New Comment on Your Match',
+    body: `${commenterName} commented on your match`,
+    data: { matchId: communityMatchId, commentId },
+  });
+}
+
 export async function notifyMemberRemoved(userId: string, communityId: string, communityName: string): Promise<void> {
   await createNotification({
     userId,

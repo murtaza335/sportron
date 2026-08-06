@@ -6,7 +6,7 @@ import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { toggleLike } from '@/services/matches';
+import { toggleCommunityMatchLike } from '@/services/communities';
 import type { MatchWithProfiles, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
@@ -100,7 +100,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
 
     try {
-      await toggleLike(match.id, currentUserId, nextLiked);
+      await toggleCommunityMatchLike(match.id, currentUserId, nextLiked);
     } catch (error) {
       console.error('Failed to toggle like:', error);
       // Revert state

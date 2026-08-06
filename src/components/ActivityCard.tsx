@@ -9,21 +9,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
-import { updateMatchVerificationStatus } from '@/services/matches';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
 import type { InAppNotification, NotificationType } from '@/types';
 
 const ACCEPTED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   session_application: 'session_accepted',
   join_request: 'join_approved',
-  match_pending: 'match_approved',
   community_match_pending: 'community_match_approved',
 };
 
 const DECLINED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   session_application: 'session_rejected',
   join_request: 'join_rejected',
-  match_pending: 'match_rejected',
   community_match_pending: 'community_match_disputed',
 };
 
@@ -37,9 +34,7 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
     case 'session_application':
     case 'join_request':
       return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
-    case 'match_pending':
     case 'community_match_pending':
-    case 'match_approval_request':
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
     default:
       return <Bell size={20} color={theme.text} strokeWidth={2.2} />;
@@ -63,8 +58,6 @@ function getDeclineLabel(type: string): string {
 const ACTION_TYPES = [
   'session_application',
   'join_request',
-  'match_pending',
-  'match_approval_request',
   'community_match_pending',
 ];
 
@@ -107,8 +100,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       }
       case 'join_request':
         return notification.body;
-      case 'match_pending':
-        return notification.body;
       case 'community_match_pending':
         return notification.body;
       default:
@@ -140,10 +131,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           ? `You approved a request to join ${community}`
           : `You rejected a request to join ${community}`;
       }
-      case 'match_pending':
-        return action === 'accepted'
-          ? 'You accepted a match result'
-          : 'You disputed a match result';
       case 'community_match_pending':
         return action === 'accepted'
           ? 'You approved a community match'
@@ -169,16 +156,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
 
   const doAction = async (action: 'accepted' | 'declined'): Promise<void> => {
     switch (notification.type) {
-      case 'match_pending': {
-        const matchId = data.matchId as string;
-        if (!matchId) throw new Error('Match not found');
-        if (action === 'accepted') {
-          await updateMatchVerificationStatus(matchId, 'verified', user.id!);
-        } else {
-          await updateMatchVerificationStatus(matchId, 'disputed', user.id!);
-        }
-        return;
-      }
       case 'community_match_pending': {
         const matchId = data.matchId as string;
         if (!matchId) throw new Error('Match not found');

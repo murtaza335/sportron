@@ -12,8 +12,6 @@ import type { NotificationType } from '@/types';
 const ACTION_REQUIRED_TYPES: NotificationType[] = [
   'session_application',
   'join_request',
-  'match_pending',
-  'match_approval_request',
   'community_match_pending',
 ];
 
