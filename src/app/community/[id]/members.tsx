@@ -127,7 +127,14 @@ export default function CommunityMembersScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: 'Members' }} />
+      <Stack.Screen
+        options={{
+          title: 'Members',
+          headerStyle: { backgroundColor: theme.background },
+          headerShadowVisible: false,
+          headerTintColor: theme.text,
+        }}
+      />
       {loading ? (
         <ActivityIndicator color={theme.text} style={styles.loader} />
       ) : (
