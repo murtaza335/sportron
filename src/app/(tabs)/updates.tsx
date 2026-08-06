@@ -54,24 +54,23 @@ export default function UpdatesScreen() {
           ]}
           hitSlop={8}
         >
-          <View style={styles.tabInner}>
-            <ThemedText
-              variant="label"
-              style={[
-                styles.tabLabel,
-                { color: activeTab === 'action' ? theme.text : theme.textSecondary },
-              ]}
-            >
-              Action Required
-            </ThemedText>
-            {actionRequired.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: '#DC2626' }]}>
-                <ThemedText style={styles.badgeText}>
-                  {actionRequired.length > 99 ? '99+' : actionRequired.length}
-                </ThemedText>
-              </View>
-            )}
-          </View>
+          <ThemedText
+            variant="label"
+            numberOfLines={1}
+            style={[
+              styles.tabLabel,
+              { color: activeTab === 'action' ? theme.text : theme.textSecondary },
+            ]}
+          >
+            Action Required
+          </ThemedText>
+          {actionRequired.length > 0 && (
+            <View style={[styles.badge, { backgroundColor: '#DC2626' }]}>
+              <ThemedText style={styles.badgeText}>
+                {actionRequired.length > 99 ? '99+' : actionRequired.length}
+              </ThemedText>
+            </View>
+          )}
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('invites')}
@@ -81,24 +80,23 @@ export default function UpdatesScreen() {
           ]}
           hitSlop={8}
         >
-          <View style={styles.tabInner}>
-            <ThemedText
-              variant="label"
-              style={[
-                styles.tabLabel,
-                { color: activeTab === 'invites' ? theme.text : theme.textSecondary },
-              ]}
-            >
-              Invites
-            </ThemedText>
-            {invites.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: '#3B82F6' }]}>
-                <ThemedText style={styles.badgeText}>
-                  {invites.length > 99 ? '99+' : invites.length}
-                </ThemedText>
-              </View>
-            )}
-          </View>
+          <ThemedText
+            variant="label"
+            numberOfLines={1}
+            style={[
+              styles.tabLabel,
+              { color: activeTab === 'invites' ? theme.text : theme.textSecondary },
+            ]}
+          >
+            Invites
+          </ThemedText>
+          {invites.length > 0 && (
+            <View style={[styles.badge, { backgroundColor: '#3B82F6' }]}>
+              <ThemedText style={styles.badgeText}>
+                {invites.length > 99 ? '99+' : invites.length}
+              </ThemedText>
+            </View>
+          )}
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('past')}
@@ -110,6 +108,7 @@ export default function UpdatesScreen() {
         >
           <ThemedText
             variant="label"
+            numberOfLines={1}
             style={[
               styles.tabLabel,
               { color: activeTab === 'past' ? theme.text : theme.textSecondary },
@@ -199,25 +198,25 @@ const styles = StyleSheet.create({
   },
   tabRow: {
     flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-evenly',
     borderBottomWidth: 1,
-    paddingHorizontal: Spacing.lg,
+    paddingHorizontal: Spacing.md,
   },
   tab: {
-    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: Spacing.sm,
     paddingVertical: Spacing.md,
     borderBottomWidth: 2,
     borderBottomColor: 'transparent',
-    alignItems: 'center',
-  },
-  tabInner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
   },
   tabLabel: {
     fontWeight: '700',
-    fontSize: 13,
-    letterSpacing: 0.3,
+    fontSize: 12,
+    letterSpacing: 0.25,
+    textTransform: 'none',
   },
   badge: {
     minWidth: 20,
