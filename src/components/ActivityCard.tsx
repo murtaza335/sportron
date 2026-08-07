@@ -9,21 +9,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
-import { updateMatchVerificationStatus } from '@/services/matches';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
 import type { InAppNotification, NotificationType } from '@/types';
 
 const ACCEPTED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   session_application: 'session_accepted',
   join_request: 'join_approved',
-  match_pending: 'match_approved',
   community_match_pending: 'community_match_approved',
 };
 
 const DECLINED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   session_application: 'session_rejected',
   join_request: 'join_rejected',
-  match_pending: 'match_rejected',
   community_match_pending: 'community_match_disputed',
 };
 
@@ -37,9 +34,7 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
     case 'session_application':
     case 'join_request':
       return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
-    case 'match_pending':
     case 'community_match_pending':
-    case 'match_approval_request':
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
     default:
       return <Bell size={20} color={theme.text} strokeWidth={2.2} />;
@@ -63,8 +58,6 @@ function getDeclineLabel(type: string): string {
 const ACTION_TYPES = [
   'session_application',
   'join_request',
-  'match_pending',
-  'match_approval_request',
   'community_match_pending',
 ];
 
@@ -83,16 +76,20 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     if (notification.type === 'session_application') {
       const sessionId = data.sessionId as string;
       if (!sessionId) return;
-      supabase
-        .from('sessions')
-        .select('sport, location')
-        .eq('id', sessionId)
-        .single()
-        .then(({ data: s }) => {
+      (async () => {
+        try {
+          const { data: s } = await supabase
+            .from('sessions')
+            .select('sport, location')
+            .eq('id', sessionId)
+            .single();
           if (s) setSessionInfo(s);
-        })
-        .catch(() => {})
-        .finally(() => setSessionInfoLoading(false));
+        } catch {
+          // ignore
+        } finally {
+          setSessionInfoLoading(false);
+        }
+      })();
     }
   }, [notification.type, data.sessionId]);
 
@@ -106,8 +103,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         return `wanna let ${name || 'someone'} in your session?`;
       }
       case 'join_request':
-        return notification.body;
-      case 'match_pending':
         return notification.body;
       case 'community_match_pending':
         return notification.body;
@@ -140,10 +135,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           ? `You approved a request to join ${community}`
           : `You rejected a request to join ${community}`;
       }
-      case 'match_pending':
-        return action === 'accepted'
-          ? 'You accepted a match result'
-          : 'You disputed a match result';
       case 'community_match_pending':
         return action === 'accepted'
           ? 'You approved a community match'
@@ -168,24 +159,16 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   };
 
   const doAction = async (action: 'accepted' | 'declined'): Promise<void> => {
+    const userId = user?.id;
+    if (!userId) throw new Error('Not signed in');
     switch (notification.type) {
-      case 'match_pending': {
-        const matchId = data.matchId as string;
-        if (!matchId) throw new Error('Match not found');
-        if (action === 'accepted') {
-          await updateMatchVerificationStatus(matchId, 'verified', user.id!);
-        } else {
-          await updateMatchVerificationStatus(matchId, 'disputed', user.id!);
-        }
-        return;
-      }
       case 'community_match_pending': {
         const matchId = data.matchId as string;
         if (!matchId) throw new Error('Match not found');
         if (action === 'accepted') {
-          await approveCommunityMatch(matchId, user.id!);
+          await approveCommunityMatch(matchId, userId);
         } else {
-          await disputeCommunityMatch(matchId, user.id!);
+          await disputeCommunityMatch(matchId, userId);
         }
         return;
       }
@@ -202,20 +185,25 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         if (ce) throw ce;
         if (!commitments?.length) throw new Error('No pending requests');
         if (action === 'accepted') {
-          await approveCommitment(commitments[0].id, user.id!);
+          await approveCommitment(commitments[0].id, userId);
         } else {
-          await rejectCommitment(commitments[0].id, user.id!);
+          await rejectCommitment(commitments[0].id, userId);
         }
         return;
       }
       case 'join_request': {
         const communityId = data.communityId as string;
         if (!communityId) throw new Error('Community not found');
-        const { data: requests, error: re } = await supabase
+        const requesterId = data.requesterId as string | undefined;
+        let query = supabase
           .from('community_join_requests')
           .select('id')
           .eq('community_id', communityId)
-          .eq('status', 'pending')
+          .eq('status', 'pending');
+        if (requesterId) {
+          query = query.eq('user_id', requesterId);
+        }
+        const { data: requests, error: re } = await query
           .order('created_at', { ascending: true })
           .limit(1);
         if (re) throw re;

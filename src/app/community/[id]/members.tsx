@@ -19,16 +19,18 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import {
   fetchCommunityMembers,
+  fetchPendingInvites,
   promoteToAdmin,
   removeMember,
 } from '@/services/communities';
-import type { CommunityMember } from '@/types';
+import type { CommunityInvite, CommunityMember } from '@/types';
 
 export default function CommunityMembersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const theme = useTheme();
   const { user } = useAuth();
   const [members, setMembers] = useState<CommunityMember[]>([]);
+  const [pendingInvites, setPendingInvites] = useState<CommunityInvite[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -60,12 +62,19 @@ export default function CommunityMembersScreen() {
     try {
       const data = await fetchCommunityMembers(id);
       setMembers(data);
+      const amAdmin = data.some((m) => m.profile_id === user?.id && m.role === 'admin');
+      if (amAdmin) {
+        const invites = await fetchPendingInvites(id);
+        setPendingInvites(invites);
+      } else {
+        setPendingInvites([]);
+      }
     } catch (e) {
       console.error('Failed to load members:', e);
     } finally {
       setLoading(false);
     }
-  }, [id]);
+  }, [id, user?.id]);
 
   useFocusEffect(
     useCallback(() => {
@@ -127,7 +136,14 @@ export default function CommunityMembersScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: 'Members' }} />
+      <Stack.Screen
+        options={{
+          title: 'Members',
+          headerStyle: { backgroundColor: theme.background },
+          headerShadowVisible: false,
+          headerTintColor: theme.text,
+        }}
+      />
       {loading ? (
         <ActivityIndicator color={theme.text} style={styles.loader} />
       ) : (
@@ -144,15 +160,49 @@ export default function CommunityMembersScreen() {
               />
             }
             ListHeaderComponent={isAdmin ? (
-              <Pressable
-                onPress={() => setShowInviteModal(true)}
-                style={styles.inviteButton}
-                hitSlop={8}
-              >
-                <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '700' }}>
-                  + Invite Member by Username
-                </ThemedText>
-              </Pressable>
+              <>
+                <Pressable
+                  onPress={() => setShowInviteModal(true)}
+                  style={styles.inviteButton}
+                  hitSlop={8}
+                >
+                  <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '700' }}>
+                    + Invite Member by Username
+                  </ThemedText>
+                </Pressable>
+                {pendingInvites.length > 0 && (
+                  <View style={styles.pendingSection}>
+                    <ThemedText variant="label" muted style={styles.pendingTitle}>
+                      Pending Invites ({pendingInvites.length})
+                    </ThemedText>
+                    {pendingInvites.map((invite) => (
+                      <View
+                        key={invite.id}
+                        style={[styles.pendingRow, { borderBottomColor: theme.border }]}
+                      >
+                        <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
+                          <ThemedText style={[styles.avatarText, { color: theme.textSecondary }]}>
+                            {(invite.invitee?.username ?? '?').charAt(0).toUpperCase()}
+                          </ThemedText>
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                            {invite.invitee?.username ?? 'Unknown'}
+                          </ThemedText>
+                          <ThemedText variant="caption" muted numberOfLines={1}>
+                            Invited by @{invite.inviter?.username ?? 'admin'}
+                          </ThemedText>
+                        </View>
+                        <View style={styles.pendingBadge}>
+                          <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700', fontSize: 11 }}>
+                            Invited
+                          </ThemedText>
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
+              </>
             ) : null}
             renderItem={({ item }) => (
               <Pressable
@@ -273,6 +323,31 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: 'rgba(128,128,128,0.2)',
+  },
+  pendingSection: {
+    paddingVertical: Spacing.md,
+  },
+  pendingTitle: {
+    fontWeight: '700',
+    textTransform: 'uppercase',
+    letterSpacing: 0.8,
+    fontSize: 12,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xs,
+  },
+  pendingRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pendingBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    backgroundColor: '#3B82F620',
   },
   memberRow: {
     flexDirection: 'row',

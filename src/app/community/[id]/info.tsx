@@ -3,6 +3,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import {
   ChevronRight,
+  Clock,
   Globe,
   Image as ImageIcon,
   Lock,
@@ -57,6 +58,8 @@ export default function CommunityInfoScreen() {
   const {
     community,
     membership,
+    myPendingInvite,
+    myJoinRequest,
     loading,
     refresh,
     setMembership,
@@ -325,10 +328,16 @@ export default function CommunityInfoScreen() {
     );
   };
 
+  const themedHeader = {
+    headerStyle: { backgroundColor: theme.background },
+    headerShadowVisible: false,
+    headerTintColor: theme.text,
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: '' }} />
+        <Stack.Screen options={{ title: '', ...themedHeader }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -337,7 +346,7 @@ export default function CommunityInfoScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ title: '' }} />
+        <Stack.Screen options={{ title: '', ...themedHeader }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -345,7 +354,7 @@ export default function CommunityInfoScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
-      <Stack.Screen options={{ title: '' }} />
+      <Stack.Screen options={{ title: '', ...themedHeader }} />
 
       <ScrollView
         style={styles.scroll}
@@ -520,9 +529,16 @@ export default function CommunityInfoScreen() {
         {!isMember && (
           <View style={styles.actionSection}>
             <Button
-              label={isRestricted ? 'Request to Join' : 'Join Community'}
-              icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
+              label={myPendingInvite ? 'Invitation Pending' : myJoinRequest ? 'Request Pending' : isRestricted ? 'Request to Join' : 'Join Community'}
+              icon={
+                myPendingInvite || myJoinRequest ? (
+                  <Clock size={18} color={theme.background} strokeWidth={2.5} />
+                ) : (
+                  <Plus size={18} color={theme.background} strokeWidth={2.5} />
+                )
+              }
               onPress={handleJoin}
+              disabled={!!myPendingInvite || !!myJoinRequest}
               buttonStyle={styles.actionButton}
             />
           </View>

@@ -110,29 +110,6 @@ export type MatchWithProfiles = Match & {
   is_liked_by_user: boolean;
 };
 
-export type MatchComment = {
-  id: string;
-  match_id: string;
-  profile_id: string;
-  content: string;
-  created_at: string;
-  profile: Pick<Profile, 'username'> | null;
-};
-
-export type CreateMatchInput = {
-  matchFormat: MatchFormat;
-  sport: Sport;
-  customSportName?: string | null;
-  teamAName?: string | null;
-  teamBName?: string | null;
-  playerPartnerId: string | null;
-  opponentId: string | null;
-  opponentPartnerId: string | null;
-  playerScore: number;
-  opponentScore: number;
-  isPublic: boolean;
-};
-
 export type CreateProfileInput = {
   username: string;
   bio?: string;
@@ -320,7 +297,21 @@ export type CommunityMatch = {
   updated_at: string;
   recorder?: Pick<Profile, 'id' | 'username'> | null;
   player?: Pick<Profile, 'id' | 'username'> | null;
+  playerPartner?: Pick<Profile, 'id' | 'username'> | null;
   opponent?: Pick<Profile, 'id' | 'username'> | null;
+  opponentPartner?: Pick<Profile, 'id' | 'username'> | null;
+  likes_count?: number;
+  comments_count?: number;
+  is_liked_by_user?: boolean;
+};
+
+export type CommunityMatchComment = {
+  id: string;
+  community_match_id: string;
+  profile_id: string;
+  content: string;
+  created_at: string;
+  profile?: Pick<Profile, 'id' | 'username'> | null;
 };
 
 export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelled';

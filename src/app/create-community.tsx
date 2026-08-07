@@ -13,7 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
@@ -29,6 +29,7 @@ export default function CreateCommunityScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
+  const insets = useSafeAreaInsets();
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
@@ -116,11 +117,11 @@ export default function CreateCommunityScreen() {
 
       <KeyboardAvoidingView
         style={styles.flex}
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
         <ScrollView
           style={styles.flex}
-          contentContainerStyle={styles.container}
+          contentContainerStyle={[styles.container, { paddingBottom: insets.bottom + Spacing.xxl }]}
           keyboardShouldPersistTaps="handled"
         >
           <View style={styles.field}>

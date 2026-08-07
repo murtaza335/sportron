@@ -1,8 +1,9 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Check,
   CheckCircle,
+  ChevronRight,
+  Clock,
   Globe,
   Lock,
   Megaphone,
@@ -40,12 +41,10 @@ import {
   fetchPingResponses,
   joinCommunity,
   requestToJoinCommunity,
-  respondToJoinRequest,
   sendPing,
 } from '@/services/communities';
 import { supabase } from '@/lib/supabase';
 import type {
-  CommunityJoinRequest,
   CommunityMatch,
   MatchWithProfiles,
   PingResponse,
@@ -60,15 +59,23 @@ export default function CommunityDetailScreen() {
     community,
     membership,
     joinRequests,
+    myPendingInvite,
+    myJoinRequest,
     loading,
     refresh,
     setMembership,
-    setJoinRequests,
   } = useCommunity(id ?? '', user?.id);
 
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
   const optimisticTitle = community?.name || communityName || '';
+
+  const joinAction = (() => {
+    if (myPendingInvite) return { label: 'Invitation Pending', disabled: true } as const;
+    if (myJoinRequest) return { label: 'Request Pending', disabled: true } as const;
+    if (community?.visibility === 'restricted') return { label: 'Request to Join', disabled: false } as const;
+    return { label: 'Join Community', disabled: false } as const;
+  })();
 
   // Ping responses
   const [lastPingId, setLastPingId] = useState<string | null>(null);
@@ -138,7 +145,7 @@ export default function CommunityDetailScreen() {
       opponent_id: cm.opponent_id,
       opponent_partner_id: cm.opponent_partner_id,
       opponent_guest_name: null,
-      match_format: 'singles',
+      match_format: cm.player_partner_id || cm.opponent_partner_id ? 'doubles' : 'singles',
       sport: cm.sport,
       custom_sport_name: cm.custom_sport_name,
       team_a_name: cm.team_a_name,
@@ -154,12 +161,12 @@ export default function CommunityDetailScreen() {
             : 'pending',
       created_at: cm.created_at,
       player: cm.player ?? null,
-      playerPartner: null,
+      playerPartner: cm.playerPartner ?? null,
       opponent: cm.opponent ?? null,
-      opponentPartner: null,
-      likes_count: 0,
-      comments_count: 0,
-      is_liked_by_user: false,
+      opponentPartner: cm.opponentPartner ?? null,
+      likes_count: cm.likes_count ?? 0,
+      comments_count: cm.comments_count ?? 0,
+      is_liked_by_user: cm.is_liked_by_user ?? false,
     };
   }
 
@@ -191,19 +198,6 @@ export default function CommunityDetailScreen() {
       refresh();
     } catch (e: any) {
       Alert.alert('Error', e?.message ?? 'Failed to join.');
-    }
-  };
-
-  const handleRespondToRequest = async (
-    request: CommunityJoinRequest,
-    status: 'approved' | 'rejected',
-  ) => {
-    try {
-      await respondToJoinRequest(request.id, status);
-      setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
-      if (status === 'approved') refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to respond.');
     }
   };
 
@@ -257,10 +251,16 @@ export default function CommunityDetailScreen() {
       )
     : undefined;
 
+  const themedHeader = {
+    headerStyle: { backgroundColor: theme.background },
+    headerShadowVisible: false,
+    headerTintColor: theme.text,
+  };
+
   if (loading) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ headerTitle, headerRight }} />
+        <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
         <ActivityIndicator color={theme.text} style={styles.loader} />
       </View>
     );
@@ -269,7 +269,7 @@ export default function CommunityDetailScreen() {
   if (!community) {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
-        <Stack.Screen options={{ headerTitle, headerRight }} />
+        <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
         <ThemedText muted style={styles.loader}>Community not found</ThemedText>
       </View>
     );
@@ -280,6 +280,7 @@ export default function CommunityDetailScreen() {
       {/* Header Actions */}
       <Stack.Screen
         options={{
+          ...themedHeader,
           headerTitle: () =>
             isMember ? (
               <Pressable
@@ -384,50 +385,53 @@ export default function CommunityDetailScreen() {
 
             <View style={styles.primaryActionRow}>
               <Button
-                label={community.visibility === 'restricted' ? 'Request to Join' : 'Join Community'}
-                icon={<Plus size={18} color={theme.background} strokeWidth={2.5} />}
+                label={joinAction.label}
+                icon={
+                  joinAction.disabled ? (
+                    <Clock size={18} color={theme.background} strokeWidth={2.5} />
+                  ) : (
+                    <Plus size={18} color={theme.background} strokeWidth={2.5} />
+                  )
+                }
                 onPress={handleJoin}
+                disabled={joinAction.disabled}
                 buttonStyle={{ flex: 1 }}
               />
             </View>
           </>
         )}
 
-        {/* 3. Join Requests (Admin Only Alerts) */}
-        {isAdmin && joinRequests.length > 0 && (
-          <View style={styles.section}>
-            <ThemedText variant="label" muted style={styles.sectionTitle}>
-              Join Requests ({joinRequests.length})
-            </ThemedText>
-            {joinRequests.map((req) => (
-              <Card key={req.id} style={styles.requestCard}>
-                <View style={styles.requestInfo}>
-                  <View style={[styles.avatar, { backgroundColor: theme.textSecondary }]}>
-                    <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                      {(req.profile?.username ?? '?').charAt(0).toUpperCase()}
-                    </ThemedText>
-                  </View>
-                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {req.profile?.username ?? 'Unknown'}
+        {/* 3. Join Requests link (Admin only) */}
+        {isAdmin && (
+          <Pressable
+            onPress={() => id && router.navigate(`/community/${id}/join-requests`)}
+            style={({ pressed }) => [
+              styles.joinRequestsLink,
+              {
+                backgroundColor: theme.backgroundElement,
+                borderColor: theme.border,
+              },
+              pressed && { opacity: 0.7 },
+            ]}
+            hitSlop={4}
+          >
+            <View style={styles.joinRequestsLinkLeft}>
+              <Users size={18} color={theme.text} strokeWidth={2} />
+              <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                Join Requests
+              </ThemedText>
+            </View>
+            <View style={styles.joinRequestsLinkRight}>
+              {joinRequests.length > 0 && (
+                <View style={[styles.requestCountBadge, { backgroundColor: '#DC2626' }]}>
+                  <ThemedText style={styles.requestCountText}>
+                    {joinRequests.length > 99 ? '99+' : joinRequests.length}
                   </ThemedText>
                 </View>
-                <View style={styles.requestActions}>
-                  <Pressable
-                    onPress={() => handleRespondToRequest(req, 'approved')}
-                    style={[styles.actionChip, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}
-                  >
-                    <Check size={14} color="#10B981" strokeWidth={3} />
-                  </Pressable>
-                  <Pressable
-                    onPress={() => handleRespondToRequest(req, 'rejected')}
-                    style={[styles.actionChip, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}
-                  >
-                    <X size={14} color="#EF4444" strokeWidth={3} />
-                  </Pressable>
-                </View>
-              </Card>
-            ))}
-          </View>
+              )}
+              <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
+            </View>
+          </Pressable>
         )}
 
         {/* 4. Matches Section */}
@@ -619,8 +623,6 @@ export default function CommunityDetailScreen() {
         onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
-        hideSocial
-        hideDelete
       />
     </View>
   );
@@ -676,40 +678,41 @@ const styles = StyleSheet.create({
     marginVertical: Spacing.xs,
   },
 
-  // Admin Alerts
+  // Join Requests link
   section: { gap: Spacing.sm, marginTop: Spacing.xs },
-  sectionTitle: {
-    fontWeight: '700',
-    textTransform: 'uppercase',
-    letterSpacing: 0.8,
-    fontSize: 12,
-    marginLeft: Spacing.xs,
-  },
-  requestCard: {
+  joinRequestsLink: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.sm,
-    paddingHorizontal: Spacing.md,
-  },
-  requestInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md, flex: 1 },
-  requestActions: { flexDirection: 'row', gap: Spacing.xs },
-  actionChip: {
-    width: 32,
-    height: 32,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    borderRadius: Radius.md,
     borderWidth: 1,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
+  joinRequestsLinkLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  joinRequestsLinkRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  requestCountBadge: {
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
+    paddingHorizontal: 6,
   },
-  avatarText: { fontSize: 16, fontWeight: '800' },
+  requestCountText: {
+    color: 'white',
+    fontSize: 11,
+    fontWeight: '700',
+    lineHeight: 14,
+  },
 
   // Matches Section
   tabsContainer: {

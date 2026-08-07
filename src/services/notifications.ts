@@ -239,13 +239,19 @@ export async function notifyFeedbackPrompt(userId: string, sessionId: string): P
 }
 
 // Community notifications
-export async function notifyJoinRequest(adminIds: string[], communityId: string, communityName: string, requesterName: string): Promise<void> {
+export async function notifyJoinRequest(
+  adminIds: string[],
+  communityId: string,
+  communityName: string,
+  requesterName: string,
+  requesterId: string,
+): Promise<void> {
   await createNotificationForMultipleUsers(
     adminIds,
     'join_request',
     'New Join Request',
     `${requesterName} wants to join ${communityName}`,
-    { communityId },
+    { communityId, requesterId },
   );
 }
 
@@ -316,6 +322,26 @@ export async function notifyCommunityMatchDisputed(recorderId: string, community
     title: 'Match Disputed',
     body: `${opponentName} disputed the match in ${communityName}`,
     data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyCommunityMatchLiked(ownerId: string, communityMatchId: string, likerName: string): Promise<void> {
+  await createNotification({
+    userId: ownerId,
+    type: 'match_liked',
+    title: 'New Like on Your Match',
+    body: `${likerName} liked your match`,
+    data: { matchId: communityMatchId },
+  });
+}
+
+export async function notifyCommunityMatchCommented(ownerId: string, communityMatchId: string, commenterName: string, commentId: string): Promise<void> {
+  await createNotification({
+    userId: ownerId,
+    type: 'match_commented',
+    title: 'New Comment on Your Match',
+    body: `${commenterName} commented on your match`,
+    data: { matchId: communityMatchId, commentId },
   });
 }
 

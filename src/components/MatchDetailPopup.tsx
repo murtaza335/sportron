@@ -1,4 +1,4 @@
-import { Calendar, Globe, Heart, Lock, Trophy, Trash2, User, X, Check, Clock, AlertTriangle } from 'lucide-react-native';
+import { Calendar, Globe, Heart, Lock, Trophy, User, X, Check, Clock, AlertTriangle } from 'lucide-react-native';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -21,8 +21,8 @@ import { Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { addComment, deleteMatch, fetchComments, toggleLike, updateMatchVerificationStatus } from '@/services/matches';
-import type { MatchComment, MatchWithProfiles, Sport } from '@/types';
+import { addCommunityMatchComment, approveCommunityMatch, disputeCommunityMatch, fetchCommunityMatchComments, toggleCommunityMatchLike } from '@/services/communities';
+import type { CommunityMatchComment, MatchWithProfiles, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 const SCREEN_HEIGHT = Dimensions.get('window').height;
@@ -33,10 +33,6 @@ type MatchDetailPopupProps = {
   onClose: () => void;
   currentUserId?: string;
   onRefreshFeed?: () => void;
-  onApprove?: (matchId: string) => Promise<void>;
-  onDispute?: (matchId: string) => Promise<void>;
-  hideSocial?: boolean;
-  hideDelete?: boolean;
   recordedByName?: string;
 };
 
@@ -68,17 +64,13 @@ export function MatchDetailPopup({
   onClose,
   currentUserId,
   onRefreshFeed,
-  onApprove,
-  onDispute,
-  hideSocial,
-  hideDelete,
   recordedByName,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
   // Comments state
-  const [comments, setComments] = useState<MatchComment[]>([]);
+  const [comments, setComments] = useState<CommunityMatchComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
   const [newCommentText, setNewCommentText] = useState('');
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -86,8 +78,6 @@ export function MatchDetailPopup({
   const [likesCount, setLikesCount] = useState(0);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
-  const [deleting, setDeleting] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Initialize pan responder in effect to avoid render-time ref access
   const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
@@ -133,29 +123,25 @@ Animated.spring(translateY, {
         setVerificationStatus(match.verification_status);
       }, 0);
 
-      if (!hideSocial) {
-        const loadComments = async () => {
-          setLoadingComments(true);
-          try {
-            const data = await fetchComments(match.id);
-            setComments(data);
-          } catch (error) {
-            console.error('Failed to load comments:', error);
-          } finally {
-            setLoadingComments(false);
-          }
-        };
-        loadComments();
-      }
+      const loadComments = async () => {
+        setLoadingComments(true);
+        try {
+          const data = await fetchCommunityMatchComments(match.id);
+          setComments(data);
+        } catch (error) {
+          console.error('Failed to load comments:', error);
+        } finally {
+          setLoadingComments(false);
+        }
+      };
+      loadComments();
     } else {
       setTimeout(() => {
         setComments([]);
         setNewCommentText('');
       }, 0);
     }
-  }, [visible, match, hideSocial]);
-
-  // Animate sheet
+  }, [visible, match]);
   useEffect(() => {
     if (visible) {
       Animated.spring(translateY, {
@@ -191,7 +177,6 @@ Animated.spring(translateY, {
   const isUserInOpponentTeam = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
 
   const isOpponent = currentUserId && (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id);
-  const canDelete = currentUserId === match.created_by && verificationStatus !== 'verified';
 
   let userResult: 'win' | 'loss' | 'draw' | null = null;
   if (currentUserId && (isUserInPlayerTeam || isUserInOpponentTeam)) {
@@ -220,7 +205,7 @@ Animated.spring(translateY, {
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
 
     try {
-      await toggleLike(match.id, currentUserId, nextLiked);
+      await toggleCommunityMatchLike(match.id, currentUserId, nextLiked);
       onRefreshFeed?.();
     } catch (error) {
       console.error('Failed to toggle like:', error);
@@ -234,7 +219,7 @@ Animated.spring(translateY, {
     if (!newCommentText.trim() || !currentUserId || !match) return;
     setSubmittingComment(true);
     try {
-      const added = await addComment(match.id, currentUserId, newCommentText);
+      const added = await addCommunityMatchComment(match.id, currentUserId, newCommentText);
       setComments((prev) => [...prev, added]);
       setNewCommentText('');
       onRefreshFeed?.();
@@ -246,15 +231,13 @@ Animated.spring(translateY, {
   };
 
   const handleVerifyStatus = async (status: 'verified' | 'disputed') => {
-    if (!match) return;
+    if (!match || !currentUserId) return;
     setUpdatingStatus(true);
     try {
-      if (status === 'verified' && onApprove) {
-        await onApprove(match.id);
-      } else if (status === 'disputed' && onDispute) {
-        await onDispute(match.id);
+      if (status === 'verified') {
+        await approveCommunityMatch(match.id, currentUserId);
       } else {
-        await updateMatchVerificationStatus(match.id, status, currentUserId!);
+        await disputeCommunityMatch(match.id, currentUserId);
       }
       setVerificationStatus(status);
       onRefreshFeed?.();
@@ -264,31 +247,6 @@ Animated.spring(translateY, {
     } finally {
       setUpdatingStatus(false);
     }
-  };
-
-  const handleDelete = () => {
-    if (!match) return;
-    setShowDeleteConfirm(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!match) return;
-    setShowDeleteConfirm(false);
-    setDeleting(true);
-    try {
-      await deleteMatch(match.id);
-      onRefreshFeed?.();
-      onClose();
-    } catch (error) {
-      console.error('Failed to delete match:', error);
-      Alert.alert('Error', 'Failed to delete match.');
-    } finally {
-      setDeleting(false);
-    }
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteConfirm(false);
   };
 
   return (
@@ -540,28 +498,10 @@ Animated.spring(translateY, {
                 </View>
               </View>
 
-              {!hideDelete && canDelete && (
-                <>
-                  <Divider spacing={Spacing.sm} />
-                  <Pressable
-                    onPress={handleDelete}
-                    disabled={deleting}
-                    style={styles.deleteAction}
-                  >
-                    <Trash2 size={16} color="#DC2626" />
-                    <ThemedText style={{ color: '#DC2626', fontWeight: '600', marginLeft: Spacing.sm }}>
-                      {deleting ? 'Deleting...' : 'Delete Match'}
-                    </ThemedText>
-                  </Pressable>
-                </>
-              )}
+              <Divider spacing={Spacing.sm} />
 
-              {!hideSocial && (
-                <>
-                  <Divider spacing={Spacing.sm} />
-
-                  {/* Social Header (Likes Count and Comments Header) */}
-                  <View style={styles.sectionHeader}>
+              {/* Social Header (Likes Count and Comments Header) */}
+              <View style={styles.sectionHeader}>
                     <ThemedText variant="label" style={styles.sectionTitle}>
                       Comments ({comments.length})
                     </ThemedText>
@@ -610,12 +550,10 @@ Animated.spring(translateY, {
                       ))}
                     </View>
                   )}
-                </>
-              )}
             </ScrollView>
 
             {/* Sticky Comment Form at the bottom of the Sheet */}
-            {!hideSocial && currentUserId && (
+            {currentUserId && (
               <View style={[styles.inputRow, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
                 <TextInput
                   value={newCommentText}
@@ -643,37 +581,7 @@ Animated.spring(translateY, {
 
             <Button label="Close" onPress={onClose} style={styles.closeAction} />
 
-            {/* Delete Confirmation Overlay */}
-            {showDeleteConfirm && (
-              <View style={styles.confirmOverlay}>
-                <View style={[styles.confirmCard, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                  <ThemedText variant="body" style={{ fontWeight: '700', textAlign: 'center', marginBottom: Spacing.xs }}>
-                    Delete Match
-                  </ThemedText>
-                  <ThemedText variant="caption" muted style={{ textAlign: 'center', marginBottom: Spacing.md }}>
-                    Are you sure you want to delete this match? This action cannot be undone.
-                  </ThemedText>
-                  <View style={styles.confirmActions}>
-                    <Pressable
-                      onPress={handleCancelDelete}
-                      style={[styles.confirmBtn, { borderColor: theme.border }]}
-                    >
-                      <ThemedText style={{ color: theme.text, fontWeight: '700', fontSize: 13 }}>Cancel</ThemedText>
-                    </Pressable>
-                    <Pressable
-                      onPress={handleConfirmDelete}
-                      disabled={deleting}
-                      style={[styles.confirmBtn, { backgroundColor: '#DC2626', borderColor: '#DC2626' }]}
-                    >
-                      <ThemedText style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 13 }}>
-                        {deleting ? 'Deleting...' : 'Delete'}
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                </View>
-              </View>
-            )}
-          </Animated.View>
+            </Animated.View>
         </View>
       </KeyboardAvoidingView>
     </Modal>
@@ -955,45 +863,6 @@ const styles = StyleSheet.create({
     width: '100%',
   },
   verifyBtn: {
-    flex: 1,
-    height: 40,
-    borderRadius: Radius.md,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-  },
-  deleteAction: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.sm + 2,
-    gap: Spacing.xs,
-  },
-  confirmOverlay: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-    zIndex: 100,
-  },
-  confirmCard: {
-    width: '100%',
-    maxWidth: 320,
-    borderRadius: Radius.md,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  confirmActions: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-    marginTop: Spacing.xs,
-  },
-  confirmBtn: {
     flex: 1,
     height: 40,
     borderRadius: Radius.md,
