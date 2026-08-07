@@ -1,17 +1,9 @@
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import type { InAppNotification } from '@/types';
 import { useCallback, useEffect, useState } from 'react';
 
-export interface Notification {
-  id: string;
-  user_id: string;
-  type: string;
-  title: string;
-  body: string;
-  data: Record<string, unknown>;
-  read: boolean;
-  created_at: string;
-}
+export type Notification = InAppNotification;
 
 let notificationsChannel: ReturnType<typeof supabase.channel> | null = null;
 
