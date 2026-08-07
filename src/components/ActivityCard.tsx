@@ -76,16 +76,20 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     if (notification.type === 'session_application') {
       const sessionId = data.sessionId as string;
       if (!sessionId) return;
-      supabase
-        .from('sessions')
-        .select('sport, location')
-        .eq('id', sessionId)
-        .single()
-        .then(({ data: s }) => {
+      (async () => {
+        try {
+          const { data: s } = await supabase
+            .from('sessions')
+            .select('sport, location')
+            .eq('id', sessionId)
+            .single();
           if (s) setSessionInfo(s);
-        })
-        .catch(() => {})
-        .finally(() => setSessionInfoLoading(false));
+        } catch {
+          // ignore
+        } finally {
+          setSessionInfoLoading(false);
+        }
+      })();
     }
   }, [notification.type, data.sessionId]);
 
@@ -155,14 +159,16 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   };
 
   const doAction = async (action: 'accepted' | 'declined'): Promise<void> => {
+    const userId = user?.id;
+    if (!userId) throw new Error('Not signed in');
     switch (notification.type) {
       case 'community_match_pending': {
         const matchId = data.matchId as string;
         if (!matchId) throw new Error('Match not found');
         if (action === 'accepted') {
-          await approveCommunityMatch(matchId, user.id!);
+          await approveCommunityMatch(matchId, userId);
         } else {
-          await disputeCommunityMatch(matchId, user.id!);
+          await disputeCommunityMatch(matchId, userId);
         }
         return;
       }
@@ -179,9 +185,9 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         if (ce) throw ce;
         if (!commitments?.length) throw new Error('No pending requests');
         if (action === 'accepted') {
-          await approveCommitment(commitments[0].id, user.id!);
+          await approveCommitment(commitments[0].id, userId);
         } else {
-          await rejectCommitment(commitments[0].id, user.id!);
+          await rejectCommitment(commitments[0].id, userId);
         }
         return;
       }

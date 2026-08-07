@@ -15,7 +15,7 @@ import { useFCM } from '@/hooks/useFCM';
 import type { NotificationType, NotificationPreferences } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
-const NOTIFICATION_SECTIONS: { title: string; items: { type: NotificationType; label: string; description: string }[] }[] = [
+const NOTIFICATION_SECTIONS: { title: string; items: { type: keyof NotificationPreferences; label: string; description: string }[] }[] = [
   {
     title: 'Matches',
     items: [

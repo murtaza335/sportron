@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   Community,
   CommunityInvite,
+  Profile,
   CommunityJoinRequest,
   CommunityMatch,
   CommunityMatchComment,
@@ -919,7 +920,7 @@ export async function inviteMemberByUsername(
 ): Promise<CommunityInvite> {
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('id')
+    .select('id, username')
     .eq('username', username.toLowerCase())
     .single();
 
@@ -957,7 +958,7 @@ export async function inviteMemberByUsername(
 
   const { data: community } = await supabase
     .from('communities')
-    .select('name')
+    .select('name, image_url')
     .eq('id', communityId)
     .single();
 
@@ -970,7 +971,7 @@ export async function inviteMemberByUsername(
   return {
     ...data,
     community: { id: communityId, name: community?.name ?? '', image_url: community?.image_url ?? null },
-    inviter: { id: adminId, username: admin.username, avatar_url: admin.avatar_url },
+    inviter: { id: adminId, username: admin?.username ?? 'Unknown', avatar_url: admin?.avatar_url ?? null },
     invitee: { id: inviteeId, username: profile.username, avatar_url: null },
   };
 }

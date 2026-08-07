@@ -50,12 +50,15 @@ export function InviteMemberModal({
   }, [communityId]);
 
   useEffect(() => {
-    if (visible) {
-      loadPendingState();
-    } else {
-      setInvitedIds(new Set());
-      setPendingRequestIds(new Set());
-    }
+    const timer = setTimeout(() => {
+      if (visible) {
+        loadPendingState();
+      } else {
+        setInvitedIds(new Set());
+        setPendingRequestIds(new Set());
+      }
+    }, 0);
+    return () => clearTimeout(timer);
   }, [visible, loadPendingState]);
 
   const loadProfiles = useCallback(async (query: string) => {
@@ -93,7 +96,7 @@ export function InviteMemberModal({
       setLoading(true);
       setError(null);
       try {
-        const data = await loadProfiles(debouncedSearchQuery);
+        const data = (await loadProfiles(debouncedSearchQuery)) ?? [];
         if (!cancelled) setProfiles(data);
       } catch {
         if (!cancelled) setError('Failed to load users');
