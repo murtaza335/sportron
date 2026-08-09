@@ -3,16 +3,16 @@ import { useFCM } from '@/hooks/useFCM';
 import { useAuth } from '@/contexts/AuthContext';
 
 export function FCMInitializer() {
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { initialize } = useFCM();
   const initializedRef = useRef(false);
 
   useEffect(() => {
-    if (session && !initializedRef.current) {
+    if (session && profile && !initializedRef.current) {
       initializedRef.current = true;
       initialize();
     }
-  }, [session, initialize]);
+  }, [session, profile, initialize]);
 
   return null;
 }
