@@ -1,243 +1,166 @@
 # FCM (Firebase Cloud Messaging) Implementation Guide
 
 ## Overview
-This guide covers implementing push notifications using Firebase Cloud Messaging (FCM) with Expo for the T3Seecs table tennis app.
+This guide documents the push notification setup for the **T3Seecs / Sportron** app using Firebase Cloud Messaging (FCM) with Expo and Supabase Edge Functions.
 
-## Prerequisites
-1. Firebase Project at https://console.firebase.google.com
-2. Expo project configured with EAS
-3. Google Services configuration files
+Current flow: an in-app notification is inserted into `in_app_notifications`, then the client fire-and-forgets a request to the Supabase Edge Function `send-notification`, which signs a Firebase OAuth token and sends to each FCM token.
 
-## Firebase Console Setup
+## Current Configuration (app.json)
 
-### 1. Create Firebase Project
-- Go to Firebase Console
-- Create new project or select existing
-- Enable "Google Analytics" (optional but recommended)
-
-### 2. Add Apps
-#### iOS App
-- Bundle ID: `com.yourcompany.t3seecs` (match your app.json)
-- Download `GoogleService-Info.plist`
-- Place in project root
-
-#### Android App
-- Package name: `com.yourcompany.t3seecs` (match your app.json)
-- Download `google-services.json`
-- Place in project root
-
-### 3. Enable Cloud Messaging
-- In Firebase Console > Project Settings > Cloud Messaging
-- Note down **Server Key** (legacy) or use **Firebase Admin SDK** for server-side
-
-### 4. Configure APNs (iOS)
-- In Firebase Console > Project Settings > Cloud Messaging > iOS app configuration
-- Upload APNs Auth Key (from Apple Developer Console)
-- Or upload APNs Certificate
-
-## Expo Configuration
-
-### 1. Install Dependencies
-```bash
-npx expo install expo-notifications expo-device expo-constants
-npx expo install @react-native-firebase/app @react-native-firebase/messaging
-```
-
-### 2. app.json / app.config.js
 ```json
 {
   "expo": {
+    "name": "Sportron",
+    "slug": "T3S",
+    "version": "1.0.0",
+    "scheme": "t3s",
     "plugins": [
       [
         "expo-notifications",
         {
-          "icon": "./assets/notification-icon.png",
-          "color": "#000000",
-          "defaultChannel": "default"
+          "icon": "./assets/images/icon.png",
+          "color": "#000000"
         }
       ],
-      [
-        "@react-native-firebase/app",
-        {
-          "ios": "./GoogleService-Info.plist",
-          "android": "./google-services.json"
-        }
-      ],
-      "@react-native-firebase/messaging"
+      "@react-native-firebase/app",
+      "@react-native-firebase/messaging",
+      "@react-native-community/datetimepicker"
     ],
     "ios": {
-      "bundleIdentifier": "com.yourcompany.t3seecs",
+      "icon": "./assets/images/icon.png",
       "googleServicesFile": "./GoogleService-Info.plist"
     },
     "android": {
-      "package": "com.yourcompany.t3seecs",
+      "package": "com.murtazabaig.T3S",
       "googleServicesFile": "./google-services.json"
     }
   }
 }
 ```
 
-### 3. eas.json (for build)
-```json
-{
-  "build": {
-    "preview": {
-      "ios": {
-        "simulator": false
-      }
-    },
-    "production": {}
-  }
-}
-```
+## Firebase Console Setup
+
+### 1. Create Firebase Project
+- Go to [Firebase Console](https://console.firebase.google.com)
+- Create a project (or reuse the existing one)
+
+### 2. Add Apps
+#### Android
+- Package name: `com.murtazabaig.T3S` (must match `app.json`)
+- Download `google-services.json` and place it in project root
+- Reference it in `app.json` under `expo.android.googleServicesFile`
+
+#### iOS
+- Bundle ID must match whatever is set for the iOS build (set `ios.bundleIdentifier` in `app.json` and keep it synced with the Apple Developer account)
+- Download `GoogleService-Info.plist` and place it in the project root
+- Reference it in `app.json` under `expo.ios.googleServicesFile`
+
+### 3. Configure APNs (iOS)
+- Firebase Console > Project Settings > Cloud Messaging > iOS app configuration
+- Upload an APNs Auth Key (from Apple Developer Console) or an APNs certificate
 
 ## Code Implementation
 
-### 1. FCM Service (`src/services/fcm.ts`)
-- Token registration and storage
-- Foreground/background message handlers
-- Notification permission handling
+### Notification Types
+Live union (in `src/types/index.ts`):
 
-### 2. Notification Types
-```typescript
-type NotificationType = 
-  | 'match_pending'      // Match needs approval
-  | 'match_approved'     // Match was approved
-  | 'match_rejected'     // Match was rejected
-  | 'match_liked'        // Someone liked your match
-  | 'match_commented';   // Someone commented on your match
+```
+match_pending, match_approved, match_rejected, match_liked, match_commented,
+session_application, session_accepted, session_rejected, session_left,
+session_reminder, feedback_prompt, ping, ping_response,
+join_request, join_approved, join_rejected,
+match_approval_request, match_approved_community, match_disputed,
+member_removed, admin_transferred, admin_promoted,
+community_match_pending, community_match_approved, community_match_disputed,
+community_invite, community_invite_accepted, community_invite_rejected
 ```
 
-### 3. Server-Side (Supabase Edge Functions or Backend)
-- Store FCM tokens in `profiles` table
-- Trigger notifications on database changes
-- Use Firebase Admin SDK to send notifications
+### Notification Data Payload
+`NotificationData` in `src/services/fcm.ts` carries semantic IDs so taps can deep-link:
+```
+type, matchId, senderId, senderName, commentId, sessionId, communityId,
+pingId, message, response, respondentName
+```
 
-## Database Schema Updates
+### Sending a Push
+1. A feature action calls a typed helper in `src/services/notifications.ts` (e.g. `notifyCommunityMatchApproved`)
+2. `createNotification({ userId, type, title, body, data })` inserts via the `insert_notification` RPC and fire-and-forgets `POST {SUPABASE_URL}/functions/v1/send-notification`
+3. The `send-notification` edge function fetches the user's `fcm_tokens`, signs a JWT with the Firebase service account, exchanges it for an OAuth token, and POSTs to the Firebase HTTP v1 API.
+
+## Database Schema
 
 ```sql
--- Add to profiles table
+-- fcm_tokens stored on profiles (from add_fcm_to_profiles.sql)
 ALTER TABLE profiles ADD COLUMN fcm_tokens TEXT[] DEFAULT '{}';
+ALTER TABLE profiles ADD COLUMN notification_preferences JSONB;
 
--- Optional: notification preferences
-ALTER TABLE profiles ADD COLUMN notification_preferences JSONB DEFAULT '{
-  "match_pending": true,
-  "match_approved": true,
-  "match_rejected": true,
-  "match_liked": true,
-  "match_commented": true
-}';
+-- in-app notification row
+CREATE TABLE in_app_notifications (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  user_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
+  type TEXT,
+  title TEXT,
+  body TEXT,
+  data JSONB,
+  read BOOLEAN DEFAULT FALSE,
+  created_at TIMESTAMPTZ DEFAULT now()
+);
 ```
 
-## Supabase Edge Function for Notifications
+## Supabase Edge Function: `send-notification`
 
-Create `supabase/functions/send-notification/index.ts`:
-```typescript
-import { serve } from 'https://deno.land/std@0.168.0/http/server.ts';
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+File: `supabase/functions/send-notification/index.ts`
 
-const admin = require('firebase-admin');
-
-serve(async (req) => {
-  const { userIds, title, body, data, type } = await req.json();
-  
-  // Get FCM tokens for users
-  const supabase = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
-  
-  const { data: profiles } = await supabase
-    .from('profiles')
-    .select('fcm_tokens')
-    .in('id', userIds);
-  
-  const tokens = profiles?.flatMap(p => p.fcm_tokens || []) || [];
-  
-  // Send via Firebase Admin SDK
-  const messaging = admin.messaging();
-  await messaging.sendEachForMulticast({
-    tokens,
-    notification: { title, body },
-    data: { ...data, type },
-  });
-  
-  return new Response(JSON.stringify({ success: true }));
-});
-```
+- Requires secret `FCM_SERVICE_ACCOUNT` = the full Firebase service account JSON
+- Signs an RS256 JWT (iss = `client_email`, scope `https://www.googleapis.com/auth/firebase.messaging`), exchanges it for an OAuth token
+- Fetches `profiles.fcm_tokens` for `user_id`, then sends to each token via the FCM HTTP v1 API
+- Message includes `notification {title, body}`, stringified `data`, `android {priority:'high'}`, `apns {aps {alert, sound:'default', badge:1}}`
+- Responds `{ sent, failed, total }`
+- Deploy: `supabase functions deploy send-notification` and store the secret `FCM_SERVICE_ACCOUNT`
 
 ## Client Integration
 
-### 1. Initialize in `_layout.tsx`
-```typescript
-import { useEffect } from 'react';
-import { useFCM } from '@/hooks/useFCM';
+### Core module: `src/services/fcm.ts`
+- `registerForPushNotificationsAsync()` — Android channels (default, match-updates), permission request, `messaging().getToken()`
+- `saveFCMTokenToProfile` / `removeFCMTokenFromProfile` — deduplicated array updates on `profiles.fcm_tokens`
+- `setupBackgroundMessageHandler()` — data-only messages schedule a local notification
+- `setupForegroundMessageHandler()` — `messaging().onMessage`
+- `setupTokenRefreshListener()` — refetch on token refresh
+- `scheduleLocalNotification()`, `getNotificationPermissions()`, `parseNotificationData/ResponseData()`
+- Sets the global `Notifications.setNotificationHandler` (alerts/sound/badge/banner)
 
-export default function RootLayout() {
-  const { initialize } = useFCM();
-  
-  useEffect(() => {
-    initialize();
-  }, []);
-  
-  return <ThemeProvider>...</ThemeProvider>;
-}
-```
+### Hook: `src/hooks/useFCM.ts`
+- `initialize()`: registers token, wires listeners (including routing ping notifications to `/ping-response`), persists to Supabase
+- `requestPermissions()`, `sendTestNotification()`, `useNotificationNavigation()`
 
-### 2. Handle Incoming Notifications
-```typescript
-// In useFCM hook
-messaging().onMessage(async (remoteMessage) => {
-  // Show local notification when app is in foreground
-  await Notifications.scheduleNotificationAsync({
-    content: {
-      title: remoteMessage.notification?.title,
-      body: remoteMessage.notification?.body,
-      data: remoteMessage.data,
-    },
-    trigger: null,
-  });
-});
-
-// Handle notification tap
-Notifications.addNotificationResponseReceivedListener((response) => {
-  const data = response.notification.request.content.data;
-  // Navigate based on data.type
-  navigateToMatch(data.matchId);
-});
-```
+### Init mount: `src/components/FCMInitializer.tsx`
+- Mounts `useFCM().initialize()` once a session is available
 
 ## Testing Checklist
 
-- [ ] Development build on physical device (not simulator)
-- [ ] Permissions granted for notifications
-- [ ] FCM token registered in database
-- [ ] Test each notification type:
-  - [ ] Match pending approval
-  - [ ] Match approved
-  - [ ] Match rejected
-  - [ ] Match liked
-  - [ ] Match commented
-- [ ] Test foreground/background/terminated states
-- [ ] Test deep linking from notification tap
+- [ ] Development build on a physical device (FCM does not work on simulators/emulators)
+- [ ] Permissions granted
+- [ ] Token registered in `profiles.fcm_tokens`
+- [ ] Test each notification type (session application/accept/reject, join request, ping, ping response, community match pending/approved/disputed, invite, etc.)
+- [ ] Test foreground / background / terminated behavior
 
 ## Production Deployment
 
 1. Build with EAS: `eas build --platform all`
-2. Submit to App Store / Play Store
-3. Configure production Firebase project
-4. Set up monitoring in Firebase Console
+2. Submit to Google Play Console / App Store
+3. Configure the production Firebase project
+4. Deploy the `send-notification` edge function with the `FCM_SERVICE_ACCOUNT` secret
 
 ## Troubleshooting
 
 | Issue | Solution |
 |-------|----------|
-| Token not received | Check GoogleService-Info.plist / google-services.json |
-| Notifications not showing | Verify APNs key, check notification permissions |
-| Duplicate tokens | Deduplicate in database, handle token refresh |
-| iOS not receiving | Ensure "Push Notifications" capability in Xcode |
+| Token not received | Verify `google-services.json` / `GoogleService-Info.plist` match the app IDs |
+| iOS not receiving | Ensure APNs key uploaded + "Push Notifications" entitlement |
+| Edge function 401/403 | Check the `FCM_SERVICE_ACCOUNT` secret is correct JSON with a valid private key |
+| Notifications only shown on tap | Check priority / OAuth scope |
 
 ## Resources
 - [Expo Notifications](https://docs.expo.dev/versions/latest/sdk/notifications/)
 - [React Native Firebase Messaging](https://rnfirebase.io/messaging/)
-- [FCM REST API](https://firebase.google.com/docs/cloud-messaging/http-server-protocol)
+- [FCM HTTP v1](https://firebase.google.com/docs/cloud-messaging/migrate-v1)

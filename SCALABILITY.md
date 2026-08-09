@@ -1,20 +1,23 @@
-# Scalability Analysis & Future Feature Roadmap
+# Scalability Analysis & Feature Roadmap
 
 ## Current Architecture Assessment
 
-The T3Seecs app is built with a **modular, sport-agnostic foundation** that supports multi-sport expansion with minimal refactoring.
+The Sportron/T3Seecs app is built on a **modular, multi-sport foundation**. It was originally a single table-tennis match tracker and has expanded into a community + sessions + community-matches platform.
 
-### ✅ Already Sport-Agnostic
-- **Match model**: `match_format` (singles/doubles) is generic
-- **Team structure**: `player_id`, `player_partner_id`, `opponent_id`, `opponent_partner_id` works for any 1v1 or 2v2 sport
-- **Scoring**: Simple `player_score` / `opponent_score` integers
-- **Profiles**: Role-based (student/teacher) but extensible
-- **Social**: Likes, comments, verification work for any match type
+### ✅ Already Built (Multi-Sport)
+- **Sports**: `Sport` union covering racket sports (table_tennis, badminton, tennis, squash, pickleball) + team sports (football, cricket, volleyball, handball, basketball) + other
+- **Match model**: `community_matches` with `player/player_partner/opponent/opponent_partner` (1v1 or 2v2) plus team-name/captain fields for team sports
+- **Scoring**: Simple `player_score` / `opponent_score` integers (>= 0)
+- **Communities**: sport-linked, public/restricted visibility, cover photos, member roles
+- **Sessions**: pickup-play sessions with commitments, expiry, time-conflict checks
+- **Social**: likes, comments, approval workflow per community match
+- **Profiles**: role-based (student/teacher)
+- **Notifications**: in-app notifications + FCM push
 
-### ⚠️ Needs Minor Changes
-- `match_format` enum → support more formats (best-of-3, best-of-5, sets)
-- Hardcoded "Team A/B" labels → make configurable per sport
-- Guest name field → generalize to "unregistered player"
+### Scope Decisions Going Forward
+- `community_matches` is the single source of truth for played matches (legacy `matches`/`match_likes`/`match_comments` tables were dropped)
+- Sports, scoring formats, and match rules are extensible but currently stored as simple text/enum fields
+- No venue, team-object, or tournament abstractions exist yet
 
 ---
 
@@ -22,12 +25,11 @@ The T3Seecs app is built with a **modular, sport-agnostic foundation** that supp
 
 | Feature | Complexity | DB Changes | Breaking? | Priority |
 |---------|------------|------------|-----------|----------|
-| Multi-sport support | Low | Add `sport` enum to matches | No | High |
 | Match locations (venues) | Low | New `venues` table + FK | No | High |
-| Photos/videos on matches | Medium | Add `match_media` table | No | High |
+| Photos/videos on matches | Medium | New `match_media` table | No | High |
+| Sport-specific scoring | Medium | Extend match model | Possible | Medium |
 | User-created teams | Medium | New `teams` + `team_members` tables | No | Medium |
 | Tournaments/brackets | High | New `tournaments`, `brackets`, `tournament_teams` | No | Medium |
-| Sport-specific scoring | Medium | Extend match model | Possible | Low |
 | Leagues/seasons | High | New `leagues`, `seasons`, `standings` | No | Low |
 | Equipment tracking | Low | New `equipment` table | No | Low |
 | Coaching/training logs | Medium | New `training_sessions` | No | Low |
@@ -36,27 +38,7 @@ The T3Seecs app is built with a **modular, sport-agnostic foundation** that supp
 
 ## Detailed Feature Specifications
 
-### 1. Multi-Sport Support (High Priority)
-**Implementation:**
-```sql
--- Add to matches table
-ALTER TABLE matches ADD COLUMN sport TEXT NOT NULL DEFAULT 'table_tennis';
-
--- Sports enum in app
-type Sport = 'table_tennis' | 'tennis' | 'badminton' | 'pickleball' | 'squash' | 'padel';
-```
-
-**UI Changes:**
-- Sport selector in match creation (SegmentedControl or modal)
-- Sport-specific icons/colors in MatchCard
-- Filter by sport in History tab
-
-**Compatibility:** ✅ Zero breaking changes - defaults to 'table_tennis'
-
----
-
-### 2. Match Locations / Venues (High Priority)
-**Implementation:**
+### 1. Match Locations / Venues (High Priority)
 ```sql
 CREATE TABLE venues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -64,29 +46,23 @@ CREATE TABLE venues (
   address TEXT,
   lat DECIMAL(10,8),
   lng DECIMAL(11,8),
-  sport_types TEXT[], -- which sports played here
+  sport_types TEXT[],
   is_public BOOLEAN DEFAULT true,
   created_by UUID REFERENCES profiles(id),
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
-ALTER TABLE matches ADD COLUMN venue_id UUID REFERENCES venues(id);
 ```
 
 **Features:**
 - Search nearby venues (PostGIS)
-- Venue detail page with upcoming matches
-- "Play here" quick action
+- Venue detail page with upcoming sessions
 - Venue ratings/reviews
 
----
-
-### 3. Photos & Videos on Matches (High Priority)
-**Implementation:**
+### 2. Photos & Videos on Matches (High Priority)
 ```sql
 CREATE TABLE match_media (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  match_id UUID REFERENCES matches(id) ON DELETE CASCADE,
+  match_id UUID REFERENCES community_matches(id) ON DELETE CASCADE,
   uploaded_by UUID REFERENCES profiles(id),
   media_type TEXT CHECK (media_type IN ('image', 'video')),
   url TEXT NOT NULL, -- Cloudinary/S3
@@ -97,15 +73,21 @@ CREATE TABLE match_media (
 ```
 
 **Upload Flow:**
-- Multi-select images/videos in add-match
+- Multi-select images/videos in record-match
 - Cloudinary auto-transformation (thumbnails, compression)
-- Carousel in MatchDetailPopup
-- Video playback with native player
+- Gallery in MatchDetailPopup
 
----
+### 3. Sport-Specific Scoring (Medium Priority)
+```sql
+-- Extend community_matches with flexible scoring
+ALTER TABLE community_matches ADD COLUMN scoring_data JSONB DEFAULT '{}';
+-- Tennis: { sets: [[6,4], [6,3]], tiebreak: true }
+-- Badminton: { games: [21, 21], gamePoints: [[21,18], [21,15]] }
+```
+
+**Renderer:** Sport-specific score components in MatchCard/DetailPopup
 
 ### 4. User-Created Teams (Medium Priority)
-**Implementation:**
 ```sql
 CREATE TABLE teams (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -121,120 +103,54 @@ CREATE TABLE teams (
 CREATE TABLE team_members (
   team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
   profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
-  role TEXT DEFAULT 'member', -- captain, co-captain, member
+  role TEXT DEFAULT 'member',
   joined_at TIMESTAMPTZ DEFAULT now(),
   PRIMARY KEY (team_id, profile_id)
 );
 ```
 
-**Features:**
-- Create/join teams from profile
-- Team matchmaking (challenge other teams)
-- Team stats (wins/losses as a unit)
-- Team chat (future)
-
----
+**Features:** Create/join teams from profile, team matchmaking, team stats.
 
 ### 5. Tournaments & Brackets (Medium Priority)
-**Implementation:**
 ```sql
 CREATE TABLE tournaments (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   sport TEXT NOT NULL,
-  format TEXT, -- single_elim, double_elim, round_robin, swiss
+  format TEXT,
   start_date TIMESTAMPTZ,
   end_date TIMESTAMPTZ,
   venue_id UUID REFERENCES venues(id),
   organizer_id UUID REFERENCES profiles(id),
   max_teams INT,
-  status TEXT DEFAULT 'upcoming', -- upcoming, active, completed
+  status TEXT DEFAULT 'upcoming',
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
-CREATE TABLE tournament_teams (
-  tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  seed INT,
-  PRIMARY KEY (tournament_id, team_id)
-);
-
-CREATE TABLE bracket_matches (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  tournament_id UUID REFERENCES tournaments(id) ON DELETE CASCADE,
-  round INT,
-  position INT,
-  team1_id UUID REFERENCES teams(id),
-  team2_id UUID REFERENCES teams(id),
-  winner_id UUID REFERENCES teams(id),
-  match_id UUID REFERENCES matches(id), -- link to actual match
-  scheduled_at TIMESTAMPTZ,
-  status TEXT DEFAULT 'pending',
-  PRIMARY KEY (tournament_id, round, position)
-);
 ```
 
-**Features:**
-- Bracket visualization (SVG/Canvas)
-- Auto-advance winners
-- Schedule notifications
-- Live bracket updates
+**Features:** Bracket visualization, auto-advance winners, schedule notifications, live updates.
 
----
-
-### 6. Sport-Specific Scoring (Low Priority)
-**Implementation:**
-```sql
--- Extend matches with flexible scoring
-ALTER TABLE matches ADD COLUMN scoring_data JSONB DEFAULT '{}';
-
--- Examples:
--- Tennis: { sets: [[6,4], [6,3]], tiebreak: true }
--- Badminton: { games: [21, 21], gamePoints: [[21,18], [21,15]] }
--- Squash: { games: [[11,9], [11,5], [11,7]], parsing: 'par' }
-```
-
-**Renderer:** Sport-specific score components in MatchCard/DetailPopup
-
----
-
-### 7. Leagues & Seasons (Low Priority)
-**Implementation:**
+### 6. Leagues & Seasons (Low Priority)
 ```sql
 CREATE TABLE leagues (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   name TEXT NOT NULL,
   sport TEXT NOT NULL,
-  season TEXT, -- "2024 Fall"
-  format TEXT, -- round_robin, divisions
+  season TEXT,
+  format TEXT,
   start_date DATE,
   end_date DATE,
   created_at TIMESTAMPTZ DEFAULT now()
 );
-
-CREATE TABLE league_standings (
-  league_id UUID REFERENCES leagues(id) ON DELETE CASCADE,
-  team_id UUID REFERENCES teams(id) ON DELETE CASCADE,
-  played INT DEFAULT 0,
-  won INT DEFAULT 0,
-  lost INT DEFAULT 0,
-  drawn INT DEFAULT 0,
-  points INT DEFAULT 0,
-  sets_for INT DEFAULT 0,
-  sets_against INT DEFAULT 0,
-  PRIMARY KEY (league_id, team_id)
-);
 ```
 
----
-
-### 8. Equipment Tracking (Low Priority)
+### 7. Equipment Tracking (Low Priority)
 ```sql
 CREATE TABLE equipment (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
   profile_id UUID REFERENCES profiles(id) ON DELETE CASCADE,
   sport TEXT NOT NULL,
-  type TEXT, -- racket, paddle, shoes, balls
+  type TEXT,
   brand TEXT,
   model TEXT,
   purchase_date DATE,
@@ -243,9 +159,7 @@ CREATE TABLE equipment (
 );
 ```
 
----
-
-### 9. Training/Coaching Logs (Low Priority)
+### 8. Training/Coaching Logs (Low Priority)
 ```sql
 CREATE TABLE training_sessions (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -253,8 +167,8 @@ CREATE TABLE training_sessions (
   sport TEXT NOT NULL,
   date DATE NOT NULL,
   duration_minutes INT,
-  focus TEXT[], -- footwork, serve, backhand, fitness
-  intensity TEXT, -- light, moderate, intense
+  focus TEXT[],
+  intensity TEXT,
   notes TEXT,
   created_at TIMESTAMPTZ DEFAULT now()
 );
@@ -262,60 +176,63 @@ CREATE TABLE training_sessions (
 
 ---
 
-## Current Feature Inventory
+## Current Feature Inventory (as of latest release)
 
-### Core Match Features
-- ✅ Singles/Doubles match creation
-- ✅ Guest player support (unregistered opponents)
-- ✅ Score tracking (+/- buttons + direct input)
-- ✅ Match verification (pending/verified/disputed)
-- ✅ Public/Private visibility
-- ✅ Match format badges
+### Communities
+- ✅ Multi-sport communities (each community linked to one sport)
+- ✅ Public / restricted visibility + discovery/search/sport filters
+- ✅ Instant join (public) / admin-approved join requests (restricted)
+- ✅ Member roles (admin/member), promote / remove / transfer admin
+- ✅ Community cover photos (Cloudinary)
+- ✅ Admin invite-by-username; invite accept/decline
+- ✅ Pings with live "Coming"/"Busy" responses
+- ✅ Edit & delete community; leave community
 
-### Social Features
-- ✅ Likes with optimistic UI
-- ✅ Threaded comments
-- ✅ Comment counts
-- ✅ Match sharing (native share sheet)
+### Community Matches
+- ✅ Singles / doubles (racket) + team names/captain (team sports)
+- ✅ Score tracker (+/- + direct input)
+- ✅ Approval workflow (pending → approved/disputed)
+- ✅ Approved / pending feed tabs, pagination, pull-to-refresh
+- ✅ Likes + comments with optimistic UI
+- ✅ Per-community standings tracked on members (`community_leaderboard` DB view exists; not yet surfaced in the UI)
+
+### Sessions
+- ✅ Create sessions (sport, location, datetime, capacity, expiry)
+- ✅ Max 7-day future window + ±30 min time-conflict check
+- ✅ Apply / approve / reject / leave / re-apply commitments
+- ✅ Session statuses + auto-close of expired sessions
+- ✅ Session detail popup, counts, countdown, delete (no accepted members)
+
+### Activity & Notifications
+- ✅ In-app notification inbox with Action Required / Invites / Past tabs
+- ✅ Inline accept/decline for session applications, join requests, match approvals, invites
+- ✅ Real-time notification inserts via Supabase Realtime
+- ✅ Unread badge on the Activity tab
+- ✅ FCM push notifications (foreground/background/terminated)
+- ✅ Per-type notification preferences
 
 ### Profile & Auth
-- ✅ Google OAuth
-- ✅ Profile CRUD (name, bio, role, avatar)
-- ✅ Cloudinary image upload
+- ✅ Google OAuth (Supabase)
+- ✅ Profile CRUD (username, bio, role, avatar)
+- ✅ Cloudinary image upload with progress
 - ✅ Theme persistence (light/dark/system)
-
-### Discovery & History
-- ✅ Global feed (public verified matches)
-- ✅ My matches feed
-- ✅ Pull-to-refresh + auto-refresh
-- ✅ Match detail bottom sheet
-
-### Notifications (FCM Ready)
-- ✅ Token registration & storage
-- ✅ Permission handling
-- ✅ 5 notification types defined
-- ⏳ Server-side triggers needed
+- ✅ Soft-delete account + re-enable on login
 
 ---
 
 ## Migration Strategy
 
-### Phase 1: Foundation (Week 1-2)
-1. Add `sport` column to matches (default 'table_tennis')
-2. Create `venues` table + migration
-3. Update `MatchLineupSelector` for sport selection
+### Phase 1: Locations & Media (Week 1-2)
+1. Create `venues` + `match_media` tables
+2. Integrate venue picker in create-session / record-match
+3. Cloudinary video support
 
-### Phase 2: Media & Location (Week 2-3)
-1. Create `match_media` table
-2. Cloudinary video support
-3. Integrate venue picker in add-match
-
-### Phase 3: Teams & Social (Week 3-4)
-1. Create `teams` + `team_members` tables
+### Phase 2: Teams (Week 2-3)
+1. `teams` + `team_members` tables
 2. Team CRUD in profile
 3. Team-based matchmaking
 
-### Phase 4: Competitions (Week 4-6)
+### Phase 3: Competitions (Week 4-6)
 1. Tournaments + brackets
 2. League standings
 3. Notification triggers for all events
@@ -326,18 +243,18 @@ CREATE TABLE training_sessions (
 
 | Issue | Impact | Fix |
 |-------|--------|-----|
-| `match_format` hardcoded singles/doubles | Blocks new sports | Make enum extensible |
-| "Team A/B" labels | UX confusion for other sports | Config per sport |
-| Guest name single field | Need per-slot guest names | Array of guest names |
-| No pagination on history | Performance at scale | Add cursor pagination |
+| Sport/scoring stored as simple text | Blocks sport-specific scoring | Add structured scoring JSON per sport |
+| No venue model | Sessions can't reference places | Add `venues` table + FK |
+| No media on matches | Missed retention | `match_media` table + Cloudinary |
+| Match types not paramount in add-match flow | Fewer recorded matches | Deeper `community_matches` seeding/join flows |
 
 ---
 
 ## Recommended Next Steps
 
-1. **Immediate**: Add `sport` enum + venue support (highest ROI)
-2. **Short-term**: Photos/videos + teams (user retention)
-3. **Medium**: Tournaments (engagement driver)
-4. **Long-term**: Leagues, equipment, training logs
+1. **Immediate**: Venues + match media (high ROI)
+2. **Short-term**: Teams (retention)
+3. **Medium**: Tournaments (engagement)
+4. **Long-term**: Leagues, equipment, sport-specific scoring
 
-The current codebase is **~80% ready** for multi-sport. Core patterns (service layer, hooks, types) are already reusable.
+The codebase is fully multi-sport-ready; core scalable loops (services, hooks, types, notifications) are already reusable.

@@ -1,104 +1,93 @@
-# T3Seecs - Table Tennis Match Tracking App
+# T3Seecs - Multi-Sport Community & Match Tracking App
 
-**Expo + Supabase + TypeScript** mobile app for tracking table tennis matches with social features.
+**Expo + Supabase + TypeScript** mobile app for organizing pickup sports through communities and sessions, and tracking played matches. The app displays as **Sportron**.
 
 ## Features
 
-### Match Tracking
-- Singles (1v1) and Doubles (2v2) match formats
-- Team builder with visual slot cards
-- Player picker with search + guest player free-text
-- Score counter (+/-) with minimum 0
-- Match visibility (public / private)
-- Match approval workflow (pending → verified / disputed)
+### Communities
+- **Create communities** linked to a single sport (table tennis, badminton, tennis, squash, pickleball, football, cricket, volleyball, handball, basketball, other)
+- Cover photo upload, description, public/restricted visibility
+- **Discover**: browse public communities with name search + sport filter chips, admin/member role tags
+- **Join**: instant for public, admin-approval for restricted
+- Admin tools: edit info, transfer admin, delete, promote/remove members, review join requests, invite members by username
+- **Pings**: notify the whole community; members respond "Coming"/"Busy" live
 
-### Match History
-- Global feed of public matches + personal match history
-- Pull-to-refresh with auto-refresh on tab focus
-- Match cards showing teams, score, format badges, and win/loss/draw
-- Social: Like (heart) and comment count with optimistic UI
-- Bottom sheet details with full match info + comments thread
+### Community Matches
+- Record matches within a community; opponents limited to community members
+- Racket sports: singles (1v1) / doubles (2v2)
+- Team sports: team names + opponent captain
+- Score counter (+/-) with direct numeric input, min 0
+- **Approval workflow**: pending → opponent approves (verified) or disputes
+- Likes + comments, win/loss badges
 
-### Home Dashboard
-- Stats cards: Total matches, Wins, Losses
-- Quick "Add Match" button
+### Sessions (Find a Match)
+- Create sessions for any sport with location, date/time, max participants, expiry (15m/30m/1hr)
+- Max 7 days in the future; time-conflict check (±30 min)
+- **Commitments**: apply, creator approves/rejects, leave and re-apply
+- Expired sessions auto-close; session cards show countdown + commitment count
 
-### Authentication
-- Google OAuth via Supabase
-- Auto profile creation on first login → onboarding flow
+### Activity (Notifications Inbox)
+- Tabs: Action Required / Invites / Past Activity
+- Inline Accept/Decline for session applications, join requests, community match approvals, community invites
+- Real-time updates + unread badge on tab
+
+### Push Notifications
+- FCM push notifications via Supabase Edge Function
+- Foreground/background/terminated handling
+- Per-type preferences toggleable in settings
 
 ### Profile & Settings
-- Profile view/edit (name, bio, role, avatar)
+- Profile view/edit: username, bio, role (student/teacher), avatar upload
 - Theme picker (Light / Dark / System)
-- **Push notification master toggle** (on/off)
-- **Advanced Settings page** with per-type notification preferences:
-  - Match Pending
-  - Match Approved
-  - Match Rejected
-  - Likes
-  - Comments
-
-### Notifications
-- Firebase Cloud Messaging (FCM) push notifications
-- Real-time in-app notification updates via Supabase Realtime
-- Notification list with mark-read, mark-all-read, and delete
-- Per-type notification preferences persisted to Supabase
+- Push notification master toggle + per-type preferences vs advanced settings
+- Delete account (soft delete)
 
 ## Tech Stack
 
 - **Framework**: Expo Router (v57) with React Native 0.86
 - **Backend**: Supabase (PostgreSQL + Auth + Realtime + Edge Functions)
 - **Language**: TypeScript (strict)
-- **Styling**: Custom theme system with light/dark mode, CSS-in-JS (StyleSheet)
+- **Styling**: Custom theme system (light/dark/system), CSS-in-JS (StyleSheet)
 - **Auth**: Google OAuth via Supabase
-- **Push Notifications**: Firebase Cloud Messaging (FCM) via `@react-native-firebase/messaging` + `expo-notifications`
+- **Images**: Cloudinary (avatars + community cover photos)
+- **Push Notifications**: Firebase Cloud Messaging (FCM)
 
 ## Project Structure
 
 ```
 src/
-├── app/                    # Expo Router file-based routing
-│   ├── _layout.tsx         # Root stack + auth gating
-│   ├── login.tsx           # Google OAuth login
-│   ├── onboarding.tsx      # Profile setup after first login
-│   ├── add-match.tsx       # Match creation modal
-│   ├── notifications.tsx   # In-app notification list
-│   ├── settings.tsx        # App settings (notification preferences, about)
-│   ├── (tabs)/
-│   │   ├── _layout.tsx     # 3 tabs: Home / History / Profile
-│   │   ├── index.tsx       # Home - stats + add match button
-│   │   ├── history.tsx     # Match feed with Global/My tabs
-│   │   └── profile.tsx     # Profile view/edit + notification master toggle + sign out
-├── components/
-│   ├── MatchCard.tsx       # Match list card with likes/comments
-│   ├── MatchDetailPopup.tsx # Bottom sheet with full details + comments
-│   ├── MatchLineupSelector.tsx # Visual team builder for add-match
-│   ├── OpponentSelector.tsx    # Player search + guest picker
-│   ├── ProfileForm.tsx     # Name/bio/role form
-│   ├── ScoreCounter.tsx    # +/- score input
-│   ├── PrivacyToggle.tsx   # Public/private toggle
-│   └── ui/                 # Reusable UI primitives
-├── contexts/
-│   ├── AuthContext.tsx     # Supabase auth + profile state
-│   └── ThemeContext.tsx    # Theme provider with light/dark/system
-├── hooks/
-│   ├── useMatches.ts       # Fetch global/my matches
-│   ├── useMatchStats.ts    # Win/loss stats
-│   ├── use-theme.ts        # Theme context wrapper
-│   ├── use-color-scheme.ts # System theme detection
-│   ├── useFCM.ts           # FCM initialization and permissions
-│   └── useNotifications.ts # In-app notification state + realtime
-├── services/
-│   ├── auth.ts             # Google OAuth flow
-│   ├── matches.ts          # CRUD + likes + comments + stats
-│   ├── profiles.ts         # Profile CRUD + notification prefs + FCM token management
-│   ├── fcm.ts              # Core FCM service (token, listeners, scheduling)
-│   └── notifications.ts    # Push notification dispatch helpers
-├── lib/
-│   └── supabase.ts         # Supabase client (AsyncStorage/web fallback)
-├── types/
-│   └── index.ts            # Shared TypeScript types
-└── constants/theme.ts      # Design tokens (colors, spacing, radius)
+├── app/                        # Expo Router file-based routing
+│   ├── _layout.tsx             # Root stack + auth gating + providers
+│   ├── login.tsx / onboarding.tsx / auth/callback.tsx
+│   ├── add-match.tsx           # Record community match (modal)
+│   ├── create-community.tsx    # New community (modal)
+│   ├── create-session.tsx      # New session (modal)
+│   ├── discover.tsx            # Browse public communities
+│   ├── ping-response.tsx       # Respond to a ping
+│   ├── settings.tsx            # Notification prefs, about, delete account
+│   ├── community/[id].tsx      # Community detail + match feed
+│   ├── community/[id]/info.tsx # Community info + edit/delete
+│   ├── community/[id]/members.tsx
+│   ├── community/[id]/join-requests.tsx
+│   ├── profile/[id].tsx        # Public profile
+│   └── (tabs)/
+│       ├── _layout.tsx         # 4 tabs: Communities / Sessions / Activity / Profile
+│       ├── index.tsx           # My communities
+│       ├── history.tsx         # Find a Match (open sessions)
+│       ├── updates.tsx         # Activity (notifications)
+│       └── profile.tsx         # Profile + settings
+├── components/                 # MatchCard, MatchDetailPopup, MatchLineupSelector,
+│                               # ScoreCounter, SessionDetailPopup, ActivityCard,
+│                               # InviteCard, InviteMemberModal, CommunityCard,
+│                               # ProfileForm, FCMInitializer, ui/*
+├── contexts/                   # AuthContext, ThemeContext
+├── hooks/                      # useCommunities, useCommunity, useSessions,
+│                               # useNotifications, useFCM, use-theme
+├── services/                   # auth, profiles, communities, sessions,
+│                               # notifications, fcm
+├── lib/                        # supabase, cloudinary, date
+├── types/ index.ts             # Shared types + sport constants
+└── constants/ theme.ts         # Design tokens
 ```
 
 ## Getting Started
@@ -108,13 +97,17 @@ src/
    npm install
    ```
 
-2. Copy `.env.example` to `.env` and fill in your Supabase credentials:
+2. Copy `.env.example` to `.env` and fill in credentials:
    ```
    EXPO_PUBLIC_SUPABASE_URL=...
    EXPO_PUBLIC_SUPABASE_ANON_KEY=...
+   EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME=...
+   EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET=...
    ```
 
-3. Start the app
+3. Apply the Supabase schema (see `supabase/schema.sql` + `supabase/migrations/`)
+
+4. Start the app
    ```bash
    npx expo start
    ```
@@ -128,3 +121,5 @@ npm run ios        # iOS simulator
 npm run web        # Web build
 npm run lint       # Expo lint (ESLint)
 ```
+
+See `AGENTS.md` for architecture details, data model, notifications, and contribution conventions. See `FCM_IMPLEMENTATION_GUIDE.md` for push notification setup.
