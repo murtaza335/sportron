@@ -1,5 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
@@ -8,6 +8,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
+import { isUsernameAvailable } from '@/services/profiles';
 import type { UserRole } from '@/types';
 
 type ProfileFormProps = {
@@ -17,6 +18,7 @@ type ProfileFormProps = {
   initialAvatar?: string | null;
   submitLabel?: string;
   loading?: boolean;
+  excludeUsername?: string;
   onSubmit: (data: { username: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
 };
 
@@ -31,17 +33,46 @@ export function ProfileForm({
   initialAvatar = null,
   submitLabel = 'Continue',
   loading = false,
+  excludeUsername,
   onSubmit,
 }: ProfileFormProps) {
   const theme = useTheme();
   const [username, setUsername] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
   const [role, setRole] = useState<UserRole>(initialRole);
-  const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
+const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
+  const [checked, setChecked] = useState<{ value: string; status: 'available' | 'taken' | 'error' } | null>(null);
 
-  const canSubmit = username.trim().length > 0;
+  const value = username.trim().toLowerCase();
+  const isOwnUsername = !!excludeUsername && value === excludeUsername.trim().toLowerCase();
+
+  const checking = value.length > 0 && !isOwnUsername && checked?.value !== value;
+  const taken = checked?.value === value && checked.status === 'taken';
+  const available = isOwnUsername || (checked?.value === value && checked.status === 'available');
+  const canSubmit = value.length > 0 && available;
+
+  useEffect(() => {
+    const currentValue = username.trim().toLowerCase();
+    const isOwn = !!excludeUsername && currentValue === excludeUsername.trim().toLowerCase();
+
+    const timer = setTimeout(async () => {
+      if (!currentValue || isOwn) {
+        setChecked(null);
+        return;
+      }
+      try {
+        const isAvailable = await isUsernameAvailable(currentValue, excludeUsername);
+        setChecked({ value: currentValue, status: isAvailable ? 'available' : 'taken' });
+      } catch (error) {
+        console.error('Username availability check failed:', error);
+        setChecked({ value: currentValue, status: 'error' });
+      }
+    }, 500);
+
+    return () => clearTimeout(timer);
+  }, [username, excludeUsername]);
 
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -182,6 +213,19 @@ export function ProfileForm({
           autoComplete="off"
           accessibilityLabel="Username"
         />
+        {checking ? (
+          <ThemedText variant="caption" muted>
+            Checking availability…
+          </ThemedText>
+        ) : taken ? (
+          <ThemedText variant="caption" style={{ color: '#DC2626' }}>
+            That username is taken. Please choose another one.
+          </ThemedText>
+        ) : available ? (
+          <ThemedText variant="caption" style={{ color: '#10B981' }}>
+            Username is available.
+          </ThemedText>
+        ) : null}
       </View>
 
       <View style={styles.field}>

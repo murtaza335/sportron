@@ -157,6 +157,7 @@ export default function ProfileScreen() {
             initialRole={profile?.role}
             initialAvatar={profile?.avatar_url ?? null}
             submitLabel="Save changes"
+            excludeUsername={profile?.username}
             onSubmit={handleSave}
           />
         )}

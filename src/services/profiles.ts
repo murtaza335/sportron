@@ -16,6 +16,30 @@ export async function fetchProfile(userId: string): Promise<Profile | null> {
   return data;
 }
 
+export async function isUsernameAvailable(username: string, excludeUserId?: string): Promise<boolean> {
+  const normalized = username.trim().toLowerCase();
+  if (!normalized) {
+    return false;
+  }
+
+  let query = supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', normalized);
+
+  if (excludeUserId) {
+    query = query.neq('id', excludeUserId);
+  }
+
+  const { data, error } = await query.limit(1);
+
+  if (error) {
+    throw error;
+  }
+
+  return (data?.length ?? 0) === 0;
+}
+
 export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[]> {
   let query = supabase
     .from('profiles')
