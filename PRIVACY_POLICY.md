@@ -20,15 +20,16 @@ The App is developed and operated by **Muhammad Murtaza** ("we", "us", "our", or
 
 ## 2. Information We Collect
 
-We collect only the information necessary to operate the App (a multi-sport community, session, and match-tracking service) and to provide you with the features you choose to use.
+We collect only the information necessary to operate the App (a multi-sport social networking application for communities, sessions, and match tracking) and to provide you with the features you choose to use.
 
 ### 2.1 Information You Provide Directly
 - **Google account profile:** When you sign in using Google, we obtain your Google account name and email address and use it to create your account. We do not access your Google password.
 - **Profile information:** Your chosen username, bio, and role (e.g., student or teacher), which you provide and manage yourself.
 - **Profile photo / community cover photos:** Photos you upload. These are stored and served by our image-processing provider (Cloudinary) and displayed to other users where relevant.
 - **Community content:** Community names, descriptions, and the sport each community is linked to.
-- **Match and session content:** Details you enter when recording a match or creating a session, including sport(s) played, scores, team, versus/opponent names, comments, and likes.
-- **Messages and pings:** Text you send when pinging a community, and your "Coming"/"Busy" responses.
+- **User-generated content:** Details you post and share — including recording a match, creating a session, posting a ping, writing comments, and adding likes. Depending on the feature, this content may be visible to other members of the relevant community or to the public.
+- **Match and session content:** Details you enter when recording a match or creating a session, including sport(s) played, scores, team, versus/opponent names, and participating members.
+- **Messages and pings:** Text you send when pinging a community and your "Coming"/"Busy" responses.
 - **Venue/location text:** When you create a session, you may type the name or location of a place. **We do not access your device's GPS or location services, and we do not track your physical location.**
 
 ### 2.2 Information Collected Automatically
@@ -74,8 +75,10 @@ We do **not** sell your information. We share it only with the categories of rec
 
 2. **Authorities and regulators:** Where we are legally required to disclose information (e.g., in response to a court order, law enforcement request, or in compliance with the Prevention of Electronic Crimes Act, 2016), we will disclose only the minimum necessary and solely for the stated purpose.
 
-3. **Other users:** By the nature of the App, certain content you choose to share is visible to other users (e.g., your username, community membership, community match feed, pings, and public comments).
-   - In search or public communities, your community profile and public content may be visible to others.
+3. **Other users:** By the nature of the App, certain content you choose to share is visible to other users (e.g., your username, community membership, community match feed, pings, and comments).
+   - In **public communities**, your community profile and public content may be visible to anyone who joins or browses.
+   - In **Restricted (invite/approval-only) communities**, interactions are limited to other approved members only. Members must be invited or approved by an administrator, and you can limit your community accordingly.
+   - We do **not** make user-generated content available for public viewing on any website or third-party platform outside the App.
 
 We will never sell, rent, or trade your personal information to any third party for advertising, marketing, or any other commercial purpose.
 
