@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "T3 Seecs",
+    "name": "Sportron",
     "slug": "T3S",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -57,6 +57,7 @@
       "eas": {
         "projectId": "0fa66530-b790-4094-84eb-3366edafc566"
       }
-    }
+    },
+    "owner": "murtazabaig"
   }
 }
