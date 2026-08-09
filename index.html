@@ -3,318 +3,43 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Sportron — Organize pickup sports, find matches, and track your game</title>
-  <meta name="description" content="Sportron is a multi-sport community app for players who want to actually play. Join a community, find or create a pickup session, record your matches, and keep your stats." />
+  <title>Sportron</title>
+  <meta name="description" content="Sportron — organize pickup sports, find matches, and track your game." />
   <meta property="og:title" content="Sportron" />
   <meta property="og:description" content="Multi-sport community app to find matches and track your game." />
   <style>
-    :root {
-      --bg: #0b0f19;
-      --surface: #111827;
-      --surface-2: #1a2332;
-      --border: #263041;
-      --text: #e5e9f0;
-      --muted: #9aa4b8;
-      --accent: #3b82f6;
-      --accent-2: #60a5fa;
-      --radius: 16px;
-      --max: 900px;
-    }
     * { margin: 0; padding: 0; box-sizing: border-box; }
-    html { scroll-behavior: smooth; }
     body {
       font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-      background: var(--bg);
-      color: var(--text);
+      background: #ffffff;
+      color: #111111;
       line-height: 1.6;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      text-align: center;
+      padding: 24px;
       -webkit-font-smoothing: antialiased;
     }
-    a { color: var(--accent-2); text-decoration: none; }
-    a:hover { text-decoration: underline; }
-
-    .wrap { max-width: var(--max); margin: 0 auto; padding: 0 24px; }
-
-    /* Hero */
-    header.hero {
-      text-align: center;
-      padding: 72px 24px 56px;
-      background: radial-gradient(1200px 500px at 50% -100px, rgba(59,130,246,0.25), transparent 60%);
-    }
-    .hero img.logo { width: 110px; height: 110px; border-radius: 26px; margin-bottom: 20px; }
-    .hero h1 { font-size: 56px; font-weight: 800; letter-spacing: -1.5px; line-height: 1.05; }
-    .hero h1 span { color: var(--accent-2); }
-    .hero .tagline { font-size: 20px; color: var(--muted); opacity: 0.9; margin: 18px auto 0; max-width: 640px; }
-    .hero .sports {
-      margin-top: 28px;
-      display: flex; flex-wrap: wrap; gap: 10px; justify-content: center;
-    }
-    .sports span {
-      background: var(--surface-2, var(--surface));
-      border: 1px solid var(--border);
-      padding: 8px 16px; border-radius: 999px; font-weight: 600; font-size: 14px;
-    }
-
-    /* Sections */
-    section { padding: 56px 0; }
-    section h2 {
-      font-size: 30px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 8px;
-    }
-    .lead { color: var(--muted); opacity: 0.9; margin-bottom: 28px; font-size: 17px; }
-    hr.rule { border: 0; height: 1px; background: var(--border); max-width: var(--max); margin: 0 auto; }
-
-    /* Feature grid */
-    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 20px; }
-    .card {
-      background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 24px;
-    }
-    .card h3 { font-size: 19px; margin-bottom: 10px; }
-    .card p { color: var(--muted); opacity: 0.95; font-size: 15px; }
-    .card ul { list-style: none; margin-top: 10px; }
-    .card li { color: var(--muted); opacity: 0.95; font-size: 14.5px; padding: 3px 0 3px 20px; position: relative; }
-    .card li::before { content: "✓"; position: absolute; left: 0; color: var(--accent-2); font-weight: 700; }
-
-    /* Callout banner */
-    .banner {
-      background: linear-gradient(120deg, rgba(59,130,246,0.16), rgba(96,165,250,0.10));
-      border: 1px solid var(--border); border-radius: var(--radius);
-      padding: 28px; margin: 24px 0;
-    }
-    .banner h3 { font-size: 20px; margin-bottom: 6px; }
-
-    /* Steps */
-    ol.steps { counter-reset: step; list-style: none; margin-top: 8px; }
-    ol.steps li {
-      counter-increment: step;
-      padding: 12px 0 12px 52px; position: relative; font-size: 16px; color: var(--text);
-    }
-    ol.steps li::before {
-      content: counter(step);
-      position: absolute; left: 0; top: 12px;
-      width: 34px; height: 34px; border-radius: 50%;
-      background: var(--surface-2, var(--surface)); border: 1px solid var(--border);
-      display: flex; align-items: center; justify-content: center;
-      font-weight: 700; color: var(--accent-2);
-    }
-
-    /* Downloads */
-    .stores { display: flex; gap: 16px; flex-wrap: wrap; margin-top: 8px; }
-    .store {
-      display: inline-flex; align-items: center; gap: 10px;
-      background: var(--text); color: var(--bg); font-weight: 700;
-      padding: 14px 22px; border-radius: 12px; font-size: 15px;
-    }
-    .store:hover { background: var(--accent-2); color: var(--bg); text-decoration: none; }
-    .store small { display: block; font-weight: 500; font-size: 12px; opacity: 0.7; }
-
-    /* FAQ */
-    details {
-      background: var(--surface); border: 1px solid var(--border); border-radius: 12px;
-      padding: 16px 20px; margin-bottom: 12px;
-    }
-    details summary { font-weight: 600; cursor: pointer; font-size: 16px; }
-    details p { color: var(--muted); opacity: 0.95; margin-top: 10px; font-size: 15px; }
-
-    footer {
-      border-top: 1px solid var(--border); padding: 40px 24px 56px;
-      text-align: center; color: var(--muted); opacity: 0.85; font-size: 14px;
-    }
-    footer p { margin: 6px 0; }
-    @media (max-width: 640px) {
-      .hero { padding: 48px 20px 40px; }
-      .hero h1 { font-size: 38px; }
-      section { padding: 40px 0; }
+    a { color: #111111; text-decoration: none; }
+    a:hover { opacity: 0.6; }
+    .logo { width: 96px; height: 96px; border-radius: 24px; margin-bottom: 24px; }
+    h1 { font-size: 32px; font-weight: 700; letter-spacing: -0.5px; margin-bottom: 32px; }
+    .links { display: flex; gap: 32px; font-size: 16px; font-weight: 500; }
+    @media (max-width: 480px) {
+      .links { flex-direction: column; gap: 20px; }
     }
   </style>
 </head>
 <body>
-
-  <!-- Hero -->
-  <header class="hero">
-    <img src="assets/images/icon.png" alt="Sportron logo" class="logo" />
-    <h1>Sport<span>tron</span></h1>
-    <p class="tagline">Organize pickup sports, find matches, and track your game.</p>
-    <div class="sports">
-      <span class="sport">Table Tennis</span>
-      <span class="sport">Badminton</span>
-      <span class="sport">Tennis</span>
-      <span class="sport">Squash</span>
-      <span class="sport">Pickleball</span>
-      <span class="sport">Football</span>
-      <span class="sport">Cricket</span>
-      <span class="sport">Volleyball</span>
-      <span class="sport">Handball</span>
-      <span class="sport">Basketball</span>
-    </div>
-  </header>
-
-  <!-- Why Sportron -->
-  <div class="wrap">
-  <section>
-    <h2>Why Sportron?</h2>
-    <p class="lead">Sportron was built for the community that loves to play — students, teachers, and players who want a reliable way to find partners and keep score.</p>
-    <div class="grid">
-      <div class="card"><h3>🏸 Play more</h3><p>Find open pickup sessions near you and jump in.</p></div>
-      <div class="card"><h3>📊 Track every match</h3><p>Record scores, get results approved by your opponent, and watch your record build.</p></div>
-      <div class="card"><h3>🎯 Stay in your lane</h3><p>Join communities by sport, from table tennis to football.</p></div>
-      <div class="card"><h3>🔔 Never miss a game</h3><p>Get pinged when there's live action in your community, and get notified when plans change.</p></div>
-    </div>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- Features -->
-  <div class="wrap">
-  <section>
-    <h2>Features</h2>
-    <div class="grid">
-      <div class="card">
-        <h3>Communities</h3>
-        <ul>
-          <li>Start or join communities organized around a sport</li>
-          <li>Public (join anytime) or restricted (admin approves)</li>
-          <li>Discover by sport or search by name</li>
-          <li>Cover photos, member lists, and admin tools</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Match Tracking</h3>
-        <ul>
-          <li>Record matches inside a community — singles or doubles</li>
-          <li>Team sports: add team names and opponent captain</li>
-          <li>Score with +/- stepper and direct entry</li>
-          <li>Opponent approval: confirm or challenge results</li>
-          <li>Likes, comments, win/loss records</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Find a Match</h3>
-        <ul>
-          <li>Pickup sessions with sport, location, time, and capacity</li>
-          <li>Sessions expire automatically if no one joins</li>
-          <li>Apply, accept, reject, or leave</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Pings</h3>
-        <ul>
-          <li>Ping your whole community</li>
-          <li>Members reply Coming or Busy, live</li>
-        </ul>
-      </div>
-      <div class="card">
-        <h3>Notifications</h3>
-        <ul>
-          <li>Real-time alerts for applications, approvals, pings, invites</li>
-          <li>Push notifications; each type customizable</li>
-        </ul>
-      </div>
-    </div>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- Privacy -->
-  <div class="wrap">
-  <section>
-    <h2>Privacy First</h2>
-    <p class="lead">We take your data seriously.</p>
-    <div class="banner">
-      <ul>
-        <li><strong>No GPS tracking</strong> — the app uses text locations you type yourself</li>
-        <li><strong>Google sign-in only</strong> — we never store your password</li>
-        <li><strong>No ads, no selling data</strong></li>
-        <li><strong>In-app Delete Account</strong> — erase your data anytime</li>
-      </ul>
-      <p style="margin-top:12px;">Full details: <a href="PRIVACY_POLICY.md">Privacy Policy</a></p>
-    </div>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- Getting started -->
-  <div class="wrap">
-  <section>
-    <h2>How to Use</h2>
-    <ol class="steps">
-      <li><strong>Sign in</strong> with your Google account — no separate sign-up needed.</li>
-      <li><strong>Complete your profile</strong> — username, bio, role, photo.</li>
-      <li><strong>Explore communities</strong> via the Communities tab or Discover.</li>
-      <li><strong>Join or create a community</strong> — membership is required to record matches.</li>
-      <li><strong>Record a match</strong> from within a community so your opponent can approve it.</li>
-      <li><strong>Find a Match</strong> tab — create or apply to a pickup session.</li>
-      <li><strong>Manage notifications</strong> in Settings for what you want to hear.</li>
-    </ol>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- Download -->
-  <div class="wrap">
-  <section>
-    <h2>Available On</h2>
-    <div class="stores">
-      <a class="store" href="https://play.google.com" target="_blank" rel="noopener">
-        <small>Android</small> Google Play
-      </a>
-      <a class="store" href="#" >
-        <small>iOS</small> App Store
-      </a>
-    </div>
-    <p class="lead" style="margin-top:16px;">Free to download and use.</p>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- FAQ -->
-  <div class="wrap">
-  <section>
-    <h2>Frequently Asked Questions</h2>
-
-    <details>
-      <summary>Is Sportron free?</summary>
-      <p>Yes — Sportron is free to download and use.</p>
-    </details>
-    <details>
-      <summary>Do I need an account?</summary>
-      <p>You sign in with Google. A profile is created the first time you sign in.</p>
-    </details>
-    <details>
-      <summary>What sports are supported?</summary>
-      <p>Table tennis, badminton, tennis, squash, pickleball, football, cricket, volleyball, handball, and basketball — plus a generic "Other".</p>
-    </details>
-    <details>
-      <summary>Can I delete my data?</summary>
-      <p>Yes. Go to Profile → Settings → <strong>Delete Account</strong> to permanently remove your data.</p>
-    </details>
-    <details>
-      <summary>Who develops Sportron?</summary>
-      <p>Sportron is developed by <strong>Muhammad Murtaza</strong>, based in Lahore, Pakistan.</p>
-    </details>
-  </section>
-  </div>
-
-  <hr />
-
-  <!-- Contact -->
-  <div class="wrap">
-  <section>
-    <h2>Contact</h2>
-    <p class="lead">For support, questions, or feedback:</p>
-    <p>📧 <a href="mailto:murtazabaig335@gmail.com">murtazabaig335@gmail.com</a></p>
-    <p>🔒 <a href="PRIVACY_POLICY.md">Privacy Policy</a></p>
-  </section>
-  </div>
-
-  <footer>
-    <p>© 2026 Muhammad Murtaza. All Rights Reserved.</p>
-    <p>Sportron is provided "as is" without warranty.</p>
-  </footer>
-
+  <img src="assets/images/icon.png" alt="Sportron logo" class="logo" />
+  <h1>Sportron</h1>
+  <nav class="links">
+    <a href="https://play.google.com" target="_blank" rel="noopener">Android</a>
+    <a href="PRIVACY_POLICY.md">Privacy Policy</a>
+    <a href="mailto:murtazabaig335@gmail.com">Contact</a>
+  </nav>
 </body>
 </html>
