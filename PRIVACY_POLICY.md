@@ -11,10 +11,9 @@ By creating an account, signing in, or using any feature of the App, you agree t
 
 ## 1. Who We Are
 
-The App is developed and operated by **Muhammad Murtaza** ("we", "us", "our", or the "Publisher"), located in Lahore, Pakistan. For any privacy-related matter, you may contact us at:
+The App is developed and operated by **Zoro Labs** ("we", "us", "our", or the "Publisher"). For any privacy-related matter, you may contact us at:
 
-- **Email:** murtazabaig335@gmail.com
-- **Postal address:** Plot 335, Abbas Block, Mustafa Town, Wahdat Road, Lahore, Punjab 54500, Pakistan
+- **Email:** zorozlabs@gmail.com
 
 ---
 
@@ -158,8 +157,7 @@ The "Last updated" date at the top of this Policy reflects the date of the most 
 
 If you have any questions, concerns, or requests about this Privacy Policy or your data, please contact us:
 
-- **Email:** murtazabaig335@gmail.com
-- **Postal address:** Plot 335, Abbas Block, Mustafa Town, Wahdat Road, Lahore, Punjab 54500, Pakistan
+- **Email:** zorozlabs@gmail.com
 - **In-App:** Profile → Settings → About
 
 We will respond to your request as quickly as possible and in accordance with applicable law.
