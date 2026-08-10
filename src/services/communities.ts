@@ -212,6 +212,41 @@ export async function fetchCommunityMembers(communityId: string): Promise<Commun
   return data ?? [];
 }
 
+export async function searchCommunityMembers(
+  communityId: string,
+  query: string,
+): Promise<CommunityMember[]> {
+  const normalized = query.trim();
+  if (normalized.length < 1) return [];
+
+  // Step 1: find profile ids whose username matches the query.
+  const { data: profileRows, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', `%${normalized}%`)
+    .limit(20);
+  if (profileError) throw profileError;
+
+  const ids = (profileRows ?? []).map((p) => p.id);
+  if (ids.length === 0) return [];
+
+  // Step 2: fetch the matching members with their joined profile. Unlike filtering
+  // on the embedded `profile.username` directly, this keeps the embed fully populated.
+  const { data, error } = await supabase
+    .from('community_members')
+    .select(`
+      *,
+      profile:profile_id(id, username, display_name, avatar_url)
+    `)
+    .eq('community_id', communityId)
+    .eq('approval_status', 'approved')
+    .in('profile_id', ids)
+    .limit(20);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
 export async function fetchCommunityMember(
   communityId: string,
   userId: string,
