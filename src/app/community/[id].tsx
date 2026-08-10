@@ -1,15 +1,18 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Building2,
   CheckCircle,
   ChevronRight,
   Clock,
   Globe,
   Lock,
+  MapPin,
   Megaphone,
   MoreHorizontal,
   Plus,
   Swords,
+  User,
   Users,
   X,
   XCircle,
@@ -17,7 +20,6 @@ import {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -32,6 +34,7 @@ import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -375,6 +378,36 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
               )}
 
+              {(community.organization || community.location) && (
+                <View style={styles.communityDetails}>
+                  {community.organization && (
+                    <View style={styles.detailItem}>
+                      <Building2 size={13} color={theme.textSecondary} strokeWidth={2} />
+                      <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                        {community.organization}
+                      </ThemedText>
+                    </View>
+                  )}
+                  {community.location && (
+                    <View style={styles.detailItem}>
+                      <MapPin size={13} color={theme.textSecondary} strokeWidth={2} />
+                      <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                        {community.location}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {community.creator?.username && (
+                <View style={styles.detailItem}>
+                  <User size={13} color={theme.textSecondary} strokeWidth={2} />
+                  <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                    Created by {community.creator.username}
+                  </ThemedText>
+                </View>
+              )}
+
               <View style={styles.metaRow}>
                 <Users size={14} color={theme.textSecondary} strokeWidth={2} />
                 <ThemedText variant="caption" muted>
@@ -462,15 +495,11 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
                 {pingResponses.map((r) => (
                   <View key={r.id} style={styles.pingResponseRow}>
-                    <View style={[styles.pingResponseAvatar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                      {r.respondent?.avatar_url ? (
-                        <Image source={{ uri: r.respondent.avatar_url }} style={styles.pingResponseAvatarImage} />
-                      ) : (
-                        <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
-                          {(r.respondent?.username ?? '?').charAt(0).toUpperCase()}
-                        </ThemedText>
-                      )}
-                    </View>
+                    <UserAvatar
+                      avatarUrl={r.respondent?.avatar_url}
+                      size={28}
+                      style={{ borderWidth: 1, borderColor: theme.border }}
+                    />
                     <ThemedText variant="body" style={{ flex: 1, fontWeight: '500' }}>
                       {r.respondent?.username ?? 'Someone'}
                     </ThemedText>
@@ -671,6 +700,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   description: { marginTop: Spacing.xs },
+  communityDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    marginTop: Spacing.xs,
+    flexWrap: 'wrap',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    maxWidth: '90%',
+  },
+  detailValue: {
+    flexShrink: 1,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
 
   // Join Action
@@ -767,20 +813,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-  },
-  pingResponseAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  pingResponseAvatarImage: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
   },
   responseBadge: {
     flexDirection: 'row',

@@ -5,6 +5,7 @@ import Svg, { Circle } from 'react-native-svg';
 
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
@@ -165,11 +166,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
               )}
             </>
           ) : (
-            <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-              <ThemedText variant="hero" style={{ color: theme.background }}>
-                {username.charAt(0)?.toUpperCase() ?? '?'}
-              </ThemedText>
-            </View>
+            <UserAvatar avatarUrl={null} size={100} />
           )}
         </View>
         <View style={styles.avatarActions}>

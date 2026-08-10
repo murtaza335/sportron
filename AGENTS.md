@@ -53,16 +53,17 @@ src/
 │   ├── FCMInitializer.tsx      # Wires FCM once a session exists
 │   └── ui/                     # Button, Card, SegmentedControl, Text
 ├── contexts/
-│   ├── AuthContext.tsx         # Supabase auth + profile state + account re-enable
-│   └── ThemeContext.tsx        # Theme provider (light/dark/system, persisted)
+│   ├── AuthContext.tsx              # Supabase auth + profile state + account re-enable
+│   ├── NotificationsContext.tsx     # Shared notifications feed + unread badge + realtime (INSERT/UPDATE/DELETE)
+│   └── ThemeContext.tsx             # Theme provider (light/dark/system, persisted)
 ├── hooks/
-│   ├── useCommunities.ts       # Fetch public / my communities
-│   ├── useCommunity.ts         # Single community detail + membership state
-│   ├── useSessions.ts          # Fetch open play sessions
-│   ├── useNotifications.ts     # In-app notification feed + realtime
-│   ├── useFCM.ts               # FCM init, permissions, notification navigation
-│   ├── use-theme.ts            # Theme context wrapper
-│   └── use-color-scheme.ts     # System theme detection (native + web)
+│   ├── useCommunities.ts            # Fetch public / my communities
+│   ├── useCommunity.ts              # Single community detail + membership state
+│   ├── useSessions.ts               # Fetch open play sessions
+│   ├── useNotifications.ts          # Wraps NotificationsContext (shared feed + unreadCount)
+│   ├── useFCM.ts                    # FCM init, permissions, notification navigation
+│   ├── use-theme.ts                 # Theme context wrapper
+│   └── use-color-scheme.ts          # System theme detection (native + web)
 ├── services/
 │   ├── auth.ts                 # Google OAuth flow
 │   ├── profiles.ts             # Profile CRUD, prefs, FCM tokens, soft delete
@@ -95,10 +96,13 @@ src/
 - Communities are **linked to a single sport** (not changeable after creation)
 
 ### 3. Communities
-- **Create**: name, description, cover photo (Cloudinary), sport pill selector, visibility (public / restricted)
+- **Create**: name, description, **organization (optional, e.g. uni/club)**, **location/city (optional)**, cover photo (Cloudinary), sport pill selector, visibility (public / restricted)
+- **Name uniqueness**: a user cannot create (or rename into) a community with a name they already own — enforced DB-side by `idx_communities_name_created_by` (case-insensitive); two different users may share a name. `createCommunity`/`updateCommunity` map the unique violation to a friendly error
 - **Discover**: browse all public communities with name search + horizontal sport filter chips; shows admin/member role tags
+- **Cards** (My Communities + Discover): show sport/visibility/member count, **"Created by <username>"** and **organization (if present)**
 - **Join**: public → `joinCommunity()` (instant); restricted → `requestToJoinCommunity()` (admin approves)
-- **Leave** / **Edit** (admin: name, description, cover, visibility, transfer admin by username) / **Delete**
+- **Leave** / **Edit** (admin: name, description, organization, location, cover, visibility, transfer admin by username) / **Delete**
+- **Details** (`community/[id]/info.tsx` + home card): description, organization, location, creator info shown to non-members before joining
 - **Members**: sorted me → admins → members; admin long-press for Make Admin / Remove; pending-invite section
 - **Invite Members**: admin can invite by typing username (public or restricted); invitees accept/reject via Invite tab
 - **Join requests**: admin review screen with approve/reject
@@ -125,9 +129,12 @@ src/
 
 ### 6. Activity (Notifications Inbox)
 - Tabs: **Action Required** (`session_application`, `join_request`, `community_match_pending`), **Invites** (`community_invite`), **Past Activity**
-- Inline Accept / Decline via `ActivityCard` / `InviteCard` (updates the notification row type in DB)
-- Unread badge (red dot) on the Activity tab, driven by live `unreadCount`
-- Realtime inserts of new notifications via `in_app_notifications` row subscription
+- Inline Accept / Decline via `ActivityCard` / `InviteCard` — after an action the notification row is updated (type → resolved type, `read = true`) so it leaves the actionable tab permanently; invites become `community_invite_accepted`/`community_invite_rejected`
+- **Resolution lives in the services too**: `approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, and `approveCommunityMatch`/`disputeCommunityMatch` each resolve the matching pending notification (matched via `data->>sessionId/applicantId`, `data->>communityId/requesterId`, `data->>matchId`), so acting from a session/community popup also clears the Action Required inbox — not just from the Activity tab
+- `session_application` notifications carry `applicantId` in `data` so a notification maps to one specific applicant
+- **Shared state**: `NotificationsProvider` (mounted in root `_layout.tsx`) owns the feed + realtime subscription (INSERT/UPDATE/DELETE) on `in_app_notifications`; `useNotifications()` just reads the context, so the tab badge and inbox always agree
+- Tapping any card marks it read (`markAsRead`); **Mark all as read** button clears the rest (`markAllAsRead`)
+- Unread badge (red dot) on the Activity tab = derived `unreadCount` from the shared feed
 
 ### 7. Push Notifications (FCM)
 - FCM token registered per device (`profiles.fcm_tokens`)
@@ -164,8 +171,11 @@ commitments
   -- partial unique index `commitments_active_unique WHERE status != 'left'`
 
 communities
-  id, name, description, image_url, visibility (public|restricted),
-  sport, created_by, created_at, updated_at
+  id, name, description, organization, location, image_url,
+  visibility (public|restricted), sport, created_by, created_at, updated_at
+  -- unique index `idx_communities_name_created_by (lower(name), created_by)`
+  --   allows two users to share a name but blocks one user creating a duplicate
+  --   (case-insensitive); enforced by migration 020
 
 community_members
   community_id (fk), profile_id (fk), role (admin|member),
@@ -229,7 +239,8 @@ See `NotificationType` in `src/types/index.ts` (all 28 types, from `match_pendin
 - All Supabase calls go through `src/services/*` (return `{ data, error }`, throw on error)
 - Hooks wrap service calls, expose `{ data, loading, refreshing, refresh }`, reload on focus
 - `useCommunity(communityId, userId)` exposes community, membership, joinRequests + setters
-- Real-time: `supabase.channel` for `ping_responses` (community screen) and `in_app_notifications` (useNotifications)
+- Real-time: `supabase.channel` for `ping_responses` (community screen) and `in_app_notifications` (`NotificationsProvider`)
+- Cross-screen state is shared via React Context (`AuthContext`, `ThemeContext`, `NotificationsContext`) — consume through the matching `use*` hook, never instantiate a fresh copy per screen
 
 ---
 
@@ -256,6 +267,7 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 - **Sport union** is the source of truth for "which sports work" (`RACKET_SPORTS` vs `TEAM_SPORTS`)
 - **Matches live only inside communities** — no global "record match" without a community (enforced by `add-match.tsx`)
 - **Approval**: join requests and community matches both go through an approve/reject flow; notification types are user-facing and update after action
+- **Notification state**: actionable notifications are resolved in-place (type → resolved type + `read = true`) both by the `ActivityCard`/`InviteCard` components and by the underlying service actions (`approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, `approveCommunityMatch`/`disputeCommunityMatch`), so the inbox, tab badge, and "Action Required"/"Invites" tabs stay consistent no matter where the action was taken — no local-only UI hacks
 - **Soft delete** keeps a deleted `profiles` row; on next login with the same Google account the profile is re-enabled
 - **Supabase RLS** protects all tables (see `supabase/schema.sql`); the `insert_notification` RPC is SECURITY DEFINER so clients can send push for other users
 
@@ -268,3 +280,4 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "feat: community match likes/comments + remove legacy match implementation" (25b1b49)
   - "pinng response implemented" (26a33ff)
   - "pings implemented" (recent pings/commits)
+  - "fix: shared notifications feed via `NotificationsContext` so unread badge clears on read / after actions (#68, #93)"

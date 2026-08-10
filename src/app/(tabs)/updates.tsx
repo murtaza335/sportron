@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
 import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { CheckCheck } from 'lucide-react-native';
 
 import { ActivityCard } from '@/components/ActivityCard';
 import { InviteCard } from '@/components/InviteCard';
@@ -21,21 +22,17 @@ const INVITE_TYPES: NotificationType[] = [
 
 export default function UpdatesScreen() {
   const theme = useTheme();
-  const { notifications, fetchNotifications, loading } = useNotifications();
+  const { notifications, fetchNotifications, loading, markAllAsRead, unreadCount } = useNotifications();
   const [activeTab, setActiveTab] = useState<'action' | 'invites' | 'past'>('action');
-  const [respondedIds, setRespondedIds] = useState<Set<string>>(new Set());
 
   const actionRequired = notifications.filter((n) => ACTION_REQUIRED_TYPES.includes(n.type));
-  const invites = notifications.filter((n) => INVITE_TYPES.includes(n.type) && !respondedIds.has(n.id));
+  const invites = notifications.filter((n) => INVITE_TYPES.includes(n.type));
   const pastActivity = notifications.filter(
     (n) => !ACTION_REQUIRED_TYPES.includes(n.type) && !INVITE_TYPES.includes(n.type)
   );
 
   const handleActionComplete = useCallback(
-    (notificationId?: string) => {
-      if (notificationId) {
-        setRespondedIds((prev) => new Set(prev).add(notificationId));
-      }
+    () => {
       fetchNotifications();
     },
     [fetchNotifications],
@@ -43,6 +40,14 @@ export default function UpdatesScreen() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
+      {unreadCount > 0 && (
+        <Pressable onPress={markAllAsRead} style={styles.markAllButton} hitSlop={8}>
+          <CheckCheck size={14} color="#3B82F6" strokeWidth={2.5} />
+          <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700' }}>
+            Mark all as read
+          </ThemedText>
+        </Pressable>
+      )}
       <View style={[styles.tabRow, { borderBottomColor: theme.border }]}>
         <Pressable
           onPress={() => setActiveTab('action')}
@@ -160,11 +165,12 @@ export default function UpdatesScreen() {
               return (
                 <InviteCard
                   key={n.id}
+                  notificationId={n.id}
                   inviteId={inviteId}
                   communityName={communityName}
                   inviterName={inviterName}
                   createdAt={n.created_at}
-                  onComplete={() => handleActionComplete(n.id)}
+                  onComplete={handleActionComplete}
                 />
               );
             })
@@ -200,6 +206,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-evenly',
     borderBottomWidth: 1,
     paddingHorizontal: Spacing.md,
+  },
+  markAllButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: Spacing.xs,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.sm,
   },
   tab: {
     flexDirection: 'row',

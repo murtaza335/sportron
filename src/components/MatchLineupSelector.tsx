@@ -1,8 +1,12 @@
 import { Check, Search, Trash2, X } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Animated,
+  Dimensions,
   FlatList,
   Modal,
+  PanResponder,
   Pressable,
   StyleSheet,
   TextInput,
@@ -10,10 +14,13 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import type { MatchFormat, Profile } from '@/types';
+import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
+
+const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
 
@@ -24,8 +31,9 @@ type LineupSelection = {
 };
 
 type MatchLineupSelectorProps = {
-  profiles: Profile[];
+  searchProfiles: (query: string) => Promise<Profile[]>;
   currentUserName: string;
+  currentUserAvatar?: string | null;
   format: MatchFormat;
   selection: LineupSelection;
   onChange: (slot: TeamSlot, profile: Profile | null) => void;
@@ -41,15 +49,6 @@ type SlotCardProps = {
   showRole?: boolean;
 };
 
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
-}
-
 function SlotCard({
   label,
   profile,
@@ -63,11 +62,7 @@ function SlotCard({
 
   const content = profile ? (
     <>
-      <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-        <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-          {getInitials(profile.username) || '?'}
-        </ThemedText>
-      </View>
+      <UserAvatar avatarUrl={profile.avatar_url} size={64} />
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
         {profile.username}
       </ThemedText>
@@ -133,15 +128,23 @@ function SlotCard({
 }
 
 export function MatchLineupSelector({
-  profiles,
+  searchProfiles,
   currentUserName,
+  currentUserAvatar,
   format,
   selection,
   onChange,
 }: MatchLineupSelectorProps) {
   const theme = useTheme();
+  const SEARCH_DEBOUNCE_MS = 300;
   const [activeSlot, setActiveSlot] = useState<TeamSlot | null>(null);
   const [query, setQuery] = useState('');
+  const [results, setResults] = useState<Profile[]>([]);
+  const [searching, setSearching] = useState(false);
+  const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const queryRef = useRef('');
+  // Drag-to-dismiss: offset grows as the user pulls the sheet down.
+  const [sheetTranslate] = useState(() => new Animated.Value(0));
 
   const selectedIds = useMemo(() => {
     return new Set(
@@ -151,27 +154,100 @@ export function MatchLineupSelector({
     );
   }, [selection.playerPartner?.id, selection.opponent?.id, selection.opponentPartner?.id]);
 
-  const availableProfiles = useMemo<Profile[]>(() => {
-    const normalized = query.trim().toLowerCase();
-    const activeSelection = activeSlot ? selection[activeSlot] : null;
+  const normalizedQuery = query.trim();
 
-    return profiles.filter((profile) => {
+  // Debounced username search — only fires once the user stops typing, and
+  // only when at least one character has been entered.
+  const handleQueryChange = (text: string) => {
+    setQuery(text);
+    queryRef.current = text;
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+
+    if (text.trim().length < 1) {
+      setResults([]);
+      setSearching(false);
+      return;
+    }
+
+    setSearching(true);
+    debounceRef.current = setTimeout(async () => {
+      try {
+        const data = await searchProfiles(text.trim());
+        if (queryRef.current.trim() === text.trim()) {
+          setResults(data);
+        }
+      } catch (e) {
+        console.error('Failed to search community members:', e);
+        if (queryRef.current.trim() === text.trim()) {
+          setResults([]);
+        }
+      } finally {
+        if (queryRef.current.trim() === text.trim()) {
+          setSearching(false);
+        }
+      }
+    }, SEARCH_DEBOUNCE_MS);
+  };
+
+  // Clear any pending debounce timer on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceRef.current) clearTimeout(debounceRef.current);
+    };
+  }, []);
+
+  const visibleProfiles = useMemo<Profile[]>(() => {
+    const activeSelection = activeSlot ? selection[activeSlot] : null;
+    return results.filter((profile) => {
       if (selectedIds.has(profile.id) && activeSelection?.id !== profile.id) {
         return false;
       }
-
-      if (!normalized) {
-        return true;
-      }
-
-      return profile.username.toLowerCase().includes(normalized);
+      return true;
     });
-  }, [activeSlot, profiles, query, selectedIds, selection]);
+  }, [activeSlot, results, selectedIds, selection]);
 
-  const closePicker = () => {
+  const closePicker = useCallback(() => {
     setActiveSlot(null);
     setQuery('');
-  };
+    setResults([]);
+    setSearching(false);
+    if (debounceRef.current) clearTimeout(debounceRef.current);
+  }, []);
+
+  // Drag-to-dismiss: pulling the sheet down translates it, releasing past a
+  // threshold (or with enough velocity) animates it off-screen and closes.
+  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
+  const [panHandlers, setPanHandlers] =
+    useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
+
+  useEffect(() => {
+    if (!panResponder.current) {
+      panResponder.current = PanResponder.create({
+        onMoveShouldSetPanResponder: (_e, gs) =>
+          Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
+        onPanResponderMove: (_e, gs) => {
+          if (gs.dy > 0) sheetTranslate.setValue(gs.dy);
+        },
+        onPanResponderRelease: (_e, gs) => {
+          if (gs.dy > 140 || gs.vy > 0.6) {
+            Animated.timing(sheetTranslate, {
+              toValue: SCREEN_HEIGHT,
+              duration: 200,
+              useNativeDriver: true,
+            }).start(closePicker);
+          } else {
+            Animated.spring(sheetTranslate, {
+              toValue: 0,
+              tension: 50,
+              friction: 8,
+              useNativeDriver: true,
+            }).start();
+          }
+        },
+      });
+      setPanHandlers(panResponder.current.panHandlers);
+    }
+  }, [sheetTranslate, closePicker]);
 
   const isDoubles = format === 'doubles';
 
@@ -199,7 +275,7 @@ export function MatchLineupSelector({
                 display_name: null,
                 bio: null,
                 role: 'student',
-                avatar_url: null,
+                avatar_url: currentUserAvatar ?? null,
                 fcm_tokens: [],
                 notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
                 deleted_at: null,
@@ -268,10 +344,18 @@ export function MatchLineupSelector({
 
       <Modal animationType="none" transparent visible={activeSlot !== null} onRequestClose={closePicker}>
         <View style={styles.modalBackdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={closePicker} />
-
-          <View style={[styles.sheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.sheetHeader}>
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.background,
+                transform: [{ translateY: sheetTranslate }],
+              },
+            ]}>
+            <View style={styles.handleContainer} {...panHandlers}>
+              <View style={[styles.handle, { backgroundColor: theme.border }]} />
+            </View>
+            <View style={styles.sheetHeader} {...panHandlers}>
               <View>
                 <ThemedText variant="label">Choose player</ThemedText>
                 <ThemedText variant="caption" muted>
@@ -292,17 +376,28 @@ export function MatchLineupSelector({
               <Search size={18} color={theme.textSecondary} />
               <TextInput
                 value={query}
-                onChangeText={setQuery}
-                placeholder="Search players"
+                onChangeText={handleQueryChange}
+                placeholder="Search players by username"
                 placeholderTextColor={theme.textSecondary}
                 style={[styles.searchInput, { color: theme.text }]}
+                autoFocus
+                autoCapitalize="none"
+                autoCorrect={false}
               />
+              {searching && <ActivityIndicator size="small" color={theme.textSecondary} />}
             </View>
 
+            {normalizedQuery.length >= 1 && searching && visibleProfiles.length > 0 && (
+              <View style={styles.searchingRow}>
+                <ActivityIndicator size="small" color={theme.textSecondary} />
+              </View>
+            )}
+
             <FlatList
-              data={availableProfiles}
+              data={visibleProfiles}
               keyExtractor={(item) => item.id}
               keyboardShouldPersistTaps="handled"
+              style={styles.listFlex}
               contentContainerStyle={styles.list}
               renderItem={({ item }) => {
                 const isSelected = activeSlot ? selection[activeSlot]?.id === item.id : false;
@@ -320,30 +415,42 @@ export function MatchLineupSelector({
                       pressed && styles.pressed,
                       isSelected && { backgroundColor: theme.backgroundElement },
                     ]}>
-                    <View style={[styles.avatarSmall, { backgroundColor: theme.text }]}>
-                      <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {getInitials(item.username) || '?'}
-                      </ThemedText>
-                    </View>
+                    <UserAvatar avatarUrl={item.avatar_url} size={48} />
                     <View style={styles.playerMeta}>
                       <ThemedText variant="body" style={styles.playerName}>
                         {item.username}
                       </ThemedText>
-                      <ThemedText variant="caption" muted>
-                        {item.role}
-                      </ThemedText>
+                      {item.display_name ? (
+                        <ThemedText variant="caption" muted>
+                          {item.display_name}
+                        </ThemedText>
+                      ) : (
+                        <ThemedText variant="caption" muted>
+                          {item.role}
+                        </ThemedText>
+                      )}
                     </View>
                     {isSelected && <Check size={18} color={theme.text} />}
                   </Pressable>
                 );
               }}
               ListEmptyComponent={
-                <ThemedText variant="caption" muted style={styles.empty}>
-                  No available players found.
-                </ThemedText>
+                normalizedQuery.length < 1 ? (
+                  <ThemedText variant="caption" muted style={styles.empty}>
+                    Type at least 1 character to search players.
+                  </ThemedText>
+                ) : searching ? (
+                  <View style={styles.searchingRow}>
+                    <ActivityIndicator size="small" color={theme.textSecondary} />
+                  </View>
+                ) : (
+                  <ThemedText variant="caption" muted style={styles.empty}>
+                    No players found.
+                  </ThemedText>
+                )
               }
             />
-          </View>
+          </Animated.View>
         </View>
       </Modal>
     </View>
@@ -409,14 +516,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  avatarSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
-  },
   slotName: {
     textAlign: 'center',
     fontWeight: '700',
@@ -451,12 +550,22 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-end',
   },
   sheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    padding: Spacing.lg,
-    maxHeight: '82%',
+    height: '100%',
+    width: '100%',
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.lg,
     gap: Spacing.md,
+  },
+  handleContainer: {
+    width: '100%',
+    paddingVertical: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  handle: {
+    width: 36,
+    height: 5,
+    borderRadius: Radius.full,
   },
   sheetHeader: {
     flexDirection: 'row',
@@ -487,6 +596,13 @@ const styles = StyleSheet.create({
   list: {
     gap: Spacing.sm,
     paddingBottom: Spacing.md,
+  },
+  listFlex: {
+    flex: 1,
+  },
+  searchingRow: {
+    alignItems: 'center',
+    paddingVertical: Spacing.lg,
   },
   playerRow: {
     flexDirection: 'row',

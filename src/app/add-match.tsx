@@ -1,6 +1,6 @@
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useState } from 'react';
 import {
   Alert,
   KeyboardAvoidingView,
@@ -21,8 +21,8 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { fetchCommunityMembers, recordCommunityMatch } from '@/services/communities';
-import type { MatchFormat, Profile, Sport, CommunityMember } from '@/types';
+import { recordCommunityMatch, searchCommunityMembers } from '@/services/communities';
+import type { MatchFormat, Profile, Sport } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES, isRacketSport, isTeamSport } from '@/types';
 
 type SelectionState = {
@@ -38,7 +38,6 @@ export default function AddMatchScreen() {
   const { communityId, sport: sportParam } = useLocalSearchParams<{ communityId?: string; sport?: Sport }>();
   const { user, profile } = useAuth();
 
-  const [communityMembers, setCommunityMembers] = useState<CommunityMember[]>([]);
   const [sport] = useState<Sport>(sportParam ?? 'table_tennis');
   const [customSportName] = useState('');
   const [teamAName, setTeamAName] = useState('');
@@ -53,14 +52,17 @@ export default function AddMatchScreen() {
   const [opponentScore, setOpponentScore] = useState(0);
   const [saving, setSaving] = useState(false);
 
-  // Build community member profiles for the opponent selector
-  const communityProfiles: Profile[] = useMemo(
-    () =>
-      communityMembers
-        .filter((m) => m.profile_id !== user?.id)
+  // Search community members by username — only called once the user stops
+  // typing (debounced in MatchLineupSelector) and at least 1 char is entered.
+  const searchProfiles = useCallback(
+    async (query: string): Promise<Profile[]> => {
+      if (!communityId) return [];
+      const members = await searchCommunityMembers(communityId, query);
+      return members
+        .filter((m) => m.profile_id !== user?.id && Boolean(m.profile))
         .map((m) => ({
           id: m.profile_id,
-          username: m.profile?.username ?? 'Unknown',
+          username: m.profile?.username ?? '',
           display_name: m.profile?.display_name ?? null,
           bio: null,
           role: 'student' as const,
@@ -70,21 +72,10 @@ export default function AddMatchScreen() {
           deleted_at: null,
           created_at: '',
           updated_at: '',
-        })),
-    [communityMembers, user?.id],
+        }));
+    },
+    [communityId, user?.id],
   );
-
-  useEffect(() => {
-    let cancelled = false;
-
-    if (communityId) {
-      fetchCommunityMembers(communityId)
-        .then((data) => { if (!cancelled) setCommunityMembers(data); })
-        .catch((error) => console.error('Failed to load community members:', error));
-    }
-
-    return () => { cancelled = true; };
-  }, [communityId]);
 
   const isRacket = isRacketSport(sport);
   const isTeam = isTeamSport(sport);
@@ -139,32 +130,33 @@ export default function AddMatchScreen() {
 
 return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
+      <View style={styles.header}>
+        <Pressable onPress={() => router.back()} hitSlop={16} style={styles.headerAction}>
+          <X size={24} color={theme.text} strokeWidth={2} />
+        </Pressable>
+        <ThemedText variant="heading" style={styles.title}>Record Match</ThemedText>
+        <Pressable
+          onPress={handleSave}
+          hitSlop={16}
+          disabled={!canSave || saving}
+          style={({ pressed }) => [
+            styles.saveAction,
+            (!canSave || saving) && styles.disabled,
+            pressed && canSave && !saving && styles.pressed,
+          ]}>
+          <ThemedText style={[styles.saveLabel, { color: canSave && !saving ? theme.text : theme.textSecondary }]}>
+            Save
+          </ThemedText>
+        </Pressable>
+      </View>
+
       <KeyboardAvoidingView
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
         enabled>
-        <View style={styles.header}>
-          <Pressable onPress={() => router.back()} hitSlop={16} style={styles.headerAction}>
-            <X size={24} color={theme.text} strokeWidth={2} />
-          </Pressable>
-          <ThemedText variant="heading" style={styles.title}>Record Match</ThemedText>
-          <Pressable
-            onPress={handleSave}
-            hitSlop={16}
-            disabled={!canSave || saving}
-            style={({ pressed }) => [
-              styles.saveAction,
-              (!canSave || saving) && styles.disabled,
-              pressed && canSave && !saving && styles.pressed,
-            ]}>
-            <ThemedText style={[styles.saveLabel, { color: canSave && !saving ? theme.text : theme.textSecondary }]}>
-              Save
-            </ThemedText>
-          </Pressable>
-        </View>
-
         <ScrollView
+          style={styles.flex}
           contentContainerStyle={styles.content}
           keyboardShouldPersistTaps="handled"
           showsVerticalScrollIndicator={false}>
@@ -204,8 +196,9 @@ return (
                   Select the captain or representative of the opposing team.
                 </ThemedText>
                 <MatchLineupSelector
-                  profiles={communityProfiles}
+                  searchProfiles={searchProfiles}
                   currentUserName={profile?.username ?? 'You'}
+                  currentUserAvatar={profile?.avatar_url}
                   format="singles"
                   selection={{ playerPartner: null, opponent: selection.opponent, opponentPartner: null }}
                   onChange={(_slot, selectedProfile) =>
@@ -244,8 +237,9 @@ return (
                   Opponent list is limited to community members.
                 </ThemedText>
                 <MatchLineupSelector
-                  profiles={communityProfiles}
+                  searchProfiles={searchProfiles}
                   currentUserName={profile?.username ?? 'You'}
+                  currentUserAvatar={profile?.avatar_url}
                   format={matchFormat}
                   selection={selection}
                   onChange={(slot, selectedProfile) =>
@@ -281,17 +275,17 @@ return (
           </View>
 
         </ScrollView>
-
-        {/* Footer Save Button */}
-        <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: Math.max(Spacing.md, insets.bottom) }]}>
-          <Button
-            label={saving ? 'Saving...' : 'Submit Match'}
-            disabled={!canSave || saving}
-            onPress={handleSave}
-            variant="primary"
-          />
-        </View>
       </KeyboardAvoidingView>
+
+      {/* Footer Save Button */}
+      <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: Math.max(Spacing.md, insets.bottom) }]}>
+        <Button
+          label={saving ? 'Saving...' : 'Submit Match'}
+          disabled={!canSave || saving}
+          onPress={handleSave}
+          variant="primary"
+        />
+      </View>
     </SafeAreaView>
   );
 }

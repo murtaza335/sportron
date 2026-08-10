@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -177,8 +178,8 @@ export function SessionDetailPopup({
       await commitToSession(sessionId, currentUserId);
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to join session.');
+    } catch (e: any) {
+      Alert.alert('Cannot Join', e?.message ?? 'Failed to join session.');
       console.error('Commit error:', e);
     } finally {
       setJoining(false);
@@ -212,8 +213,8 @@ export function SessionDetailPopup({
       setSession(sessionData);
       setMyCommitmentStatus(sessionData?.my_commitment?.status ?? null);
       onRefreshFeed?.();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to approve applicant.');
+    } catch (e: any) {
+      Alert.alert('Cannot Approve', e?.message ?? 'Failed to approve applicant.');
       console.error('Approve error:', e);
     } finally {
       setApprovingId(null);
@@ -270,6 +271,12 @@ export function SessionDetailPopup({
   const rejectedCommitments = commitments.filter((c) => c.status === 'rejected');
   const leftCommitments = commitments.filter((c) => c.status === 'left');
   const hasAcceptedParticipants = acceptedCommitments.length > 0;
+
+  const maxParticipants = session?.max_participants ?? initialSession?.max_participants;
+  const commitmentCount = session?.commitment_count ?? acceptedCommitments.length;
+  const isSessionFull =
+    session?.status === 'full' ||
+    (maxParticipants != null && commitmentCount >= maxParticipants);
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
@@ -339,15 +346,10 @@ export function SessionDetailPopup({
             ) : null}
 
             <View style={styles.creatorRow}>
-              <View
-                style={[styles.creatorAvatar, { backgroundColor: theme.textSecondary }]}
-              >
-                <ThemedText
-                  style={[styles.avatarText, { color: theme.background }]}
-                >
-                  {(session?.creator?.username ?? initialSession?.creator?.username ?? '?').charAt(0).toUpperCase()}
-                </ThemedText>
-              </View>
+              <UserAvatar
+                avatarUrl={session?.creator?.avatar_url ?? initialSession?.creator?.avatar_url}
+                size={40}
+              />
               <View>
                 <ThemedText variant="caption" muted>
                   Posted by
@@ -385,18 +387,7 @@ export function SessionDetailPopup({
                             ]}
                           >
                             <View style={styles.applicantInfo}>
-                              <View
-                                style={[
-                                  styles.applicantAvatar,
-                                  { backgroundColor: theme.textSecondary },
-                                ]}
-                              >
-                                <ThemedText
-                                  style={[styles.avatarText, { color: theme.background }]}
-                                >
-                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                </ThemedText>
-                              </View>
+                              <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                               <View style={styles.applicantDetails}>
                                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                   {c.profile?.username ?? 'Unknown'}
@@ -408,26 +399,32 @@ export function SessionDetailPopup({
                               </View>
                             </View>
                             <View style={styles.applicantActions}>
-                              <Pressable
-                                onPress={() => handleApprove(c.id)}
-                                disabled={approvingId === c.id}
-                                style={[
-                                  styles.actionChip,
-                                  { backgroundColor: '#10B98120', borderColor: '#10B98140' },
-                                ]}
-                              >
-                                <Check size={14} color="#10B981" strokeWidth={3} />
-                              </Pressable>
-                              <Pressable
-                                onPress={() => handleReject(c.id)}
-                                disabled={approvingId === c.id}
-                                style={[
-                                  styles.actionChip,
-                                  { backgroundColor: '#EF444420', borderColor: '#EF444440' },
-                                ]}
-                              >
-                                <X size={14} color="#EF4444" strokeWidth={3} />
-                              </Pressable>
+                              {approvingId === c.id ? (
+                                <ActivityIndicator size="small" color={theme.textSecondary} style={styles.actionLoading} />
+                              ) : (
+                                <>
+                                  <Pressable
+                                    onPress={() => handleApprove(c.id)}
+                                    disabled={approvingId === c.id}
+                                    style={[
+                                      styles.actionChip,
+                                      { backgroundColor: '#10B98120', borderColor: '#10B98140' },
+                                    ]}
+                                  >
+                                    <Check size={14} color="#10B981" strokeWidth={3} />
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => handleReject(c.id)}
+                                    disabled={approvingId === c.id}
+                                    style={[
+                                      styles.actionChip,
+                                      { backgroundColor: '#EF444420', borderColor: '#EF444440' },
+                                    ]}
+                                  >
+                                    <X size={14} color="#EF4444" strokeWidth={3} />
+                                  </Pressable>
+                                </>
+                              )}
                             </View>
                           </View>
                         ))}
@@ -442,18 +439,7 @@ export function SessionDetailPopup({
                             ]}
                           >
                             <View style={styles.applicantInfo}>
-                              <View
-                                style={[
-                                  styles.applicantAvatar,
-                                  { backgroundColor: '#10B981' },
-                                ]}
-                              >
-                                <ThemedText
-                                  style={[styles.avatarText, { color: 'white' }]}
-                                >
-                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                </ThemedText>
-                              </View>
+                              <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                               <View style={styles.applicantDetails}>
                                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                   {c.profile?.username ?? 'Unknown'}
@@ -494,18 +480,7 @@ export function SessionDetailPopup({
                                 ]}
                               >
                                 <View style={styles.applicantInfo}>
-                                  <View
-                                    style={[
-                                      styles.applicantAvatar,
-                                      { backgroundColor: theme.textSecondary },
-                                    ]}
-                                  >
-                                    <ThemedText
-                                      style={[styles.avatarText, { color: theme.background }]}
-                                    >
-                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                    </ThemedText>
-                                  </View>
+                                  <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                                   <View style={styles.applicantDetails}>
                                     <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                       {c.profile?.username ?? 'Unknown'}
@@ -552,18 +527,7 @@ export function SessionDetailPopup({
                                 ]}
                               >
                                 <View style={styles.applicantInfo}>
-                                  <View
-                                    style={[
-                                      styles.applicantAvatar,
-                                      { backgroundColor: '#A855F7', opacity: 0.6 },
-                                    ]}
-                                  >
-                                    <ThemedText
-                                      style={[styles.avatarText, { color: 'white' }]}
-                                    >
-                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                    </ThemedText>
-                                  </View>
+                                  <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                                   <View style={styles.applicantDetails}>
                                     <ThemedText
                                       variant="body"
@@ -673,12 +637,25 @@ export function SessionDetailPopup({
                       </ThemedText>
                     )}
                     {!myCommitmentStatus && (
-                      <Button
-                        label="Yes, I'm In!"
-                        onPress={handleCommit}
-                        loading={joining}
-                        buttonStyle={styles.actionBtn}
-                      />
+                      <>
+                        {isSessionFull ? (
+                          <View style={[styles.fullBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
+                            <ThemedText
+                              variant="body"
+                              style={{ color: '#DC2626', fontWeight: '600', textAlign: 'center' }}
+                            >
+                              Session is full
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          <Button
+                            label="Yes, I'm In!"
+                            onPress={handleCommit}
+                            loading={joining}
+                            buttonStyle={styles.actionBtn}
+                          />
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -757,17 +734,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
-  creatorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
   actionBtn: {
     marginTop: Spacing.sm,
   },
@@ -808,13 +774,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     flex: 1,
   },
-  applicantAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
   applicantDetails: {
     gap: 1,
     flex: 1,
@@ -822,6 +781,9 @@ const styles = StyleSheet.create({
   applicantActions: {
     flexDirection: 'row',
     gap: Spacing.xs,
+  },
+  actionLoading: {
+    width: 64,
   },
   actionChip: {
     width: 32,
@@ -852,6 +814,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   deleteBlockedBanner: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+  },
+  fullBanner: {
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,

@@ -178,32 +178,32 @@ export async function notifyMatchCommented(ownerId: string, matchId: string, com
 }
 
 // Session notifications
-export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string): Promise<void> {
+export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string, applicantId: string): Promise<void> {
   await createNotification({
     userId: sessionCreatorId,
     type: 'session_application',
     title: 'New Session Applicant',
     body: `${applicantName} applied to your session`,
-    data: { sessionId },
+    data: { sessionId, applicantId },
   });
 }
 
-export async function notifySessionAccepted(applicantId: string, sessionId: string, creatorName: string): Promise<void> {
+export async function notifySessionAccepted(applicantId: string, sessionId: string, creatorName: string, sessionName: string): Promise<void> {
   await createNotification({
     userId: applicantId,
     type: 'session_accepted',
     title: 'Session Application Accepted',
-    body: `${creatorName} accepted you into the session`,
+    body: `${creatorName} accepted you into the ${sessionName}`,
     data: { sessionId },
   });
 }
 
-export async function notifySessionRejected(applicantId: string, sessionId: string, creatorName: string): Promise<void> {
+export async function notifySessionRejected(applicantId: string, sessionId: string, creatorName: string, sessionName: string): Promise<void> {
   await createNotification({
     userId: applicantId,
     type: 'session_rejected',
     title: 'Session Application Declined',
-    body: `${creatorName} declined your session application`,
+    body: `${creatorName} declined your request for the ${sessionName}`,
     data: { sessionId },
   });
 }

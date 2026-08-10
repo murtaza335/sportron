@@ -6,10 +6,13 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/date';
+import { supabase } from '@/lib/supabase';
 import { respondToCommunityInvite } from '@/services/communities';
 
 interface InviteCardProps {
+  notificationId: string;
   inviteId: string;
   communityName: string;
   inviterName: string;
@@ -17,17 +20,33 @@ interface InviteCardProps {
   onComplete: () => void;
 }
 
-export function InviteCard({ inviteId, communityName, inviterName, createdAt, onComplete }: InviteCardProps) {
+export function InviteCard({ notificationId, inviteId, communityName, inviterName, createdAt, onComplete }: InviteCardProps) {
   const theme = useTheme();
   const { user } = useAuth();
+  const { markAsRead } = useNotifications();
   const [actionResult, setActionResult] = useState<'accepted' | 'rejected' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
+
+  const resolveNotification = async (accepted: boolean) => {
+    try {
+      await supabase
+        .from('in_app_notifications')
+        .update({
+          type: accepted ? 'community_invite_accepted' : 'community_invite_rejected',
+          read: true,
+        })
+        .eq('id', notificationId);
+    } catch (e) {
+      console.error('Failed to resolve invite notification:', e);
+    }
+  };
 
   const handleAccept = async () => {
     if (!user?.id || actionLoading) return;
     setActionLoading(true);
     try {
       await respondToCommunityInvite(inviteId, user.id, true);
+      await resolveNotification(true);
       setActionResult('accepted');
       onComplete();
     } catch (err) {
@@ -43,6 +62,7 @@ export function InviteCard({ inviteId, communityName, inviterName, createdAt, on
     setActionLoading(true);
     try {
       await respondToCommunityInvite(inviteId, user.id, false);
+      await resolveNotification(false);
       setActionResult('rejected');
       onComplete();
     } catch (err) {
@@ -57,7 +77,8 @@ export function InviteCard({ inviteId, communityName, inviterName, createdAt, on
   const unreadBg = isDark ? 'rgba(59, 130, 246, 0.08)' : '#F8FAFF';
 
   return (
-    <View
+    <Pressable
+      onPress={() => markAsRead(notificationId)}
       style={{
         backgroundColor: actionResult ? theme.background : unreadBg,
         borderBottomWidth: 1,
@@ -173,6 +194,6 @@ export function InviteCard({ inviteId, communityName, inviterName, createdAt, on
           </Pressable>
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }

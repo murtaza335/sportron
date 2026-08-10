@@ -6,6 +6,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { FCMInitializer } from '@/components/FCMInitializer';
 
@@ -201,7 +202,9 @@ export default function RootLayout() {
   return (
     <ThemeProvider>
       <AuthProvider>
-        <RootNavigator />
+        <NotificationsProvider>
+          <RootNavigator />
+        </NotificationsProvider>
       </AuthProvider>
     </ThemeProvider>
   );

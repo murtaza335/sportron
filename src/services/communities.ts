@@ -35,6 +35,7 @@ import {
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
+  creator?: { id: string; username: string } | null;
 };
 
 function normalizeCommunity(row: CommunityRow): Community {
@@ -42,6 +43,8 @@ function normalizeCommunity(row: CommunityRow): Community {
     id: row.id,
     name: row.name,
     description: row.description,
+    organization: row.organization,
+    location: row.location,
     image_url: row.image_url,
     visibility: row.visibility,
     sport: row.sport,
@@ -49,6 +52,7 @@ function normalizeCommunity(row: CommunityRow): Community {
     created_at: row.created_at,
     updated_at: row.updated_at,
     member_count: row.member_count?.[0]?.count ?? 0,
+    creator: Array.isArray(row.creator) ? row.creator[0] ?? null : row.creator ?? null,
   };
 }
 
@@ -57,7 +61,8 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
     .from('communities')
     .select(`
       *,
-      member_count:community_members(count)
+      member_count:community_members(count),
+      creator:created_by(id, username)
     `)
     .order('created_at', { ascending: false });
 
@@ -71,7 +76,8 @@ export async function fetchMyCommunities(userId: string): Promise<Community[]> {
     .select(`
       community:community_id(
         *,
-        member_count:community_members(count)
+        member_count:community_members(count),
+        creator:created_by(id, username)
       )
     `)
     .eq('profile_id', userId)
@@ -106,7 +112,8 @@ export async function fetchCommunityById(id: string): Promise<Community | null> 
     .from('communities')
     .select(`
       *,
-      member_count:community_members(count)
+      member_count:community_members(count),
+      creator:created_by(id, username)
     `)
     .eq('id', id)
     .single();
@@ -127,6 +134,8 @@ export async function createCommunity(
     .insert({
       name: input.name.trim(),
       description: input.description?.trim() || null,
+      organization: input.organization?.trim() || null,
+      location: input.location?.trim() || null,
       visibility: input.visibility,
       sport: input.sport,
       image_url: input.image_url || null,
@@ -135,7 +144,12 @@ export async function createCommunity(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
+      throw new Error('You already have a community with this name.');
+    }
+    throw error;
+  }
 
   const { error: memberError } = await supabase
     .from('community_members')
@@ -158,6 +172,8 @@ export async function updateCommunity(
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
+  if (input.organization !== undefined) updates.organization = input.organization?.trim() || null;
+  if (input.location !== undefined) updates.location = input.location?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
 
@@ -166,7 +182,12 @@ export async function updateCommunity(
     .update(updates)
     .eq('id', communityId);
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
+      throw new Error('You already have a community with this name.');
+    }
+    throw error;
+  }
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
@@ -186,6 +207,41 @@ export async function fetchCommunityMembers(communityId: string): Promise<Commun
       profile:profile_id(id, username, display_name, avatar_url)
     `)
     .eq('community_id', communityId);
+
+  if (error) throw error;
+  return data ?? [];
+}
+
+export async function searchCommunityMembers(
+  communityId: string,
+  query: string,
+): Promise<CommunityMember[]> {
+  const normalized = query.trim();
+  if (normalized.length < 1) return [];
+
+  // Step 1: find profile ids whose username matches the query.
+  const { data: profileRows, error: profileError } = await supabase
+    .from('profiles')
+    .select('id')
+    .ilike('username', `%${normalized}%`)
+    .limit(20);
+  if (profileError) throw profileError;
+
+  const ids = (profileRows ?? []).map((p) => p.id);
+  if (ids.length === 0) return [];
+
+  // Step 2: fetch the matching members with their joined profile. Unlike filtering
+  // on the embedded `profile.username` directly, this keeps the embed fully populated.
+  const { data, error } = await supabase
+    .from('community_members')
+    .select(`
+      *,
+      profile:profile_id(id, username, display_name, avatar_url)
+    `)
+    .eq('community_id', communityId)
+    .eq('approval_status', 'approved')
+    .in('profile_id', ids)
+    .limit(20);
 
   if (error) throw error;
   return data ?? [];
@@ -418,6 +474,20 @@ export async function respondToJoinRequest(
   }
 
   try {
+    await supabase
+      .from('in_app_notifications')
+      .update({
+        type: status === 'approved' ? 'join_approved' : 'join_rejected',
+        read: true,
+      })
+      .eq('type', 'join_request')
+      .eq('data->>communityId', request.community_id)
+      .eq('data->>requesterId', request.user_id);
+  } catch (e) {
+    console.error('Failed to resolve join request notification:', e);
+  }
+
+  try {
     const { data: community } = await supabase
       .from('communities')
       .select('name')
@@ -623,11 +693,11 @@ export async function fetchCommunityMatches(
     .from('community_matches')
     .select(`
       *,
-      recorder:recorded_by(id, username),
-      player:player_id(id, username),
-      playerPartner:player_partner_id(id, username),
-      opponent:opponent_id(id, username),
-      opponentPartner:opponent_partner_id(id, username),
+      recorder:recorded_by(id, username, avatar_url),
+      player:player_id(id, username, avatar_url),
+      playerPartner:player_partner_id(id, username, avatar_url),
+      opponent:opponent_id(id, username, avatar_url),
+      opponentPartner:opponent_partner_id(id, username, avatar_url),
       likes:community_match_likes(profile_id),
       comments:community_match_comments(id)
     `)
@@ -713,7 +783,7 @@ export async function fetchCommunityMatchComments(
     .from('community_match_comments')
     .select(`
       *,
-      profile:profiles(id, username)
+      profile:profiles(id, username, avatar_url)
     `)
     .eq('community_match_id', communityMatchId)
     .order('created_at', { ascending: true });
@@ -740,7 +810,7 @@ export async function addCommunityMatchComment(
     })
     .select(`
       *,
-      profile:profiles(id, username)
+      profile:profiles(id, username, avatar_url)
     `)
     .single();
 
@@ -794,6 +864,16 @@ export async function approveCommunityMatch(
   if (error) throw error;
 
   try {
+    await supabase
+      .from('in_app_notifications')
+      .update({ type: 'community_match_approved', read: true })
+      .eq('type', 'community_match_pending')
+      .eq('data->>matchId', matchId);
+  } catch (e) {
+    console.error('Failed to resolve community match notification:', e);
+  }
+
+  try {
     if (match.recorded_by !== actorId) {
       const actor = await fetchProfile(actorId);
       const { data: community } = await supabase
@@ -834,6 +914,16 @@ export async function disputeCommunityMatch(
     .eq('id', matchId);
 
   if (error) throw error;
+
+  try {
+    await supabase
+      .from('in_app_notifications')
+      .update({ type: 'community_match_disputed', read: true })
+      .eq('type', 'community_match_pending')
+      .eq('data->>matchId', matchId);
+  } catch (e) {
+    console.error('Failed to resolve community match notification:', e);
+  }
 
   try {
     if (match.recorded_by !== actorId) {

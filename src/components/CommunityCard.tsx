@@ -1,5 +1,5 @@
 import { Image, Pressable, StyleSheet, View } from 'react-native';
-import { ShieldCheck, Users } from 'lucide-react-native';
+import { Building2, ShieldCheck, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -49,6 +49,19 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
               {community.description}
             </ThemedText>
           )}
+          <View style={styles.byRow}>
+            <ThemedText variant="caption" muted numberOfLines={1} style={styles.byText}>
+              Created by {community.creator?.username ?? 'unknown'}
+            </ThemedText>
+            {community.organization && (
+              <View style={styles.orgItem}>
+                <Building2 size={11} color={theme.textSecondary} strokeWidth={2} />
+                <ThemedText variant="caption" muted numberOfLines={1} style={styles.byText}>
+                  {community.organization}
+                </ThemedText>
+              </View>
+            )}
+          </View>
           <View style={styles.metaRow}>
             <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
               <ThemedText variant="caption" muted style={styles.badgeText}>
@@ -127,6 +140,22 @@ const styles = StyleSheet.create({
   },
   desc: {
     marginTop: 1,
+  },
+  byRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    flexWrap: 'wrap',
+  },
+  byText: {
+    fontSize: 11,
+  },
+  orgItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    maxWidth: '100%',
   },
   metaRow: {
     flexDirection: 'row',

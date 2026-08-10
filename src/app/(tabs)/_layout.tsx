@@ -46,22 +46,23 @@ export default function TabLayout() {
           borderTopWidth: 0,
           elevation: 0,
           shadowOpacity: 0,
-          height: Platform.OS === 'ios' ? 88 : 56 + Math.max(insets.bottom, Spacing.md),
+          height: Platform.OS === 'ios' ? 92 : 60 + Math.max(insets.bottom, Spacing.md),
           paddingTop: Spacing.sm,
-          paddingBottom: Platform.OS === 'ios' ? 28 : Math.max(insets.bottom, Spacing.md),
+          paddingBottom: Platform.OS === 'ios' ? 22 : Math.max(insets.bottom, Spacing.md),
         },
         tabBarLabelStyle: {
           fontSize: 11,
           fontWeight: '700',
           letterSpacing: 0.2,
         },
-        tabBarShowLabel: false,
+        tabBarShowLabel: true,
       }}
     >
       <Tabs.Screen
         name="index"
         options={{
           title: 'Communities',
+          tabBarLabel: 'Communities',
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
           headerLeft: () => (
             <Pressable
@@ -92,6 +93,7 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'Sessions',
+          tabBarLabel: 'Find',
           headerTitle: () => <DefaultHeaderTitle title="Find a Match" />,
           headerLeft: () => (
             <Pressable
@@ -122,6 +124,7 @@ export default function TabLayout() {
         name="updates"
         options={{
           title: 'Activity',
+          tabBarLabel: 'Updates',
           headerTitle: () => <DefaultHeaderTitle title="Activity" />,
           tabBarIcon: ({ color, size }) => (
             <View style={{ position: 'relative', paddingBottom: 2 }}>
@@ -145,6 +148,7 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
+          tabBarLabel: 'Profile',
           headerTitle: () => <DefaultHeaderTitle title="Profile" />,
           tabBarIcon: ({ color, size }) => (
             <View style={{ position: 'relative', paddingBottom: 2 }}>
