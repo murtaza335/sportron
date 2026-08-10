@@ -50,7 +50,7 @@ export default function LoginScreen() {
               />
               <Text style={styles.titleText}>Sportron</Text>
               <View>
-                <Text style={styles.subtitleText}>A community Driven App</Text>
+                <Text style={styles.subtitleText}>A community Driven Sports App</Text>
               </View>
             </View>
 
