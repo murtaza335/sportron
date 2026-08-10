@@ -177,8 +177,8 @@ export function SessionDetailPopup({
       await commitToSession(sessionId, currentUserId);
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to join session.');
+    } catch (e: any) {
+      Alert.alert('Cannot Join', e?.message ?? 'Failed to join session.');
       console.error('Commit error:', e);
     } finally {
       setJoining(false);
@@ -212,8 +212,8 @@ export function SessionDetailPopup({
       setSession(sessionData);
       setMyCommitmentStatus(sessionData?.my_commitment?.status ?? null);
       onRefreshFeed?.();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to approve applicant.');
+    } catch (e: any) {
+      Alert.alert('Cannot Approve', e?.message ?? 'Failed to approve applicant.');
       console.error('Approve error:', e);
     } finally {
       setApprovingId(null);
@@ -270,6 +270,12 @@ export function SessionDetailPopup({
   const rejectedCommitments = commitments.filter((c) => c.status === 'rejected');
   const leftCommitments = commitments.filter((c) => c.status === 'left');
   const hasAcceptedParticipants = acceptedCommitments.length > 0;
+
+  const maxParticipants = session?.max_participants ?? initialSession?.max_participants;
+  const commitmentCount = session?.commitment_count ?? acceptedCommitments.length;
+  const isSessionFull =
+    session?.status === 'full' ||
+    (maxParticipants != null && commitmentCount >= maxParticipants);
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
@@ -679,12 +685,25 @@ export function SessionDetailPopup({
                       </ThemedText>
                     )}
                     {!myCommitmentStatus && (
-                      <Button
-                        label="Yes, I'm In!"
-                        onPress={handleCommit}
-                        loading={joining}
-                        buttonStyle={styles.actionBtn}
-                      />
+                      <>
+                        {isSessionFull ? (
+                          <View style={[styles.fullBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
+                            <ThemedText
+                              variant="body"
+                              style={{ color: '#DC2626', fontWeight: '600', textAlign: 'center' }}
+                            >
+                              Session is full
+                            </ThemedText>
+                          </View>
+                        ) : (
+                          <Button
+                            label="Yes, I'm In!"
+                            onPress={handleCommit}
+                            loading={joining}
+                            buttonStyle={styles.actionBtn}
+                          />
+                        )}
+                      </>
                     )}
                   </>
                 )}
@@ -861,6 +880,13 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
   },
   deleteBlockedBanner: {
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    alignItems: 'center',
+  },
+  fullBanner: {
     borderWidth: 1,
     borderRadius: Radius.md,
     paddingVertical: Spacing.md,

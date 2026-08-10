@@ -198,12 +198,19 @@ export async function commitToSession(
 ): Promise<Commitment> {
   const { data: sessionRow, error: sessionError } = await supabase
     .from('sessions')
-    .select('date_time, created_by')
+    .select('date_time, created_by, max_participants')
     .eq('id', sessionId)
     .single();
 
   if (sessionError) throw sessionError;
   if (!sessionRow) throw new Error('Session not found');
+
+  if (sessionRow.max_participants != null) {
+    const countMap = await fetchAcceptedCounts([sessionId]);
+    if ((countMap[sessionId] ?? 0) >= sessionRow.max_participants) {
+      throw new Error('This session is full.');
+    }
+  }
 
   const conflicts = await checkTimeConflicts(userId, sessionRow.date_time);
   if (conflicts.length > 0) {
@@ -253,12 +260,38 @@ export async function approveCommitment(
 
   if (!commitment) throw new Error('Commitment not found');
 
+  const { data: sessionRow } = await supabase
+    .from('sessions')
+    .select('max_participants')
+    .eq('id', commitment.session_id)
+    .single();
+
+  if (sessionRow?.max_participants != null) {
+    const countMap = await fetchAcceptedCounts([commitment.session_id]);
+    if ((countMap[commitment.session_id] ?? 0) >= sessionRow.max_participants) {
+      throw new Error(
+        `This session is full (${sessionRow.max_participants}/${sessionRow.max_participants}). Cannot accept more participants.`,
+      );
+    }
+  }
+
   const { error } = await supabase
     .from('commitments')
     .update({ status: 'accepted' })
     .eq('id', commitmentId);
 
   if (error) throw error;
+
+  if (sessionRow?.max_participants != null) {
+    const countMap = await fetchAcceptedCounts([commitment.session_id]);
+    if ((countMap[commitment.session_id] ?? 0) >= sessionRow.max_participants) {
+      const { error: statusError } = await supabase
+        .from('sessions')
+        .update({ status: 'full' })
+        .eq('id', commitment.session_id);
+      if (statusError) console.error('Failed to mark session as full:', statusError);
+    }
+  }
 
   await resolveSessionApplicationNotification(
     commitment.session_id,
@@ -375,7 +408,7 @@ async function resolveSessionApplicationNotification(
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {
   const { data: session } = await supabase
     .from('sessions')
-    .select('created_by')
+    .select('created_by, max_participants, status')
     .eq('id', sessionId)
     .single();
 
@@ -389,6 +422,17 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
     .in('status', ['pending', 'accepted']);
 
   if (error) throw error;
+
+  if (session.status === 'full' && session.max_participants != null) {
+    const countMap = await fetchAcceptedCounts([sessionId]);
+    if ((countMap[sessionId] ?? 0) < session.max_participants) {
+      const { error: statusError } = await supabase
+        .from('sessions')
+        .update({ status: 'open' })
+        .eq('id', sessionId);
+      if (statusError) console.error('Failed to reopen session:', statusError);
+    }
+  }
 
   try {
     if (session.created_by !== userId) {
