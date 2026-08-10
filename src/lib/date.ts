@@ -12,3 +12,17 @@ export function formatRelativeTime(dateString: string): string {
   if (diffDays < 7) return `${diffDays}d ago`;
   return date.toLocaleDateString();
 }
+
+function ordinalSuffix(n: number): string {
+  const suffixes = ['th', 'st', 'nd', 'rd'];
+  const v = n % 100;
+  return n + (suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]);
+}
+
+export function formatSessionDisplayName(sport: string, dateTime: string): string {
+  const d = new Date(dateTime);
+  if (Number.isNaN(d.getTime())) return `${sport} session`;
+  const day = ordinalSuffix(d.getDate());
+  const month = d.toLocaleDateString(undefined, { month: 'long' });
+  return `${sport} ${day} ${month} session`;
+}

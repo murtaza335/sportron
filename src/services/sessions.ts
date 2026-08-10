@@ -1,6 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput } from '@/types';
 import { fetchProfile } from './profiles';
+import { formatSessionDisplayName } from '@/lib/date';
 import {
   notifySessionApplication,
   notifySessionAccepted,
@@ -113,6 +114,9 @@ export async function fetchSessionById(
 // Maximum session duration: 1 week in minutes
 export const MAX_SESSION_DURATION_MINUTES = 7 * 24 * 60; // 10080 minutes
 
+export const MIN_SESSION_PARTICIPANTS = 1;
+export const MAX_SESSION_PARTICIPANTS = 50;
+
 // Maximum future date for session: end of day, 7 days from now (inclusive)
 const now = new Date();
 const maxDate = new Date(now);
@@ -128,6 +132,16 @@ export async function createSession(
 
   if (expireAfter > MAX_SESSION_DURATION_MINUTES) {
     throw new Error(`Session duration cannot exceed 1 week (${MAX_SESSION_DURATION_MINUTES} minutes)`);
+  }
+
+  if (
+    !Number.isInteger(input.max_participants) ||
+    input.max_participants < MIN_SESSION_PARTICIPANTS ||
+    input.max_participants > MAX_SESSION_PARTICIPANTS
+  ) {
+    throw new Error(
+      `Session must allow between ${MIN_SESSION_PARTICIPANTS} and ${MAX_SESSION_PARTICIPANTS} participants`,
+    );
   }
 
   const sessionDate = new Date(input.date_time);
@@ -255,10 +269,19 @@ export async function approveCommitment(
 
   try {
     const actor = await fetchProfile(actorId);
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('sport, date_time')
+      .eq('id', commitment.session_id)
+      .maybeSingle();
+    const sessionName = session
+      ? formatSessionDisplayName(session.sport, session.date_time)
+      : 'this session';
     await notifySessionAccepted(
       commitment.user_id,
       commitment.session_id,
       actor?.username ?? 'Session host',
+      sessionName,
     );
   } catch (e) {
     console.error('Failed to send session accepted notification:', e);
@@ -293,10 +316,19 @@ export async function rejectCommitment(
 
   try {
     const actor = await fetchProfile(actorId);
+    const { data: session } = await supabase
+      .from('sessions')
+      .select('sport, date_time')
+      .eq('id', commitment.session_id)
+      .maybeSingle();
+    const sessionName = session
+      ? formatSessionDisplayName(session.sport, session.date_time)
+      : 'this session';
     await notifySessionRejected(
       commitment.user_id,
       commitment.session_id,
       actor?.username ?? 'Session host',
+      sessionName,
     );
   } catch (e) {
     console.error('Failed to send session rejected notification:', e);
@@ -312,21 +344,24 @@ async function resolveSessionApplicationNotification(
   action: 'accepted' | 'rejected',
 ): Promise<void> {
   try {
-    const { data: applicant } = await supabase
-      .from('profiles')
-      .select('username')
-      .eq('id', applicantId)
-      .single();
+    const [applicantResult, sessionResult] = await Promise.all([
+      supabase.from('profiles').select('username').eq('id', applicantId).single(),
+      supabase.from('sessions').select('sport, date_time').eq('id', sessionId).maybeSingle(),
+    ]);
 
-    const name = applicant?.username ?? 'Someone';
+    const name = applicantResult.data?.username ?? 'Someone';
+    const session = sessionResult.data;
+    const sessionName = session
+      ? formatSessionDisplayName(session.sport, session.date_time)
+      : 'your session';
     await supabase
       .from('in_app_notifications')
       .update({
         type: action === 'accepted' ? 'session_accepted' : 'session_rejected',
         read: true,
         body: action === 'accepted'
-          ? `You accepted ${name} into your session`
-          : `You declined ${name} from your session`,
+          ? `You accepted ${name} into the ${sessionName}`
+          : `You declined ${name} from the ${sessionName}`,
       })
       .eq('user_id', creatorId)
       .eq('type', 'session_application')

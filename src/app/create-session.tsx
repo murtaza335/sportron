@@ -20,7 +20,13 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { checkTimeConflicts, createSession, MAX_SESSION_FUTURE_DATE } from '@/services/sessions';
+import {
+  checkTimeConflicts,
+  createSession,
+  MAX_SESSION_FUTURE_DATE,
+  MAX_SESSION_PARTICIPANTS,
+  MIN_SESSION_PARTICIPANTS,
+} from '@/services/sessions';
 import type { CreateSessionInput } from '@/types';
 
 export default function CreateSessionScreen() {
@@ -51,9 +57,26 @@ export default function CreateSessionScreen() {
   ];
   const [expireIndex, setExpireIndex] = useState(1); // 30 min default
 
+  const handleParticipantsChange = (text: string) => {
+    const digits = text.replace(/[^0-9]/g, '');
+    if (digits === '') {
+      setMaxParticipants('');
+      return;
+    }
+    const num = parseInt(digits, 10);
+    setMaxParticipants(String(Math.min(Math.max(num, MIN_SESSION_PARTICIPANTS), MAX_SESSION_PARTICIPANTS)));
+  };
+
+  const participantsNum = parseInt(maxParticipants, 10);
+  const participantsValid =
+    !Number.isNaN(participantsNum) &&
+    participantsNum >= MIN_SESSION_PARTICIPANTS &&
+    participantsNum <= MAX_SESSION_PARTICIPANTS;
+
   const canSave =
     sport.trim().length > 0 &&
     location.trim().length > 0 &&
+    participantsValid &&
     !saving;
 
   const handleCreate = async () => {
@@ -71,6 +94,14 @@ export default function CreateSessionScreen() {
     maxDate.setDate(maxDate.getDate() + 7);
     if (new Date(dateTime) > maxDate) {
       Alert.alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
+      return;
+    }
+
+    if (!participantsValid) {
+      Alert.alert(
+        'Invalid Participants',
+        `Please enter a number between ${MIN_SESSION_PARTICIPANTS} and ${MAX_SESSION_PARTICIPANTS}.`,
+      );
       return;
     }
 
@@ -93,7 +124,7 @@ export default function CreateSessionScreen() {
         sport: sport.trim(),
         location: location.trim(),
         date_time: dateTime,
-        max_participants: parseInt(maxParticipants, 10) || 2,
+        max_participants: participantsNum,
         description: description.trim() || undefined,
         expireAfterMinutes: EXPIRE_OPTIONS[expireIndex].value,
       };
@@ -304,7 +335,7 @@ export default function CreateSessionScreen() {
             </ThemedText>
             <TextInput
               value={maxParticipants}
-              onChangeText={setMaxParticipants}
+              onChangeText={handleParticipantsChange}
               placeholder="2"
               placeholderTextColor={theme.textSecondary}
               style={[
@@ -317,6 +348,9 @@ export default function CreateSessionScreen() {
               ]}
               keyboardType="number-pad"
             />
+            <ThemedText variant="caption" muted style={styles.hintText}>
+              {MIN_SESSION_PARTICIPANTS}–{MAX_SESSION_PARTICIPANTS} participants
+            </ThemedText>
           </View>
 
           <View style={styles.field}>
@@ -424,6 +458,9 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   label: {
+    marginLeft: Spacing.xs,
+  },
+  hintText: {
     marginLeft: Spacing.xs,
   },
   input: {
