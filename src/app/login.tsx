@@ -1,6 +1,6 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, ImageBackground, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Alert, Image, ImageBackground, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -48,9 +48,9 @@ export default function LoginScreen() {
                 style={styles.appLogo}
                 resizeMode="contain"
               />
-              <Text style={styles.titleText}>T3 SEECS</Text>
+              <Text style={styles.titleText}>Sportron</Text>
               <View>
-                <Text style={styles.subtitleText}>Table Tennis Tracker</Text>
+                <Text style={styles.subtitleText}>A community Driven Sports App</Text>
               </View>
             </View>
 
@@ -72,10 +72,24 @@ export default function LoginScreen() {
                 )}
               </TouchableOpacity>
               
+<View style={styles.linksRow}>
               <Text style={styles.footnoteText}>
-                By continuing, you agree to our Terms & Privacy Policy.
+                By continuing, you agree to our{' '}
               </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://murtaza335.github.io/sportron/TERMS_OF_SERVICE.html')}
+              >
+                <Text style={styles.linkText}>Terms of Service</Text>
+              </TouchableOpacity>
+              <Text style={styles.footnoteText}> and </Text>
+              <TouchableOpacity
+                onPress={() => Linking.openURL('https://murtaza335.github.io/sportron/PRIVACY_POLICY.html')}
+              >
+                <Text style={styles.linkText}>Privacy Policy</Text>
+              </TouchableOpacity>
+              <Text style={styles.footnoteText}>.</Text>
             </View>
+          </View>
 
           </View>
         </SafeAreaView>
@@ -184,5 +198,16 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 12,
     color: 'rgba(255, 255, 255, 0.55)',
+  },
+  linkText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    textDecorationLine: 'underline',
+    fontWeight: '600',
+  },
+  linksRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
 });

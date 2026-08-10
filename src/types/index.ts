@@ -178,7 +178,8 @@ export type NotificationType =
   | 'community_match_disputed'
   | 'community_invite'
   | 'community_invite_accepted'
-  | 'community_invite_rejected';
+  | 'community_invite_rejected'
+  | 'session_chat_message';
 
 export type InAppNotification = {
   id: string;
@@ -368,4 +369,13 @@ export type Commitment = {
     completed_sessions?: number;
     total_committed_sessions?: number;
   } | null;
+};
+
+export type SessionChatMessage = {
+  id: string;
+  session_id: string;
+  sender_id: string;
+  content: string;
+  created_at: string;
+  sender?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
 };

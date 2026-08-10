@@ -46,6 +46,7 @@ Sportron was built for the community that loves to play — students, teachers, 
 - Create pickup sessions with sport, location, time, and capacity.
 - Sessions expire automatically if no one joins.
 - Apply, accept, reject, or leave — just like scheduling a real game.
+- Live chat for the host and accepted players, with push notifications on every message.
 
 ### Pings
 - Ping your whole community: *"Playing tonight, anyone in?"*

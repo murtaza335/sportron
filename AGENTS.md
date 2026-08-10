@@ -45,6 +45,7 @@ src/
 │   ├── MatchLineupSelector.tsx # Visual team builder for record match
 │   ├── ScoreCounter.tsx        # +/- score input
 │   ├── SessionDetailPopup.tsx  # Session detail: applicants, approve/reject, join/leave
+│   ├── SessionChatPopup.tsx    # Full-screen live chat for a session (creator + accepted members)
 │   ├── ActivityCard.tsx        # Notification row with accept/decline actions
 │   ├── InviteCard.tsx          # Community invite accept/decline
 │   ├── InviteMemberModal.tsx   # Admin invite-by-username modal
@@ -60,12 +61,14 @@ src/
 │   ├── useCommunities.ts            # Fetch public / my communities
 │   ├── useCommunity.ts              # Single community detail + membership state
 │   ├── useSessions.ts               # Fetch open play sessions
+│   ├── useSessionChat.ts            # Session chat messages + realtime subscribe
 │   ├── useNotifications.ts          # Wraps NotificationsContext (shared feed + unreadCount)
 │   ├── useFCM.ts                    # FCM init, permissions, notification navigation
 │   ├── use-theme.ts                 # Theme context wrapper
 │   └── use-color-scheme.ts          # System theme detection (native + web)
 ├── services/
 │   ├── auth.ts                 # Google OAuth flow
+│   ├── chat.ts                 # Session chat: fetch/send messages + FCM push to members
 │   ├── profiles.ts             # Profile CRUD, prefs, FCM tokens, soft delete
 │   ├── communities.ts          # Communities, members, matches, pings, invites
 │   ├── sessions.ts             # Session CRUD + commitments (approve/reject/leave)
@@ -127,7 +130,15 @@ src/
 - **Delete**: allowed only while no member has `accepted` status
 - Session cards show "closes in X" countdown, commitment count, creator name
 
-### 6. Activity (Notifications Inbox)
+### 6. Session Chat
+- Live text chat per session, realtime via Postgres Changes on `session_messages` (`supabase.channel('session-chat-<id>')`, INSERT filtered on `session_id`)
+- Scoped to the session **creator + accepted participants** only (RLS enforces both read and write)
+- Users who **left** a session can still read history up to the moment they left (`created_at <=` their commitment's `updated_at`) but cannot send; the client skips its realtime subscription and shows a "you left" banner, and they receive no further FCM pushes
+- Chat button sits in the `SessionDetailPopup` header (next to close); opens a full-screen `SessionChatPopup`
+- Text only, max 1000 chars, permanent (no delete/edit); sending disabled once a session is closed/completed/cancelled
+- **Push**: each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every member except the sender — title = session name, body = `<sender>: <content>`, via `pushFcmToUser` in `services/notifications.ts`
+
+### 7. Activity (Notifications Inbox)
 - Tabs: **Action Required** (`session_application`, `join_request`, `community_match_pending`), **Invites** (`community_invite`), **Past Activity**
 - Inline Accept / Decline via `ActivityCard` / `InviteCard` — after an action the notification row is updated (type → resolved type, `read = true`) so it leaves the actionable tab permanently; invites become `community_invite_accepted`/`community_invite_rejected`
 - **Resolution lives in the services too**: `approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, and `approveCommunityMatch`/`disputeCommunityMatch` each resolve the matching pending notification (matched via `data->>sessionId/applicantId`, `data->>communityId/requesterId`, `data->>matchId`), so acting from a session/community popup also clears the Action Required inbox — not just from the Activity tab
@@ -136,12 +147,13 @@ src/
 - Tapping any card marks it read (`markAsRead`); **Mark all as read** button clears the rest (`markAllAsRead`)
 - Unread badge (red dot) on the Activity tab = derived `unreadCount` from the shared feed
 
-### 7. Push Notifications (FCM)
+### 8. Push Notifications (FCM)
 - FCM token registered per device (`profiles.fcm_tokens`)
 - `send-notification` Edge Function delivers via Firebase HTTP v1
 - Foreground/background/terminated handling; background data-only messages → local notification
+- `session_chat_message` pushes are **FCM-only** (sent via `pushFcmToUser`, never inserted into `in_app_notifications`)
 
-### 8. Profile & Settings
+### 9. Profile & Settings
 - **Profile**: view/edit username, bio, role (student/teacher), avatar upload; profile for other users via `/profile/[id]`
 - **Theme picker**: Light / Dark / System (bottom sheet, persisted)
 - **Push notification master toggle** + per-type preferences in Advanced Settings
@@ -169,6 +181,11 @@ commitments
   id, session_id (fk), user_id (fk), status (pending|accepted|rejected|left),
   feedback_status, feedback_provided_by, created_at, updated_at
   -- partial unique index `commitments_active_unique WHERE status != 'left'`
+
+session_messages
+  id, session_id (fk, cascade), sender_id (fk, cascade), content, created_at
+  -- live text chat; readable/writable only by the session creator + accepted
+  -- participants (RLS); added to the supabase_realtime publication (migration 021)
 
 communities
   id, name, description, organization, location, image_url,
@@ -217,7 +234,7 @@ in_app_notifications
 ```
 
 ### Notification Types
-See `NotificationType` in `src/types/index.ts` (all 28 types, from `match_pending` to `community_invite_rejected`).
+See `NotificationType` in `src/types/index.ts` (all 29 types, from `match_pending` to `session_chat_message`).
 
 ---
 
