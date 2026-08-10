@@ -33,6 +33,8 @@ export default function CreateCommunityScreen() {
 
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [organization, setOrganization] = useState('');
+  const [location, setLocation] = useState('');
   const [sport, setSport] = useState<Sport>('table_tennis');
   const [visibility, setVisibility] = useState<CommunityVisibility>('public');
   const [imageUri, setImageUri] = useState<string | null>(null);
@@ -92,13 +94,15 @@ export default function CreateCommunityScreen() {
       await createCommunity(user.id, {
         name: name.trim(),
         description: description.trim() || undefined,
+        organization: organization.trim() || undefined,
+        location: location.trim() || undefined,
         visibility,
         sport,
         image_url: uploadedUrl ?? undefined,
       });
       router.back();
-    } catch (e) {
-      Alert.alert('Error', 'Failed to create community. Please try again.');
+    } catch (e: any) {
+      Alert.alert('Error', e?.message ?? 'Failed to create community. Please try again.');
       console.error('Create community error:', e);
     } finally {
       setSaving(false);
@@ -211,6 +215,48 @@ export default function CreateCommunityScreen() {
                 },
               ]}
               maxLength={300}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
+              Organization (optional)
+            </ThemedText>
+            <TextInput
+              value={organization}
+              onChangeText={setOrganization}
+              placeholder="e.g. University of Lahore"
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.input,
+                {
+                  color: theme.text,
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+              maxLength={60}
+            />
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
+              Location / City (optional)
+            </ThemedText>
+            <TextInput
+              value={location}
+              onChangeText={setLocation}
+              placeholder="e.g. Lahore"
+              placeholderTextColor={theme.textSecondary}
+              style={[
+                styles.input,
+                {
+                  color: theme.text,
+                  backgroundColor: theme.backgroundElement,
+                  borderColor: theme.border,
+                },
+              ]}
+              maxLength={60}
             />
           </View>
 

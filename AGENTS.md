@@ -95,10 +95,13 @@ src/
 - Communities are **linked to a single sport** (not changeable after creation)
 
 ### 3. Communities
-- **Create**: name, description, cover photo (Cloudinary), sport pill selector, visibility (public / restricted)
+- **Create**: name, description, **organization (optional, e.g. uni/club)**, **location/city (optional)**, cover photo (Cloudinary), sport pill selector, visibility (public / restricted)
+- **Name uniqueness**: a user cannot create (or rename into) a community with a name they already own — enforced DB-side by `idx_communities_name_created_by` (case-insensitive); two different users may share a name. `createCommunity`/`updateCommunity` map the unique violation to a friendly error
 - **Discover**: browse all public communities with name search + horizontal sport filter chips; shows admin/member role tags
+- **Cards** (My Communities + Discover): show sport/visibility/member count, **"Created by <username>"** and **organization (if present)**
 - **Join**: public → `joinCommunity()` (instant); restricted → `requestToJoinCommunity()` (admin approves)
-- **Leave** / **Edit** (admin: name, description, cover, visibility, transfer admin by username) / **Delete**
+- **Leave** / **Edit** (admin: name, description, organization, location, cover, visibility, transfer admin by username) / **Delete**
+- **Details** (`community/[id]/info.tsx` + home card): description, organization, location, creator info shown to non-members before joining
 - **Members**: sorted me → admins → members; admin long-press for Make Admin / Remove; pending-invite section
 - **Invite Members**: admin can invite by typing username (public or restricted); invitees accept/reject via Invite tab
 - **Join requests**: admin review screen with approve/reject
@@ -164,8 +167,11 @@ commitments
   -- partial unique index `commitments_active_unique WHERE status != 'left'`
 
 communities
-  id, name, description, image_url, visibility (public|restricted),
-  sport, created_by, created_at, updated_at
+  id, name, description, organization, location, image_url,
+  visibility (public|restricted), sport, created_by, created_at, updated_at
+  -- unique index `idx_communities_name_created_by (lower(name), created_by)`
+  --   allows two users to share a name but blocks one user creating a duplicate
+  --   (case-insensitive); enforced by migration 020
 
 community_members
   community_id (fk), profile_id (fk), role (admin|member),

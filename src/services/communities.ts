@@ -35,6 +35,7 @@ import {
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
+  creator?: { id: string; username: string } | null;
 };
 
 function normalizeCommunity(row: CommunityRow): Community {
@@ -42,6 +43,8 @@ function normalizeCommunity(row: CommunityRow): Community {
     id: row.id,
     name: row.name,
     description: row.description,
+    organization: row.organization,
+    location: row.location,
     image_url: row.image_url,
     visibility: row.visibility,
     sport: row.sport,
@@ -49,6 +52,7 @@ function normalizeCommunity(row: CommunityRow): Community {
     created_at: row.created_at,
     updated_at: row.updated_at,
     member_count: row.member_count?.[0]?.count ?? 0,
+    creator: Array.isArray(row.creator) ? row.creator[0] ?? null : row.creator ?? null,
   };
 }
 
@@ -57,7 +61,8 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
     .from('communities')
     .select(`
       *,
-      member_count:community_members(count)
+      member_count:community_members(count),
+      creator:created_by(id, username)
     `)
     .order('created_at', { ascending: false });
 
@@ -71,7 +76,8 @@ export async function fetchMyCommunities(userId: string): Promise<Community[]> {
     .select(`
       community:community_id(
         *,
-        member_count:community_members(count)
+        member_count:community_members(count),
+        creator:created_by(id, username)
       )
     `)
     .eq('profile_id', userId)
@@ -106,7 +112,8 @@ export async function fetchCommunityById(id: string): Promise<Community | null> 
     .from('communities')
     .select(`
       *,
-      member_count:community_members(count)
+      member_count:community_members(count),
+      creator:created_by(id, username)
     `)
     .eq('id', id)
     .single();
@@ -127,6 +134,8 @@ export async function createCommunity(
     .insert({
       name: input.name.trim(),
       description: input.description?.trim() || null,
+      organization: input.organization?.trim() || null,
+      location: input.location?.trim() || null,
       visibility: input.visibility,
       sport: input.sport,
       image_url: input.image_url || null,
@@ -135,7 +144,12 @@ export async function createCommunity(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
+      throw new Error('You already have a community with this name.');
+    }
+    throw error;
+  }
 
   const { error: memberError } = await supabase
     .from('community_members')
@@ -158,6 +172,8 @@ export async function updateCommunity(
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
+  if (input.organization !== undefined) updates.organization = input.organization?.trim() || null;
+  if (input.location !== undefined) updates.location = input.location?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
 
@@ -166,7 +182,12 @@ export async function updateCommunity(
     .update(updates)
     .eq('id', communityId);
 
-  if (error) throw error;
+  if (error) {
+    if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
+      throw new Error('You already have a community with this name.');
+    }
+    throw error;
+  }
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {

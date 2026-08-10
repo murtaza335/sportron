@@ -1,15 +1,18 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
+  Building2,
   CheckCircle,
   ChevronRight,
   Clock,
   Globe,
   Lock,
+  MapPin,
   Megaphone,
   MoreHorizontal,
   Plus,
   Swords,
+  User,
   Users,
   X,
   XCircle,
@@ -375,6 +378,36 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
               )}
 
+              {(community.organization || community.location) && (
+                <View style={styles.communityDetails}>
+                  {community.organization && (
+                    <View style={styles.detailItem}>
+                      <Building2 size={13} color={theme.textSecondary} strokeWidth={2} />
+                      <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                        {community.organization}
+                      </ThemedText>
+                    </View>
+                  )}
+                  {community.location && (
+                    <View style={styles.detailItem}>
+                      <MapPin size={13} color={theme.textSecondary} strokeWidth={2} />
+                      <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                        {community.location}
+                      </ThemedText>
+                    </View>
+                  )}
+                </View>
+              )}
+
+              {community.creator?.username && (
+                <View style={styles.detailItem}>
+                  <User size={13} color={theme.textSecondary} strokeWidth={2} />
+                  <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                    Created by {community.creator.username}
+                  </ThemedText>
+                </View>
+              )}
+
               <View style={styles.metaRow}>
                 <Users size={14} color={theme.textSecondary} strokeWidth={2} />
                 <ThemedText variant="caption" muted>
@@ -671,6 +704,23 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   description: { marginTop: Spacing.xs },
+  communityDetails: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    marginTop: Spacing.xs,
+    flexWrap: 'wrap',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    marginTop: Spacing.xs,
+    maxWidth: '90%',
+  },
+  detailValue: {
+    flexShrink: 1,
+  },
   metaRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xs },
 
   // Join Action

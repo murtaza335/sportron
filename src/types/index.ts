@@ -197,6 +197,8 @@ export type Community = {
   id: string;
   name: string;
   description: string | null;
+  organization: string | null;
+  location: string | null;
   image_url: string | null;
   visibility: CommunityVisibility;
   sport: Sport;
@@ -204,6 +206,7 @@ export type Community = {
   created_at: string;
   updated_at: string;
   member_count?: number;
+  creator?: Pick<Profile, 'id' | 'username'> | null;
 };
 
 export type CommunityMemberRole = 'admin' | 'member';
@@ -224,6 +227,8 @@ export type CommunityMember = {
 export type CreateCommunityInput = {
   name: string;
   description?: string;
+  organization?: string;
+  location?: string;
   visibility: CommunityVisibility;
   sport: Sport;
   image_url?: string;
@@ -232,6 +237,8 @@ export type CreateCommunityInput = {
 export type UpdateCommunityInput = {
   name?: string;
   description?: string | null;
+  organization?: string | null;
+  location?: string | null;
   visibility?: CommunityVisibility;
   image_url?: string | null;
 };

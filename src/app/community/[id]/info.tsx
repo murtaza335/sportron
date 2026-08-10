@@ -2,12 +2,14 @@ import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import {
+  Building2,
   ChevronRight,
   Clock,
   Globe,
   Image as ImageIcon,
   Lock,
   LogOut,
+  MapPin,
   Pencil,
   Plus,
   Shield,
@@ -73,6 +75,8 @@ export default function CommunityInfoScreen() {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [editName, setEditName] = useState('');
   const [editDescription, setEditDescription] = useState('');
+  const [editOrganization, setEditOrganization] = useState('');
+  const [editLocation, setEditLocation] = useState('');
   const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
   const [editImageUri, setEditImageUri] = useState<string | null>(null);
   const [uploadingEditImage, setUploadingEditImage] = useState(false);
@@ -170,6 +174,8 @@ export default function CommunityInfoScreen() {
       await updateCommunity(id, {
         name: editName.trim(),
         description: editDescription.trim() || null,
+        organization: editOrganization.trim() || null,
+        location: editLocation.trim() || null,
         visibility: editVisibility,
         image_url: imageUrl,
       });
@@ -288,6 +294,8 @@ export default function CommunityInfoScreen() {
     if (!community) return;
     setEditName(community.name);
     setEditDescription(community.description ?? '');
+    setEditOrganization(community.organization ?? '');
+    setEditLocation(community.location ?? '');
     setEditVisibility(community.visibility);
     setEditImageUri(community.image_url ?? null);
     setEditModalVisible(true);
@@ -433,11 +441,33 @@ export default function CommunityInfoScreen() {
           <ThemedText variant="body" style={styles.descriptionText}>
             {community.description || 'No description provided.'}
           </ThemedText>
-          <View style={styles.creatorRow}>
-            <User size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
-              Created by {creator?.username || '...'}
-            </ThemedText>
+          <View style={styles.detailRows}>
+            {(community.organization || community.location) && (
+              <View style={styles.detailRow}>
+                {community.organization && (
+                  <View style={styles.detailItem}>
+                    <Building2 size={14} color={theme.textSecondary} strokeWidth={2} />
+                    <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                      {community.organization}
+                    </ThemedText>
+                  </View>
+                )}
+                {community.location && (
+                  <View style={styles.detailItem}>
+                    <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
+                    <ThemedText variant="caption" muted numberOfLines={1} style={styles.detailValue}>
+                      {community.location}
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            )}
+            <View style={styles.creatorRow}>
+              <User size={14} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText variant="caption" muted>
+                Created by {creator?.username || '...'}
+              </ThemedText>
+            </View>
           </View>
         </Card>
 
@@ -637,7 +667,31 @@ export default function CommunityInfoScreen() {
               multiline
               maxLength={300}
             />
-            
+
+            <TextInput
+              placeholder="Organization (optional)"
+              placeholderTextColor={theme.textSecondary}
+              value={editOrganization}
+              onChangeText={setEditOrganization}
+              style={[
+                styles.editInput,
+                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              maxLength={60}
+            />
+
+            <TextInput
+              placeholder="Location / City (optional)"
+              placeholderTextColor={theme.textSecondary}
+              value={editLocation}
+              onChangeText={setEditLocation}
+              style={[
+                styles.editInput,
+                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+              maxLength={60}
+            />
+
             <View style={styles.visibilityToggle}>
               <Pressable
                 onPress={() => setEditVisibility('public')}
@@ -788,6 +842,24 @@ const styles = StyleSheet.create({
   },
   descriptionText: {
     lineHeight: 22,
+  },
+  detailRows: {
+    gap: Spacing.xs,
+  },
+  detailRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.lg,
+    flexWrap: 'wrap',
+  },
+  detailItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.xs,
+    maxWidth: '70%',
+  },
+  detailValue: {
+    flexShrink: 1,
   },
   creatorRow: {
     flexDirection: 'row',

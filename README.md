@@ -30,7 +30,9 @@ Sportron was built for the community that loves to play — students, teachers, 
 ### Communities
 - Start or join communities organized around a specific sport.
 - Public (join anytime) or restricted (request to join, admin approves).
+- Optional organization (university/club) and location/city so communities with the same name are easy to tell apart; two users can share a name, but one user can't create a duplicate.
 - Discover communities by sport or search by name.
+- Cards show "created by", organization, sport, and visibility.
 - Community cover photos, member lists, and admin tools.
 
 ### Match Tracking
