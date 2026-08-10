@@ -1,4 +1,4 @@
-import { Check, Clock, MapPin, Users, X } from 'lucide-react-native';
+import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-native';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
+import { SessionChatPopup } from '@/components/SessionChatPopup';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -78,6 +79,7 @@ export function SessionDetailPopup({
   const [approvingId, setApprovingId] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
   const [loadedSessionId, setLoadedSessionId] = useState<string | null>(null);
+  const [chatVisible, setChatVisible] = useState(false);
   const isLoading = visible && sessionId !== null && loadedSessionId !== sessionId;
   const isCreator = currentUserId && (session?.created_by ?? (initialSession as Session | null)?.created_by) === currentUserId;
 
@@ -278,21 +280,33 @@ export function SessionDetailPopup({
     session?.status === 'full' ||
     (maxParticipants != null && commitmentCount >= maxParticipants);
 
-  return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+  const canViewChat = !!(
+    sessionId &&
+    currentUserId &&
+    (isCreator || myCommitmentStatus === 'accepted' || myCommitmentStatus === 'left')
+  );
+  const sessionStatus = session?.status ?? initialSession?.status;
+  const canSendChat =
+    canViewChat &&
+    (isCreator || myCommitmentStatus === 'accepted') &&
+    (!sessionStatus || sessionStatus === 'open' || sessionStatus === 'full');
 
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              backgroundColor: theme.background,
-              borderColor: theme.border,
-              transform: [{ translateY }],
-            },
-          ]}
-        >
+  return (
+    <>
+      <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
+        <View style={styles.backdrop}>
+          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
+
+          <Animated.View
+            style={[
+              styles.sheet,
+              {
+                backgroundColor: theme.background,
+                borderColor: theme.border,
+                transform: [{ translateY }],
+              },
+            ]}
+          >
           <View style={styles.handleContainer} {...panHandlers}>
             <View style={[styles.handle, { backgroundColor: theme.border }]} />
           </View>
@@ -301,13 +315,24 @@ export function SessionDetailPopup({
             <ThemedText variant="heading" numberOfLines={1} style={{ flex: 1 }}>
               {session?.sport ?? initialSession?.sport ?? 'Session'}
             </ThemedText>
-            <Pressable
-              onPress={onClose}
-              hitSlop={16}
-              style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
-            >
-              <X size={18} color={theme.text} strokeWidth={2.5} />
-            </Pressable>
+            <View style={styles.headerActions}>
+              {canViewChat && (
+                <Pressable
+                  onPress={() => setChatVisible(true)}
+                  hitSlop={16}
+                  style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
+                >
+                  <MessageCircle size={18} color={theme.text} strokeWidth={2.5} />
+                </Pressable>
+              )}
+              <Pressable
+                onPress={onClose}
+                hitSlop={16}
+                style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
+              >
+                <X size={18} color={theme.text} strokeWidth={2.5} />
+              </Pressable>
+            </View>
           </View>
 
           <ScrollView
@@ -664,7 +689,18 @@ export function SessionDetailPopup({
           </ScrollView>
         </Animated.View>
       </View>
-    </Modal>
+      </Modal>
+
+      <SessionChatPopup
+        sessionId={sessionId}
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+        currentUserId={currentUserId}
+        session={session ?? initialSession}
+        canSend={canSendChat}
+        hasLeft={myCommitmentStatus === 'left'}
+      />
+    </>
   );
 }
 
@@ -699,6 +735,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     marginBottom: Spacing.md,
     gap: Spacing.md,
+  },
+  headerActions: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
   },
   closeBtn: {
     width: 32,

@@ -5,11 +5,16 @@ const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
 const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
 const fcmFunctionUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/send-notification` : '';
 
-async function triggerFcmPush(userId: string, title: string, body: string, data?: Record<string, unknown>) {
+export async function pushFcmToUser(
+  userId: string,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
   if (!fcmFunctionUrl || !supabaseAnonKey) return;
 
   try {
-    fetch(fcmFunctionUrl, {
+    await fetch(fcmFunctionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -73,7 +78,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
     throw error;
   }
 
-  triggerFcmPush(input.userId, input.title, input.body, input.data);
+  pushFcmToUser(input.userId, input.title, input.body, input.data);
 
   return Array.isArray(data) ? data[0] : data;
 }

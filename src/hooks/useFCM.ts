@@ -45,6 +45,7 @@ export function useFCM() {
         case 'session_accepted':
         case 'session_rejected':
         case 'session_reminder':
+        case 'session_chat_message':
           if (data.sessionId) {
             console.log('Navigate to session:', data.sessionId);
           }
@@ -193,6 +194,7 @@ export function useFCM() {
       community_match_pending: 'Match Pending Approval',
       community_match_approved: 'Match Approved',
       community_match_disputed: 'Match Disputed',
+      session_chat_message: 'Session Chat',
     };
 
     const notificationBodies: Record<NotificationType, string> = {
@@ -220,6 +222,7 @@ export function useFCM() {
       community_match_pending: 'A community match needs your approval',
       community_match_approved: 'Your community match was approved',
       community_match_disputed: 'Your community match was disputed',
+      session_chat_message: 'New message in a session',
     };
 
     await scheduleLocalNotification(

@@ -28,7 +28,8 @@ export type NotificationType =
   | 'admin_promoted'
   | 'community_match_pending'
   | 'community_match_approved'
-  | 'community_match_disputed';
+  | 'community_match_disputed'
+  | 'session_chat_message';
 
 export interface NotificationData {
   type: NotificationType;
