@@ -14,6 +14,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { MatchFormat, Profile } from '@/types';
@@ -32,6 +33,7 @@ type LineupSelection = {
 type MatchLineupSelectorProps = {
   searchProfiles: (query: string) => Promise<Profile[]>;
   currentUserName: string;
+  currentUserAvatar?: string | null;
   format: MatchFormat;
   selection: LineupSelection;
   onChange: (slot: TeamSlot, profile: Profile | null) => void;
@@ -47,15 +49,6 @@ type SlotCardProps = {
   showRole?: boolean;
 };
 
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
-}
-
 function SlotCard({
   label,
   profile,
@@ -69,11 +62,7 @@ function SlotCard({
 
   const content = profile ? (
     <>
-      <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-        <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-          {getInitials(profile.username) || '?'}
-        </ThemedText>
-      </View>
+      <UserAvatar avatarUrl={profile.avatar_url} size={64} />
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
         {profile.username}
       </ThemedText>
@@ -141,6 +130,7 @@ function SlotCard({
 export function MatchLineupSelector({
   searchProfiles,
   currentUserName,
+  currentUserAvatar,
   format,
   selection,
   onChange,
@@ -285,7 +275,7 @@ export function MatchLineupSelector({
                 display_name: null,
                 bio: null,
                 role: 'student',
-                avatar_url: null,
+                avatar_url: currentUserAvatar ?? null,
                 fcm_tokens: [],
                 notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
                 deleted_at: null,
@@ -425,11 +415,7 @@ export function MatchLineupSelector({
                       pressed && styles.pressed,
                       isSelected && { backgroundColor: theme.backgroundElement },
                     ]}>
-                    <View style={[styles.avatarSmall, { backgroundColor: theme.text }]}>
-                      <ThemedText variant="caption" style={{ color: theme.background, fontWeight: '800' }}>
-                        {getInitials(item.username) || '?'}
-                      </ThemedText>
-                    </View>
+                    <UserAvatar avatarUrl={item.avatar_url} size={48} />
                     <View style={styles.playerMeta}>
                       <ThemedText variant="body" style={styles.playerName}>
                         {item.username}
@@ -529,14 +515,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  avatarSmall: {
-    width: 48,
-    height: 48,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexShrink: 0,
   },
   slotName: {
     textAlign: 'center',

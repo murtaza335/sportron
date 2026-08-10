@@ -20,7 +20,6 @@ import {
 import {
   ActivityIndicator,
   Alert,
-  Image,
   Modal,
   Pressable,
   RefreshControl,
@@ -35,6 +34,7 @@ import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -495,15 +495,11 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
                 {pingResponses.map((r) => (
                   <View key={r.id} style={styles.pingResponseRow}>
-                    <View style={[styles.pingResponseAvatar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                      {r.respondent?.avatar_url ? (
-                        <Image source={{ uri: r.respondent.avatar_url }} style={styles.pingResponseAvatarImage} />
-                      ) : (
-                        <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
-                          {(r.respondent?.username ?? '?').charAt(0).toUpperCase()}
-                        </ThemedText>
-                      )}
-                    </View>
+                    <UserAvatar
+                      avatarUrl={r.respondent?.avatar_url}
+                      size={28}
+                      style={{ borderWidth: 1, borderColor: theme.border }}
+                    />
                     <ThemedText variant="body" style={{ flex: 1, fontWeight: '500' }}>
                       {r.respondent?.username ?? 'Someone'}
                     </ThemedText>
@@ -817,20 +813,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
-  },
-  pingResponseAvatar: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  pingResponseAvatarImage: {
-    width: 28,
-    height: 28,
-    borderRadius: Radius.full,
   },
   responseBadge: {
     flexDirection: 'row',

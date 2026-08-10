@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { addCommunityMatchComment, approveCommunityMatch, disputeCommunityMatch, fetchCommunityMatchComments, toggleCommunityMatchLike } from '@/services/communities';
@@ -35,15 +36,6 @@ type MatchDetailPopupProps = {
   onRefreshFeed?: () => void;
   recordedByName?: string;
 };
-
-function getInitials(name: string) {
-  return name
-    .split(/\s+/)
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((part) => part[0]?.toUpperCase())
-    .join('');
-}
 
 function formatDate(dateString: string) {
   const date = new Date(dateString);
@@ -314,17 +306,9 @@ Animated.spring(translateY, {
                 {/* Team A */}
                 <View style={styles.teamCol}>
                   <View style={[styles.avatarGroup, isPlayerTeamWinner && styles.winnerAvatarGroup]}>
-                    <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-                      <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                        {getInitials(match.player?.username ?? 'P1')}
-                      </ThemedText>
-                    </View>
+                    <UserAvatar avatarUrl={match.player?.avatar_url} size={40} />
                     {match.playerPartner ? (
-                      <View style={[styles.avatar, styles.avatarOverlap, { backgroundColor: theme.textSecondary }]}>
-                        <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                          {getInitials(match.playerPartner.username)}
-                        </ThemedText>
-                      </View>
+                      <UserAvatar avatarUrl={match.playerPartner.avatar_url} size={40} style={styles.avatarOverlap} />
                     ) : null}
                   </View>
 
@@ -372,17 +356,9 @@ Animated.spring(translateY, {
                 {/* Team B */}
                 <View style={styles.teamCol}>
                   <View style={[styles.avatarGroup, isOpponentTeamWinner && styles.winnerAvatarGroup]}>
-                    <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-                      <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                        {getInitials(match.opponent?.username ?? 'P2')}
-                      </ThemedText>
-                    </View>
+                    <UserAvatar avatarUrl={match.opponent?.avatar_url} size={40} />
                     {match.opponentPartner ? (
-                      <View style={[styles.avatar, styles.avatarOverlap, { backgroundColor: theme.textSecondary }]}>
-                        <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                          {getInitials(match.opponentPartner.username)}
-                        </ThemedText>
-                      </View>
+                      <UserAvatar avatarUrl={match.opponentPartner.avatar_url} size={40} style={styles.avatarOverlap} />
                     ) : null}
                   </View>
 
@@ -528,11 +504,7 @@ Animated.spring(translateY, {
                     <View style={styles.commentsContainer}>
                       {comments.map((comment) => (
                         <View key={comment.id} style={styles.commentRow}>
-                          <View style={[styles.commentAvatar, { backgroundColor: theme.textSecondary }]}>
-                            <ThemedText style={[styles.avatarText, { fontSize: 10, color: theme.background }]}>
-                              {getInitials(comment.profile?.username ?? '?')}
-                            </ThemedText>
-                          </View>
+                          <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} style={styles.commentAvatar} />
                           <View style={[styles.commentBody, { backgroundColor: theme.backgroundElement }]}>
                             <View style={styles.commentMeta}>
                               <ThemedText variant="caption" style={styles.commentAuthor}>
@@ -675,21 +647,8 @@ const styles = StyleSheet.create({
   winnerAvatarGroup: {
     transform: [{ scale: 1.05 }],
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: '#00000000',
-  },
   avatarOverlap: {
     marginLeft: -12,
-  },
-  avatarText: {
-    fontSize: 14,
-    fontWeight: '800',
   },
   namesContainer: {
     alignItems: 'center',

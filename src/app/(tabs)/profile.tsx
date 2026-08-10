@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, Image, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Animated, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
 import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -117,21 +118,7 @@ export default function ProfileScreen() {
         {!editing ? (
           <View style={styles.summary}>
             <View style={styles.avatarContainer}>
-              {profile?.avatar_url ? (
-                <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-                  <Image
-                    source={{ uri: profile.avatar_url }}
-                    style={styles.avatarImage}
-                    resizeMode="cover"
-                  />
-                </View>
-              ) : (
-                <View style={[styles.avatar, { backgroundColor: theme.text }]}>
-                  <ThemedText variant="hero" style={{ color: theme.background }}>
-                    {profile?.username?.charAt(0)?.toUpperCase() ?? '?'}
-                  </ThemedText>
-                </View>
-              )}
+              <UserAvatar avatarUrl={profile?.avatar_url} size={88} />
               <Pressable
                 onPress={() => setEditing(true)}
                 style={[styles.editAvatarButton, { backgroundColor: theme.text }]}
@@ -319,19 +306,6 @@ const styles = StyleSheet.create({
   avatarContainer: {
     width: 88,
     height: 88,
-    borderRadius: 44,
-  },
-  avatar: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
-  },
-  avatarImage: {
-    width: '100%',
-    height: '100%',
     borderRadius: 44,
   },
   editAvatarButton: {

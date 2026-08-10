@@ -2,7 +2,6 @@ import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Image,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -13,6 +12,7 @@ import { X } from 'lucide-react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchProfile } from '@/services/profiles';
@@ -54,15 +54,7 @@ export default function PublicProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headerSection}>
-            <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
-              {profile.avatar_url ? (
-                <Image source={{ uri: profile.avatar_url }} style={styles.avatarImage} />
-              ) : (
-                <ThemedText style={[styles.avatarInitial, { color: theme.textSecondary }]}>
-                  {(profile.username ?? '?').charAt(0).toUpperCase()}
-                </ThemedText>
-              )}
-            </View>
+            <UserAvatar avatarUrl={profile.avatar_url} size={96} style={styles.avatar} />
             <ThemedText variant="hero" style={styles.username}>
               {profile.username}
             </ThemedText>
@@ -104,22 +96,7 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   avatar: {
-    width: 96,
-    height: 96,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    overflow: 'hidden',
     marginBottom: Spacing.xs,
-  },
-  avatarImage: {
-    width: 96,
-    height: 96,
-    borderRadius: Radius.full,
-  },
-  avatarInitial: {
-    fontSize: 36,
-    fontWeight: '800',
   },
   username: {
     fontWeight: '800',

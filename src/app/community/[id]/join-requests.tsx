@@ -13,6 +13,7 @@ import { Check, UserPlus, X } from 'lucide-react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchJoinRequests, respondToJoinRequest } from '@/services/communities';
@@ -94,11 +95,7 @@ export default function CommunityJoinRequestsScreen() {
           joinRequests.map((req) => (
             <Card key={req.id} style={styles.requestCard}>
               <View style={styles.requestInfo}>
-                <View style={[styles.avatar, { backgroundColor: theme.textSecondary }]}>
-                  <ThemedText style={[styles.avatarText, { color: theme.background }]}>
-                    {(req.profile?.username ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </View>
+                <UserAvatar avatarUrl={req.profile?.avatar_url} size={36} />
                 <View style={styles.memberInfo}>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
                     {req.profile?.username ?? 'Unknown'}
@@ -164,12 +161,4 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     borderWidth: 1,
   },
-  avatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: 16, fontWeight: '800' },
 });

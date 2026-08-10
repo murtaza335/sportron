@@ -34,6 +34,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -515,11 +516,7 @@ export default function CommunityInfoScreen() {
                 }}
                 style={[styles.memberRow, { borderBottomColor: theme.border }]}
               >
-                <View style={[styles.memberAvatar, { backgroundColor: member.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
-                  <ThemedText style={styles.memberAvatarText}>
-                    {(member.profile?.username ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </View>
+                <UserAvatar avatarUrl={member.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
                     {member.profile_id === user?.id
@@ -893,18 +890,6 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
-  },
-  memberAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  memberAvatarText: {
-    fontSize: 16,
-    fontWeight: '800',
-    color: '#fff',
   },
   memberInfo: {
     flex: 1,

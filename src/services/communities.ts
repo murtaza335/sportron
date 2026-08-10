@@ -693,11 +693,11 @@ export async function fetchCommunityMatches(
     .from('community_matches')
     .select(`
       *,
-      recorder:recorded_by(id, username),
-      player:player_id(id, username),
-      playerPartner:player_partner_id(id, username),
-      opponent:opponent_id(id, username),
-      opponentPartner:opponent_partner_id(id, username),
+      recorder:recorded_by(id, username, avatar_url),
+      player:player_id(id, username, avatar_url),
+      playerPartner:player_partner_id(id, username, avatar_url),
+      opponent:opponent_id(id, username, avatar_url),
+      opponentPartner:opponent_partner_id(id, username, avatar_url),
       likes:community_match_likes(profile_id),
       comments:community_match_comments(id)
     `)
@@ -783,7 +783,7 @@ export async function fetchCommunityMatchComments(
     .from('community_match_comments')
     .select(`
       *,
-      profile:profiles(id, username)
+      profile:profiles(id, username, avatar_url)
     `)
     .eq('community_match_id', communityMatchId)
     .order('created_at', { ascending: true });
@@ -810,7 +810,7 @@ export async function addCommunityMatchComment(
     })
     .select(`
       *,
-      profile:profiles(id, username)
+      profile:profiles(id, username, avatar_url)
     `)
     .single();
 

@@ -198,6 +198,7 @@ return (
                 <MatchLineupSelector
                   searchProfiles={searchProfiles}
                   currentUserName={profile?.username ?? 'You'}
+                  currentUserAvatar={profile?.avatar_url}
                   format="singles"
                   selection={{ playerPartner: null, opponent: selection.opponent, opponentPartner: null }}
                   onChange={(_slot, selectedProfile) =>
@@ -238,6 +239,7 @@ return (
                 <MatchLineupSelector
                   searchProfiles={searchProfiles}
                   currentUserName={profile?.username ?? 'You'}
+                  currentUserAvatar={profile?.avatar_url}
                   format={matchFormat}
                   selection={selection}
                   onChange={(slot, selectedProfile) =>

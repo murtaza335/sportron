@@ -16,6 +16,7 @@ import {
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import {
@@ -345,15 +346,10 @@ export function SessionDetailPopup({
             ) : null}
 
             <View style={styles.creatorRow}>
-              <View
-                style={[styles.creatorAvatar, { backgroundColor: theme.textSecondary }]}
-              >
-                <ThemedText
-                  style={[styles.avatarText, { color: theme.background }]}
-                >
-                  {(session?.creator?.username ?? initialSession?.creator?.username ?? '?').charAt(0).toUpperCase()}
-                </ThemedText>
-              </View>
+              <UserAvatar
+                avatarUrl={session?.creator?.avatar_url ?? initialSession?.creator?.avatar_url}
+                size={40}
+              />
               <View>
                 <ThemedText variant="caption" muted>
                   Posted by
@@ -391,18 +387,7 @@ export function SessionDetailPopup({
                             ]}
                           >
                             <View style={styles.applicantInfo}>
-                              <View
-                                style={[
-                                  styles.applicantAvatar,
-                                  { backgroundColor: theme.textSecondary },
-                                ]}
-                              >
-                                <ThemedText
-                                  style={[styles.avatarText, { color: theme.background }]}
-                                >
-                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                </ThemedText>
-                              </View>
+                              <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                               <View style={styles.applicantDetails}>
                                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                   {c.profile?.username ?? 'Unknown'}
@@ -454,18 +439,7 @@ export function SessionDetailPopup({
                             ]}
                           >
                             <View style={styles.applicantInfo}>
-                              <View
-                                style={[
-                                  styles.applicantAvatar,
-                                  { backgroundColor: '#10B981' },
-                                ]}
-                              >
-                                <ThemedText
-                                  style={[styles.avatarText, { color: 'white' }]}
-                                >
-                                  {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                </ThemedText>
-                              </View>
+                              <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                               <View style={styles.applicantDetails}>
                                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                   {c.profile?.username ?? 'Unknown'}
@@ -506,18 +480,7 @@ export function SessionDetailPopup({
                                 ]}
                               >
                                 <View style={styles.applicantInfo}>
-                                  <View
-                                    style={[
-                                      styles.applicantAvatar,
-                                      { backgroundColor: theme.textSecondary },
-                                    ]}
-                                  >
-                                    <ThemedText
-                                      style={[styles.avatarText, { color: theme.background }]}
-                                    >
-                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                    </ThemedText>
-                                  </View>
+                                  <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                                   <View style={styles.applicantDetails}>
                                     <ThemedText variant="body" style={{ fontWeight: '600' }}>
                                       {c.profile?.username ?? 'Unknown'}
@@ -564,18 +527,7 @@ export function SessionDetailPopup({
                                 ]}
                               >
                                 <View style={styles.applicantInfo}>
-                                  <View
-                                    style={[
-                                      styles.applicantAvatar,
-                                      { backgroundColor: '#A855F7', opacity: 0.6 },
-                                    ]}
-                                  >
-                                    <ThemedText
-                                      style={[styles.avatarText, { color: 'white' }]}
-                                    >
-                                      {(c.profile?.username ?? '?').charAt(0).toUpperCase()}
-                                    </ThemedText>
-                                  </View>
+                                  <UserAvatar avatarUrl={c.profile?.avatar_url} size={36} />
                                   <View style={styles.applicantDetails}>
                                     <ThemedText
                                       variant="body"
@@ -782,17 +734,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
   },
-  creatorAvatar: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: {
-    fontSize: 16,
-    fontWeight: '800',
-  },
   actionBtn: {
     marginTop: Spacing.sm,
   },
@@ -832,13 +773,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: Spacing.md,
     flex: 1,
-  },
-  applicantAvatar: {
-    width: 36,
-    height: 36,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
   },
   applicantDetails: {
     gap: 1,

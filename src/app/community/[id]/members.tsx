@@ -14,6 +14,7 @@ import {
 
 import { ThemedText } from '@/components/ui/Text';
 import { InviteMemberModal } from '@/components/InviteMemberModal';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -180,11 +181,7 @@ export default function CommunityMembersScreen() {
                         key={invite.id}
                         style={[styles.pendingRow, { borderBottomColor: theme.border }]}
                       >
-                        <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
-                          <ThemedText style={[styles.avatarText, { color: theme.textSecondary }]}>
-                            {(invite.invitee?.username ?? '?').charAt(0).toUpperCase()}
-                          </ThemedText>
-                        </View>
+                        <UserAvatar avatarUrl={invite.invitee?.avatar_url} size={40} />
                         <View style={styles.memberInfo}>
                           <ThemedText variant="body" style={{ fontWeight: '600' }}>
                             {invite.invitee?.username ?? 'Unknown'}
@@ -218,11 +215,7 @@ export default function CommunityMembersScreen() {
                   pressed && { opacity: 0.6 },
                 ]}
               >
-                <View style={[styles.avatar, { backgroundColor: item.role === 'admin' ? '#D97706' : theme.textSecondary }]}>
-                  <ThemedText style={[styles.avatarText, { color: '#fff' }]}>
-                    {(item.profile?.username ?? '?').charAt(0).toUpperCase()}
-                  </ThemedText>
-                </View>
+                <UserAvatar avatarUrl={item.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
                     {item.profile_id === userId
@@ -356,14 +349,6 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.md,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-  avatar: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  avatarText: { fontSize: 16, fontWeight: '800' },
   memberInfo: {
     flex: 1,
     gap: 2,

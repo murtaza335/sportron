@@ -101,10 +101,10 @@ export type Match = {
 };
 
 export type MatchWithProfiles = Match & {
-  player: Pick<Profile, 'id' | 'username'> | null;
-  playerPartner: Pick<Profile, 'id' | 'username'> | null;
-  opponent: Pick<Profile, 'id' | 'username'> | null;
-  opponentPartner: Pick<Profile, 'id' | 'username'> | null;
+  player: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  playerPartner: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  opponent: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  opponentPartner: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
   likes_count: number;
   comments_count: number;
   is_liked_by_user: boolean;
@@ -302,11 +302,11 @@ export type CommunityMatch = {
   approval_status: 'pending' | 'approved' | 'disputed';
   created_at: string;
   updated_at: string;
-  recorder?: Pick<Profile, 'id' | 'username'> | null;
-  player?: Pick<Profile, 'id' | 'username'> | null;
-  playerPartner?: Pick<Profile, 'id' | 'username'> | null;
-  opponent?: Pick<Profile, 'id' | 'username'> | null;
-  opponentPartner?: Pick<Profile, 'id' | 'username'> | null;
+  recorder?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  player?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  playerPartner?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  opponent?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  opponentPartner?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
   likes_count?: number;
   comments_count?: number;
   is_liked_by_user?: boolean;
@@ -318,7 +318,7 @@ export type CommunityMatchComment = {
   profile_id: string;
   content: string;
   created_at: string;
-  profile?: Pick<Profile, 'id' | 'username'> | null;
+  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
 };
 
 export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelled';
