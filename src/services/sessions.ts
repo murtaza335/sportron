@@ -217,6 +217,7 @@ export async function commitToSession(
         sessionRow.created_by,
         sessionId,
         applicant?.username ?? 'Someone',
+        userId,
       );
     }
   } catch (e) {
@@ -244,6 +245,13 @@ export async function approveCommitment(
     .eq('id', commitmentId);
 
   if (error) throw error;
+
+  await resolveSessionApplicationNotification(
+    commitment.session_id,
+    commitment.user_id,
+    actorId,
+    'accepted',
+  );
 
   try {
     const actor = await fetchProfile(actorId);
@@ -276,6 +284,13 @@ export async function rejectCommitment(
 
   if (error) throw error;
 
+  await resolveSessionApplicationNotification(
+    commitment.session_id,
+    commitment.user_id,
+    actorId,
+    'rejected',
+  );
+
   try {
     const actor = await fetchProfile(actorId);
     await notifySessionRejected(
@@ -285,6 +300,40 @@ export async function rejectCommitment(
     );
   } catch (e) {
     console.error('Failed to send session rejected notification:', e);
+  }
+}
+
+// Resolves the session creator's pending `session_application` notification so it
+// leaves the "Action Required" inbox regardless of where the action was taken.
+async function resolveSessionApplicationNotification(
+  sessionId: string,
+  applicantId: string,
+  creatorId: string,
+  action: 'accepted' | 'rejected',
+): Promise<void> {
+  try {
+    const { data: applicant } = await supabase
+      .from('profiles')
+      .select('username')
+      .eq('id', applicantId)
+      .single();
+
+    const name = applicant?.username ?? 'Someone';
+    await supabase
+      .from('in_app_notifications')
+      .update({
+        type: action === 'accepted' ? 'session_accepted' : 'session_rejected',
+        read: true,
+        body: action === 'accepted'
+          ? `You accepted ${name} into your session`
+          : `You declined ${name} from your session`,
+      })
+      .eq('user_id', creatorId)
+      .eq('type', 'session_application')
+      .eq('data->>sessionId', sessionId)
+      .eq('data->>applicantId', applicantId);
+  } catch (e) {
+    console.error('Failed to resolve session application notification:', e);
   }
 }
 

@@ -6,6 +6,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
@@ -64,6 +65,7 @@ const ACTION_TYPES = [
 export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   const theme = useTheme();
   const { user } = useAuth();
+  const { markAsRead } = useNotifications();
   const [actionResult, setActionResult] = useState<'accepted' | 'declined' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [sessionInfo, setSessionInfo] = useState<{ sport: string; location: string } | null>(null);
@@ -174,14 +176,17 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       }
       case 'session_application': {
         const sessionId = data.sessionId as string;
+        const applicantId = data.applicantId as string | undefined;
         if (!sessionId) throw new Error('Session not found');
-        const { data: commitments, error: ce } = await supabase
+        let query = supabase
           .from('commitments')
           .select('id')
           .eq('session_id', sessionId)
-          .eq('status', 'pending')
-          .order('created_at', { ascending: true })
-          .limit(1);
+          .eq('status', 'pending');
+        if (applicantId) {
+          query = query.eq('user_id', applicantId);
+        }
+        const { data: commitments, error: ce } = await query;
         if (ce) throw ce;
         if (!commitments?.length) throw new Error('No pending requests');
         if (action === 'accepted') {
@@ -260,13 +265,16 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   const unreadBg = isDark ? 'rgba(59, 130, 246, 0.08)' : '#F8FAFF';
 
   return (
-    <View style={{
-      backgroundColor: notification.read ? theme.background : unreadBg,
-      borderBottomWidth: 1,
-      borderBottomColor: theme.border,
-      paddingHorizontal: Spacing.lg,
-      paddingVertical: Spacing.md,
-    }}>
+    <Pressable
+      onPress={() => markAsRead(notification.id)}
+      style={{
+        backgroundColor: notification.read ? theme.background : unreadBg,
+        borderBottomWidth: 1,
+        borderBottomColor: theme.border,
+        paddingHorizontal: Spacing.lg,
+        paddingVertical: Spacing.md,
+      }}
+    >
       <View style={{ flexDirection: 'row', gap: Spacing.md }}>
         <View style={{
           width: 40,
@@ -376,6 +384,6 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           )}
         </View>
       )}
-    </View>
+    </Pressable>
   );
 }

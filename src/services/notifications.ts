@@ -178,13 +178,13 @@ export async function notifyMatchCommented(ownerId: string, matchId: string, com
 }
 
 // Session notifications
-export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string): Promise<void> {
+export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string, applicantId: string): Promise<void> {
   await createNotification({
     userId: sessionCreatorId,
     type: 'session_application',
     title: 'New Session Applicant',
     body: `${applicantName} applied to your session`,
-    data: { sessionId },
+    data: { sessionId, applicantId },
   });
 }
 

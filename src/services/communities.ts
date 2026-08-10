@@ -439,6 +439,20 @@ export async function respondToJoinRequest(
   }
 
   try {
+    await supabase
+      .from('in_app_notifications')
+      .update({
+        type: status === 'approved' ? 'join_approved' : 'join_rejected',
+        read: true,
+      })
+      .eq('type', 'join_request')
+      .eq('data->>communityId', request.community_id)
+      .eq('data->>requesterId', request.user_id);
+  } catch (e) {
+    console.error('Failed to resolve join request notification:', e);
+  }
+
+  try {
     const { data: community } = await supabase
       .from('communities')
       .select('name')
@@ -815,6 +829,16 @@ export async function approveCommunityMatch(
   if (error) throw error;
 
   try {
+    await supabase
+      .from('in_app_notifications')
+      .update({ type: 'community_match_approved', read: true })
+      .eq('type', 'community_match_pending')
+      .eq('data->>matchId', matchId);
+  } catch (e) {
+    console.error('Failed to resolve community match notification:', e);
+  }
+
+  try {
     if (match.recorded_by !== actorId) {
       const actor = await fetchProfile(actorId);
       const { data: community } = await supabase
@@ -855,6 +879,16 @@ export async function disputeCommunityMatch(
     .eq('id', matchId);
 
   if (error) throw error;
+
+  try {
+    await supabase
+      .from('in_app_notifications')
+      .update({ type: 'community_match_disputed', read: true })
+      .eq('type', 'community_match_pending')
+      .eq('data->>matchId', matchId);
+  } catch (e) {
+    console.error('Failed to resolve community match notification:', e);
+  }
 
   try {
     if (match.recorded_by !== actorId) {

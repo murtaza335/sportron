@@ -408,26 +408,32 @@ export function SessionDetailPopup({
                               </View>
                             </View>
                             <View style={styles.applicantActions}>
-                              <Pressable
-                                onPress={() => handleApprove(c.id)}
-                                disabled={approvingId === c.id}
-                                style={[
-                                  styles.actionChip,
-                                  { backgroundColor: '#10B98120', borderColor: '#10B98140' },
-                                ]}
-                              >
-                                <Check size={14} color="#10B981" strokeWidth={3} />
-                              </Pressable>
-                              <Pressable
-                                onPress={() => handleReject(c.id)}
-                                disabled={approvingId === c.id}
-                                style={[
-                                  styles.actionChip,
-                                  { backgroundColor: '#EF444420', borderColor: '#EF444440' },
-                                ]}
-                              >
-                                <X size={14} color="#EF4444" strokeWidth={3} />
-                              </Pressable>
+                              {approvingId === c.id ? (
+                                <ActivityIndicator size="small" color={theme.textSecondary} style={styles.actionLoading} />
+                              ) : (
+                                <>
+                                  <Pressable
+                                    onPress={() => handleApprove(c.id)}
+                                    disabled={approvingId === c.id}
+                                    style={[
+                                      styles.actionChip,
+                                      { backgroundColor: '#10B98120', borderColor: '#10B98140' },
+                                    ]}
+                                  >
+                                    <Check size={14} color="#10B981" strokeWidth={3} />
+                                  </Pressable>
+                                  <Pressable
+                                    onPress={() => handleReject(c.id)}
+                                    disabled={approvingId === c.id}
+                                    style={[
+                                      styles.actionChip,
+                                      { backgroundColor: '#EF444420', borderColor: '#EF444440' },
+                                    ]}
+                                  >
+                                    <X size={14} color="#EF4444" strokeWidth={3} />
+                                  </Pressable>
+                                </>
+                              )}
                             </View>
                           </View>
                         ))}
@@ -822,6 +828,9 @@ const styles = StyleSheet.create({
   applicantActions: {
     flexDirection: 'row',
     gap: Spacing.xs,
+  },
+  actionLoading: {
+    width: 64,
   },
   actionChip: {
     width: 32,
