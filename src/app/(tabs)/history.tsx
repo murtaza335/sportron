@@ -1,4 +1,4 @@
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -45,7 +45,20 @@ export default function SessionsScreen() {
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSessionData, setSelectedSessionData] = useState<Partial<Session> | null>(null);
-  const [detailVisible, setDetailVisible] = useState(false);
+
+  const params = useLocalSearchParams<{ sessionId?: string | string[] }>();
+  const sessionIdParam = typeof params.sessionId === 'string' ? params.sessionId : undefined;
+
+  // A notification deep link carries `sessionId` in the URL; derive the open
+  // popup from it so we never have to sync it into local state.
+  const openSessionId = selectedSessionId ?? sessionIdParam ?? null;
+  const detailVisible = openSessionId !== null;
+
+  const closePopup = () => {
+    setSelectedSessionId(null);
+    setSelectedSessionData(null);
+    if (sessionIdParam) router.setParams({ sessionId: undefined });
+  };
 
   // Countdown ticker — re-renders every 30s to update "closes in X" labels
   const [, setTick] = useState(0);
@@ -99,7 +112,6 @@ export default function SessionsScreen() {
                 onPress={() => {
                   setSelectedSessionId(item.id);
                   setSelectedSessionData(item);
-                  setDetailVisible(true);
                 }}
                 style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
               >
@@ -184,14 +196,10 @@ export default function SessionsScreen() {
       </View>
 
       <SessionDetailPopup
-        key={selectedSessionId ?? 'closed'}
-        sessionId={selectedSessionId}
+        key={openSessionId ?? 'closed'}
+        sessionId={openSessionId}
         visible={detailVisible}
-        onClose={() => {
-          setDetailVisible(false);
-          setSelectedSessionId(null);
-          setSelectedSessionData(null);
-        }}
+        onClose={closePopup}
         currentUserId={user?.id}
         initialSession={selectedSessionData}
         onRefreshFeed={refresh}

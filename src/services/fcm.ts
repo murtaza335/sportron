@@ -29,6 +29,10 @@ export type NotificationType =
   | 'community_match_pending'
   | 'community_match_approved'
   | 'community_match_disputed'
+  | 'session_left'
+  | 'community_invite'
+  | 'community_invite_accepted'
+  | 'community_invite_rejected'
   | 'session_chat_message';
 
 export interface NotificationData {

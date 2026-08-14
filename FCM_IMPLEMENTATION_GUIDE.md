@@ -130,11 +130,13 @@ File: `supabase/functions/send-notification/index.ts`
 - Sets the global `Notifications.setNotificationHandler` (alerts/sound/badge/banner)
 
 ### Hook: `src/hooks/useFCM.ts`
-- `initialize()`: registers token, wires listeners (including routing ping notifications to `/ping-response`), persists to Supabase
-- `requestPermissions()`, `sendTestNotification()`, `useNotificationNavigation()`
+- `initialize()`: registers token, wires listeners (foreground/background/token refresh), persists to Supabase
+- `handleNotificationResponse()`: routes a tapped notification's data to the right screen — ping → `/ping-response`; community match → `/community/[id]` (+ auto-opens the match popup via `matchId`); session → `/history` (+ auto-opens the session popup via `sessionId`); community events → `/community/[id]`
+- `requestPermissions()`
 
 ### Init mount: `src/components/FCMInitializer.tsx`
 - Mounts `useFCM().initialize()` once a session is available
+- Uses `Notifications.useLastNotificationResponse()` to catch taps that launched the app (cold start / background) and navigates, then calls `clearLastNotificationResponse()`
 
 ## Testing Checklist
 

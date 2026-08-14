@@ -131,57 +131,6 @@ export async function deleteNotification(notificationId: string): Promise<void> 
   }
 }
 
-// Match notifications
-export async function notifyMatchPending(opponentId: string, matchId: string, creatorName: string): Promise<void> {
-  await createNotification({
-    userId: opponentId,
-    type: 'match_pending',
-    title: 'Match Pending Approval',
-    body: `${creatorName} submitted a match for your approval`,
-    data: { matchId },
-  });
-}
-
-export async function notifyMatchApproved(creatorId: string, matchId: string, opponentName: string): Promise<void> {
-  await createNotification({
-    userId: creatorId,
-    type: 'match_approved',
-    title: 'Match Approved!',
-    body: `${opponentName} approved your match`,
-    data: { matchId },
-  });
-}
-
-export async function notifyMatchRejected(creatorId: string, matchId: string, opponentName: string): Promise<void> {
-  await createNotification({
-    userId: creatorId,
-    type: 'match_rejected',
-    title: 'Match Disputed',
-    body: `${opponentName} disputed your match`,
-    data: { matchId },
-  });
-}
-
-export async function notifyMatchLiked(ownerId: string, matchId: string, likerName: string): Promise<void> {
-  await createNotification({
-    userId: ownerId,
-    type: 'match_liked',
-    title: 'New Like on Your Match',
-    body: `${likerName} liked your match`,
-    data: { matchId },
-  });
-}
-
-export async function notifyMatchCommented(ownerId: string, matchId: string, commenterName: string, commentId: string): Promise<void> {
-  await createNotification({
-    userId: ownerId,
-    type: 'match_commented',
-    title: 'New Comment on Your Match',
-    body: `${commenterName} commented on your match`,
-    data: { matchId, commentId },
-  });
-}
-
 // Session notifications
 export async function notifySessionApplication(sessionCreatorId: string, sessionId: string, applicantName: string, applicantId: string): Promise<void> {
   await createNotification({
@@ -300,53 +249,53 @@ export async function notifyPingResponse(senderId: string, pingId: string, commu
   });
 }
 
-export async function notifyCommunityMatchPending(opponentId: string, communityMatchId: string, recorderName: string, communityName: string): Promise<void> {
+export async function notifyCommunityMatchPending(opponentId: string, communityMatchId: string, communityId: string, recorderName: string, communityName: string): Promise<void> {
   await createNotification({
     userId: opponentId,
     type: 'community_match_pending',
     title: 'Match Pending Approval',
     body: `${recorderName} recorded a match in ${communityName} for your approval`,
-    data: { matchId: communityMatchId },
+    data: { matchId: communityMatchId, communityId },
   });
 }
 
-export async function notifyCommunityMatchApproved(recorderId: string, communityMatchId: string, opponentName: string, communityName: string): Promise<void> {
+export async function notifyCommunityMatchApproved(recorderId: string, communityMatchId: string, communityId: string, opponentName: string, communityName: string): Promise<void> {
   await createNotification({
     userId: recorderId,
     type: 'community_match_approved',
     title: 'Match Approved',
     body: `${opponentName} approved the match in ${communityName}`,
-    data: { matchId: communityMatchId },
+    data: { matchId: communityMatchId, communityId },
   });
 }
 
-export async function notifyCommunityMatchDisputed(recorderId: string, communityMatchId: string, opponentName: string, communityName: string): Promise<void> {
+export async function notifyCommunityMatchDisputed(recorderId: string, communityMatchId: string, communityId: string, opponentName: string, communityName: string): Promise<void> {
   await createNotification({
     userId: recorderId,
     type: 'community_match_disputed',
     title: 'Match Disputed',
     body: `${opponentName} disputed the match in ${communityName}`,
-    data: { matchId: communityMatchId },
+    data: { matchId: communityMatchId, communityId },
   });
 }
 
-export async function notifyCommunityMatchLiked(ownerId: string, communityMatchId: string, likerName: string): Promise<void> {
+export async function notifyCommunityMatchLiked(ownerId: string, communityMatchId: string, communityId: string, likerName: string): Promise<void> {
   await createNotification({
     userId: ownerId,
     type: 'match_liked',
     title: 'New Like on Your Match',
     body: `${likerName} liked your match`,
-    data: { matchId: communityMatchId },
+    data: { matchId: communityMatchId, communityId },
   });
 }
 
-export async function notifyCommunityMatchCommented(ownerId: string, communityMatchId: string, commenterName: string, commentId: string): Promise<void> {
+export async function notifyCommunityMatchCommented(ownerId: string, communityMatchId: string, communityId: string, commenterName: string, commentId: string): Promise<void> {
   await createNotification({
     userId: ownerId,
     type: 'match_commented',
     title: 'New Comment on Your Match',
     body: `${commenterName} commented on your match`,
-    data: { matchId: communityMatchId, commentId },
+    data: { matchId: communityMatchId, communityId, commentId },
   });
 }
 

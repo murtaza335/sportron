@@ -41,6 +41,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
   fetchCommunityMatches,
+  fetchCommunityMatchById,
   fetchPingResponses,
   joinCommunity,
   requestToJoinCommunity,
@@ -55,7 +56,12 @@ import type {
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id, communityName } = useLocalSearchParams<{ id: string; communityName?: string }>();
+  const { id, communityName, matchId: matchIdParam } = useLocalSearchParams<{
+    id: string;
+    communityName?: string;
+    matchId?: string | string[];
+  }>();
+  const matchId = typeof matchIdParam === 'string' ? matchIdParam : undefined;
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -139,39 +145,64 @@ export default function CommunityDetailScreen() {
 
   const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
 
-  function toMatchWithProfiles(cm: CommunityMatch): MatchWithProfiles {
-    return {
-      id: cm.id,
-      created_by: cm.recorded_by,
-      player_id: cm.player_id,
-      player_partner_id: cm.player_partner_id,
-      opponent_id: cm.opponent_id,
-      opponent_partner_id: cm.opponent_partner_id,
-      opponent_guest_name: null,
-      match_format: cm.player_partner_id || cm.opponent_partner_id ? 'doubles' : 'singles',
-      sport: cm.sport,
-      custom_sport_name: cm.custom_sport_name,
-      team_a_name: cm.team_a_name,
-      team_b_name: cm.team_b_name,
-      player_score: cm.player_score,
-      opponent_score: cm.opponent_score,
-      is_public: true,
-      verification_status:
-        cm.approval_status === 'approved'
-          ? 'verified'
-          : cm.approval_status === 'disputed'
-            ? 'disputed'
-            : 'pending',
-      created_at: cm.created_at,
-      player: cm.player ?? null,
-      playerPartner: cm.playerPartner ?? null,
-      opponent: cm.opponent ?? null,
-      opponentPartner: cm.opponentPartner ?? null,
-      likes_count: cm.likes_count ?? 0,
-      comments_count: cm.comments_count ?? 0,
-      is_liked_by_user: cm.is_liked_by_user ?? false,
+  const toMatchWithProfiles = useCallback(
+    (cm: CommunityMatch): MatchWithProfiles => {
+      return {
+        id: cm.id,
+        created_by: cm.recorded_by,
+        player_id: cm.player_id,
+        player_partner_id: cm.player_partner_id,
+        opponent_id: cm.opponent_id,
+        opponent_partner_id: cm.opponent_partner_id,
+        opponent_guest_name: null,
+        match_format: cm.player_partner_id || cm.opponent_partner_id ? 'doubles' : 'singles',
+        sport: cm.sport,
+        custom_sport_name: cm.custom_sport_name,
+        team_a_name: cm.team_a_name,
+        team_b_name: cm.team_b_name,
+        player_score: cm.player_score,
+        opponent_score: cm.opponent_score,
+        is_public: true,
+        verification_status:
+          cm.approval_status === 'approved'
+            ? 'verified'
+            : cm.approval_status === 'disputed'
+              ? 'disputed'
+              : 'pending',
+        created_at: cm.created_at,
+        player: cm.player ?? null,
+        playerPartner: cm.playerPartner ?? null,
+        opponent: cm.opponent ?? null,
+        opponentPartner: cm.opponentPartner ?? null,
+        likes_count: cm.likes_count ?? 0,
+        comments_count: cm.comments_count ?? 0,
+        is_liked_by_user: cm.is_liked_by_user ?? false,
+      };
+    },
+    []
+  );
+
+  // Auto-open match detail when navigating from a notification tap
+  useEffect(() => {
+    if (!matchId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const m = await fetchCommunityMatchById(matchId, user?.id);
+        if (!cancelled && m) {
+          setSelectedMatch(toMatchWithProfiles(m));
+          setPopupVisible(true);
+        }
+      } catch (e) {
+        console.error('Failed to open deep-linked match:', e);
+      } finally {
+        if (!cancelled) router.setParams({ matchId: undefined });
+      }
+    })();
+    return () => {
+      cancelled = true;
     };
-  }
+  }, [matchId, user?.id, toMatchWithProfiles]);
 
   // Ping modal
   const [pingModalVisible, setPingModalVisible] = useState(false);

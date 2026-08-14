@@ -54,7 +54,7 @@ async function fetchAcceptedCounts(sessionIds: string[]): Promise<Record<string,
 }
 
 export async function fetchOpenSessions(currentUserId?: string): Promise<Session[]> {
-  await closeExpiredSessions();
+  await closeExpiredSessions(currentUserId);
 
   const { data, error } = await supabase
     .from('sessions')
@@ -83,7 +83,7 @@ export async function fetchSessionById(
   id: string,
   currentUserId?: string,
 ): Promise<Session | null> {
-  await closeExpiredSessions();
+  await closeExpiredSessions(currentUserId);
 
   const { data, error } = await supabase
     .from('sessions')
@@ -451,7 +451,7 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
 export async function fetchUserSessions(
   userId: string,
 ): Promise<Session[]> {
-  await closeExpiredSessions();
+  await closeExpiredSessions(userId);
 
   const { data, error } = await supabase
     .from('sessions')
@@ -500,6 +500,19 @@ export async function deleteSession(sessionId: string, userId: string): Promise<
     .eq('created_by', userId);
 
   if (error) throw error;
+
+  // Remove the creator's pending applicant-approval notifications for this session
+  try {
+    await supabase
+      .from('in_app_notifications')
+      .delete()
+      .eq('user_id', userId)
+      .eq('type', 'session_application')
+      .eq('read', false)
+      .eq('data->>sessionId', sessionId);
+  } catch (e) {
+    console.error('Failed to clean up session application notifications:', e);
+  }
 }
 
 export async function checkTimeConflicts(
@@ -557,9 +570,33 @@ export async function checkTimeConflicts(
   );
 }
 
-export async function closeExpiredSessions(): Promise<void> {
+export async function closeExpiredSessions(currentUserId?: string): Promise<void> {
   const { error } = await supabase.rpc('close_expired_sessions');
   if (error) console.error('Failed to close expired sessions:', error);
+
+  // Best-effort cleanup: drop the current user's pending applicant-approval
+  // notifications for sessions that have ended, so "wanna let X in the session?"
+  // doesn't linger in the Action Required inbox. (A DB trigger also handles this
+  // server-side, see 022_cleanup_session_notifications.sql.)
+  if (!currentUserId) return;
+  try {
+    const { data: ended } = await supabase
+      .from('sessions')
+      .select('id')
+      .eq('created_by', currentUserId)
+      .in('status', ['closed', 'completed', 'cancelled']);
+    const endedIds = (ended ?? []).map((s) => s.id);
+    if (endedIds.length === 0) return;
+    await supabase
+      .from('in_app_notifications')
+      .delete()
+      .eq('user_id', currentUserId)
+      .eq('type', 'session_application')
+      .eq('read', false)
+      .in('data->>sessionId', endedIds);
+  } catch (e) {
+    console.error('Failed to clean up session application notifications:', e);
+  }
 }
 
 export function getRemainingTime(expiresAt: string | null): string {
