@@ -671,6 +671,7 @@ export async function recordCommunityMatch(input: {
         await notifyCommunityMatchPending(
           input.opponent_id,
           data.id,
+          input.community_id,
           recorder?.username ?? 'Someone',
           community.name,
         );
@@ -741,6 +742,44 @@ export async function fetchCommunityMatches(
   return { data: matches, hasMore };
 }
 
+export async function fetchCommunityMatchById(
+  matchId: string,
+  userId?: string,
+): Promise<CommunityMatch | null> {
+  const { data, error } = await supabase
+    .from('community_matches')
+    .select(`
+      *,
+      recorder:recorded_by(id, username, avatar_url),
+      player:player_id(id, username, avatar_url),
+      playerPartner:player_partner_id(id, username, avatar_url),
+      opponent:opponent_id(id, username, avatar_url),
+      opponentPartner:opponent_partner_id(id, username, avatar_url),
+      likes:community_match_likes(profile_id),
+      comments:community_match_comments(id)
+    `)
+    .eq('id', matchId)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const row = data as any;
+  const likes = row.likes ?? [];
+  const comments = row.comments ?? [];
+  return {
+    ...row,
+    player: Array.isArray(row.player) ? row.player[0] ?? null : row.player,
+    playerPartner: Array.isArray(row.playerPartner) ? row.playerPartner[0] ?? null : row.playerPartner,
+    opponent: Array.isArray(row.opponent) ? row.opponent[0] ?? null : row.opponent,
+    opponentPartner: Array.isArray(row.opponentPartner) ? row.opponentPartner[0] ?? null : row.opponentPartner,
+    recorder: Array.isArray(row.recorder) ? row.recorder[0] ?? null : row.recorder,
+    likes_count: likes.length,
+    comments_count: comments.length,
+    is_liked_by_user: userId ? likes.some((like: { profile_id: string }) => like.profile_id === userId) : false,
+  } as CommunityMatch;
+}
+
 export async function toggleCommunityMatchLike(
   communityMatchId: string,
   userId: string,
@@ -755,13 +794,13 @@ export async function toggleCommunityMatchLike(
     try {
       const { data: match } = await supabase
         .from('community_matches')
-        .select('recorded_by')
+        .select('recorded_by, community_id')
         .eq('id', communityMatchId)
         .single();
 
       if (match && match.recorded_by !== userId) {
         const liker = await fetchProfile(userId);
-        await notifyCommunityMatchLiked(match.recorded_by, communityMatchId, liker?.username ?? 'Someone');
+        await notifyCommunityMatchLiked(match.recorded_by, communityMatchId, match.community_id, liker?.username ?? 'Someone');
       }
     } catch (e) {
       console.error('Failed to send community match like notification:', e);
@@ -825,7 +864,7 @@ export async function addCommunityMatchComment(
   try {
     const { data: match } = await supabase
       .from('community_matches')
-      .select('recorded_by')
+      .select('recorded_by, community_id')
       .eq('id', communityMatchId)
       .single();
 
@@ -833,6 +872,7 @@ export async function addCommunityMatchComment(
       await notifyCommunityMatchCommented(
         match.recorded_by,
         communityMatchId,
+        match.community_id,
         comment.profile?.username ?? 'Someone',
         comment.id,
       );
@@ -886,6 +926,7 @@ export async function approveCommunityMatch(
         await notifyCommunityMatchApproved(
           match.recorded_by,
           matchId,
+          match.community_id,
           actor?.username ?? 'Someone',
           community.name,
         );
@@ -938,6 +979,7 @@ export async function disputeCommunityMatch(
         await notifyCommunityMatchDisputed(
           match.recorded_by,
           matchId,
+          match.community_id,
           actor?.username ?? 'Someone',
           community.name,
         );
