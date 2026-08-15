@@ -1,8 +1,7 @@
 import { ChatPopup } from '@/components/ChatPopup';
-import { useAuth } from '@/contexts/AuthContext';
-import { useCommunityChat } from '@/hooks/useCommunityChat';
+import type { ChatThread } from '@/hooks/useChat';
 import { SPORT_LABELS } from '@/types';
-import type { Community } from '@/types';
+import type { Community, CommunityChatMessage } from '@/types';
 
 type CommunityChatPopupProps = {
   communityId: string | null;
@@ -10,6 +9,7 @@ type CommunityChatPopupProps = {
   onClose: () => void;
   currentUserId?: string;
   community?: Partial<Community> | null;
+  chat: ChatThread<CommunityChatMessage>;
 };
 
 export function CommunityChatPopup({
@@ -18,10 +18,8 @@ export function CommunityChatPopup({
   onClose,
   currentUserId,
   community,
+  chat,
 }: CommunityChatPopupProps) {
-  const { profile } = useAuth();
-  const chat = useCommunityChat(communityId, currentUserId, true, profile);
-
   const headerSubtitle = [
     community?.sport ? (SPORT_LABELS[community.sport] ?? community.sport) : '',
     community?.member_count != null ? `${community.member_count} members` : '',

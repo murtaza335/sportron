@@ -20,6 +20,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { SessionChatPopup } from '@/components/SessionChatPopup';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useSessionChat } from '@/hooks/useSessionChat';
 import {
   approveCommitment,
   checkTimeConflicts,
@@ -266,6 +267,19 @@ export function SessionDetailPopup({
     );
   };
 
+  const canViewChat = !!(
+    sessionId &&
+    currentUserId &&
+    (isCreator || myCommitmentStatus === 'accepted' || myCommitmentStatus === 'left')
+  );
+
+  const sessionChat = useSessionChat(
+    canViewChat ? sessionId : null,
+    currentUserId,
+    canViewChat && myCommitmentStatus !== 'left',
+    null,
+  );
+
   if (!visible) return null;
 
   const pendingCommitments = commitments.filter((c) => c.status === 'pending');
@@ -280,11 +294,6 @@ export function SessionDetailPopup({
     session?.status === 'full' ||
     (maxParticipants != null && commitmentCount >= maxParticipants);
 
-  const canViewChat = !!(
-    sessionId &&
-    currentUserId &&
-    (isCreator || myCommitmentStatus === 'accepted' || myCommitmentStatus === 'left')
-  );
   const sessionStatus = session?.status ?? initialSession?.status;
   const canSendChat =
     canViewChat &&
@@ -324,9 +333,16 @@ export function SessionDetailPopup({
                 <Pressable
                   onPress={() => setChatVisible(true)}
                   hitSlop={16}
-                  style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
+                  style={[styles.chatBtn, { backgroundColor: theme.backgroundElement }]}
                 >
                   <MessageCircle size={18} color={theme.text} strokeWidth={2.5} />
+                  {sessionChat.unreadCount > 0 && (
+                    <View style={styles.chatUnreadBadge}>
+                      <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
+                        {sessionChat.unreadCount > 99 ? '99+' : sessionChat.unreadCount}
+                      </ThemedText>
+                    </View>
+                  )}
                 </Pressable>
               )}
               <Pressable
@@ -703,6 +719,7 @@ export function SessionDetailPopup({
         session={session ?? initialSession}
         canSend={canSendChat}
         hasLeft={myCommitmentStatus === 'left'}
+        chat={sessionChat}
       />
     </>
   );
@@ -751,6 +768,33 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
+  },
+  chatBtn: {
+    width: 32,
+    height: 32,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    position: 'relative',
+  },
+  chatUnreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 16,
+    height: 16,
+    borderRadius: Radius.full,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 3,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  chatUnreadCount: {
+    color: '#FFFFFF',
+    fontSize: 8,
+    fontWeight: '700',
+    lineHeight: 9,
   },
   scroll: {
     flexGrow: 0,

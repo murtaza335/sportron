@@ -2,7 +2,13 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/lib/supabase';
-import { normalizeChatMessage, type ReplyTargetInfo } from '@/services/chat';
+import {
+  fetchChatReadCursor,
+  fetchChatUnreadCount,
+  normalizeChatMessage,
+  upsertChatReadCursor,
+  type ReplyTargetInfo,
+} from '@/services/chat';
 import type { ChatMessageBase } from '@/types';
 
 type SenderProfile = { id: string; username: string; avatar_url: string | null };
@@ -27,6 +33,9 @@ export type ChatThread<T extends ChatMessageBase> = {
   loading: boolean;
   sendMessage: (content: string, replyToId?: string | null) => Promise<T | null>;
   refresh: () => void;
+  unreadCount: number;
+  firstUnreadIndex: number | null;
+  markRead: () => void;
 };
 
 export function useChat<T extends ChatMessageBase>(
@@ -38,6 +47,8 @@ export function useChat<T extends ChatMessageBase>(
   const { sourceId, table, idColumn, channelPrefix, fetchMessages, sendMessage } = config;
   const [messages, setMessages] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+  const [firstUnreadIndex, setFirstUnreadIndex] = useState<number | null>(null);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const pendingTempsRef = useRef<Map<string, { content: string; replyToId: string | null }>>(
     new Map(),
@@ -53,12 +64,38 @@ export function useChat<T extends ChatMessageBase>(
     try {
       const data = await fetchMessages(sourceId);
       setMessages(data);
+
+      if (userId) {
+        const [cursor, count] = await Promise.all([
+          fetchChatReadCursor(idColumn, sourceId, userId),
+          fetchChatUnreadCount(table, idColumn, sourceId, userId),
+        ]);
+        setUnreadCount(count);
+        // Index (in the ascending messages list) of the oldest unread message.
+        // null means the user is fully caught up (scroll to bottom on open).
+        if (cursor) {
+          const cursorTime = new Date(cursor).getTime();
+          const idx = data.findIndex((m) => new Date(m.created_at).getTime() > cursorTime);
+          setFirstUnreadIndex(idx >= 0 ? idx : null);
+        } else {
+          setFirstUnreadIndex(null);
+        }
+      }
     } catch (e) {
       console.error('Failed to load chat:', e);
     } finally {
       setLoading(false);
     }
-  }, [sourceId, fetchMessages]);
+  }, [sourceId, fetchMessages, idColumn, table, userId]);
+
+  // Mark the whole thread as read (cursor -> now). Keeps the unread divider in
+  // place for the current session; the badge/count resets immediately.
+  const markRead = useCallback(() => {
+    if (!sourceId || !userId) return;
+    upsertChatReadCursor(idColumn, sourceId, userId)
+      .then(() => setUnreadCount(0))
+      .catch((e) => console.error('Failed to mark chat read:', e));
+  }, [sourceId, userId, idColumn]);
 
   useEffect(() => {
     if (!sourceId || !subscribe) return;
@@ -98,6 +135,11 @@ export function useChat<T extends ChatMessageBase>(
             );
           } else {
             appendMessage(raw);
+            // Live badge: new messages from other people bump the unread count.
+            // The popup resets it to 0 via markRead on open / on scroll.
+            if (raw.sender_id && raw.sender_id !== userId) {
+              setUnreadCount((prev) => prev + 1);
+            }
           }
         },
       )
@@ -109,7 +151,7 @@ export function useChat<T extends ChatMessageBase>(
         channelRef.current = null;
       }
     };
-  }, [sourceId, table, idColumn, channelPrefix, subscribe, appendMessage]);
+  }, [sourceId, table, idColumn, channelPrefix, subscribe, appendMessage, userId]);
 
   useFocusEffect(
     useCallback(() => {
@@ -184,5 +226,13 @@ export function useChat<T extends ChatMessageBase>(
     [sourceId, userId, messages, senderProfile, sendMessage],
   );
 
-  return { messages, loading, sendMessage: send, refresh: load };
+  return {
+    messages,
+    loading,
+    sendMessage: send,
+    refresh: load,
+    unreadCount,
+    firstUnreadIndex,
+    markRead,
+  };
 }
