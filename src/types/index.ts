@@ -212,7 +212,8 @@ export type NotificationType =
   | 'community_invite'
   | 'community_invite_accepted'
   | 'community_invite_rejected'
-  | 'session_chat_message';
+  | 'session_chat_message'
+  | 'session_chat_reply';
 
 export type InAppNotification = {
   id: string;
@@ -412,5 +413,16 @@ export type SessionChatMessage = {
   sender_id: string;
   content: string;
   created_at: string;
+  reply_to_id?: string | null;
+  sender_username?: string | null;
+  sender_avatar_url?: string | null;
   sender?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  reply_to?: {
+    id: string;
+    sender_id?: string | null;
+    content: string;
+    sender?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  } | null;
+  status?: 'sending' | 'delivered';
+  tempId?: string;
 };

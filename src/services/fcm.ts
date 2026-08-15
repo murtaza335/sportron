@@ -33,7 +33,8 @@ export type NotificationType =
   | 'community_invite'
   | 'community_invite_accepted'
   | 'community_invite_rejected'
-  | 'session_chat_message';
+  | 'session_chat_message'
+  | 'session_chat_reply';
 
 export interface NotificationData {
   type: NotificationType;

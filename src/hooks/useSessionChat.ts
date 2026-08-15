@@ -2,29 +2,26 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/lib/supabase';
-import {
-  fetchSessionMessageById,
-  fetchSessionMessages,
-  sendSessionMessage,
-} from '@/services/chat';
+import { fetchSessionMessages, normalizeChatMessage, sendSessionMessage } from '@/services/chat';
 import type { SessionChatMessage } from '@/types';
 
-export function useSessionChat(sessionId: string | null, userId?: string, subscribe = true) {
+type SenderProfile = { id: string; username: string; avatar_url: string | null };
+
+export function useSessionChat(
+  sessionId: string | null,
+  userId?: string,
+  subscribe = true,
+  senderProfile?: SenderProfile | null,
+) {
   const [messages, setMessages] = useState<SessionChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
-  const [sending, setSending] = useState(false);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const pendingTempsRef = useRef<Map<string, { content: string; replyToId: string | null }>>(
+    new Map(),
+  );
 
   const appendMessage = useCallback((message: SessionChatMessage) => {
     setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
-  }, []);
-
-  const hydrateMessage = useCallback((messageId: string) => {
-    fetchSessionMessageById(messageId).then((msg) => {
-      if (msg) {
-        setMessages((prev) => prev.map((m) => (m.id === msg.id ? msg : m)));
-      }
-    });
   }, []);
 
   const load = useCallback(async () => {
@@ -54,9 +51,31 @@ export function useSessionChat(sessionId: string | null, userId?: string, subscr
           filter: `session_id=eq.${sessionId}`,
         },
         (payload) => {
-          const raw = payload.new as SessionChatMessage;
-          appendMessage(raw);
-          hydrateMessage(raw.id);
+          const raw = normalizeChatMessage(payload.new as SessionChatMessage);
+
+          // Realtime rows carry the sender snapshot but no reply_to join. If this
+          // row matches an optimistic temp message we already placed, upgrade that
+          // temp in-place (swap tempId -> real id, keep its sending mark) instead
+          // of adding a second bubble.
+          let matchedTempId: string | null = null;
+          for (const [tempId, info] of pendingTempsRef.current.entries()) {
+            if (
+              info.content === raw.content &&
+              (info.replyToId ?? null) === (raw.reply_to_id ?? null)
+            ) {
+              matchedTempId = tempId;
+              pendingTempsRef.current.delete(tempId);
+              break;
+            }
+          }
+
+          if (matchedTempId) {
+            setMessages((prev) =>
+              prev.map((m) => (m.id === matchedTempId ? { ...m, id: raw.id } : m)),
+            );
+          } else {
+            appendMessage(raw);
+          }
         },
       )
       .subscribe();
@@ -67,7 +86,7 @@ export function useSessionChat(sessionId: string | null, userId?: string, subscr
         channelRef.current = null;
       }
     };
-  }, [sessionId, subscribe, appendMessage, hydrateMessage]);
+  }, [sessionId, subscribe, appendMessage]);
 
   useFocusEffect(
     useCallback(() => {
@@ -77,19 +96,71 @@ export function useSessionChat(sessionId: string | null, userId?: string, subscr
   );
 
   const sendMessage = useCallback(
-    async (content: string): Promise<SessionChatMessage | null> => {
+    async (content: string, replyToId?: string | null): Promise<SessionChatMessage | null> => {
       if (!sessionId || !userId) return null;
-      setSending(true);
+
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
+      const replyTarget = replyToId ? messages.find((m) => m.id === replyToId) ?? null : null;
+
+      const temp: SessionChatMessage = {
+        id: tempId,
+        session_id: sessionId,
+        sender_id: userId,
+        content,
+        created_at: new Date().toISOString(),
+        reply_to_id: replyToId ?? null,
+        sender: senderProfile
+          ? { id: senderProfile.id, username: senderProfile.username, avatar_url: senderProfile.avatar_url }
+          : { id: userId, username: 'You', avatar_url: null },
+        reply_to: replyTarget
+          ? {
+              id: replyTarget.id,
+              sender_id: replyTarget.sender_id ?? null,
+              content: replyTarget.content,
+              sender:
+                replyTarget.sender ??
+                (replyTarget.sender_id === userId
+                  ? senderProfile
+                    ? { id: senderProfile.id, username: senderProfile.username, avatar_url: senderProfile.avatar_url }
+                    : { id: userId, username: 'You', avatar_url: null }
+                  : null),
+            }
+          : null,
+        status: 'sending',
+        tempId,
+      };
+
+      setMessages((prev) => [...prev, temp]);
+      pendingTempsRef.current.set(tempId, { content, replyToId: replyToId ?? null });
+
       try {
-        const message = await sendSessionMessage(sessionId, userId, content);
-        appendMessage(message);
-        return message;
-      } finally {
-        setSending(false);
+        const msg = await sendSessionMessage(
+          sessionId,
+          userId,
+          content,
+          replyToId,
+          replyTarget
+            ? {
+                id: replyTarget.id,
+                senderId: replyTarget.sender_id ?? null,
+                content: replyTarget.content,
+              }
+            : null,
+        );
+        pendingTempsRef.current.delete(tempId);
+        setMessages((prev) => {
+          const next = prev.filter((m) => m.id !== tempId && m.id !== msg?.id);
+          return msg ? [...next, { ...msg, status: 'delivered' }] : next;
+        });
+        return msg;
+      } catch (e) {
+        pendingTempsRef.current.delete(tempId);
+        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        throw e;
       }
     },
-    [sessionId, userId, appendMessage],
+    [sessionId, userId, messages, senderProfile],
   );
 
-  return { messages, loading, sending, sendMessage, refresh: load };
+  return { messages, loading, sendMessage, refresh: load };
 }

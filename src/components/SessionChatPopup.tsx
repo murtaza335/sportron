@@ -1,10 +1,13 @@
-import { MessageCircle, Send, X } from 'lucide-react-native';
-import { useRef, useState } from 'react';
+import { Check, Clock, MessageCircle, Reply, Send, X } from 'lucide-react-native';
+import { useMemo, useRef, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   ActivityIndicator,
+  Animated,
   FlatList,
   KeyboardAvoidingView,
   Modal,
+  PanResponder,
   Platform,
   Pressable,
   StyleSheet,
@@ -16,6 +19,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useSessionChat } from '@/hooks/useSessionChat';
 import type { Session, SessionChatMessage } from '@/types';
@@ -55,6 +59,40 @@ function formatMessageTime(dateString: string) {
   });
 }
 
+// Swipe a message to the right to reply to it (WhatsApp style).
+function SwipeableMessage({
+  onReply,
+  children,
+}: {
+  onReply: () => void;
+  children: ReactNode;
+}) {
+  const [translateX] = useState(() => new Animated.Value(0));
+
+  const reset = () => {
+    Animated.spring(translateX, { toValue: 0, useNativeDriver: true, friction: 7 }).start();
+  };
+
+  const [panResponder] = useState(() =>
+    PanResponder.create({
+      onMoveShouldSetPanResponder: (_e, g) =>
+        g.dx > 8 && Math.abs(g.dx) > Math.abs(g.dy),
+      onPanResponderMove: (_e, g) => translateX.setValue(Math.min(g.dx, 72)),
+      onPanResponderRelease: (_e, g) => {
+        if (g.dx > 60) onReply();
+        reset();
+      },
+      onPanResponderTerminate: reset,
+    }),
+  );
+
+  return (
+    <Animated.View {...panResponder.panHandlers} style={{ transform: [{ translateX }] }}>
+      {children}
+    </Animated.View>
+  );
+}
+
 export function SessionChatPopup({
   sessionId,
   visible,
@@ -66,64 +104,149 @@ export function SessionChatPopup({
 }: SessionChatPopupProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
-  const { messages, loading, sending, sendMessage } = useSessionChat(
+  const { profile } = useAuth();
+  const { messages, loading, sendMessage } = useSessionChat(
     sessionId,
     currentUserId,
     !hasLeft,
+    profile,
   );
 
   const [draft, setDraft] = useState('');
+  const [replyTo, setReplyTo] = useState<SessionChatMessage | null>(null);
   const listRef = useRef<FlatList<SessionChatMessage>>(null);
+
+  const sortedMessages = useMemo(
+    () =>
+      [...messages].sort(
+        (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
+      ),
+    [messages],
+  );
+
+  const resolveReplyPreview = (item: SessionChatMessage): { name: string; content: string } => {
+    const targetId = item.reply_to?.id ?? item.reply_to_id ?? null;
+    const target = targetId ? sortedMessages.find((m) => m.id === targetId) : null;
+    const sender = item.reply_to?.sender ?? target?.sender ?? null;
+    const senderId = item.reply_to?.sender_id ?? target?.sender_id ?? null;
+    let name = sender?.username ?? null;
+    if (!name && senderId && senderId === currentUserId) name = profile?.username ?? 'You';
+    return {
+      name: name ?? 'Unknown',
+      content: (item.reply_to?.content || target?.content || '').trim(),
+    };
+  };
+
+  const resolveMessageName = (msg: SessionChatMessage): string => {
+    if (msg.sender?.username) return msg.sender.username;
+    if (msg.sender_id && msg.sender_id === currentUserId) return profile?.username ?? 'You';
+    return 'Unknown';
+  };
 
   const scrollToEnd = () => {
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
   const handleSend = async () => {
-    if (!draft.trim() || sending) return;
-    const text = draft;
+    const text = draft.trim();
+    if (!text) return;
+    const reply = replyTo;
     setDraft('');
+    setReplyTo(null);
     try {
-      await sendMessage(text);
-    } catch (e: any) {
+      await sendMessage(text, reply?.id);
+    } catch (e) {
       setDraft(text);
+      if (reply) setReplyTo(reply);
       console.error('Failed to send message:', e);
     }
   };
 
+  const renderReplyPreview = (item: SessionChatMessage, mine: boolean) => {
+    if (!item.reply_to && !item.reply_to_id) return null;
+    const preview = resolveReplyPreview(item);
+    if (!preview.content) return null;
+    return (
+      <View
+        style={[
+          styles.replyBlock,
+          {
+            borderLeftColor: mine ? 'rgba(255,255,255,0.7)' : theme.border,
+          },
+        ]}
+      >
+        <ThemedText
+          variant="caption"
+          numberOfLines={1}
+          style={[
+            styles.replyName,
+            { color: mine ? 'rgba(255,255,255,0.9)' : theme.textSecondary },
+          ]}
+        >
+          {preview.name}
+        </ThemedText>
+        <ThemedText
+          variant="caption"
+          numberOfLines={1}
+          style={[styles.replyContent, { color: mine ? 'rgba(255,255,255,0.8)' : theme.textSecondary }]}
+        >
+          {preview.content}
+        </ThemedText>
+      </View>
+    );
+  };
+
   const renderMessage = ({ item }: { item: SessionChatMessage }) => {
     const mine = item.sender_id === currentUserId;
+    const isSending = item.status === 'sending';
     return (
-      <View style={[styles.msgRow, mine ? styles.msgRowMine : styles.msgRowOther]}>
-        {!mine && (
-          <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
-        )}
-        <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
+      <SwipeableMessage onReply={() => setReplyTo(item)}>
+        <View style={[styles.msgRow, mine ? styles.msgRowMine : styles.msgRowOther]}>
           {!mine && (
-            <ThemedText variant="caption" muted style={styles.senderName}>
-              {item.sender?.username ?? 'Unknown'}
-            </ThemedText>
+            <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
           )}
-          <View
-            style={[
-              styles.bubble,
-              mine
-                ? { backgroundColor: '#10B981' }
-                : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
-            <ThemedText
-              variant="body"
-              style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
+          <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
+            {!mine && (
+              <ThemedText variant="caption" muted style={styles.senderName}>
+                {item.sender?.username ?? 'Unknown'}
+              </ThemedText>
+            )}
+            <View
+              style={[
+                styles.bubble,
+                mine
+                  ? { backgroundColor: '#10B981' }
+                  : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
             >
-              {item.content}
-            </ThemedText>
+              {renderReplyPreview(item, mine)}
+              <ThemedText
+                variant="body"
+                style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
+              >
+                {item.content}
+              </ThemedText>
+            </View>
+            <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
+              {mine && (
+                <View style={styles.msgStatus}>
+                  {isSending ? (
+                    <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
+                  ) : (
+                    <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
+                  )}
+                </View>
+              )}
+              <ThemedText variant="caption" muted style={styles.msgTime}>
+                {formatMessageTime(item.created_at)}
+              </ThemedText>
+            </View>
           </View>
-          <ThemedText variant="caption" muted style={styles.msgTime}>
-            {formatMessageTime(item.created_at)}
-          </ThemedText>
+          {mine && (
+            <UserAvatar avatarUrl={profile?.avatar_url ?? null} size={30} style={styles.msgAvatar} />
+          )}
         </View>
-      </View>
+      </SwipeableMessage>
     );
   };
 
@@ -201,7 +324,7 @@ export function SessionChatPopup({
             ) : (
               <FlatList
                 ref={listRef}
-                data={messages}
+                data={sortedMessages}
                 keyExtractor={(item) => item.id}
                 renderItem={renderMessage}
                 contentContainerStyle={styles.listContent}
@@ -222,47 +345,67 @@ export function SessionChatPopup({
               },
             ]}
           >
-            <TextInput
-              value={draft}
-              onChangeText={setDraft}
-              placeholder={
-                hasLeft
-                  ? 'You are no longer in this chat'
-                  : canSend
-                    ? 'Type a message...'
-                    : 'This session is closed'
-              }
-              placeholderTextColor={theme.textSecondary}
-              editable={canSend}
-              multiline
-              maxLength={1000}
-              style={[
-                styles.input,
-                {
-                  color: theme.text,
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                },
-              ]}
-            />
-            <Pressable
-              onPress={handleSend}
-              disabled={!canSend || !draft.trim() || sending}
-              style={({ pressed }) => [
-                styles.sendBtn,
-                {
-                  backgroundColor:
-                    !canSend || !draft.trim() ? theme.backgroundElement : '#10B981',
-                  opacity: pressed ? 0.8 : 1,
-                },
-              ]}
-            >
-              {sending ? (
-                <ActivityIndicator size="small" color="#FFFFFF" />
-              ) : (
+            {replyTo && (
+              <View
+                style={[
+                  styles.replyBar,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+              >
+                <Reply size={14} color="#10B981" strokeWidth={2.5} />
+                <View style={styles.replyBarText}>
+                  <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: '#10B981' }]}>
+                    Replying to {resolveMessageName(replyTo)}
+                  </ThemedText>
+                  <ThemedText variant="caption" muted numberOfLines={1}>
+                    {replyTo.content}
+                  </ThemedText>
+                </View>
+                <Pressable onPress={() => setReplyTo(null)} hitSlop={10}>
+                  <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
+                </Pressable>
+              </View>
+            )}
+
+            <View style={styles.inputRow}>
+              <TextInput
+                value={draft}
+                onChangeText={setDraft}
+                placeholder={
+                  hasLeft
+                    ? 'You are no longer in this chat'
+                    : canSend
+                      ? 'Type a message...'
+                      : 'This session is closed'
+                }
+                placeholderTextColor={theme.textSecondary}
+                editable={canSend}
+                multiline
+                maxLength={1000}
+                style={[
+                  styles.input,
+                  {
+                    color: theme.text,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              />
+              <Pressable
+                onPress={handleSend}
+                disabled={!canSend || !draft.trim()}
+                style={({ pressed }) => [
+                  styles.sendBtn,
+                  {
+                    backgroundColor:
+                      !canSend || !draft.trim() ? theme.backgroundElement : '#10B981',
+                    opacity: pressed ? 0.8 : 1,
+                  },
+                ]}
+              >
                 <Send size={18} color={!canSend || !draft.trim() ? theme.textSecondary : '#FFFFFF'} />
-              )}
-            </Pressable>
+              </Pressable>
+            </View>
           </View>
         </KeyboardAvoidingView>
       </View>
@@ -368,18 +511,69 @@ const styles = StyleSheet.create({
     fontSize: 15,
     lineHeight: 20,
   },
+  replyBlock: {
+    borderLeftWidth: 3,
+    paddingLeft: Spacing.sm,
+    marginBottom: 4,
+    gap: 1,
+  },
+  replyName: {
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  replyContent: {
+    fontSize: 12,
+  },
+  msgMeta: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+    marginTop: 1,
+    paddingHorizontal: 4,
+  },
+  msgMetaMine: {
+    alignSelf: 'flex-end',
+  },
+  msgMetaOther: {
+    alignSelf: 'flex-start',
+  },
+  msgStatus: {
+    width: 12,
+    height: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   msgTime: {
     fontSize: 10,
-    marginLeft: 4,
-    marginTop: 1,
+    marginLeft: 1,
   },
   inputBar: {
-    flexDirection: 'row',
-    alignItems: 'flex-end',
-    gap: Spacing.sm,
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.sm,
     borderTopWidth: StyleSheet.hairlineWidth,
+    gap: Spacing.sm,
+  },
+  replyBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+  },
+  replyBarText: {
+    flex: 1,
+    gap: 1,
+  },
+  replyBarName: {
+    fontWeight: '700',
+    fontSize: 11,
+  },
+  inputRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-end',
+    gap: Spacing.sm,
   },
   input: {
     flex: 1,

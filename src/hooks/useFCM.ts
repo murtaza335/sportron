@@ -79,7 +79,8 @@ export function useFCM() {
         case 'session_left':
         case 'session_reminder':
         case 'feedback_prompt':
-        case 'session_chat_message': {
+        case 'session_chat_message':
+        case 'session_chat_reply': {
           if (data.sessionId) {
             router.navigate({
               pathname: '/history',
