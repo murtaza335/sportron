@@ -41,6 +41,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
+import { useCommunityChat } from '@/hooks/useCommunityChat';
 import {
   fetchCommunityMatches,
   fetchCommunityMatchById,
@@ -79,6 +80,14 @@ export default function CommunityDetailScreen() {
 
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
+
+  const communityChat = useCommunityChat(
+    isMember ? (id ?? null) : null,
+    user?.id,
+    true,
+    null,
+  );
+
   const optimisticTitle = community?.name || communityName || '';
 
   const joinAction = (() => {
@@ -519,6 +528,13 @@ export default function CommunityDetailScreen() {
                 style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
               >
                 <MessageCircle size={20} color={theme.text} strokeWidth={2} />
+                {communityChat.unreadCount > 0 && (
+                  <View style={styles.chatUnreadBadge}>
+                    <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
+                      {communityChat.unreadCount > 99 ? '99+' : communityChat.unreadCount}
+                    </ThemedText>
+                  </View>
+                )}
               </Pressable>
               <Pressable
                 onPress={() => setPingModalVisible(true)}
@@ -702,6 +718,7 @@ export default function CommunityDetailScreen() {
         onClose={() => setChatVisible(false)}
         currentUserId={user?.id}
         community={community}
+        chat={communityChat}
       />
     </View>
   );
@@ -852,6 +869,25 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: Radius.full,
     backgroundColor: '#EF4444',
+  },
+  chatUnreadBadge: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    minWidth: 18,
+    height: 18,
+    borderRadius: Radius.full,
+    backgroundColor: '#EF4444',
+    paddingHorizontal: 4,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+  },
+  chatUnreadCount: {
+    color: '#FFFFFF',
+    fontSize: 9,
+    fontWeight: '700',
+    lineHeight: 10,
   },
   pingResponsesSection: {
     borderWidth: 1,

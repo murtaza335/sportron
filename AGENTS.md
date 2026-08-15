@@ -149,6 +149,7 @@ src/
 - **Long-press to reply**: long-press any message to open a bottom-sheet "Reply to <name>" option; replies store `reply_to_id` (migration 025) and render a preview block (quoted name/content) inside the bubble
 - **No joins / no per-message refetch**: `sender_username`/`sender_avatar_url` are snapshotted on the row at insert (migrations 026 / 027), so realtime payloads and the initial fetch carry the display name without a join. Reply previews/names resolve client-side from the already-loaded list (`resolveReplyPreview`), so replying to your own message shows your own name. This removed the self-join (`!reply_to_id`) entirely, along with the PGRST200 schema-cache dependency and one extra round-trip per message
 - **Push**: each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. `notifyChatMembers` / `notifyCommunityChatMembers` fan out via **one batched edge-function call** (`pushFcmToUsers`) instead of one HTTP call per recipient. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …")
+- **Unread tracking** (migration 028): one row per (chat, user) in `session_chat_read` / `community_chat_read` holding `last_read_at` — O(participants), no per-message receipts. `fetchChatUnreadCount` counts `created_at > last_read_at` (0 when no cursor yet); `fetchChatReadCursor`/`upsertChatReadCursor` read/write the cursor. `useChat` exposes `unreadCount`, `firstUnreadIndex` (index of the oldest unread in the ascending list), and `markRead()` (upsert cursor → now, resets count). `ChatPopup` scrolls to the oldest unread with a "New messages" divider on open, marks read on open + debounced on scroll-end, and skips auto-pin-to-bottom while unread remain; realtime INSERTs from others bump `unreadCount` live so the badge updates even while closed. Unread badges show on the chat button in `community/[id].tsx` (members only) and on the session chat button in `SessionDetailPopup` (`canViewChat`). The `chat` thread is owned by the parent screen and passed into `SessionChatPopup`/`CommunityChatPopup` (no internal hook), so the badge and popup share one subscription
 
 ### 7. Activity (Notifications Inbox)
 - Tabs: **Action Required** (`session_application`, `join_request`, `community_match_pending`), **Invites** (`community_invite`), **Past Activity**
@@ -254,6 +255,14 @@ ping_responses
 in_app_notifications
   id, user_id (fk, cascade), type, title, body, data, read, created_at
   -- inserted via SECURITY DEFINER RPC `insert_notification`
+
+session_chat_read
+  session_id (fk, cascade), profile_id (fk, cascade), last_read_at
+  -- pk (session_id, profile_id); owner-only RLS (select/insert/update)
+
+community_chat_read
+  community_id (fk, cascade), profile_id (fk, cascade), last_read_at
+  -- pk (community_id, profile_id); owner-only RLS (select/insert/update)
 
 -- View: community_leaderboard (per-community rank by win_ratio)
 -- RPCs: get_accepted_commitment_counts, close_expired_sessions,

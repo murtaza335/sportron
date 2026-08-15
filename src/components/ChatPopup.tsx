@@ -1,5 +1,5 @@
 import { Check, Clock, MessageCircle, Reply, Send, X } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -52,12 +52,15 @@ export function ChatPopup<T extends ChatMessageBase>({
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { messages, loading, sendMessage } = chat;
+  const { messages, loading, sendMessage, firstUnreadIndex, markRead } = chat;
 
   const [draft, setDraft] = useState('');
   const [replyTo, setReplyTo] = useState<T | null>(null);
   const [contextMessage, setContextMessage] = useState<T | null>(null);
   const listRef = useRef<FlatList<T>>(null);
+  const didInitialScrollRef = useRef(false);
+  const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastMarkReadRef = useRef(0);
 
   const sortedMessages = useMemo(
     () =>
@@ -65,6 +68,51 @@ export function ChatPopup<T extends ChatMessageBase>({
         (a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime(),
       ),
     [messages],
+  );
+
+  // On open, jump to the oldest unread message (or the bottom when caught up),
+  // then mark everything read. Subsequent opens reset so it re-evaluates.
+  useEffect(() => {
+    didInitialScrollRef.current = false;
+  }, [visible]);
+
+  useEffect(() => {
+    if (!visible || loading || !sortedMessages.length || didInitialScrollRef.current) return;
+    didInitialScrollRef.current = true;
+
+    const target = firstUnreadIndex;
+    if (target != null && target >= 0) {
+      try {
+        listRef.current?.scrollToIndex({
+          index: target,
+          viewPosition: 0,
+          animated: false,
+        });
+      } catch {
+        // items not measured yet — onScrollToIndexFailed handles the retry
+      }
+    } else {
+      listRef.current?.scrollToEnd({ animated: false });
+    }
+
+    markRead();
+  }, [visible, loading, sortedMessages.length, firstUnreadIndex, markRead]);
+
+  // Debounced mark-as-read while scrolling: keeps the cursor advancing as new
+  // realtime messages land at the bottom while the user keeps reading.
+  const handleScrollEndReached = () => {
+    const now = Date.now();
+    if (now - lastMarkReadRef.current < 1500) return;
+    lastMarkReadRef.current = now;
+    if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+    markReadTimerRef.current = setTimeout(() => markRead(), 800);
+  };
+
+  useEffect(
+    () => () => {
+      if (markReadTimerRef.current) clearTimeout(markReadTimerRef.current);
+    },
+    [],
   );
 
   const resolveReplyPreview = (item: T): { name: string; content: string } => {
@@ -87,6 +135,9 @@ export function ChatPopup<T extends ChatMessageBase>({
   };
 
   const scrollToEnd = () => {
+    // When opening with unread messages we scroll to the divider instead of
+    // pinning to the bottom, so don't auto-pin on layout/content changes.
+    if (firstUnreadIndex != null && firstUnreadIndex >= 0) return;
     requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
   };
 
@@ -139,63 +190,75 @@ export function ChatPopup<T extends ChatMessageBase>({
     );
   };
 
-  const renderMessage = ({ item }: { item: T }) => {
+  const renderMessage = ({ item, index }: { item: T; index: number }) => {
     const mine = item.sender_id === currentUserId;
     const isSending = item.status === 'sending';
+    const isFirstUnread = firstUnreadIndex != null && index === firstUnreadIndex;
     return (
-      <Pressable
-        onLongPress={() => setContextMessage(item)}
-        delayLongPress={350}
-        style={({ pressed }) => [
-          styles.msgRow,
-          mine ? styles.msgRowMine : styles.msgRowOther,
-          pressed && { opacity: 0.85 },
-        ]}
-      >
-        {!mine && (
-          <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
+      <View>
+        {isFirstUnread && (
+          <View style={styles.unreadDivider}>
+            <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
+            <ThemedText variant="caption" style={[styles.unreadDividerText, { color: '#10B981' }]}>
+              New messages
+            </ThemedText>
+            <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
+          </View>
         )}
-        <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
+        <Pressable
+          onLongPress={() => setContextMessage(item)}
+          delayLongPress={350}
+          style={({ pressed }) => [
+            styles.msgRow,
+            mine ? styles.msgRowMine : styles.msgRowOther,
+            pressed && { opacity: 0.85 },
+          ]}
+        >
           {!mine && (
-            <ThemedText variant="caption" muted style={styles.senderName}>
-              {item.sender?.username ?? 'Unknown'}
-            </ThemedText>
+            <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
           )}
-          <View
-            style={[
-              styles.bubble,
-              mine
-                ? { backgroundColor: '#10B981' }
-                : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-            ]}
-          >
-            {renderReplyPreview(item, mine)}
-            <ThemedText
-              variant="body"
-              style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
-            >
-              {item.content}
-            </ThemedText>
-          </View>
-          <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
-            {mine && (
-              <View style={styles.msgStatus}>
-                {isSending ? (
-                  <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                ) : (
-                  <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                )}
-              </View>
+          <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
+            {!mine && (
+              <ThemedText variant="caption" muted style={styles.senderName}>
+                {item.sender?.username ?? 'Unknown'}
+              </ThemedText>
             )}
-            <ThemedText variant="caption" muted style={styles.msgTime}>
-              {formatMessageTime(item.created_at)}
-            </ThemedText>
+            <View
+              style={[
+                styles.bubble,
+                mine
+                  ? { backgroundColor: '#10B981' }
+                  : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              ]}
+            >
+              {renderReplyPreview(item, mine)}
+              <ThemedText
+                variant="body"
+                style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
+              >
+                {item.content}
+              </ThemedText>
+            </View>
+            <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
+              {mine && (
+                <View style={styles.msgStatus}>
+                  {isSending ? (
+                    <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
+                  ) : (
+                    <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
+                  )}
+                </View>
+              )}
+              <ThemedText variant="caption" muted style={styles.msgTime}>
+                {formatMessageTime(item.created_at)}
+              </ThemedText>
+            </View>
           </View>
-        </View>
-        {mine && (
-          <UserAvatar avatarUrl={profile?.avatar_url ?? null} size={30} style={styles.msgAvatar} />
-        )}
-      </Pressable>
+          {mine && (
+            <UserAvatar avatarUrl={profile?.avatar_url ?? null} size={30} style={styles.msgAvatar} />
+          )}
+        </Pressable>
+      </View>
     );
   };
 
@@ -285,6 +348,19 @@ export function ChatPopup<T extends ChatMessageBase>({
                   showsVerticalScrollIndicator={false}
                   onContentSizeChange={scrollToEnd}
                   onLayout={scrollToEnd}
+                  onEndReached={handleScrollEndReached}
+                  onEndReachedThreshold={0.3}
+                  onScrollToIndexFailed={(info) => {
+                    if (info.index === 0) {
+                      listRef.current?.scrollToEnd({ animated: false });
+                    } else {
+                      listRef.current?.scrollToIndex({
+                        index: Math.max(0, info.index - 1),
+                        viewPosition: 0,
+                        animated: false,
+                      });
+                    }
+                  }}
                 />
               )}
             </View>
@@ -455,6 +531,22 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingVertical: Spacing.md,
     gap: Spacing.sm,
+  },
+  unreadDivider: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginVertical: Spacing.md,
+  },
+  unreadDividerLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  unreadDividerText: {
+    fontWeight: '700',
+    fontSize: 12,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   msgRow: {
     flexDirection: 'row',

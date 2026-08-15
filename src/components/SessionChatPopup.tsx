@@ -1,7 +1,6 @@
 import { ChatPopup } from '@/components/ChatPopup';
-import { useAuth } from '@/contexts/AuthContext';
-import { useSessionChat } from '@/hooks/useSessionChat';
-import type { Session } from '@/types';
+import type { ChatThread } from '@/hooks/useChat';
+import type { Session, SessionChatMessage } from '@/types';
 
 type SessionChatPopupProps = {
   sessionId: string | null;
@@ -11,6 +10,7 @@ type SessionChatPopupProps = {
   session?: Partial<Session> | null;
   canSend: boolean;
   hasLeft?: boolean;
+  chat: ChatThread<SessionChatMessage>;
 };
 
 function formatSessionDate(dateString?: string) {
@@ -39,10 +39,8 @@ export function SessionChatPopup({
   session,
   canSend,
   hasLeft = false,
+  chat,
 }: SessionChatPopupProps) {
-  const { profile } = useAuth();
-  const chat = useSessionChat(sessionId, currentUserId, !hasLeft, profile);
-
   const headerSubtitle = [
     session?.location ?? '',
     session?.date_time

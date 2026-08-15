@@ -31,6 +31,76 @@ export type ReplyTargetInfo = {
   content: string;
 };
 
+type ChatReadTable = 'session_chat_read' | 'community_chat_read';
+type ChatIdColumn = 'session_id' | 'community_id';
+type ChatMessageTable = 'session_messages' | 'community_messages';
+
+function readTableForIdColumn(idColumn: ChatIdColumn): ChatReadTable {
+  return idColumn === 'session_id' ? 'session_chat_read' : 'community_chat_read';
+}
+
+// ---------------------------------------------------------------------------
+// Read cursors (unread tracking) — shared by session + community chat
+// ---------------------------------------------------------------------------
+
+export async function fetchChatReadCursor(
+  idColumn: ChatIdColumn,
+  chatId: string,
+  userId: string,
+): Promise<string | null> {
+  const readTable = readTableForIdColumn(idColumn);
+  const { data, error } = await supabase
+    .from(readTable)
+    .select('last_read_at')
+    .eq(idColumn, chatId)
+    .eq('profile_id', userId)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data?.last_read_at ?? null;
+}
+
+export async function upsertChatReadCursor(
+  idColumn: ChatIdColumn,
+  chatId: string,
+  userId: string,
+  lastReadAt = new Date().toISOString(),
+): Promise<void> {
+  const readTable = readTableForIdColumn(idColumn);
+  const { error } = await supabase
+    .from(readTable)
+    .upsert(
+      { [idColumn]: chatId, profile_id: userId, last_read_at: lastReadAt },
+      { onConflict: `${idColumn},profile_id` },
+    );
+
+  if (error) throw error;
+}
+
+// Count of messages newer than the user's last-read cursor. When no cursor has
+// ever been written, count = 0 (nothing is "unread" before their first read).
+export async function fetchChatUnreadCount(
+  messageTable: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatId: string,
+  userId: string,
+  lastReadAt?: string | null,
+): Promise<number> {
+  if (lastReadAt === undefined) {
+    lastReadAt = await fetchChatReadCursor(idColumn, chatId, userId);
+  }
+  if (!lastReadAt) return 0;
+
+  const { count, error } = await supabase
+    .from(messageTable)
+    .select('*', { count: 'exact', head: true })
+    .eq(idColumn, chatId)
+    .gt('created_at', lastReadAt);
+
+  if (error) throw error;
+  return count ?? 0;
+}
+
 type InsertedMessage = {
   id: string;
 };
