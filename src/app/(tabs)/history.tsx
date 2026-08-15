@@ -1,15 +1,17 @@
-import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useState } from 'react';
+import { router, useLocalSearchParams } from 'expo-router';
+import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  Modal,
   Pressable,
   RefreshControl,
+  ScrollView,
   StyleSheet,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, Clock, MapPin, Timer, Users } from 'lucide-react-native';
+import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
 
 import { SessionDetailPopup } from '@/components/SessionDetailPopup';
 import { Card } from '@/components/ui/Card';
@@ -17,8 +19,11 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { useSessions } from '@/hooks/useSessions';
-import type { Session } from '@/types';
+import { useSessionFeed, useSessionHistory } from '@/hooks/useSessions';
+import type { SessionScope } from '@/hooks/useSessions';
+import { getSessionsView, subscribeSessionsView } from '@/lib/sessionsView';
+import type { Session, SessionStatus } from '@/types';
+import { formatSessionPurpose, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 import { getRemainingTime } from '@/services/sessions';
 
 function formatSessionDate(dateString: string) {
@@ -37,20 +42,141 @@ function formatSessionTime(dateString: string) {
   });
 }
 
+const STATUS_STYLES: Record<SessionStatus, { bg: string; fg: string; label: string }> = {
+  open: { bg: '#10B98120', fg: '#10B981', label: 'Open' },
+  full: { bg: '#D9770620', fg: '#D97706', label: 'Full' },
+  completed: { bg: '#3B82F620', fg: '#3B82F6', label: 'Completed' },
+  cancelled: { bg: '#DC262620', fg: '#DC2626', label: 'Cancelled' },
+  closed: { bg: '#6B728020', fg: '#6B7280', label: 'Closed' },
+};
+
+function SessionCard({ session, onPress }: { session: Session; onPress: () => void }) {
+  const theme = useTheme();
+  const statusStyle = STATUS_STYLES[session.status] ?? STATUS_STYLES.closed;
+  const isActive = session.status === 'open' || session.status === 'full';
+
+  return (
+    <Pressable
+      onPress={onPress}
+      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
+    >
+      <Card style={styles.sessionCard}>
+        <View style={styles.cardTop}>
+          <ThemedText variant="heading" style={styles.purposeName} numberOfLines={1}>
+            {session.title ?? formatSessionPurpose(session.purpose)}
+          </ThemedText>
+          <View style={[styles.statusBadge, { backgroundColor: statusStyle.bg }]}>
+            <ThemedText variant="caption" style={[styles.statusText, { color: statusStyle.fg }]}>
+              {statusStyle.label}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={[styles.purposePill, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+          <ThemedText variant="caption" style={[styles.purposePillText, { color: theme.textSecondary }]}>
+            {formatSessionPurpose(session.purpose)}
+          </ThemedText>
+        </View>
+
+        <View style={styles.cardDetails}>
+          <View style={styles.detailRow}>
+            <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="caption" muted>
+              {session.location}
+            </ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <Calendar size={14} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="caption" muted>
+              {formatSessionDate(session.date_time)}
+            </ThemedText>
+          </View>
+          <View style={styles.detailRow}>
+            <Clock size={14} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="caption" muted>
+              {formatSessionTime(session.date_time)}
+            </ThemedText>
+          </View>
+        </View>
+
+        <View style={styles.cardFooter}>
+          <View style={styles.footerLeft}>
+            {isActive && session.expires_at && (
+              <View style={[styles.expiryBadge, { backgroundColor: '#D9770620' }]}>
+                <Timer size={12} color="#D97706" strokeWidth={2} />
+                <ThemedText
+                  variant="caption"
+                  style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
+                >
+                  {getRemainingTime(session.expires_at)}
+                </ThemedText>
+              </View>
+            )}
+            <Users size={14} color={theme.textSecondary} strokeWidth={2} />
+            <ThemedText variant="caption" muted>
+              {session.commitment_count ?? 0} / {session.max_participants}
+            </ThemedText>
+          </View>
+          <ThemedText variant="caption" muted>
+            by {session.creator?.username ?? 'Unknown'}
+          </ThemedText>
+        </View>
+      </Card>
+    </Pressable>
+  );
+}
+
+function FilterChip({
+  label,
+  selected,
+  onPress,
+}: {
+  label: string;
+  selected: boolean;
+  onPress: () => void;
+}) {
+  const theme = useTheme();
+  return (
+    <Pressable
+      onPress={onPress}
+      style={[
+        styles.chip,
+        { backgroundColor: selected ? theme.text : theme.backgroundElement, borderColor: theme.border },
+      ]}
+    >
+      <ThemedText
+        variant="caption"
+        style={[styles.chipText, selected && { color: theme.background }]}
+      >
+        {label}
+      </ThemedText>
+    </Pressable>
+  );
+}
+
 export default function SessionsScreen() {
   const theme = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
-  const { sessions, loading, refreshing, refresh } = useSessions(user?.id);
+  const [scope, setScope] = useState<SessionScope>('all');
+  const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
+  const [showPurposeModal, setShowPurposeModal] = useState(false);
+
+  const { sessions, loading, refreshing, refresh } = useSessionFeed(user?.id, scope);
+  const {
+    sessions: historySessions,
+    loading: historyLoading,
+    refreshing: historyRefreshing,
+    refresh: refreshHistory,
+  } = useSessionHistory(user?.id);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   const [selectedSessionData, setSelectedSessionData] = useState<Partial<Session> | null>(null);
 
   const params = useLocalSearchParams<{ sessionId?: string | string[] }>();
   const sessionIdParam = typeof params.sessionId === 'string' ? params.sessionId : undefined;
+  const isHistory = useSyncExternalStore(subscribeSessionsView, getSessionsView) === 'history';
 
-  // A notification deep link carries `sessionId` in the URL; derive the open
-  // popup from it so we never have to sync it into local state.
   const openSessionId = selectedSessionId ?? sessionIdParam ?? null;
   const detailVisible = openSessionId !== null;
 
@@ -67,129 +193,142 @@ export default function SessionsScreen() {
     return () => clearInterval(id);
   }, []);
 
-  useFocusEffect(
-    useCallback(() => {
-      refresh();
-    }, [refresh]),
-  );
+  const filteredSessions = useMemo(() => {
+    if (!purposeFilter) return sessions;
+    return sessions.filter((s) => s.purpose === purposeFilter);
+  }, [sessions, purposeFilter]);
+
+  const hasFilters = purposeFilter !== null;
+  const listData = isHistory ? historySessions : filteredSessions;
+  const listLoading = isHistory ? historyLoading : loading;
+  const listRefreshing = isHistory ? historyRefreshing : refreshing;
+  const onRefresh = isHistory ? refreshHistory : refresh;
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
-        {loading && !refreshing ? (
+        {!isHistory && (
+          <View style={styles.filterBar}>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.chipsRow}
+              style={styles.chipsScroll}
+            >
+              <FilterChip label="All" selected={scope === 'all'} onPress={() => setScope('all')} />
+              <FilterChip
+                label="Joined"
+                selected={scope === 'joined'}
+                onPress={() => setScope('joined')}
+              />
+              <FilterChip label="My" selected={scope === 'my'} onPress={() => setScope('my')} />
+              <Pressable
+                onPress={() => setShowPurposeModal(true)}
+                style={[
+                  styles.chip,
+                  styles.purposeDropdown,
+                  {
+                    backgroundColor: purposeFilter ? theme.text : theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <ThemedText
+                  variant="caption"
+                  style={[
+                    styles.chipText,
+                    purposeFilter && { color: theme.background },
+                  ]}
+                >
+                  {purposeFilter ? formatSessionPurpose(purposeFilter) : 'All purposes'}
+                </ThemedText>
+                <ChevronDown
+                  size={14}
+                  color={purposeFilter ? theme.background : theme.textSecondary}
+                  strokeWidth={2.5}
+                />
+              </Pressable>
+            </ScrollView>
+          </View>
+        )}
+
+        {listLoading && !listRefreshing ? (
           <ActivityIndicator color={theme.text} style={styles.loader} />
         ) : (
           <FlatList
-            data={sessions}
+            data={listData}
             keyExtractor={(item) => item.id}
-            contentContainerStyle={[styles.list, { paddingBottom: Spacing.xxxl + Math.max(insets.bottom, 56) }]}
+            contentContainerStyle={[
+              styles.list,
+              { paddingBottom: Spacing.xxxl + Math.max(insets.bottom, 56) },
+            ]}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl
-                refreshing={refreshing}
-                onRefresh={refresh}
-                tintColor={theme.text}
-              />
+              <RefreshControl refreshing={listRefreshing} onRefresh={onRefresh} tintColor={theme.text} />
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
-              !refreshing ? (
+              !listRefreshing ? (
                 <View style={styles.empty}>
                   <View style={styles.emptyIcon}>
                     <Calendar size={48} color={theme.textSecondary} strokeWidth={1.5} />
                   </View>
-                  <ThemedText variant="body" muted style={styles.emptyText}>
-                    No open sessions yet
-                  </ThemedText>
-                  <ThemedText variant="caption" muted style={styles.emptySubtext}>
-                    Be the first to post a session!
-                  </ThemedText>
+                  {!isHistory ? (
+                    scope === 'all' ? (
+                      <>
+                        <ThemedText variant="body" muted style={styles.emptyText}>
+                          {hasFilters ? 'No sessions match your filters' : 'No open sessions yet'}
+                        </ThemedText>
+                        <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                          {hasFilters
+                            ? 'Try a different purpose'
+                            : 'Be the first to post a session!'}
+                        </ThemedText>
+                      </>
+                    ) : scope === 'joined' ? (
+                      <>
+                        <ThemedText variant="body" muted style={styles.emptyText}>
+                          {hasFilters ? 'No joined sessions match' : 'No joined sessions yet'}
+                        </ThemedText>
+                        <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                          {hasFilters
+                            ? 'Try a different purpose'
+                            : 'Join a session to see it here'}
+                        </ThemedText>
+                      </>
+                    ) : (
+                      <>
+                        <ThemedText variant="body" muted style={styles.emptyText}>
+                          {hasFilters ? 'No sessions match your filters' : 'No sessions yet'}
+                        </ThemedText>
+                        <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                          {hasFilters
+                            ? 'Try a different purpose'
+                            : 'Create a session to get started!'}
+                        </ThemedText>
+                      </>
+                    )
+                  ) : (
+                    <>
+                      <ThemedText variant="body" muted style={styles.emptyText}>
+                        No past sessions yet
+                      </ThemedText>
+                      <ThemedText variant="caption" muted style={styles.emptySubtext}>
+                        Sessions you host or join will show up here once they end
+                      </ThemedText>
+                    </>
+                  )}
                 </View>
               ) : null
             }
             renderItem={({ item }) => (
-              <Pressable
+              <SessionCard
+                session={item}
                 onPress={() => {
                   setSelectedSessionId(item.id);
                   setSelectedSessionData(item);
                 }}
-                style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-              >
-                <Card style={styles.sessionCard}>
-                  <View style={styles.cardTop}>
-                    <ThemedText variant="heading" style={styles.sportName} numberOfLines={1}>
-                      {item.sport}
-                    </ThemedText>
-                    <View
-                      style={[
-                        styles.statusBadge,
-                        {
-                          backgroundColor:
-                            item.status === 'open'
-                              ? '#10B98120'
-                              : '#D9770620',
-                        },
-                      ]}
-                    >
-                      <ThemedText
-                        variant="caption"
-                        style={[
-                          styles.statusText,
-                          {
-                            color: item.status === 'open' ? '#10B981' : '#D97706',
-                          },
-                        ]}
-                      >
-                        {item.status === 'open' ? 'Open' : 'Full'}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.cardDetails}>
-                    <View style={styles.detailRow}>
-                      <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
-                      <ThemedText variant="caption" muted>
-                        {item.location}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Calendar size={14} color={theme.textSecondary} strokeWidth={2} />
-                      <ThemedText variant="caption" muted>
-                        {formatSessionDate(item.date_time)}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.detailRow}>
-                      <Clock size={14} color={theme.textSecondary} strokeWidth={2} />
-                      <ThemedText variant="caption" muted>
-                        {formatSessionTime(item.date_time)}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.cardFooter}>
-                    <View style={styles.footerLeft}>
-                      {item.expires_at && (
-                        <View style={[styles.expiryBadge, { backgroundColor: '#D9770620' }]}>
-                          <Timer size={12} color="#D97706" strokeWidth={2} />
-                          <ThemedText
-                            variant="caption"
-                            style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
-                          >
-                            {getRemainingTime(item.expires_at)}
-                          </ThemedText>
-                        </View>
-                      )}
-                      <Users size={14} color={theme.textSecondary} strokeWidth={2} />
-                      <ThemedText variant="caption" muted>
-                        {item.commitment_count ?? 0} / {item.max_participants}
-                      </ThemedText>
-                    </View>
-                    <ThemedText variant="caption" muted>
-                      by {item.creator?.username ?? 'Unknown'}
-                    </ThemedText>
-                  </View>
-                </Card>
-              </Pressable>
+              />
             )}
           />
         )}
@@ -202,8 +341,84 @@ export default function SessionsScreen() {
         onClose={closePopup}
         currentUserId={user?.id}
         initialSession={selectedSessionData}
-        onRefreshFeed={refresh}
+        onRefreshFeed={() => {
+          if (!isHistory) refresh();
+          else refreshHistory();
+        }}
       />
+
+      <Modal
+        transparent
+        visible={showPurposeModal}
+        animationType="fade"
+        onRequestClose={() => setShowPurposeModal(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <Pressable
+            style={StyleSheet.absoluteFill}
+            onPress={() => setShowPurposeModal(false)}
+          />
+          <View
+            style={[
+              styles.pickerSheet,
+              { backgroundColor: theme.background, borderColor: theme.border },
+            ]}
+          >
+            <ThemedText variant="label" style={styles.pickerTitle}>
+              Filter by purpose
+            </ThemedText>
+            <ScrollView
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={styles.pickerOptions}
+              style={{ maxHeight: 360 }}
+            >
+              <Pressable
+                onPress={() => {
+                  setPurposeFilter(null);
+                  setShowPurposeModal(false);
+                }}
+                style={[
+                  styles.pickerOption,
+                  {
+                    backgroundColor:
+                      purposeFilter === null ? theme.backgroundElement : theme.background,
+                  },
+                ]}
+              >
+                <ThemedText
+                  variant="body"
+                  style={purposeFilter === null ? { fontWeight: '700' } : undefined}
+                >
+                  All purposes
+                </ThemedText>
+              </Pressable>
+              {SESSION_PURPOSES.map((p) => (
+                <Pressable
+                  key={p}
+                  onPress={() => {
+                    setPurposeFilter(purposeFilter === p ? null : p);
+                    setShowPurposeModal(false);
+                  }}
+                  style={[
+                    styles.pickerOption,
+                    {
+                      backgroundColor:
+                        purposeFilter === p ? theme.backgroundElement : theme.background,
+                    },
+                  ]}
+                >
+                  <ThemedText
+                    variant="body"
+                    style={purposeFilter === p ? { fontWeight: '700' } : undefined}
+                  >
+                    {SESSION_PURPOSE_LABELS[p]}
+                  </ThemedText>
+                </Pressable>
+              ))}
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -221,14 +436,71 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.lg,
   },
   list: {
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.xxxl,
     flexGrow: 1,
   },
   loader: {
     marginTop: Spacing.xxl,
   },
+  filterBar: {
+    height: 40,
+    marginTop: Spacing.sm,
+    overflow: 'hidden',
+  },
+  chipsScroll: {
+    height: '100%',
+  },
+  chipsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    height: '100%',
+  },
+  chip: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: 4,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+  },
+  chipText: {
+    fontWeight: '700',
+    fontSize: 12,
+  },
+  purposeDropdown: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    justifyContent: 'flex-end',
+  },
+  pickerSheet: {
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    borderTopWidth: 1,
+    paddingTop: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingBottom: Spacing.xl,
+    maxHeight: '70%',
+  },
+  pickerTitle: {
+    marginBottom: Spacing.sm,
+  },
+  pickerOptions: {
+    paddingBottom: Spacing.xs,
+  },
+  pickerOption: {
+    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
+    marginTop: Spacing.xs,
+  },
   empty: {
-    paddingTop: Spacing.xxxl,
+    flexGrow: 1,
+    justifyContent: 'center',
     alignItems: 'center',
     gap: Spacing.md,
   },
@@ -258,10 +530,21 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     gap: Spacing.xs,
   },
-  sportName: {
+  purposeName: {
     fontSize: 20,
     fontWeight: '800',
     flexShrink: 1,
+  },
+  purposePill: {
+    alignSelf: 'flex-start',
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 2,
+    borderRadius: Radius.sm,
+    borderWidth: 1,
+  },
+  purposePillText: {
+    fontWeight: '700',
+    fontSize: 11,
   },
   expiryBadge: {
     flexDirection: 'row',

@@ -1,11 +1,17 @@
 import { router, Tabs } from 'expo-router';
-import { Activity, Plus, Swords, User, Users } from 'lucide-react-native';
+import { CalendarDays, Activity, History, Plus, User, Users, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
+import { useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
+import {
+  getSessionsView,
+  setSessionsView,
+  subscribeSessionsView,
+} from '@/lib/sessionsView';
 
 function DefaultHeaderTitle({ title }: { title: string }) {
   const theme = useTheme();
@@ -14,6 +20,38 @@ function DefaultHeaderTitle({ title }: { title: string }) {
     <Text style={{ fontSize: 22, fontWeight: '800', color: theme.text, letterSpacing: -0.3 }}>
       {title}
     </Text>
+  );
+}
+
+function SessionsHeaderRight() {
+  const theme = useTheme();
+  const isHistory = useSyncExternalStore(subscribeSessionsView, getSessionsView) === 'history';
+
+  return (
+    <Pressable
+      onPress={() => setSessionsView(isHistory ? 'new' : 'history')}
+      style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+      hitSlop={12}
+      accessibilityLabel={isHistory ? 'Show open sessions' : 'Show session history'}
+      accessibilityRole="button"
+    >
+      <View style={{
+        width: 36,
+        height: 36,
+        borderRadius: 18,
+        backgroundColor: theme.backgroundElement,
+        alignItems: 'center',
+        justifyContent: 'center',
+        borderWidth: 1,
+        borderColor: isHistory ? theme.text : theme.border,
+      }}>
+        {isHistory ? (
+          <X size={18} color={theme.text} strokeWidth={2.5} />
+        ) : (
+          <History size={18} color={theme.textSecondary} strokeWidth={2.5} />
+        )}
+      </View>
+    </Pressable>
   );
 }
 
@@ -93,8 +131,9 @@ export default function TabLayout() {
         name="history"
         options={{
           title: 'Sessions',
-          tabBarLabel: 'Find',
-          headerTitle: () => <DefaultHeaderTitle title="Find a Match" />,
+          tabBarLabel: 'Sessions',
+          headerTitle: () => <DefaultHeaderTitle title="Sessions" />,
+          headerRight: () => <SessionsHeaderRight />,
           headerLeft: () => (
             <Pressable
               onPress={() => router.navigate('/create-session')}
@@ -117,7 +156,7 @@ export default function TabLayout() {
               </View>
             </Pressable>
           ),
-          tabBarIcon: ({ color, size }) => <Swords size={size} color={color} strokeWidth={2.2} />,
+          tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
         }}
       />
       <Tabs.Screen

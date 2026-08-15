@@ -39,6 +39,39 @@ export function isTeamSport(sport: Sport): boolean {
   return TEAM_SPORTS.includes(sport);
 }
 
+// Sessions ask for a "purpose" instead of a sport: a sport, a walk, chit-chat, etc.
+export const SESSION_PURPOSES = [
+  ...RACKET_SPORTS,
+  ...TEAM_SPORTS,
+  'walk',
+  'chit_chat',
+  'other',
+] as const;
+
+export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
+
+export const SESSION_PURPOSE_LABELS: Record<SessionPurpose, string> = {
+  table_tennis: 'Table Tennis',
+  badminton: 'Badminton',
+  tennis: 'Tennis',
+  squash: 'Squash',
+  pickleball: 'Pickleball',
+  football: 'Football',
+  cricket: 'Cricket',
+  volleyball: 'Volleyball',
+  handball: 'Handball',
+  basketball: 'Basketball',
+  walk: 'Walk',
+  chit_chat: 'Chit-Chat',
+  other: 'Other',
+};
+
+export function formatSessionPurpose(purpose: string): string {
+  return SESSION_PURPOSE_LABELS[purpose as SessionPurpose] ?? purpose;
+}
+
+export const MAX_SESSION_TITLE_LENGTH = 40;
+
 export type Profile = {
   id: string;
   username: string;
@@ -327,7 +360,8 @@ export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelle
 export type Session = {
   id: string;
   created_by: string;
-  sport: string;
+  purpose: string;
+  title: string | null;
   location: string;
   date_time: string;
   expires_at: string | null;
@@ -342,7 +376,8 @@ export type Session = {
 };
 
 export type CreateSessionInput = {
-  sport: string;
+  purpose: SessionPurpose;
+  title: string;
   location: string;
   date_time: string;
   max_participants: number;

@@ -27,7 +27,8 @@ import {
   MAX_SESSION_PARTICIPANTS,
   MIN_SESSION_PARTICIPANTS,
 } from '@/services/sessions';
-import type { CreateSessionInput } from '@/types';
+import type { CreateSessionInput, SessionPurpose } from '@/types';
+import { MAX_SESSION_TITLE_LENGTH, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 
 export default function CreateSessionScreen() {
   const theme = useTheme();
@@ -35,7 +36,8 @@ export default function CreateSessionScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
 
-  const [sport, setSport] = useState('');
+  const [purpose, setPurpose] = useState<SessionPurpose | null>(null);
+  const [title, setTitle] = useState('');
   const [location, setLocation] = useState('');
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [selectedTime, setSelectedTime] = useState(new Date());
@@ -46,7 +48,7 @@ export default function CreateSessionScreen() {
   const [maxParticipants, setMaxParticipants] = useState('2');
   const [description, setDescription] = useState('');
   const [saving, setSaving] = useState(false);
-  const [conflicts, setConflicts] = useState<{ sport: string; date_time: string; location: string }[]>([]);
+  const [conflicts, setConflicts] = useState<{ purpose: string; date_time: string; location: string }[]>([]);
 
   const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
 
@@ -74,13 +76,23 @@ export default function CreateSessionScreen() {
     participantsNum <= MAX_SESSION_PARTICIPANTS;
 
   const canSave =
-    sport.trim().length > 0 &&
+    purpose !== null &&
+    title.trim().length > 0 &&
     location.trim().length > 0 &&
     participantsValid &&
     !saving;
 
   const handleCreate = async () => {
     if (!user?.id || !canSave) return;
+
+    if (!purpose) {
+      Alert.alert('Select a purpose', 'Please choose what this session is for.');
+      return;
+    }
+    if (!title.trim()) {
+      Alert.alert('Missing title', 'Please add a short title for this session.');
+      return;
+    }
 
     const dateTime = new Date(
       selectedDate.getFullYear(),
@@ -111,7 +123,7 @@ export default function CreateSessionScreen() {
       if (conflicting.length > 0) {
         setConflicts(
           conflicting.map((s) => ({
-            sport: s.sport,
+            purpose: s.purpose,
             date_time: new Date(s.date_time).toLocaleString(),
             location: s.location,
           })),
@@ -121,7 +133,8 @@ export default function CreateSessionScreen() {
       }
 
       const input: CreateSessionInput = {
-        sport: sport.trim(),
+        purpose,
+        title: title.trim(),
         location: location.trim(),
         date_time: dateTime,
         max_participants: participantsNum,
@@ -169,7 +182,7 @@ export default function CreateSessionScreen() {
               {conflicts.map((c, i) => (
                 <View key={i} style={styles.conflictItem}>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                    {c.sport}
+                    {c.purpose}
                   </ThemedText>
                   <ThemedText variant="caption" muted>
                     {c.date_time} at {c.location}
@@ -181,13 +194,51 @@ export default function CreateSessionScreen() {
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
-              Sport
+              Purpose
+            </ThemedText>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purposePicker}>
+              {SESSION_PURPOSES.map((p) => {
+                const selected = p === purpose;
+                return (
+                  <Pressable
+                    key={p}
+                    onPress={() => setPurpose(p)}
+                    style={[
+                      styles.purposePill,
+                      { borderColor: theme.border },
+                      selected && { backgroundColor: theme.text, borderColor: theme.text },
+                    ]}
+                  >
+                    <ThemedText
+                      variant="caption"
+                      style={[
+                        styles.purposePillText,
+                        selected && { color: theme.background },
+                      ]}
+                    >
+                      {SESSION_PURPOSE_LABELS[p]}
+                    </ThemedText>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+            {purpose === null && (
+              <ThemedText variant="caption" muted style={styles.hintText}>
+                Select a purpose
+              </ThemedText>
+            )}
+          </View>
+
+          <View style={styles.field}>
+            <ThemedText variant="label" muted style={styles.label}>
+              Short Title
             </ThemedText>
             <TextInput
-              value={sport}
-              onChangeText={setSport}
-              placeholder="e.g. Table Tennis, Badminton"
+              value={title}
+              onChangeText={setTitle}
+              placeholder="e.g. Evening doubles"
               placeholderTextColor={theme.textSecondary}
+              maxLength={MAX_SESSION_TITLE_LENGTH}
               style={[
                 styles.input,
                 {
@@ -196,8 +247,10 @@ export default function CreateSessionScreen() {
                   borderColor: theme.border,
                 },
               ]}
-              autoFocus
             />
+            <ThemedText variant="caption" muted style={styles.hintText}>
+              {title.length}/{MAX_SESSION_TITLE_LENGTH} characters
+            </ThemedText>
           </View>
 
           <View style={styles.field}>
@@ -217,6 +270,7 @@ export default function CreateSessionScreen() {
                   borderColor: theme.border,
                 },
               ]}
+              autoFocus
             />
           </View>
 
@@ -490,6 +544,20 @@ const styles = StyleSheet.create({
   expireRow: {
     flexDirection: 'row',
     gap: Spacing.sm,
+  },
+  purposePicker: {
+    flexDirection: 'row',
+  },
+  purposePill: {
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    marginRight: Spacing.sm,
+  },
+  purposePillText: {
+    fontWeight: '700',
+    fontSize: 13,
   },
   expireChip: {
     flexDirection: 'row',

@@ -146,7 +146,7 @@ export function SessionChatPopup({
         >
           <View style={styles.headerInfo}>
             <ThemedText variant="heading" numberOfLines={1} style={styles.headerTitle}>
-              {session?.sport ?? 'Session'} Chat
+              {session?.title ?? session?.purpose ?? 'Session'} Chat
             </ThemedText>
             <ThemedText variant="caption" muted numberOfLines={1}>
               {session?.location ?? ''}

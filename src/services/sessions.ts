@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput } from '@/types';
+import { MAX_SESSION_TITLE_LENGTH } from '@/types';
 import { fetchProfile } from './profiles';
 import { formatSessionDisplayName } from '@/lib/date';
 import {
@@ -22,7 +23,8 @@ function normalizeSession(
   return {
     id: row.id,
     created_by: row.created_by,
-    sport: row.sport,
+    purpose: row.purpose,
+    title: row.title,
     location: row.location,
     date_time: row.date_time,
     expires_at: row.expires_at,
@@ -111,6 +113,128 @@ export async function fetchSessionById(
   return data ? normalizeSession(data as SessionRow, currentUserId, acceptedCount) : null;
 }
 
+// Sorts sessions so active ones (open/full) appear first (soonest first),
+// then past ones (most recent first). Used by "My" and "Joined" scopes.
+function sortActiveFirst(sessions: Session[]): Session[] {
+  const active = sessions
+    .filter((s) => s.status === 'open' || s.status === 'full')
+    .sort((a, b) => new Date(a.date_time).getTime() - new Date(b.date_time).getTime());
+  const past = sessions
+    .filter((s) => s.status !== 'open' && s.status !== 'full')
+    .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime());
+  return [...active, ...past];
+}
+
+// Sessions created by the user — active (open/full) first, then ended ones.
+export async function fetchMySessions(userId: string): Promise<Session[]> {
+  await closeExpiredSessions(userId);
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(
+      `
+      *,
+      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
+      commitments:commitments (id, user_id, status)
+    `,
+    )
+    .eq('created_by', userId);
+
+  if (error) throw error;
+
+  const sessions = data ?? [];
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return sortActiveFirst(
+    sessions.map((row) =>
+      normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
+    ),
+  );
+}
+
+// Sessions the user has an accepted commitment on — active first, then ended.
+export async function fetchJoinedSessions(userId: string): Promise<Session[]> {
+  await closeExpiredSessions(userId);
+
+  const { data: committedRows, error: committedError } = await supabase
+    .from('commitments')
+    .select('session_id')
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+
+  if (committedError) throw committedError;
+
+  const committedIds = (committedRows ?? []).map((c) => c.session_id);
+  if (committedIds.length === 0) return [];
+
+  const { data, error } = await supabase
+    .from('sessions')
+    .select(
+      `
+      *,
+      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
+      commitments:commitments (id, user_id, status)
+    `,
+    )
+    .in('id', committedIds);
+
+  if (error) throw error;
+
+  const sessions = data ?? [];
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return sortActiveFirst(
+    sessions.map((row) =>
+      normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
+    ),
+  );
+}
+
+// Sessions the user was once part of (as creator or an accepted/left
+// participant) that have since ended.
+export async function fetchSessionHistory(userId: string): Promise<Session[]> {
+  const { data: committedRows, error: committedError } = await supabase
+    .from('commitments')
+    .select('session_id')
+    .eq('user_id', userId)
+    .in('status', ['accepted', 'left']);
+
+  if (committedError) throw committedError;
+
+  const committedIds = (committedRows ?? []).map((c) => c.session_id);
+
+  let query = supabase
+    .from('sessions')
+    .select(
+      `
+      *,
+      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
+      commitments:commitments (id, user_id, status)
+    `,
+    )
+    .in('status', ['closed', 'completed', 'cancelled']);
+
+  if (committedIds.length > 0) {
+    query = query.or(`created_by.eq.${userId},id.in.(${committedIds.join(',')})`);
+  } else {
+    query = query.eq('created_by', userId);
+  }
+
+  const { data, error } = await query.order('date_time', { ascending: false });
+
+  if (error) throw error;
+
+  const sessions = data ?? [];
+  const sessionIds = sessions.map((s) => s.id);
+  const countMap = await fetchAcceptedCounts(sessionIds);
+
+  return sessions.map((row) =>
+    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
+  );
+}
+
 // Maximum session duration: 1 week in minutes
 export const MAX_SESSION_DURATION_MINUTES = 7 * 24 * 60; // 10080 minutes
 
@@ -156,7 +280,8 @@ export async function createSession(
     .from('sessions')
     .insert({
       created_by: userId,
-      sport: input.sport.trim(),
+      purpose: input.purpose,
+      title: input.title.trim().slice(0, MAX_SESSION_TITLE_LENGTH) || null,
       location: input.location.trim(),
       date_time: input.date_time,
       max_participants: input.max_participants,
@@ -215,7 +340,7 @@ export async function commitToSession(
   const conflicts = await checkTimeConflicts(userId, sessionRow.date_time);
   if (conflicts.length > 0) {
     throw new Error(
-      `You already have a session within 30 minutes of this one: ${conflicts[0].sport} at ${conflicts[0].location}`,
+      `You already have a session within 30 minutes of this one: ${conflicts[0].purpose} at ${conflicts[0].location}`,
     );
   }
 
@@ -304,11 +429,11 @@ export async function approveCommitment(
     const actor = await fetchProfile(actorId);
     const { data: session } = await supabase
       .from('sessions')
-      .select('sport, date_time')
+      .select('title, purpose, date_time')
       .eq('id', commitment.session_id)
       .maybeSingle();
     const sessionName = session
-      ? formatSessionDisplayName(session.sport, session.date_time)
+      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
       : 'this session';
     await notifySessionAccepted(
       commitment.user_id,
@@ -351,11 +476,11 @@ export async function rejectCommitment(
     const actor = await fetchProfile(actorId);
     const { data: session } = await supabase
       .from('sessions')
-      .select('sport, date_time')
+      .select('title, purpose, date_time')
       .eq('id', commitment.session_id)
       .maybeSingle();
     const sessionName = session
-      ? formatSessionDisplayName(session.sport, session.date_time)
+      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
       : 'this session';
     await notifySessionRejected(
       commitment.user_id,
@@ -379,13 +504,13 @@ async function resolveSessionApplicationNotification(
   try {
     const [applicantResult, sessionResult] = await Promise.all([
       supabase.from('profiles').select('username').eq('id', applicantId).single(),
-      supabase.from('sessions').select('sport, date_time').eq('id', sessionId).maybeSingle(),
+      supabase.from('sessions').select('title, purpose, date_time').eq('id', sessionId).maybeSingle(),
     ]);
 
     const name = applicantResult.data?.username ?? 'Someone';
     const session = sessionResult.data;
     const sessionName = session
-      ? formatSessionDisplayName(session.sport, session.date_time)
+      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
       : 'your session';
     await supabase
       .from('in_app_notifications')
@@ -453,7 +578,17 @@ export async function fetchUserSessions(
 ): Promise<Session[]> {
   await closeExpiredSessions(userId);
 
-  const { data, error } = await supabase
+  const { data: committedRows, error: committedError } = await supabase
+    .from('commitments')
+    .select('session_id')
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+
+  if (committedError) throw committedError;
+
+  const committedIds = (committedRows ?? []).map((c) => c.session_id);
+
+  let query = supabase
     .from('sessions')
     .select(
       `
@@ -461,11 +596,17 @@ export async function fetchUserSessions(
       creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
       commitments:commitments (id, user_id, status)
     `,
-    )
-    .or(
-      `created_by.eq.${userId},and(status.in.(open,full),id.in.(select session_id from commitments where user_id.eq.${userId} and status.eq.accepted))`,
-    )
-    .order('date_time', { ascending: true });
+    );
+
+  if (committedIds.length > 0) {
+    query = query.or(
+      `created_by.eq.${userId},and(status.in.(open,full),id.in.(${committedIds.join(',')}))`,
+    );
+  } else {
+    query = query.eq('created_by', userId);
+  }
+
+  const { data, error } = await query.order('date_time', { ascending: true });
 
   if (error) throw error;
 

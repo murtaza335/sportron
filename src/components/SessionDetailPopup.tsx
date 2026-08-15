@@ -172,7 +172,7 @@ export function SessionDetailPopup({
         Alert.alert(
           'Time Conflict',
           `You have a conflicting session within ±30 minutes:\n\n${otherConflicts
-            .map((c) => `• ${c.sport} at ${new Date(c.date_time).toLocaleString()}`)
+            .map((c) => `• ${c.purpose} at ${new Date(c.date_time).toLocaleString()}`)
             .join('\n')}`,
         );
         return;
@@ -313,7 +313,11 @@ export function SessionDetailPopup({
 
           <View style={styles.header} {...panHandlers}>
             <ThemedText variant="heading" numberOfLines={1} style={{ flex: 1 }}>
-              {session?.sport ?? initialSession?.sport ?? 'Session'}
+              {session?.title ??
+                session?.purpose ??
+                initialSession?.title ??
+                initialSession?.purpose ??
+                'Session'}
             </ThemedText>
             <View style={styles.headerActions}>
               {canViewChat && (

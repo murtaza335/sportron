@@ -49,7 +49,7 @@ export async function sendSessionMessage(
 
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, created_by, sport, date_time, status')
+    .select('id, created_by, purpose, date_time, status')
     .eq('id', sessionId)
     .single();
 
@@ -87,7 +87,7 @@ export async function sendSessionMessage(
 // Sends an FCM-only push (no in-app notification) to every member of the
 // session (creator + accepted participants), except the sender.
 async function notifyChatMembers(
-  session: { id: string; created_by: string; sport: string; date_time: string },
+  session: { id: string; created_by: string; purpose: string; date_time: string },
   senderId: string,
   senderName: string,
   content: string,
@@ -103,7 +103,7 @@ async function notifyChatMembers(
   const memberIds = new Set<string>([session.created_by]);
   for (const c of accepted ?? []) memberIds.add(c.user_id);
 
-  const sessionName = formatSessionDisplayName(session.sport, session.date_time);
+  const sessionName = formatSessionDisplayName(session.purpose, session.date_time);
   const pushData = { type: 'session_chat_message', sessionId: session.id };
 
   await Promise.allSettled(
