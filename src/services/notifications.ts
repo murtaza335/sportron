@@ -11,7 +11,18 @@ export async function pushFcmToUser(
   body: string,
   data?: Record<string, unknown>,
 ): Promise<void> {
-  if (!fcmFunctionUrl || !supabaseAnonKey) return;
+  return pushFcmToUsers([userId], title, body, data);
+}
+
+// Batches a single edge-function call for many recipients (one JWT, one
+// profiles query, N FCM sends inside the function) instead of N HTTP calls.
+export async function pushFcmToUsers(
+  userIds: string[],
+  title: string,
+  body: string,
+  data?: Record<string, unknown>,
+): Promise<void> {
+  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) return;
 
   try {
     await fetch(fcmFunctionUrl, {
@@ -20,7 +31,7 @@ export async function pushFcmToUser(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supabaseAnonKey}`,
       },
-      body: JSON.stringify({ user_id: userId, title, body, data }),
+      body: JSON.stringify({ user_ids: userIds, title, body, data }),
     });
   } catch {
     // fire-and-forget: silently ignore FCM failures

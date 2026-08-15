@@ -39,6 +39,39 @@ export function isTeamSport(sport: Sport): boolean {
   return TEAM_SPORTS.includes(sport);
 }
 
+// Sessions ask for a "purpose" instead of a sport: a sport, a walk, chit-chat, etc.
+export const SESSION_PURPOSES = [
+  ...RACKET_SPORTS,
+  ...TEAM_SPORTS,
+  'walk',
+  'chit_chat',
+  'other',
+] as const;
+
+export type SessionPurpose = (typeof SESSION_PURPOSES)[number];
+
+export const SESSION_PURPOSE_LABELS: Record<SessionPurpose, string> = {
+  table_tennis: 'Table Tennis',
+  badminton: 'Badminton',
+  tennis: 'Tennis',
+  squash: 'Squash',
+  pickleball: 'Pickleball',
+  football: 'Football',
+  cricket: 'Cricket',
+  volleyball: 'Volleyball',
+  handball: 'Handball',
+  basketball: 'Basketball',
+  walk: 'Walk',
+  chit_chat: 'Chit-Chat',
+  other: 'Other',
+};
+
+export function formatSessionPurpose(purpose: string): string {
+  return SESSION_PURPOSE_LABELS[purpose as SessionPurpose] ?? purpose;
+}
+
+export const MAX_SESSION_TITLE_LENGTH = 40;
+
 export type Profile = {
   id: string;
   username: string;
@@ -179,7 +212,10 @@ export type NotificationType =
   | 'community_invite'
   | 'community_invite_accepted'
   | 'community_invite_rejected'
-  | 'session_chat_message';
+  | 'session_chat_message'
+  | 'session_chat_reply'
+  | 'community_chat_message'
+  | 'community_chat_reply';
 
 export type InAppNotification = {
   id: string;
@@ -327,7 +363,8 @@ export type SessionStatus = 'open' | 'full' | 'closed' | 'completed' | 'cancelle
 export type Session = {
   id: string;
   created_by: string;
-  sport: string;
+  purpose: string;
+  title: string | null;
   location: string;
   date_time: string;
   expires_at: string | null;
@@ -342,7 +379,8 @@ export type Session = {
 };
 
 export type CreateSessionInput = {
-  sport: string;
+  purpose: SessionPurpose;
+  title: string;
   location: string;
   date_time: string;
   max_participants: number;
@@ -371,11 +409,36 @@ export type Commitment = {
   } | null;
 };
 
-export type SessionChatMessage = {
+export type ChatSender = Pick<Profile, 'id' | 'username' | 'avatar_url'>;
+
+export type ChatReplyRef = {
   id: string;
-  session_id: string;
+  sender_id?: string | null;
+  content: string;
+  sender?: ChatSender | null;
+};
+
+// Shared shape for both session and community chat messages. Sender info is
+// snapshotted at insert time (no join needed for realtime payloads); replies
+// carry only a reference + client-side resolution.
+export type ChatMessageBase = {
+  id: string;
   sender_id: string;
   content: string;
   created_at: string;
-  sender?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  reply_to_id?: string | null;
+  sender_username?: string | null;
+  sender_avatar_url?: string | null;
+  sender?: ChatSender | null;
+  reply_to?: ChatReplyRef | null;
+  status?: 'sending' | 'delivered';
+  tempId?: string;
+};
+
+export type SessionChatMessage = ChatMessageBase & {
+  session_id: string;
+};
+
+export type CommunityChatMessage = ChatMessageBase & {
+  community_id: string;
 };

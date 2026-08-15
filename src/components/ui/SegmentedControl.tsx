@@ -7,12 +7,14 @@ type SegmentedControlProps<T extends string> = {
   options: { value: T; label: string }[];
   value: T;
   onChange: (value: T) => void;
+  compact?: boolean;
 };
 
 export function SegmentedControl<T extends string>({
   options,
   value,
   onChange,
+  compact = false,
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
 
@@ -26,14 +28,16 @@ export function SegmentedControl<T extends string>({
             onPress={() => onChange(option.value)}
             style={[
               styles.segment,
+              compact && styles.segmentCompact,
               selected && { backgroundColor: theme.text },
             ]}
-            hitSlop={16}
+            hitSlop={12}
             accessibilityRole="button"
             accessibilityState={{ selected }}>
             <Text
               style={[
                 styles.label,
+                compact && styles.labelCompact,
                 { color: selected ? theme.background : theme.text },
               ]}>
               {option.label}
@@ -60,8 +64,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
+  segmentCompact: {
+    minHeight: 32,
+    paddingVertical: 4,
+    paddingHorizontal: Spacing.md,
+  },
   label: {
     fontSize: 14,
     fontWeight: '700',
+  },
+  labelCompact: {
+    fontSize: 13,
   },
 });

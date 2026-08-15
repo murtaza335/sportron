@@ -79,7 +79,8 @@ export function useFCM() {
         case 'session_left':
         case 'session_reminder':
         case 'feedback_prompt':
-        case 'session_chat_message': {
+        case 'session_chat_message':
+        case 'session_chat_reply': {
           if (data.sessionId) {
             router.navigate({
               pathname: '/history',
@@ -97,7 +98,9 @@ export function useFCM() {
         case 'ping_response':
         case 'community_invite':
         case 'community_invite_accepted':
-        case 'community_invite_rejected': {
+        case 'community_invite_rejected':
+        case 'community_chat_message':
+        case 'community_chat_reply': {
           if (data.communityId) {
             router.push({
               pathname: '/community/[id]',

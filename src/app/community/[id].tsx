@@ -9,6 +9,7 @@ import {
   Lock,
   MapPin,
   Megaphone,
+  MessageCircle,
   MoreHorizontal,
   Plus,
   Swords,
@@ -31,6 +32,7 @@ import {
 
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
+import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -208,6 +210,9 @@ export default function CommunityDetailScreen() {
   const [pingModalVisible, setPingModalVisible] = useState(false);
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
+
+  // Community chat
+  const [chatVisible, setChatVisible] = useState(false);
 
   const handleJoin = async () => {
     if (!id || !user) return;
@@ -510,6 +515,12 @@ export default function CommunityDetailScreen() {
                 buttonStyle={styles.recordMatchButton}
               />
               <Pressable
+                onPress={() => setChatVisible(true)}
+                style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+              >
+                <MessageCircle size={20} color={theme.text} strokeWidth={2} />
+              </Pressable>
+              <Pressable
                 onPress={() => setPingModalVisible(true)}
                 style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
               >
@@ -683,6 +694,14 @@ export default function CommunityDetailScreen() {
         onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
+      />
+
+      <CommunityChatPopup
+        communityId={id ?? null}
+        visible={chatVisible}
+        onClose={() => setChatVisible(false)}
+        currentUserId={user?.id}
+        community={community}
       />
     </View>
   );

@@ -68,7 +68,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   const { markAsRead } = useNotifications();
   const [actionResult, setActionResult] = useState<'accepted' | 'declined' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
-  const [sessionInfo, setSessionInfo] = useState<{ sport: string; location: string } | null>(null);
+  const [sessionInfo, setSessionInfo] = useState<{ purpose: string; location: string } | null>(null);
   const [sessionInfoLoading, setSessionInfoLoading] = useState(notification.type === 'session_application');
 
   const isActionType = ACTION_TYPES.includes(notification.type);
@@ -82,7 +82,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         try {
           const { data: s } = await supabase
             .from('sessions')
-            .select('sport, location')
+            .select('purpose, location')
             .eq('id', sessionId)
             .single();
           if (s) setSessionInfo(s);
@@ -100,7 +100,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       case 'session_application': {
         const name = notification.body.replace(' applied to your session', '').trim();
         if (sessionInfo) {
-          return `wanna let ${name} in ${sessionInfo.sport} at ${sessionInfo.location}?`;
+          return `wanna let ${name} in ${sessionInfo.purpose} at ${sessionInfo.location}?`;
         }
         return `wanna let ${name || 'someone'} in your session?`;
       }

@@ -19,10 +19,15 @@ function ordinalSuffix(n: number): string {
   return n + (suffixes[(v - 20) % 10] ?? suffixes[v] ?? suffixes[0]);
 }
 
-export function formatSessionDisplayName(sport: string, dateTime: string): string {
+export function formatSessionDisplayName(
+  purpose: string,
+  dateTime: string,
+  title?: string | null,
+): string {
+  if (title) return title;
   const d = new Date(dateTime);
-  if (Number.isNaN(d.getTime())) return `${sport} session`;
+  if (Number.isNaN(d.getTime())) return `${purpose} session`;
   const day = ordinalSuffix(d.getDate());
   const month = d.toLocaleDateString(undefined, { month: 'long' });
-  return `${sport} ${day} ${month} session`;
+  return `${purpose} ${day} ${month} session`;
 }

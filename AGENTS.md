@@ -36,7 +36,7 @@ src/
 │   └── (tabs)/
 │       ├── _layout.tsx         # 4 tabs: Communities / Sessions / Activity / Profile
 │       ├── index.tsx           # My communities (home)
-│       ├── history.tsx         # "Find a Match" - open play sessions
+│       ├── history.tsx         # Sessions: new (All/Joined/My) or history view + cards
 │       ├── updates.tsx         # Activity - in-app notifications inbox
 │       └── profile.tsx         # Profile view/edit + theme + notification toggle
 ├── components/
@@ -46,6 +46,8 @@ src/
 │   ├── ScoreCounter.tsx        # +/- score input
 │   ├── SessionDetailPopup.tsx  # Session detail: applicants, approve/reject, join/leave
 │   ├── SessionChatPopup.tsx    # Full-screen live chat for a session (creator + accepted members)
+│   ├── CommunityChatPopup.tsx  # Full-screen live chat for a community (approved members)
+│   ├── ChatPopup.tsx           # Shared chat UI used by session + community chat
 │   ├── ActivityCard.tsx        # Notification row with accept/decline actions
 │   ├── InviteCard.tsx          # Community invite accept/decline
 │   ├── InviteMemberModal.tsx   # Admin invite-by-username modal
@@ -60,24 +62,27 @@ src/
 ├── hooks/
 │   ├── useCommunities.ts            # Fetch public / my communities
 │   ├── useCommunity.ts              # Single community detail + membership state
-│   ├── useSessions.ts               # Fetch open play sessions
-│   ├── useSessionChat.ts            # Session chat messages + realtime subscribe
+│   ├── useSessions.ts               # Session feeds by scope (all/joined/my) + history
+│   ├── useSessionChat.ts            # Session chat: optimistic send + realtime dedupe
+│   ├── useCommunityChat.ts          # Community chat: same features via shared useChat
+│   ├── useChat.ts                   # Generic chat thread (optimistic send + realtime dedupe)
 │   ├── useNotifications.ts          # Wraps NotificationsContext (shared feed + unreadCount)
 │   ├── useFCM.ts                    # FCM init, permissions, notification navigation
 │   ├── use-theme.ts                 # Theme context wrapper
 │   └── use-color-scheme.ts          # System theme detection (native + web)
 ├── services/
 │   ├── auth.ts                 # Google OAuth flow
-│   ├── chat.ts                 # Session chat: fetch/send messages + FCM push to members
+│   ├── chat.ts                 # Session + community chat: fetch/send + sender snapshot + batched FCM push
 │   ├── profiles.ts             # Profile CRUD, prefs, FCM tokens, soft delete
 │   ├── communities.ts          # Communities, members, matches, pings, invites
 │   ├── sessions.ts             # Session CRUD + commitments (approve/reject/leave)
-│   ├── notifications.ts        # In-app notification insert + typed notify helpers
+│   ├── notifications.ts        # In-app notification insert + typed notify helpers + batched FCM
 │   └── fcm.ts                  # FCM token management + listeners + local notifications
 ├── lib/
 │   ├── supabase.ts             # Supabase client (AsyncStorage/web fallback)
 │   ├── cloudinary.ts           # Image upload with progress
-│   └── date.ts                 # formatRelativeTime
+│   ├── date.ts                 # formatRelativeTime + formatSessionDisplayName
+│   └── sessionsView.ts         # 'new' | 'history' toggle store (useSyncExternalStore)
 ├── types/
 │   └── index.ts                # Shared TypeScript types + sport constants
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
@@ -123,20 +128,27 @@ src/
 - **Win/Loss/Draw**: badges on match cards when user participated
 
 ### 5. Sessions (Find a Match)
-- **Create**: sport, location, date/time, max participants, "expire after" chips (15m/30m/1hr), description
+- **Create**: purpose (sport), **title (required short name ≤ 40 chars)**, location, date/time, max participants, "expire after" chips (15m/30m/1hr), description
 - Constraints: max 7 days in the future; time-conflict check (±30 min on created + committed sessions)
 - **Statuses**: open / full / closed / completed / cancelled; expired sessions auto-closed
 - **Commitments**: apply (pending) → creator approves (accepted) or rejects; can leave and re-apply
 - **Delete**: allowed only while no member has `accepted` status
-- Session cards show "closes in X" countdown, commitment count, creator name
+- **Views** (`history.tsx`): a header clock/X button toggles between **New** (open play) and **History** (ended sessions); the shared view lives in `src/lib/sessionsView.ts` (a tiny `useSyncExternalStore` store) so the header and tab stay in sync. New view has an **All / Joined / My** segmented control + a purpose (sport) dropdown filter
+- **Feeds**: `useSessionFeed(userId, scope)` with `SessionScope` = `all` | `joined` | `my` and `useSessionHistory(userId)`; backed by `fetchOpenSessions`/`fetchMySessions`/`fetchJoinedSessions`/`fetchSessionHistory` in `sessions.ts`, which sort active (open/full) sessions first
+- Session cards show title (falls back to purpose), "closes in X" countdown, commitment count, creator name
 
-### 6. Session Chat
-- Live text chat per session, realtime via Postgres Changes on `session_messages` (`supabase.channel('session-chat-<id>')`, INSERT filtered on `session_id`)
-- Scoped to the session **creator + accepted participants** only (RLS enforces both read and write)
-- Users who **left** a session can still read history up to the moment they left (`created_at <=` their commitment's `updated_at`) but cannot send; the client skips its realtime subscription and shows a "you left" banner, and they receive no further FCM pushes
+### 6. Session & Community Chat
+- **Shared implementation**: `ChatPopup.tsx` renders a full-screen live chat; `useChat.ts` is a generic hook (optimistic send + realtime dedupe) parameterized by a `ChatSourceConfig` (table, id column, channel prefix, fetch/send functions). `SessionChatPopup`/`useSessionChat` and `CommunityChatPopup`/`useCommunityChat` are thin wrappers over the shared pieces
+- **Live text chat, realtime via Postgres Changes** on `session_messages` / `community_messages` (`supabase.channel('session-chat-<id>')` / `'community-chat-<id>'`, INSERT filtered on `session_id`/`community_id`)
+- **Session scope**: session **creator + accepted participants** only (RLS enforces both read and write). Users who **left** can still read history up to the moment they left (`created_at <=` their commitment's `updated_at`) but cannot send; the client skips its realtime subscription and shows a "you left" banner, and they receive no further FCM pushes
+- **Community scope**: any **approved community member** (RLS enforces both read and write); the chat button sits next to the ping button on the community screen and opens `CommunityChatPopup`
 - Chat button sits in the `SessionDetailPopup` header (next to close); opens a full-screen `SessionChatPopup`
 - Text only, max 1000 chars, permanent (no delete/edit); sending disabled once a session is closed/completed/cancelled
-- **Push**: each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every member except the sender — title = session name, body = `<sender>: <content>`, via `pushFcmToUser` in `services/notifications.ts`
+- **Optimistic UI** (`src/hooks/useChat.ts`): sending adds a temp bubble instantly with a **clock** (sending) → **check** (delivered) mark, then swaps to the real row with **no refetch**. Failure removes the temp and restores the draft + reply. A realtime INSERT for your own just-sent message is matched to the temp (by content + `reply_to_id`) and upgrades its id in place — never a second bubble, never a lost mark
+- **My avatar** renders on the right of your own bubbles (from `useAuth().profile`)
+- **Long-press to reply**: long-press any message to open a bottom-sheet "Reply to <name>" option; replies store `reply_to_id` (migration 025) and render a preview block (quoted name/content) inside the bubble
+- **No joins / no per-message refetch**: `sender_username`/`sender_avatar_url` are snapshotted on the row at insert (migrations 026 / 027), so realtime payloads and the initial fetch carry the display name without a join. Reply previews/names resolve client-side from the already-loaded list (`resolveReplyPreview`), so replying to your own message shows your own name. This removed the self-join (`!reply_to_id`) entirely, along with the PGRST200 schema-cache dependency and one extra round-trip per message
+- **Push**: each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. `notifyChatMembers` / `notifyCommunityChatMembers` fan out via **one batched edge-function call** (`pushFcmToUsers`) instead of one HTTP call per recipient. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …")
 
 ### 7. Activity (Notifications Inbox)
 - Tabs: **Action Required** (`session_application`, `join_request`, `community_match_pending`), **Invites** (`community_invite`), **Past Activity**
@@ -149,9 +161,10 @@ src/
 
 ### 8. Push Notifications (FCM)
 - FCM token registered per device (`profiles.fcm_tokens`)
-- `send-notification` Edge Function delivers via Firebase HTTP v1
+- `send-notification` Edge Function delivers via Firebase HTTP v1; accepts `user_ids[]` for **batched fan-out** (one invocation, one profiles `.in()` query, N FCM sends) and **caches the OAuth access token** with a single-flight promise (one JWT per hour per warm instance)
+- `pushFcmToUsers(userIds, ...)` batches a whole fan-out in a single edge call; `pushFcmToUser` is a thin wrapper for single recipients
 - Foreground/background/terminated handling; background data-only messages → local notification
-- `session_chat_message` pushes are **FCM-only** (sent via `pushFcmToUser`, never inserted into `in_app_notifications`)
+- `session_chat_message` / `session_chat_reply` / `community_chat_message` / `community_chat_reply` pushes are **FCM-only** (sent via `pushFcmToUsers`, never inserted into `in_app_notifications`)
 
 ### 9. Profile & Settings
 - **Profile**: view/edit username, bio, role (student/teacher), avatar upload; profile for other users via `/profile/[id]`
@@ -174,8 +187,10 @@ profiles
   deleted_at, created_at, updated_at
 
 sessions
-  id, created_by, sport, location, date_time, expires_at, max_participants,
-  description, status (open|full|closed|completed|cancelled), created_at, updated_at
+  id, created_by, purpose (renamed from sport, migration 023),
+  title (optional short name ≤ 40, migration 024), location, date_time,
+  expires_at, max_participants, description,
+  status (open|full|closed|completed|cancelled), created_at, updated_at
 
 commitments
   id, session_id (fk), user_id (fk), status (pending|accepted|rejected|left),
@@ -183,9 +198,21 @@ commitments
   -- partial unique index `commitments_active_unique WHERE status != 'left'`
 
 session_messages
-  id, session_id (fk, cascade), sender_id (fk, cascade), content, created_at
+  id, session_id (fk, cascade), sender_id (fk, cascade), content,
+  reply_to_id (self fk, ON DELETE SET NULL, migration 025),
+  created_at
+  -- sender snapshot: sender_username, sender_avatar_url (migration 026) — written
+  -- at insert so realtime payloads/reads carry the display name with no join
   -- live text chat; readable/writable only by the session creator + accepted
   -- participants (RLS); added to the supabase_realtime publication (migration 021)
+
+community_messages
+  id, community_id (fk, cascade), sender_id (fk, cascade), content,
+  reply_to_id (self fk, ON DELETE SET NULL), sender_username, sender_avatar_url,
+  created_at
+  -- live text chat; readable/writable only by approved community members (RLS);
+  -- composite index (community_id, created_at); added to the supabase_realtime
+  -- publication (migration 027)
 
 communities
   id, name, description, organization, location, image_url,
@@ -234,7 +261,7 @@ in_app_notifications
 ```
 
 ### Notification Types
-See `NotificationType` in `src/types/index.ts` (all 29 types, from `match_pending` to `session_chat_message`).
+See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pending` to `community_chat_reply`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`).
 
 ---
 
@@ -256,8 +283,9 @@ See `NotificationType` in `src/types/index.ts` (all 29 types, from `match_pendin
 - All Supabase calls go through `src/services/*` (return `{ data, error }`, throw on error)
 - Hooks wrap service calls, expose `{ data, loading, refreshing, refresh }`, reload on focus
 - `useCommunity(communityId, userId)` exposes community, membership, joinRequests + setters
-- Real-time: `supabase.channel` for `ping_responses` (community screen) and `in_app_notifications` (`NotificationsProvider`)
+- Real-time: `supabase.channel` for `ping_responses` (community screen), `session_messages` / `community_messages` (session + community chat), and `in_app_notifications` (`NotificationsProvider`)
 - Cross-screen state is shared via React Context (`AuthContext`, `ThemeContext`, `NotificationsContext`) — consume through the matching `use*` hook, never instantiate a fresh copy per screen
+- Tiny external stores via `useSyncExternalStore` for state the header and tabs must agree on: `src/lib/sessionsView.ts` (`'new' | 'history'` toggle)
 
 ---
 
@@ -287,6 +315,9 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 - **Notification state**: actionable notifications are resolved in-place (type → resolved type + `read = true`) both by the `ActivityCard`/`InviteCard` components and by the underlying service actions (`approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, `approveCommunityMatch`/`disputeCommunityMatch`), so the inbox, tab badge, and "Action Required"/"Invites" tabs stay consistent no matter where the action was taken — no local-only UI hacks
 - **Soft delete** keeps a deleted `profiles` row; on next login with the same Google account the profile is re-enabled
 - **Supabase RLS** protects all tables (see `supabase/schema.sql`); the `insert_notification` RPC is SECURITY DEFINER so clients can send push for other users
+- **Session/community chat has no joins / no per-message refetch** — sender name/avatar are snapshotted on the row at insert (migration 026 / 027) and reply previews resolve from the already-loaded message list; this removes the self-join (and its PGRST200 schema-cache dependency) plus one extra round-trip per message
+- **FCM fan-out is batched** — `sendSessionMessage`/`sendCommunityMessage` fan out via a single `send-notification` call for all recipients (`pushFcmToUsers`); the edge function caches its OAuth token (single-flight promise, 5-min refresh margin) so a message costs one JWT, not one per recipient
+- **Chat is FCM-only** — chat pushes never touch `in_app_notifications`, so they don't pollute the Activity inbox or drive its unread badge
 
 ---
 
@@ -298,3 +329,6 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "pinng response implemented" (26a33ff)
   - "pings implemented" (recent pings/commits)
   - "fix: shared notifications feed via `NotificationsContext` so unread badge clears on read / after actions (#68, #93)"
+  - "sessions: optional title + required purpose, New/History header toggle, All/Joined/My scopes, active-first sorting"
+  - "feat: session chat — optimistic sends (clock → checked), own avatar, long-press reply sheets + reply pushes, batched FCM fan-out (single edge call), sender snapshots with no per-message refetch"
+  - "feat: community chat — same shared chat implementation as sessions, scoped to approved community members, FCM-only pushes, chat button next to ping button in community home"
