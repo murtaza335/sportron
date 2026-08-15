@@ -1,7 +1,7 @@
 import { supabase } from '@/lib/supabase';
 import { formatSessionDisplayName } from '@/lib/date';
 import { pushFcmToUsers } from './notifications';
-import type { SessionChatMessage } from '@/types';
+import type { ChatMessageBase, ChatSender, CommunityChatMessage, SessionChatMessage } from '@/types';
 
 export const MAX_CHAT_MESSAGE_LENGTH = 1000;
 
@@ -12,7 +12,7 @@ function isMessageOpen(status: string): boolean {
 // Attaches the `sender` object from the snapshot columns stored at send time.
 // Realtime payloads and raw rows don't carry joins, so callers use this to get
 // a renderable sender without an extra fetch per message.
-export function normalizeChatMessage(message: SessionChatMessage): SessionChatMessage {
+export function normalizeChatMessage<T extends ChatMessageBase>(message: T): T {
   return {
     ...message,
     sender: message.sender_username
@@ -25,6 +25,56 @@ export function normalizeChatMessage(message: SessionChatMessage): SessionChatMe
   };
 }
 
+export type ReplyTargetInfo = {
+  id: string;
+  senderId: string | null;
+  content: string;
+};
+
+type InsertedMessage = {
+  id: string;
+};
+
+// Shared insert path for both session and community chat. Writes the sender
+// snapshot so realtime payloads/reads carry the display name with no join.
+async function insertChatMessage(input: {
+  table: 'session_messages' | 'community_messages';
+  idColumn: 'session_id' | 'community_id';
+  sourceId: string;
+  userId: string;
+  content: string;
+  replyToId?: string | null;
+}): Promise<{ messageId: string; sender: ChatSender }> {
+  const { data: sender, error: senderError } = await supabase
+    .from('profiles')
+    .select('id, username, avatar_url')
+    .eq('id', input.userId)
+    .single();
+
+  if (senderError) throw senderError;
+
+  const { data: inserted, error } = await supabase
+    .from(input.table)
+    .insert({
+      [input.idColumn]: input.sourceId,
+      sender_id: input.userId,
+      content: input.content,
+      reply_to_id: input.replyToId ?? null,
+      sender_username: sender?.username ?? null,
+      sender_avatar_url: sender?.avatar_url ?? null,
+    })
+    .select('id')
+    .single();
+
+  if (error) throw error;
+
+  return { messageId: (inserted as InsertedMessage).id, sender };
+}
+
+// ---------------------------------------------------------------------------
+// Session chat
+// ---------------------------------------------------------------------------
+
 export async function fetchSessionMessages(sessionId: string): Promise<SessionChatMessage[]> {
   const { data, error } = await supabase
     .from('session_messages')
@@ -36,12 +86,6 @@ export async function fetchSessionMessages(sessionId: string): Promise<SessionCh
   if (error) throw error;
   return (data ?? []).map(normalizeChatMessage);
 }
-
-export type ReplyTargetInfo = {
-  id: string;
-  senderId: string | null;
-  content: string;
-};
 
 export async function sendSessionMessage(
   sessionId: string,
@@ -68,39 +112,25 @@ export async function sendSessionMessage(
     throw new Error('This session is no longer accepting messages.');
   }
 
-  const { data: sender, error: senderError } = await supabase
-    .from('profiles')
-    .select('id, username, avatar_url')
-    .eq('id', userId)
-    .single();
-
-  if (senderError) throw senderError;
-
-  const { data: inserted, error } = await supabase
-    .from('session_messages')
-    .insert({
-      session_id: sessionId,
-      sender_id: userId,
-      content: trimmed,
-      reply_to_id: replyToId ?? null,
-      sender_username: sender?.username ?? null,
-      sender_avatar_url: sender?.avatar_url ?? null,
-    })
-    .select('id')
-    .single();
-
-  if (error) throw error;
+  const { messageId, sender } = await insertChatMessage({
+    table: 'session_messages',
+    idColumn: 'session_id',
+    sourceId: sessionId,
+    userId,
+    content: trimmed,
+    replyToId,
+  });
 
   const message: SessionChatMessage = {
-    id: inserted.id,
+    id: messageId,
     session_id: sessionId,
     sender_id: userId,
     content: trimmed,
     created_at: new Date().toISOString(),
     reply_to_id: replyToId ?? null,
-    sender_username: sender?.username ?? null,
-    sender_avatar_url: sender?.avatar_url ?? null,
-    sender: { id: sender.id, username: sender.username, avatar_url: sender.avatar_url },
+    sender_username: sender.username ?? null,
+    sender_avatar_url: sender.avatar_url ?? null,
+    sender,
     reply_to: replyToId
       ? {
           id: replyToId,
@@ -112,7 +142,7 @@ export async function sendSessionMessage(
   };
 
   try {
-    await notifyChatMembers(session, userId, sender?.username ?? 'Someone', trimmed);
+    await notifyChatMembers(session, userId, sender.username ?? 'Someone', trimmed);
   } catch (e) {
     console.error('Failed to send chat push notifications:', e);
   }
@@ -125,7 +155,7 @@ export async function sendSessionMessage(
       await pushFcmToUsers(
         [repliedToSenderId],
         sessionName,
-        `${sender?.username ?? 'Someone'} replied to you: ${trimmed}`,
+        `${sender.username ?? 'Someone'} replied to you: ${trimmed}`,
         { type: 'session_chat_reply', sessionId, messageId: message.id },
       );
     } catch (e) {
@@ -165,6 +195,135 @@ async function notifyChatMembers(
   await pushFcmToUsers(
     [...memberIds],
     sessionName,
+    `${senderName}: ${content}`,
+    pushData,
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Community chat
+// ---------------------------------------------------------------------------
+
+export async function fetchCommunityMessages(communityId: string): Promise<CommunityChatMessage[]> {
+  const { data, error } = await supabase
+    .from('community_messages')
+    .select('*')
+    .eq('community_id', communityId)
+    .order('created_at', { ascending: true })
+    .limit(200);
+
+  if (error) throw error;
+  return (data ?? []).map(normalizeChatMessage);
+}
+
+export async function sendCommunityMessage(
+  communityId: string,
+  userId: string,
+  content: string,
+  replyToId?: string | null,
+  replyTarget?: ReplyTargetInfo | null,
+): Promise<CommunityChatMessage | null> {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message cannot be empty.');
+  if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+    throw new Error(`Message is too long (max ${MAX_CHAT_MESSAGE_LENGTH} characters).`);
+  }
+
+  const { data: community, error: communityError } = await supabase
+    .from('communities')
+    .select('id, name')
+    .eq('id', communityId)
+    .single();
+
+  if (communityError) throw communityError;
+  if (!community) throw new Error('Community not found');
+
+  const { messageId, sender } = await insertChatMessage({
+    table: 'community_messages',
+    idColumn: 'community_id',
+    sourceId: communityId,
+    userId,
+    content: trimmed,
+    replyToId,
+  });
+
+  const message: CommunityChatMessage = {
+    id: messageId,
+    community_id: communityId,
+    sender_id: userId,
+    content: trimmed,
+    created_at: new Date().toISOString(),
+    reply_to_id: replyToId ?? null,
+    sender_username: sender.username ?? null,
+    sender_avatar_url: sender.avatar_url ?? null,
+    sender,
+    reply_to: replyToId
+      ? {
+          id: replyToId,
+          sender_id: replyTarget?.senderId ?? null,
+          content: replyTarget?.content ?? '',
+          sender: null,
+        }
+      : null,
+  };
+
+  try {
+    await notifyCommunityChatMembers(communityId, userId, sender.username ?? 'Someone', trimmed);
+  } catch (e) {
+    console.error('Failed to send community chat push notifications:', e);
+  }
+
+  // Notify the person whose message was replied to.
+  const repliedToSenderId = replyTarget?.senderId;
+  if (replyToId && repliedToSenderId && repliedToSenderId !== userId) {
+    try {
+      await pushFcmToUsers(
+        [repliedToSenderId],
+        community.name,
+        `${sender.username ?? 'Someone'} replied to you: ${trimmed}`,
+        { type: 'community_chat_reply', communityId, messageId: message.id },
+      );
+    } catch (e) {
+      console.error('Failed to send community chat reply notification:', e);
+    }
+  }
+
+  return message;
+}
+
+// Sends an FCM-only push (no in-app notification) to every approved member of
+// the community, except the sender. One batched edge-function call.
+async function notifyCommunityChatMembers(
+  communityId: string,
+  senderId: string,
+  senderName: string,
+  content: string,
+): Promise<void> {
+  const { data: members, error } = await supabase
+    .from('community_members')
+    .select('profile_id')
+    .eq('community_id', communityId)
+    .eq('approval_status', 'approved');
+
+  if (error) throw error;
+
+  const memberIds = new Set<string>();
+  for (const m of members ?? []) memberIds.add(m.profile_id);
+  memberIds.delete(senderId);
+
+  if (memberIds.size === 0) return;
+
+  const { data: community } = await supabase
+    .from('communities')
+    .select('name')
+    .eq('id', communityId)
+    .single();
+
+  const pushData = { type: 'community_chat_message', communityId };
+
+  await pushFcmToUsers(
+    [...memberIds],
+    community?.name ?? 'Community',
     `${senderName}: ${content}`,
     pushData,
   );

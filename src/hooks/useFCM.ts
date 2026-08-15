@@ -98,7 +98,9 @@ export function useFCM() {
         case 'ping_response':
         case 'community_invite':
         case 'community_invite_accepted':
-        case 'community_invite_rejected': {
+        case 'community_invite_rejected':
+        case 'community_chat_message':
+        case 'community_chat_reply': {
           if (data.communityId) {
             router.push({
               pathname: '/community/[id]',
