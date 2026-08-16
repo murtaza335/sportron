@@ -242,6 +242,7 @@ export type Community = {
   created_by: string;
   created_at: string;
   updated_at: string;
+  pings_enabled: boolean;
   member_count?: number;
   creator?: Pick<Profile, 'id' | 'username'> | null;
 };
@@ -278,6 +279,7 @@ export type UpdateCommunityInput = {
   location?: string | null;
   visibility?: CommunityVisibility;
   image_url?: string | null;
+  pings_enabled?: boolean;
 };
 
 export type CommunityJoinRequest = {

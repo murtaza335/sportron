@@ -51,6 +51,7 @@ function normalizeCommunity(row: CommunityRow): Community {
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    pings_enabled: row.pings_enabled,
     member_count: row.member_count?.[0]?.count ?? 0,
     creator: Array.isArray(row.creator) ? row.creator[0] ?? null : row.creator ?? null,
   };
@@ -176,6 +177,7 @@ export async function updateCommunity(
   if (input.location !== undefined) updates.location = input.location?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
+  if (input.pings_enabled !== undefined) updates.pings_enabled = input.pings_enabled;
 
   const { error } = await supabase
     .from('communities')
@@ -188,6 +190,15 @@ export async function updateCommunity(
     }
     throw error;
   }
+}
+
+export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('communities')
+    .update({ pings_enabled: enabled })
+    .eq('id', communityId);
+
+  if (error) throw error;
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {

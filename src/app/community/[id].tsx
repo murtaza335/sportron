@@ -1,5 +1,4 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Building2,
   CheckCircle,
@@ -18,6 +17,7 @@ import {
   X,
   XCircle,
 } from 'lucide-react-native';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -30,9 +30,9 @@ import {
   View,
 } from 'react-native';
 
+import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
-import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -42,16 +42,16 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
+import { supabase } from '@/lib/supabase';
 import {
-  fetchCommunityMatches,
   fetchCommunityMatchById,
+  fetchCommunityMatches,
   fetchPingResponses,
   getNextPingTime,
   joinCommunity,
   requestToJoinCommunity,
   sendPing,
 } from '@/services/communities';
-import { supabase } from '@/lib/supabase';
 import type {
   CommunityMatch,
   MatchWithProfiles,
@@ -570,13 +570,15 @@ export default function CommunityDetailScreen() {
                   </View>
                 )}
               </Pressable>
-              <Pressable
-                onPress={openPingModal}
-                style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
-              >
-                <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                <View style={styles.pingDot} />
-              </Pressable>
+              {(isAdmin || community.pings_enabled) && (
+                <Pressable
+                  onPress={openPingModal}
+                  style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                >
+                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
+                  <View style={styles.pingDot} />
+                </Pressable>
+              )}
             </View>
 
             {/* Ping Responses */}
@@ -733,7 +735,7 @@ export default function CommunityDetailScreen() {
               <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
                 <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
                 <ThemedText variant="caption" muted style={{ flex: 1 }}>
-                  You can only ping once every 15 minutes. You can ping again in{' '}
+                  You can ping again in{' '}
                   <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
                     {formatCooldown(cooldownRemainingMs)}
                   </ThemedText>

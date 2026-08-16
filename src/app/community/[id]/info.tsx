@@ -10,6 +10,7 @@ import {
   Lock,
   LogOut,
   MapPin,
+  Megaphone,
   Pencil,
   Plus,
   Shield,
@@ -27,6 +28,7 @@ import {
   RefreshControl,
   ScrollView,
   StyleSheet,
+  Switch,
   TextInput,
   View,
 } from 'react-native';
@@ -47,6 +49,7 @@ import {
   promoteToAdmin,
   removeMember,
   requestToJoinCommunity,
+  setPingsEnabled,
   transferAdmin,
   updateCommunity,
 } from '@/services/communities';
@@ -82,6 +85,21 @@ export default function CommunityInfoScreen() {
   const [editImageUri, setEditImageUri] = useState<string | null>(null);
   const [uploadingEditImage, setUploadingEditImage] = useState(false);
   const [savingEdit, setSavingEdit] = useState(false);
+
+  const [pingsEnabledOverride, setPingsEnabledOverride] = useState<boolean | null>(null);
+  const pingsEnabled = pingsEnabledOverride ?? community?.pings_enabled ?? true;
+
+  const handleTogglePings = async (value: boolean) => {
+    if (!id) return;
+    const previous = community?.pings_enabled ?? true;
+    setPingsEnabledOverride(value);
+    try {
+      await setPingsEnabled(id, value);
+    } catch (e: any) {
+      setPingsEnabledOverride(previous);
+      Alert.alert('Error', e?.message ?? 'Failed to update ping settings.');
+    }
+  };
 
   const loadMembers = useCallback(async () => {
     if (!id) return;
@@ -576,6 +594,31 @@ export default function CommunityInfoScreen() {
           <View style={styles.actionSection}>
             {isAdmin && (
               <>
+                <View
+                  style={[
+                    styles.settingRow,
+                    { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement },
+                  ]}
+                >
+                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
+                  <View style={styles.pingsToggleInfo}>
+                    <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                      Allow Members to Ping
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>
+                      {pingsEnabled
+                        ? 'Members can ping the whole community'
+                        : 'Pings are disabled for members'}
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    value={pingsEnabled}
+                    onValueChange={handleTogglePings}
+                    trackColor={{ false: theme.border, true: '#10B981' }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor={theme.border}
+                  />
+                </View>
                 <Pressable
                   style={[styles.settingRow, { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement }]}
                   onPress={handleEdit}
@@ -927,6 +970,10 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     borderRadius: Radius.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  pingsToggleInfo: {
+    flex: 1,
+    gap: 2,
   },
 
   // Edit Modal Styles
