@@ -46,6 +46,7 @@ import {
   fetchCommunityMatches,
   fetchCommunityMatchById,
   fetchPingResponses,
+  getNextPingTime,
   joinCommunity,
   requestToJoinCommunity,
   sendPing,
@@ -219,6 +220,39 @@ export default function CommunityDetailScreen() {
   const [pingModalVisible, setPingModalVisible] = useState(false);
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
+  const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+
+  const openPingModal = useCallback(async () => {
+    if (!id || !user) return;
+    setPingModalVisible(true);
+    setNowTs(Date.now());
+    try {
+      const until = await getNextPingTime(id, user.id);
+      setPingCooldownUntil(until);
+    } catch {
+      setPingCooldownUntil(null);
+    }
+  }, [id, user, setPingModalVisible, setNowTs, setPingCooldownUntil]);
+
+  useEffect(() => {
+    if (!pingModalVisible) return;
+    const interval = setInterval(() => setNowTs(Date.now()), 1000);
+    return () => clearInterval(interval);
+  }, [pingModalVisible]);
+
+  const cooldownRemainingMs = pingCooldownUntil
+    ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
+    : 0;
+  const inCooldown = cooldownRemainingMs > 0;
+
+  const formatCooldown = (ms: number) => {
+    const totalSeconds = Math.ceil(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes === 0) return `${seconds}s`;
+    return `${minutes}m ${seconds}s`;
+  };
 
   // Community chat
   const [chatVisible, setChatVisible] = useState(false);
@@ -537,7 +571,7 @@ export default function CommunityDetailScreen() {
                 )}
               </Pressable>
               <Pressable
-                onPress={() => setPingModalVisible(true)}
+                onPress={openPingModal}
                 style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
               >
                 <Megaphone size={20} color={theme.text} strokeWidth={2} />
@@ -683,10 +717,11 @@ export default function CommunityDetailScreen() {
               placeholderTextColor={theme.textSecondary}
               value={pingMessage}
               onChangeText={setPingMessage}
+              editable={!inCooldown}
               style={[
                 styles.pingInput,
                 {
-                  color: theme.text,
+                  color: inCooldown ? theme.textSecondary : theme.text,
                   backgroundColor: theme.backgroundElement,
                   borderColor: theme.border,
                 },
@@ -694,12 +729,25 @@ export default function CommunityDetailScreen() {
               multiline
               maxLength={200}
             />
-            <Button
-              label="Send Ping"
-              onPress={handleSendPing}
-              loading={sendingPing}
-              disabled={!pingMessage.trim()}
-            />
+            {inCooldown ? (
+              <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
+                <ThemedText variant="caption" muted style={{ flex: 1 }}>
+                  You can only ping once every 15 minutes. You can ping again in{' '}
+                  <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
+                    {formatCooldown(cooldownRemainingMs)}
+                  </ThemedText>
+                  .
+                </ThemedText>
+              </View>
+            ) : (
+              <Button
+                label="Send Ping"
+                onPress={handleSendPing}
+                loading={sendingPing}
+                disabled={!pingMessage.trim()}
+              />
+            )}
           </Pressable>
         </Pressable>
       </Modal>
@@ -983,6 +1031,14 @@ const styles = StyleSheet.create({
     fontSize: 15,
     minHeight: 80,
     textAlignVertical: 'top',
+  },
+  pingCooldownBox: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
   },
   editInput: {
     borderRadius: Radius.md,
