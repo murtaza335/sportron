@@ -19,7 +19,7 @@ as $$
 begin
   delete from public.in_app_notifications
   where type = 'session_application'
-    and data->>'sessionId' = old.id;
+    and (data->>'sessionId')::uuid = old.id;
   return old;
 end;
 $$;

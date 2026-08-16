@@ -51,6 +51,7 @@ function normalizeCommunity(row: CommunityRow): Community {
     created_by: row.created_by,
     created_at: row.created_at,
     updated_at: row.updated_at,
+    pings_enabled: row.pings_enabled,
     member_count: row.member_count?.[0]?.count ?? 0,
     creator: Array.isArray(row.creator) ? row.creator[0] ?? null : row.creator ?? null,
   };
@@ -176,6 +177,7 @@ export async function updateCommunity(
   if (input.location !== undefined) updates.location = input.location?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
+  if (input.pings_enabled !== undefined) updates.pings_enabled = input.pings_enabled;
 
   const { error } = await supabase
     .from('communities')
@@ -188,6 +190,15 @@ export async function updateCommunity(
     }
     throw error;
   }
+}
+
+export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
+  const { error } = await supabase
+    .from('communities')
+    .update({ pings_enabled: enabled })
+    .eq('id', communityId);
+
+  if (error) throw error;
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
@@ -506,11 +517,50 @@ export async function respondToJoinRequest(
   }
 }
 
+export const PING_COOLDOWN_MS = 15 * 60 * 1000;
+
+export async function fetchLastCommunityPing(
+  communityId: string,
+  senderId: string,
+): Promise<Ping | null> {
+  const { data, error } = await supabase
+    .from('pings')
+    .select('*')
+    .eq('community_id', communityId)
+    .eq('sender_id', senderId)
+    .order('created_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  if (error) throw error;
+  return data ?? null;
+}
+
+export async function getNextPingTime(
+  communityId: string,
+  senderId: string,
+): Promise<Date | null> {
+  const lastPing = await fetchLastCommunityPing(communityId, senderId);
+  if (!lastPing) return null;
+  const next = new Date(new Date(lastPing.created_at).getTime() + PING_COOLDOWN_MS);
+  return next;
+}
+
 export async function sendPing(
   communityId: string,
   senderId: string,
   message: string,
 ): Promise<string> {
+  const nextPingTime = await getNextPingTime(communityId, senderId);
+  if (nextPingTime && nextPingTime.getTime() > Date.now()) {
+    const minutes = Math.ceil((nextPingTime.getTime() - Date.now()) / 60000);
+    throw new Error(
+      `You can only ping once every 15 minutes. Try again in ${minutes} minute${
+        minutes === 1 ? '' : 's'
+      }.`,
+    );
+  }
+
   const { data: ping, error } = await supabase
     .from('pings')
     .insert({
@@ -521,7 +571,12 @@ export async function sendPing(
     .select('id')
     .single();
 
-  if (error) throw error;
+  if (error) {
+    if (error.message?.includes('only ping once every 15 minutes')) {
+      throw new Error('You can only ping once every 15 minutes. Please wait before pinging again.');
+    }
+    throw error;
+  }
 
   try {
     const sender = await fetchProfile(senderId);

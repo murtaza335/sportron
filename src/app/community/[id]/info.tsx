@@ -1,6 +1,4 @@
-import * as ImagePicker from 'expo-image-picker';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { uploadImageFromUri } from '@/lib/cloudinary';
 import {
   Building2,
   ChevronRight,
@@ -10,24 +8,22 @@ import {
   Lock,
   LogOut,
   MapPin,
+  Megaphone,
   Pencil,
   Plus,
-  Shield,
   Trash2,
   User,
-  X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
   Image,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
   StyleSheet,
-  TextInput,
+  Switch,
   View,
 } from 'react-native';
 
@@ -47,11 +43,10 @@ import {
   promoteToAdmin,
   removeMember,
   requestToJoinCommunity,
-  transferAdmin,
-  updateCommunity,
+  setPingsEnabled,
 } from '@/services/communities';
 import { fetchProfile } from '@/services/profiles';
-import type { CommunityMember, CommunityVisibility, Profile } from '@/types';
+import type { CommunityMember, Profile } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityInfoScreen() {
@@ -72,16 +67,20 @@ export default function CommunityInfoScreen() {
   const [membersLoading, setMembersLoading] = useState(true);
   const [creator, setCreator] = useState<Profile | null>(null);
 
-  // Edit modal
-  const [editModalVisible, setEditModalVisible] = useState(false);
-  const [editName, setEditName] = useState('');
-  const [editDescription, setEditDescription] = useState('');
-  const [editOrganization, setEditOrganization] = useState('');
-  const [editLocation, setEditLocation] = useState('');
-  const [editVisibility, setEditVisibility] = useState<CommunityVisibility>('public');
-  const [editImageUri, setEditImageUri] = useState<string | null>(null);
-  const [uploadingEditImage, setUploadingEditImage] = useState(false);
-  const [savingEdit, setSavingEdit] = useState(false);
+  const [pingsEnabledOverride, setPingsEnabledOverride] = useState<boolean | null>(null);
+  const pingsEnabled = pingsEnabledOverride ?? community?.pings_enabled ?? true;
+
+  const handleTogglePings = async (value: boolean) => {
+    if (!id) return;
+    const previous = community?.pings_enabled ?? true;
+    setPingsEnabledOverride(value);
+    try {
+      await setPingsEnabled(id, value);
+    } catch (e: any) {
+      setPingsEnabledOverride(previous);
+      Alert.alert('Error', e?.message ?? 'Failed to update ping settings.');
+    }
+  };
 
   const loadMembers = useCallback(async () => {
     if (!id) return;
@@ -129,93 +128,6 @@ export default function CommunityInfoScreen() {
       fetchProfile(community.created_by).then(setCreator).catch(console.error);
     }
   }, [community?.created_by]);
-
-  const pickEditImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setEditImageUri(result.assets[0].uri);
-    }
-  };
-
-  const removeEditImage = () => {
-    setEditImageUri(null);
-  };
-
-  const handleSaveEdit = async () => {
-    if (!id || !editName.trim()) return;
-    setSavingEdit(true);
-    try {
-      let imageUrl: string | null | undefined = undefined;
-      if (editImageUri !== (community?.image_url ?? null)) {
-        if (editImageUri) {
-          setUploadingEditImage(true);
-          const uploaded = await uploadImageFromUri(editImageUri);
-          if (!uploaded) {
-            Alert.alert('Error', 'Failed to upload image.');
-            setSavingEdit(false);
-            setUploadingEditImage(false);
-            return;
-          }
-          imageUrl = uploaded;
-          setUploadingEditImage(false);
-        } else {
-          imageUrl = null;
-        }
-      }
-      await updateCommunity(id, {
-        name: editName.trim(),
-        description: editDescription.trim() || null,
-        organization: editOrganization.trim() || null,
-        location: editLocation.trim() || null,
-        visibility: editVisibility,
-        image_url: imageUrl,
-      });
-      setEditModalVisible(false);
-      refresh();
-    } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to update.');
-    } finally {
-      setSavingEdit(false);
-      setUploadingEditImage(false);
-    }
-  };
-
-  const handleTransferAdmin = () => {
-    if (!id) return;
-    if (Alert.prompt) {
-      Alert.prompt(
-        'Transfer Admin',
-        'Enter the username of the new admin:',
-        async (text) => {
-          if (!text.trim()) return;
-          try {
-            await transferAdmin(id, user!.id, text.trim());
-            setMembership(null);
-            setEditModalVisible(false);
-            refresh();
-            Alert.alert('Done', 'Admin rights transferred.');
-          } catch (e: any) {
-            Alert.alert('Error', e?.message ?? 'Failed to transfer.');
-          }
-        },
-      );
-    } else {
-      Alert.alert(
-        'Transfer Admin',
-        'Transfer admin by username: feature available on iOS.',
-      );
-    }
-  };
 
   const handleJoin = async () => {
     if (!id || !user) return;
@@ -289,17 +201,6 @@ export default function CommunityInfoScreen() {
         },
       ],
     );
-  };
-
-  const handleEdit = () => {
-    if (!community) return;
-    setEditName(community.name);
-    setEditDescription(community.description ?? '');
-    setEditOrganization(community.organization ?? '');
-    setEditLocation(community.location ?? '');
-    setEditVisibility(community.visibility);
-    setEditImageUri(community.image_url ?? null);
-    setEditModalVisible(true);
   };
 
   const handleMakeAdmin = async (member: CommunityMember) => {
@@ -576,9 +477,34 @@ export default function CommunityInfoScreen() {
           <View style={styles.actionSection}>
             {isAdmin && (
               <>
+                <View
+                  style={[
+                    styles.settingRow,
+                    { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement },
+                  ]}
+                >
+                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
+                  <View style={styles.pingsToggleInfo}>
+                    <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                      Allow Members to Ping
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>
+                      {pingsEnabled
+                        ? 'Members can ping the whole community'
+                        : 'Pings are disabled for members'}
+                    </ThemedText>
+                  </View>
+                  <Switch
+                    value={pingsEnabled}
+                    onValueChange={handleTogglePings}
+                    trackColor={{ false: theme.border, true: '#10B981' }}
+                    thumbColor="#FFFFFF"
+                    ios_backgroundColor={theme.border}
+                  />
+                </View>
                 <Pressable
                   style={[styles.settingRow, { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement }]}
-                  onPress={handleEdit}
+                  onPress={() => router.push(`/community/${id}/edit`)}
                 >
                   <Pencil size={20} color={theme.text} strokeWidth={2} />
                   <ThemedText variant="body" style={{ fontWeight: '600', flex: 1 }}>
@@ -612,138 +538,6 @@ export default function CommunityInfoScreen() {
         )}
       </ScrollView>
 
-      {/* Edit Modal */}
-      <Modal transparent visible={editModalVisible} animationType="fade" onRequestClose={() => setEditModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setEditModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Edit Community</ThemedText>
-              <Pressable onPress={() => setEditModalVisible(false)} hitSlop={16}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-
-            <Pressable onPress={pickEditImage} style={[styles.editImagePicker, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-              {editImageUri ? (
-                <>
-                  <Image source={{ uri: editImageUri }} style={[styles.editImagePreview, { backgroundColor: theme.border }]} resizeMode="cover" />
-                  <Pressable onPress={removeEditImage} style={[styles.editImageRemove, { backgroundColor: theme.background }]} hitSlop={12}>
-                    <X size={12} color={theme.text} strokeWidth={2.5} />
-                  </Pressable>
-                </>
-              ) : (
-                <View style={styles.editImagePlaceholder}>
-                  <ImageIcon size={24} color={theme.textSecondary} strokeWidth={1.5} />
-                  <ThemedText variant="caption" muted>Tap to add cover image</ThemedText>
-                </View>
-              )}
-            </Pressable>
-            
-            <TextInput
-              placeholder="Community name"
-              placeholderTextColor={theme.textSecondary}
-              value={editName}
-              onChangeText={setEditName}
-              style={[
-                styles.editInput,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              maxLength={60}
-            />
-            
-            <TextInput
-              placeholder="Description (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={editDescription}
-              onChangeText={setEditDescription}
-              style={[
-                styles.editInput,
-                styles.editInputMultiline,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              multiline
-              maxLength={300}
-            />
-
-            <TextInput
-              placeholder="Organization (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={editOrganization}
-              onChangeText={setEditOrganization}
-              style={[
-                styles.editInput,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              maxLength={60}
-            />
-
-            <TextInput
-              placeholder="Location / City (optional)"
-              placeholderTextColor={theme.textSecondary}
-              value={editLocation}
-              onChangeText={setEditLocation}
-              style={[
-                styles.editInput,
-                { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-              ]}
-              maxLength={60}
-            />
-
-            <View style={styles.visibilityToggle}>
-              <Pressable
-                onPress={() => setEditVisibility('public')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'public' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'public' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Public
-                </ThemedText>
-              </Pressable>
-              
-              <Pressable
-                onPress={() => setEditVisibility('restricted')}
-                style={[
-                  styles.visibilityOption,
-                  {
-                    backgroundColor: editVisibility === 'restricted' ? theme.textSecondary + '20' : 'transparent',
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <ThemedText
-                  variant="body"
-                  style={editVisibility === 'restricted' ? { fontWeight: '700' } : { fontWeight: '400' }}
-                >
-                  Restricted
-                </ThemedText>
-              </Pressable>
-            </View>
-            
-            <Button
-              label="Save Changes"
-              onPress={handleSaveEdit}
-              loading={savingEdit || uploadingEditImage}
-              disabled={!editName.trim() || uploadingEditImage}
-            />
-
-            <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
-               <Shield size={14} color="#EF4444" strokeWidth={2} />
-               <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
-                 Transfer Admin Rights
-               </ThemedText>
-            </Pressable>
-
-          </Pressable>
-        </Pressable>
-      </Modal>
     </View>
   );
 }
@@ -928,84 +722,8 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     borderBottomWidth: StyleSheet.hairlineWidth,
   },
-
-  // Edit Modal Styles
-  modalBackdrop: {
+  pingsToggleInfo: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.45)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  editImagePicker: {
-    width: '100%',
-    height: 120,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editImagePreview: {
-    width: '100%',
-    height: 120,
-  },
-  editImageRemove: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-  },
-  editInput: {
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    padding: Spacing.md,
-    fontSize: 15,
-  },
-  editInputMultiline: {
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  visibilityToggle: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
-  },
-  visibilityOption: {
-    flex: 1,
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-  },
-  transferAdminLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    marginTop: Spacing.md,
-    paddingVertical: Spacing.sm,
+    gap: 2,
   },
 });

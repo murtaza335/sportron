@@ -105,23 +105,12 @@ export default function TabLayout() {
           headerLeft: () => (
             <Pressable
               onPress={() => router.navigate('/create-community')}
-              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
-              hitSlop={12}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
+              hitSlop={16}
               accessibilityLabel="Create community"
               accessibilityRole="button"
             >
-              <View style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: theme.backgroundElement,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: theme.border,
-              }}>
-                <Plus size={18} color={theme.text} strokeWidth={2.5} />
-              </View>
+              <Plus size={24} color={theme.text} strokeWidth={3} />
             </Pressable>
           ),
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
@@ -137,23 +126,12 @@ export default function TabLayout() {
           headerLeft: () => (
             <Pressable
               onPress={() => router.navigate('/create-session')}
-              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
-              hitSlop={12}
+              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
+              hitSlop={16}
               accessibilityLabel="Create session"
               accessibilityRole="button"
             >
-              <View style={{
-                width: 36,
-                height: 36,
-                borderRadius: 18,
-                backgroundColor: theme.backgroundElement,
-                alignItems: 'center',
-                justifyContent: 'center',
-                borderWidth: 1,
-                borderColor: theme.border,
-              }}>
-                <Plus size={18} color={theme.text} strokeWidth={2.5} />
-              </View>
+              <Plus size={24} color={theme.text} strokeWidth={3} />
             </Pressable>
           ),
           tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
