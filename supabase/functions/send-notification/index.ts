@@ -121,7 +121,9 @@ Deno.serve(async (req: Request) => {
     return new Response('Method not allowed', { status: 405 });
   }
 
-  const { user_id, user_ids, title, body, data }: SendNotificationPayload = await req.json();
+  const raw = await req.json() as Partial<SendNotificationPayload> & Record<string, unknown>;
+  console.log('[send-notification] payload', JSON.stringify(raw));
+  const { user_id, user_ids, title, body, data } = raw;
   const recipients = user_ids && user_ids.length > 0 ? user_ids : user_id ? [user_id] : [];
   if (recipients.length === 0 || !title || !body) {
     return new Response('Missing required fields: user_ids (or user_id), title, body', {

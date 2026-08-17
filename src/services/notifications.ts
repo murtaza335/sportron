@@ -22,10 +22,17 @@ export async function pushFcmToUsers(
   body: string,
   data?: Record<string, unknown>,
 ): Promise<void> {
-  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) return;
+  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) {
+    console.warn('[pushFcmToUsers] skipping push', {
+      fcmFunctionUrl,
+      hasAnonKey: !!supabaseAnonKey,
+      userIds: userIds.length,
+    });
+    return;
+  }
 
   try {
-    await fetch(fcmFunctionUrl, {
+    const res = await fetch(fcmFunctionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -33,8 +40,14 @@ export async function pushFcmToUsers(
       },
       body: JSON.stringify({ user_ids: userIds, title, body, data }),
     });
-  } catch {
-    // fire-and-forget: silently ignore FCM failures
+    if (!res.ok) {
+      console.warn('[pushFcmToUsers] function error', res.status, await res.text());
+    } else {
+      const body = await res.json().catch(() => ({}));
+      console.warn('[pushFcmToUsers] ok', JSON.stringify(body));
+    }
+  } catch (e) {
+    console.warn('[pushFcmToUsers] fetch failed', e);
   }
 }
 

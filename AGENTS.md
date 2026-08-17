@@ -281,12 +281,16 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 - Stack screens with `headerShown`: `/settings`, `/discover`, `/community/[id]`, `/community/[id]/members`, `/community/[id]/info`, `/profile/[id]`, `/ping-response`
 - Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`
 - Auth screens: `/login`, `/onboarding`, `/auth/callback`
-- Registration of `notifications` route in `_layout.tsx` is currently dangling (no backing screen)
 
 ### Theme
 - `useTheme()` returns `{ ...Colors[resolvedColorScheme], colorScheme(from origin), resolvedColorScheme, toggleTheme, setTheme }`
 - Colors: `background`, `text`, `backgroundElement`, `border`, `textSecondary`, `tabBar`, `tabBarActive`, `tabBarInactive`, `backgroundSelected`
 - `Colors.light` / `Colors.dark` in `src/constants/theme.ts`
+
+### Edge Functions (Supabase)
+- Edge functions live in `supabase/functions/` and deploy **separately** from the app — a Vercel deploy does NOT deploy them. They are never deployed automatically by committing code.
+- **CRITICAL**: any change to an edge function — payload/response contract, request fields, response shape, secrets/env (`FCM_SERVICE_ACCOUNT`), or the function body — takes effect **only after** `supabase functions deploy <name>`. Keep deployed functions backward-compatible with installed app versions (e.g. `send-notification` accepts both `user_id` and `user_ids`); a stale deployed function vs. new client payload = silent 400s = push broken for everyone.
+- **Whenever an edge function is edited, the AI must explicitly instruct the user to redeploy it** (e.g. `supabase functions deploy send-notification`) and remind them to verify with a live test afterward.
 
 ### State & Data Patterns
 - All Supabase calls go through `src/services/*` (return `{ data, error }`, throw on error)
@@ -308,6 +312,7 @@ npm run web        # Web build
 npm run lint       # Expo lint (ESLint)
 npx tsc --noEmit   # TypeScript check
 npx expo install   # Install dependencies matching SDK 57
+supabase functions deploy <name>  # Deploy a changed edge function (e.g. send-notification)
 ```
 
 ### Environment

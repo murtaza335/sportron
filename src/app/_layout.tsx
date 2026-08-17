@@ -174,17 +174,6 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
-          name="notifications"
-          options={{
-            headerShown: true,
-            title: 'Notifications',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
           name="profile/[id]"
           options={{
             headerShown: true,
