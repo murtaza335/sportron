@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, Modal, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
@@ -66,7 +66,7 @@ export default function ProfileScreen() {
 
     if (value) {
       await requestPermissions();
-    } else if (user?.id) {
+    } else if (user?.id && Platform.OS !== 'web') {
       try {
         const token = await messaging().getToken();
         if (token) {
