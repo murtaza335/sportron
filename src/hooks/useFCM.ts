@@ -1,4 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
 import messaging from '@react-native-firebase/messaging';
@@ -194,6 +195,7 @@ export function useFCM() {
 
   const requestPermissions = useCallback(async () => {
     if (!user?.id) return;
+    if (Platform.OS === 'web') return;
 
     setIsLoading(true);
     try {

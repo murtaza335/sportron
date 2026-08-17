@@ -1,0 +1,3 @@
+npx expo export -p web
+cp vercel.json dist/vercel.json
+vercel ./dist --prod

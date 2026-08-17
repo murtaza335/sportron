@@ -3,7 +3,7 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -70,7 +70,7 @@ function RootNavigator() {
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
-      <FCMInitializer />
+      {Platform.OS !== 'web' && <FCMInitializer />}
       <StatusBar style="auto" />
       <Stack screenOptions={{
         headerShown: false,

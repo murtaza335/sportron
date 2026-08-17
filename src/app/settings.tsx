@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Alert, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Alert, Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
 import { Card, Divider } from '@/components/ui/Card';
@@ -106,7 +106,7 @@ export default function SettingsScreen() {
 
     if (value) {
       await requestPermissions();
-    } else if (user?.id) {
+    } else if (user?.id && Platform.OS !== 'web') {
       try {
         const token = await messaging().getToken();
         if (token) {
@@ -144,9 +144,11 @@ export default function SettingsScreen() {
             if (!profile?.id || !user?.id) return;
 
             try {
-              const token = await messaging().getToken();
-              if (token) {
-                await removeFCMToken(user.id, token).catch(() => {});
+              if (Platform.OS !== 'web') {
+                const token = await messaging().getToken();
+                if (token) {
+                  await removeFCMToken(user.id, token).catch(() => {});
+                }
               }
             } catch {}
 
