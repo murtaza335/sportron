@@ -1,10 +1,12 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, History, MessageSquare, Plus, User, Users, X } from 'lucide-react-native';
+import { CalendarDays, Activity, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { UserAvatar } from '@/components/UserAvatar';
 import { Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import {
@@ -59,6 +61,38 @@ function SessionsHeaderRight() {
   );
 }
 
+function CommunitiesHeaderProfile() {
+  const { profile } = useAuth();
+
+  return (
+    <Pressable
+      onPress={() => router.navigate('/profile')}
+      style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
+      hitSlop={12}
+      accessibilityLabel="Open profile"
+      accessibilityRole="button"
+    >
+      <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+    </Pressable>
+  );
+}
+
+function CommunitiesHeaderAdd() {
+  const theme = useTheme();
+
+  return (
+    <Pressable
+      onPress={() => router.navigate('/create-community')}
+      style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+      hitSlop={16}
+      accessibilityLabel="Create community"
+      accessibilityRole="button"
+    >
+      <Plus size={24} color={theme.text} strokeWidth={3} />
+    </Pressable>
+  );
+}
+
 export default function TabLayout() {
   const theme = useTheme();
   const { unreadCount } = useNotifications();
@@ -107,17 +141,8 @@ export default function TabLayout() {
           title: 'Communities',
           tabBarLabel: 'Communities',
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
-          headerLeft: () => (
-            <Pressable
-              onPress={() => router.navigate('/create-community')}
-              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
-              hitSlop={16}
-              accessibilityLabel="Create community"
-              accessibilityRole="button"
-            >
-              <Plus size={24} color={theme.text} strokeWidth={3} />
-            </Pressable>
-          ),
+          headerLeft: () => <CommunitiesHeaderAdd />,
+          headerRight: () => <CommunitiesHeaderProfile />,
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
         }}
       />
@@ -201,13 +226,8 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Profile',
-          tabBarLabel: 'Profile',
           headerTitle: () => <DefaultHeaderTitle title="Profile" />,
-          tabBarIcon: ({ color, size }) => (
-            <View style={{ position: 'relative', paddingBottom: 2 }}>
-              <User size={28} color={color} strokeWidth={2.2} />
-            </View>
-          ),
+          href: null,
         }}
       />
     </Tabs>
