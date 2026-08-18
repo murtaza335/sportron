@@ -2,10 +2,23 @@ import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { setChatUnreadCount } from '@/lib/chatUnreadStore';
-import { fetchChatUnreadCounts } from '@/services/chat';
+import { fetchChatLastMessageAt, fetchChatUnreadCounts } from '@/services/chat';
 import { fetchMyCommunities } from '@/services/communities';
 import { fetchJoinedSessions, fetchMySessions } from '@/services/sessions';
 import type { Community, Session } from '@/types';
+
+// Sorts chats by latest activity (most recent message first); chats with no
+// messages fall to the bottom.
+function sortByLastMessage<T extends { id: string }>(
+  items: T[],
+  lastMessageAt: Record<string, string | null>,
+): T[] {
+  return [...items].sort((a, b) => {
+    const ta = lastMessageAt[a.id] ?? '';
+    const tb = lastMessageAt[b.id] ?? '';
+    return tb.localeCompare(ta);
+  });
+}
 
 // Loads the Chats hub data: communities I'm a member of + sessions I created
 // or am accepted on, each with an unread chat-message count. Pushes the total
@@ -41,7 +54,7 @@ export function useChats(userId: string | undefined) {
       for (const session of [...joined, ...mine]) sessMap.set(session.id, session);
       const sess = [...sessMap.values()];
 
-      const [commUnread, sessUnread] = await Promise.all([
+      const [commUnread, sessUnread, commLastAt, sessLastAt] = await Promise.all([
         fetchChatUnreadCounts(
           'community_messages',
           'community_id',
@@ -54,10 +67,20 @@ export function useChats(userId: string | undefined) {
           sess.map((s) => s.id),
           userId,
         ),
+        fetchChatLastMessageAt(
+          'community_messages',
+          'community_id',
+          comm.map((c) => c.id),
+        ),
+        fetchChatLastMessageAt(
+          'session_messages',
+          'session_id',
+          sess.map((s) => s.id),
+        ),
       ]);
 
-      setCommunities(comm);
-      setSessions(sess);
+      setCommunities(sortByLastMessage(comm, commLastAt));
+      setSessions(sortByLastMessage(sess, sessLastAt));
       setCommunityUnread(commUnread);
       setSessionUnread(sessUnread);
 

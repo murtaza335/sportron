@@ -123,6 +123,35 @@ export async function fetchChatUnreadCounts(
   return result;
 }
 
+// Timestamp of the most recent message in each chat (null when empty), used to
+// order the Chats hub most-recent-activity first. One query total: rows come
+// back newest-first, so the first row seen per chat is its latest message.
+export async function fetchChatLastMessageAt(
+  messageTable: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatIds: string[],
+): Promise<Record<string, string | null>> {
+  const result: Record<string, string | null> = {};
+  if (chatIds.length === 0) return result;
+
+  const { data, error } = await supabase
+    .from(messageTable)
+    .select(`${idColumn}, created_at`)
+    .in(idColumn, chatIds)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const id = (row as Record<string, unknown>)[idColumn] as string;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result[id] = (row as Record<string, unknown>).created_at as string;
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Chat presence (active-reader heartbeat) — separate from read cursors
 // ---------------------------------------------------------------------------
