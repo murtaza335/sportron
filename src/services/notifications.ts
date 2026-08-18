@@ -14,6 +14,11 @@ export async function pushFcmToUser(
   return pushFcmToUsers([userId], title, body, data);
 }
 
+export interface PresenceFilter {
+  chat_type: 'session' | 'community';
+  chat_id: string;
+}
+
 // Batches a single edge-function call for many recipients (one JWT, one
 // profiles query, N FCM sends inside the function) instead of N HTTP calls.
 export async function pushFcmToUsers(
@@ -21,6 +26,7 @@ export async function pushFcmToUsers(
   title: string,
   body: string,
   data?: Record<string, unknown>,
+  presenceFilter?: PresenceFilter,
 ): Promise<void> {
   if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) {
     console.warn('[pushFcmToUsers] skipping push', {
@@ -38,7 +44,13 @@ export async function pushFcmToUsers(
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supabaseAnonKey}`,
       },
-      body: JSON.stringify({ user_ids: userIds, title, body, data }),
+      body: JSON.stringify({
+        user_ids: userIds,
+        title,
+        body,
+        data,
+        presence_filter: presenceFilter ?? undefined,
+      }),
     });
     if (!res.ok) {
       console.warn('[pushFcmToUsers] function error', res.status, await res.text());
