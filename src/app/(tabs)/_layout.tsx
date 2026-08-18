@@ -1,5 +1,5 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, History, Plus, User, Users, X } from 'lucide-react-native';
+import { CalendarDays, Activity, History, MessageSquare, Plus, User, Users, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -7,6 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
+import {
+  getChatUnreadCount,
+  subscribeChatUnreadCount,
+} from '@/lib/chatUnreadStore';
 import {
   getSessionsView,
   setSessionsView,
@@ -58,6 +62,7 @@ function SessionsHeaderRight() {
 export default function TabLayout() {
   const theme = useTheme();
   const { unreadCount } = useNotifications();
+  const chatUnreadCount = useSyncExternalStore(subscribeChatUnreadCount, getChatUnreadCount);
   const insets = useSafeAreaInsets();
 
   const commonHeaderStyle = {
@@ -135,6 +140,37 @@ export default function TabLayout() {
             </Pressable>
           ),
           tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="chats"
+        options={{
+          title: 'Chats',
+          tabBarLabel: 'Chats',
+          headerTitle: () => <DefaultHeaderTitle title="Chats" />,
+          tabBarIcon: ({ color, size }) => (
+            <View style={{ position: 'relative', paddingBottom: 2 }}>
+              <MessageSquare size={size} color={color} strokeWidth={2.2} />
+              {chatUnreadCount > 0 && (
+                <View style={{
+                  position: 'absolute',
+                  top: -4,
+                  right: -6,
+                  minWidth: 16,
+                  height: 16,
+                  borderRadius: 8,
+                  paddingHorizontal: 4,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  backgroundColor: '#10B981',
+                }}>
+                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>
+                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
+                  </Text>
+                </View>
+              )}
+            </View>
+          ),
         }}
       />
       <Tabs.Screen

@@ -77,6 +77,52 @@ export async function upsertChatReadCursor(
   if (error) throw error;
 }
 
+// Unread counts for many chats at once (used by the Chats hub). Reads every
+// read cursor the user has for this chat type in one query, then counts
+// messages newer than each cursor in parallel. A chat with no cursor counts as
+// fully unread.
+export async function fetchChatUnreadCounts(
+  messageTable: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatIds: string[],
+  userId: string,
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+  if (chatIds.length === 0) return result;
+
+  const readTable = readTableForIdColumn(idColumn);
+  const { data: cursors, error: cursorError } = await supabase
+    .from(readTable)
+    .select(`${idColumn}, last_read_at`)
+    .eq('profile_id', userId);
+
+  if (cursorError) throw cursorError;
+
+  const cursorMap = new Map<string, string | null>();
+  for (const row of cursors ?? []) {
+    cursorMap.set((row as Record<string, unknown>)[idColumn] as string, (row as Record<string, unknown>).last_read_at as string | null);
+  }
+
+  const counts = await Promise.all(
+    chatIds.map(async (chatId) => {
+      let query = supabase
+        .from(messageTable)
+        .select('*', { count: 'exact', head: true })
+        .eq(idColumn, chatId);
+      const lastReadAt = cursorMap.get(chatId);
+      if (lastReadAt) query = query.gt('created_at', lastReadAt);
+      const { count, error } = await query;
+      if (error) throw error;
+      return [chatId, count ?? 0] as const;
+    }),
+  );
+
+  for (const [chatId, count] of counts) {
+    if (count > 0) result[chatId] = count;
+  }
+  return result;
+}
+
 // ---------------------------------------------------------------------------
 // Chat presence (active-reader heartbeat) — separate from read cursors
 // ---------------------------------------------------------------------------
