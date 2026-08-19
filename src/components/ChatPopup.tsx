@@ -1,8 +1,21 @@
-import { Check, ChevronDown, Clock, MessageCircle, Reply, Send, X } from 'lucide-react-native';
+import { BlurView } from 'expo-blur';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Clock,
+  MessageCircle,
+  RefreshCw,
+  Reply,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  GestureResponderEvent,
   KeyboardAvoidingView,
   Modal,
   NativeScrollEvent,
@@ -11,6 +24,7 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -32,6 +46,10 @@ const PRESENCE_HEARTBEAT_MS = 20_000;
 // within this distance of the top.
 const BOTTOM_THRESHOLD = 60;
 const TOP_LOAD_THRESHOLD = 80;
+
+// Long-press context menu (iPhone-style), anchored to the touch point.
+const CONTEXT_CARD_W = 170;
+const CONTEXT_CARD_H = 52;
 
 type ChatPopupProps<T extends ChatMessageBase> = {
   visible: boolean;
@@ -75,16 +93,21 @@ export function ChatPopup<T extends ChatMessageBase>({
     hasMore,
     loadOlder,
     sendMessage,
+    resendMessage,
+    deleteMessage,
     firstUnreadIndex,
     markRead,
   } = chat;
 
   const [draft, setDraft] = useState('');
+  const draftRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
   const [replyTo, setReplyTo] = useState<T | null>(null);
-  const [contextMessage, setContextMessage] = useState<T | null>(null);
-  const [sending, setSending] = useState(false);
+  const [contextMenu, setContextMenu] = useState<{ message: T; x: number; y: number } | null>(null);
+  const [failedMenu, setFailedMenu] = useState<T | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const listRef = useRef<FlatList<T>>(null);
+  const { width: windowWidth } = useWindowDimensions();
   const didInitialScrollRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkReadRef = useRef(0);
@@ -227,6 +250,38 @@ export function ChatPopup<T extends ChatMessageBase>({
     setAtBottom(true);
   }, []);
 
+  // Long-press captures the touch position so the floating context menu can
+  // anchor near the finger instead of sliding up a bottom sheet (which would
+  // dismiss the keyboard).
+  const handleLongPress = useCallback((item: T, e: GestureResponderEvent) => {
+    setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+  }, []);
+
+  const replyToContextMessage = useCallback(() => {
+    if (!contextMenu) return;
+    setReplyTo(contextMenu.message);
+    setContextMenu(null);
+    if (canSend) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [contextMenu, canSend]);
+
+  // Clamp the floating card so it stays on screen. Defaults to hovering ABOVE
+  // the touch point; flips below the touch near the top.
+  const contextLayout = useMemo(() => {
+    if (!contextMenu) return null;
+    const { x, y } = contextMenu;
+    const margin = Spacing.sm;
+    const minTop = insets.top + margin;
+    const left = Math.max(
+      margin,
+      Math.min(x - CONTEXT_CARD_W + 24, windowWidth - CONTEXT_CARD_W - margin),
+    );
+    const above = y - CONTEXT_CARD_H - 14 >= minTop;
+    const top = above ? y - CONTEXT_CARD_H - 14 : y + 18;
+    return { left, top };
+  }, [contextMenu, insets.top, windowWidth]);
+
   // Inverted list scrolling:
   // - offset 0 = the visual bottom (newest) — being there means "at bottom".
   // - the visual TOP is the scroll END, so reaching it loads older messages.
@@ -251,29 +306,29 @@ export function ChatPopup<T extends ChatMessageBase>({
     }
   };
 
-  const handleSend = async () => {
-    const text = draft.trim();
-    if (!text || sending) return;
+  // The send button is decoupled from the network round-trip: it INSTANTLY
+  // clears the input and lets the chat thread place the optimistic bubble
+  // (clock → check once realtime/DB confirms). The API call then runs in the
+  // background — typing the next message is never blocked on the send, and a
+  // failure (bubble removed by useChat) never restores the cleared text,
+  // because the user may already be typing the next message.
+  const handleSend = () => {
+    // draftRef (not the `draft` state) is the live source of truth for the
+    // input text — read it here so the ref is cleared in this exact tick.
+    const text = draftRef.current.trim();
+    if (!text || !canSend) return;
     const reply = replyTo;
+    draftRef.current = '';
+    // The input is UNCONTROLLED (no `value` prop), so clear() is the only way
+    // the native text ever becomes ''. Nothing can re-assert the old text:
+    // controlled reconciliation or a stale keystroke landing before a re-render.
+    inputRef.current?.clear();
     setDraft('');
     setReplyTo(null);
-    setSending(true);
-    try {
-      // useChat.send adds the optimistic bubble + clock SYNCHRONOUSLY before it
-      // awaits the DB write, so once this call returns the message is already in
-      // the UI. Free the send button immediately instead of waiting for the
-      // whole round-trip — the user can type/send the next message right away.
-      const promise = sendMessage(text, reply?.id);
-      setSending(false);
-      await promise;
-      // Sending always jumps to the bottom (and clears the divider state).
-      scrollToBottom(true);
-    } catch (e) {
-      setSending(false);
-      setDraft(text);
-      if (reply) setReplyTo(reply);
-      console.error('Failed to send message:', e);
-    }
+    sendMessage(text, reply?.id).then(
+      () => scrollToBottom(true),
+      (e) => console.error('Failed to send message:', e),
+    );
   };
 
   const renderReplyPreview = (item: T, mine: boolean) => {
@@ -330,7 +385,7 @@ export function ChatPopup<T extends ChatMessageBase>({
           </View>
         )}
         <Pressable
-          onLongPress={() => setContextMessage(item)}
+          onLongPress={(e) => handleLongPress(item, e)}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -366,7 +421,11 @@ export function ChatPopup<T extends ChatMessageBase>({
             <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
               {mine && (
                 <View style={styles.msgStatus}>
-                  {isSending ? (
+                  {item.status === 'failed' ? (
+                    <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
+                      <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
+                    </Pressable>
+                  ) : isSending ? (
                     <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
                   ) : (
                     <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
@@ -392,7 +451,7 @@ export function ChatPopup<T extends ChatMessageBase>({
       ? 'Type a message...'
       : 'Chat is unavailable';
 
-  const sendDisabled = !canSend || !draft.trim() || sending;
+  const sendDisabled = !canSend || !draft.trim();
 
   return (
     <>
@@ -573,8 +632,11 @@ export function ChatPopup<T extends ChatMessageBase>({
 
               <View style={styles.inputRow}>
                 <TextInput
-                  value={draft}
-                  onChangeText={setDraft}
+                  ref={inputRef}
+                  onChangeText={(text) => {
+                    draftRef.current = text;
+                    setDraft(text);
+                  }}
                   placeholder={placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
@@ -608,39 +670,109 @@ export function ChatPopup<T extends ChatMessageBase>({
               </View>
             </View>
           </KeyboardAvoidingView>
-        </View>
-      </Modal>
 
-      {/* Long-press context menu */}
-      <Modal
-        transparent
-        visible={!!contextMessage}
-        animationType="fade"
-        onRequestClose={() => setContextMessage(null)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setContextMessage(null)}>
-          <Pressable
-            style={[
-              styles.contextSheet,
-              { backgroundColor: theme.background, borderColor: theme.border },
-            ]}
-          >
-            <Pressable
-              style={[styles.contextOption, { borderBottomColor: theme.border }]}
-              onPress={() => {
-                if (contextMessage) setReplyTo(contextMessage);
-                setContextMessage(null);
-              }}
-            >
-              <View style={styles.contextOptionRow}>
-                <Reply size={18} color="#10B981" strokeWidth={2.5} />
-                <ThemedText variant="body" style={[styles.contextOptionText, { color: '#10B981', fontWeight: '600' }]}>
-                  Reply
-                </ThemedText>
+          {/* Floating long-press context menu. Rendered INLINE (not a Modal) so
+              the keyboard stays open while it's showing. On iOS the backdrop is
+              frosted (BlurView); everywhere else it falls back to a dim
+              overlay, so the chat always reads as "background". */}
+          {contextMenu && contextLayout && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Pressable style={styles.contextBackdrop} onPress={() => setContextMenu(null)}>
+                {Platform.OS === 'ios' && (
+                  <BlurView
+                    tint={theme.resolvedColorScheme === 'dark' ? 'dark' : 'light'}
+                    intensity={60}
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
+                <View
+                  style={[
+                    styles.contextBackdropDim,
+                    {
+                      backgroundColor:
+                        theme.resolvedColorScheme === 'dark'
+                          ? 'rgba(0,0,0,0.5)'
+                          : 'rgba(0,0,0,0.35)',
+                    },
+                  ]}
+                />
+              </Pressable>
+              <View
+                style={[
+                  styles.contextCard,
+                  {
+                    left: contextLayout.left,
+                    top: contextLayout.top,
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Pressable style={styles.contextOption} onPress={replyToContextMessage}>
+                  <View style={styles.contextOptionRow}>
+                    <Reply size={18} color="#10B981" strokeWidth={2.5} />
+                    <ThemedText
+                      variant="body"
+                      style={[styles.contextOptionText, { color: '#10B981', fontWeight: '600' }]}
+                    >
+                      Reply
+                    </ThemedText>
+                  </View>
+                </Pressable>
               </View>
-            </Pressable>
-          </Pressable>
-        </Pressable>
+            </View>
+          )}
+
+          {/* Failed-message menu: tapped from the warning icon on a bubble whose
+              write failed. Offers Resend (replaces the bubble in place) or
+              Delete (drops the local bubble). */}
+          {failedMenu && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Pressable style={styles.contextBackdrop} onPress={() => setFailedMenu(null)}>
+                <BlurView
+                  tint={theme.resolvedColorScheme === 'dark' ? 'dark' : 'light'}
+                  intensity={10}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Pressable>
+              <View
+                style={[
+                  styles.failedCard,
+                  { backgroundColor: theme.background, borderColor: theme.border },
+                ]}
+              >
+                <Pressable
+                  style={[styles.failedOption, { borderBottomColor: theme.border }]}
+                  onPress={() => {
+                    resendMessage(failedMenu);
+                    setFailedMenu(null);
+                  }}
+                >
+                  <View style={styles.failedOptionRow}>
+                    <RefreshCw size={18} color="#10B981" strokeWidth={2.5} />
+                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#10B981', fontWeight: '600' }]}>
+                      Resend
+                    </ThemedText>
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={styles.failedOption}
+                  onPress={() => {
+                    deleteMessage(failedMenu.id);
+                    setFailedMenu(null);
+                  }}
+                >
+                  <View style={styles.failedOptionRow}>
+                    <Trash2 size={18} color="#EF4444" strokeWidth={2.5} />
+                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#EF4444', fontWeight: '600' }]}>
+                      Delete
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
       </Modal>
     </>
   );
@@ -873,25 +1005,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  contextBackdrop: {
+    ...StyleSheet.absoluteFill,
   },
-  contextSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
-    gap: Spacing.sm,
+  contextBackdropDim: {
+    ...StyleSheet.absoluteFill,
+  },
+  contextCard: {
+    position: 'absolute',
+    width: CONTEXT_CARD_W,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.sm,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
   },
   contextOption: {
     paddingVertical: Spacing.md,
-    gap: 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   contextOptionRow: {
     flexDirection: 'row',
@@ -899,6 +1032,33 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   contextOptionText: {
+    fontSize: 15,
+  },
+  failedCard: {
+    position: 'absolute',
+    top: '45%',
+    alignSelf: 'center',
+    minWidth: 220,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.sm,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  failedOption: {
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  failedOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  failedOptionText: {
     fontSize: 15,
   },
 });

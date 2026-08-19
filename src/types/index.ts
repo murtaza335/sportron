@@ -420,7 +420,7 @@ export type ChatMessageBase = {
   sender_avatar_url?: string | null;
   sender?: ChatSender | null;
   reply_to?: ChatReplyRef | null;
-  status?: 'sending' | 'delivered';
+  status?: 'sending' | 'delivered' | 'failed';
   tempId?: string;
 };
 

@@ -47,6 +47,8 @@ export type ChatThread<T extends ChatMessageBase> = {
   hasMore: boolean;
   loadOlder: () => void;
   sendMessage: (content: string, replyToId?: string | null) => Promise<T | null>;
+  resendMessage: (message: T) => void;
+  deleteMessage: (messageId: string) => void;
   refresh: () => void;
   unreadCount: number;
   firstUnreadIndex: number | null;
@@ -71,10 +73,6 @@ export function useChat<T extends ChatMessageBase>(
   const pendingTempsRef = useRef<Map<string, { content: string; replyToId: string | null }>>(
     new Map(),
   );
-
-  const appendMessage = useCallback((message: T) => {
-    setMessages((prev) => (prev.some((m) => m.id === message.id) ? prev : [...prev, message]));
-  }, []);
 
   const load = useCallback(async () => {
     if (!sourceId) return;
@@ -197,7 +195,25 @@ export function useChat<T extends ChatMessageBase>(
               ),
             );
           } else {
-            appendMessage(raw);
+            setMessages((prev) => {
+              // A send whose client-side promise FAILED (e.g. a timeout) may
+              // still have committed server-side. If a failed bubble matches
+              // this row, upgrade it in place so we never duplicate a message
+              // that actually went through.
+              const failedId = prev.find(
+                (m) =>
+                  m.status === 'failed' &&
+                  m.content === raw.content &&
+                  (m.reply_to_id ?? null) === (raw.reply_to_id ?? null),
+              )?.id;
+              if (failedId) {
+                return prev.map((m) =>
+                  m.id === failedId ? { ...m, id: raw.id, status: 'delivered' } : m,
+                );
+              }
+              if (prev.some((m) => m.id === raw.id)) return prev;
+              return [...prev, raw];
+            });
             // Live badge: new messages from other people bump the unread count.
             // The popup resets it to 0 via markRead on open / on scroll.
             if (raw.sender_id && raw.sender_id !== userId) {
@@ -216,7 +232,7 @@ export function useChat<T extends ChatMessageBase>(
         supabase.removeChannel(other);
       }
     }
-  }, [sourceId, subscribe, table, idColumn, channelPrefix, appendMessage, userId]);
+  }, [sourceId, subscribe, table, idColumn, channelPrefix, userId]);
 
   useEffect(() => {
     if (!sourceId || !subscribe) return;
@@ -245,7 +261,11 @@ export function useChat<T extends ChatMessageBase>(
   );
 
   const send = useCallback(
-    async (content: string, replyToId?: string | null): Promise<T | null> => {
+    async (
+      content: string,
+      replyToId?: string | null,
+      retryTempId?: string | null,
+    ): Promise<T | null> => {
       if (!sourceId || !userId) return null;
 
       const tempId = `temp-${Date.now()}-${Math.random().toString(36).slice(2)}`;
@@ -282,8 +302,14 @@ export function useChat<T extends ChatMessageBase>(
         tempId,
       } as T;
 
-      setMessages((prev) => [...prev, temp]);
       pendingTempsRef.current.set(tempId, { content, replyToId: replyToId ?? null });
+      // A resend of a failed bubble replaces it IN PLACE (keeps its position);
+      // a fresh send appends at the end.
+      setMessages((prev) =>
+        retryTempId && prev.some((m) => m.id === retryTempId)
+          ? prev.map((m) => (m.id === retryTempId ? temp : m))
+          : [...prev, temp],
+      );
 
       try {
         const msg = await sendMessage(
@@ -314,12 +340,35 @@ export function useChat<T extends ChatMessageBase>(
         return msg;
       } catch (e) {
         pendingTempsRef.current.delete(tempId);
-        setMessages((prev) => prev.filter((m) => m.id !== tempId));
+        // Keep the bubble in place but mark it failed so the sender can resend
+        // or delete it — the input was already cleared when the send started,
+        // so restoring text there is neither needed nor wanted.
+        setMessages((prev) =>
+          prev.map((m) => (m.id === tempId ? { ...m, status: 'failed' } : m)),
+        );
         throw e;
       }
     },
     [sourceId, userId, messages, senderProfile, sendMessage, idColumn],
   );
+
+  // Resend a failed message: replaces the failed bubble with a fresh optimistic
+  // one and fires the network call again. Content + reply target are preserved.
+  const resendMessage = useCallback(
+    (message: T) => {
+      if (message.status !== 'failed') return;
+      send(message.content, message.reply_to_id ?? null, message.id).catch((e) =>
+        console.error('Failed to resend message:', e),
+      );
+    },
+    [send],
+  );
+
+  // Removes a local (failed) message bubble without touching the server — a
+  // failed write never reached the DB, so there is nothing to delete remotely.
+  const deleteMessage = useCallback((messageId: string) => {
+    setMessages((prev) => prev.filter((m) => m.id !== messageId));
+  }, []);
 
   return {
     messages,
@@ -328,6 +377,8 @@ export function useChat<T extends ChatMessageBase>(
     hasMore,
     loadOlder,
     sendMessage: send,
+    resendMessage,
+    deleteMessage,
     refresh: load,
     unreadCount,
     firstUnreadIndex,
