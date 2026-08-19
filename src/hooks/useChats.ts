@@ -1,4 +1,4 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { setChatUnreadCount } from '@/lib/chatUnreadStore';
@@ -6,6 +6,8 @@ import { fetchChatLastMessageAt, fetchChatUnreadCounts } from '@/services/chat';
 import { fetchMyCommunities } from '@/services/communities';
 import { fetchJoinedSessions, fetchMySessions } from '@/services/sessions';
 import type { Community, Session } from '@/types';
+
+export type ChatKind = 'community' | 'session';
 
 // Sorts chats by latest activity (most recent message first); chats with no
 // messages fall to the bottom.
@@ -29,6 +31,8 @@ export function useChats(userId: string | undefined) {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [communityUnread, setCommunityUnread] = useState<Record<string, number>>({});
   const [sessionUnread, setSessionUnread] = useState<Record<string, number>>({});
+  const [communityLastAt, setCommunityLastAt] = useState<Record<string, string | null>>({});
+  const [sessionLastAt, setSessionLastAt] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
@@ -38,6 +42,8 @@ export function useChats(userId: string | undefined) {
       setSessions([]);
       setCommunityUnread({});
       setSessionUnread({});
+      setCommunityLastAt({});
+      setSessionLastAt({});
       setChatUnreadCount(0);
       setLoading(false);
       return;
@@ -79,10 +85,12 @@ export function useChats(userId: string | undefined) {
         ),
       ]);
 
-      setCommunities(sortByLastMessage(comm, commLastAt));
-      setSessions(sortByLastMessage(sess, sessLastAt));
+      setCommunities(comm);
+      setSessions(sess);
       setCommunityUnread(commUnread);
       setSessionUnread(sessUnread);
+      setCommunityLastAt(commLastAt);
+      setSessionLastAt(sessLastAt);
 
       const total =
         Object.values(commUnread).reduce((sum, n) => sum + n, 0) +
@@ -107,5 +115,45 @@ export function useChats(userId: string | undefined) {
     setRefreshing(false);
   }, [load]);
 
-  return { communities, sessions, communityUnread, sessionUnread, loading, refreshing, refresh };
+  // Opt-in "most recent message" update used while a chat popup is open on top
+  // of the hub. When a message is sent/arrives in the chat we are reading, its
+  // thread re-orders instantly without a refetch — so the chat pops to the top
+  // the moment we close the popup (no spinner).
+  const touchLastMessage = useCallback((kind: ChatKind, chatId: string, at: string) => {
+    const setter = kind === 'community' ? setCommunityLastAt : setSessionLastAt;
+    setter((prev) => {
+      const existing = prev[chatId];
+      if (existing && existing >= at) return prev;
+      return { ...prev, [chatId]: at };
+    });
+  }, []);
+
+  // Keeps a per-chat badge in sync with the thread currently being read:
+  // clears when markRead fires (badge disappears on return), bumps live while
+  // incoming messages land.
+  const setChatUnread = useCallback((kind: ChatKind, chatId: string, count: number) => {
+    const setter = kind === 'community' ? setCommunityUnread : setSessionUnread;
+    setter((prev) => ({ ...prev, [chatId]: count }));
+  }, []);
+
+  const sortedCommunities = useMemo(
+    () => sortByLastMessage(communities, communityLastAt),
+    [communities, communityLastAt],
+  );
+  const sortedSessions = useMemo(
+    () => sortByLastMessage(sessions, sessionLastAt),
+    [sessions, sessionLastAt],
+  );
+
+  return {
+    communities: sortedCommunities,
+    sessions: sortedSessions,
+    communityUnread,
+    sessionUnread,
+    loading,
+    refreshing,
+    refresh,
+    touchLastMessage,
+    setChatUnread,
+  };
 }

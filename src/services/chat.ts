@@ -108,7 +108,10 @@ export async function fetchChatUnreadCounts(
       let query = supabase
         .from(messageTable)
         .select('*', { count: 'exact', head: true })
-        .eq(idColumn, chatId);
+        .eq(idColumn, chatId)
+        // A user's own messages are never "unread" for them (they know what
+        // they wrote), so they must not inflate the badge.
+        .neq('sender_id', userId);
       const lastReadAt = cursorMap.get(chatId);
       if (lastReadAt) query = query.gt('created_at', lastReadAt);
       const { count, error } = await query;
@@ -210,7 +213,9 @@ export async function fetchChatUnreadCount(
   let query = supabase
     .from(messageTable)
     .select('*', { count: 'exact', head: true })
-    .eq(idColumn, chatId);
+    .eq(idColumn, chatId)
+    // Own messages never count as unread (see fetchChatUnreadCounts).
+    .neq('sender_id', userId);
   if (lastReadAt) {
     query = query.gt('created_at', lastReadAt);
   }

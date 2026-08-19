@@ -257,6 +257,10 @@ export function useChat<T extends ChatMessageBase>(
         content,
         created_at: new Date().toISOString(),
         reply_to_id: replyToId ?? null,
+        // Stamp the chat id on the optimistic bubble too, so consumers (e.g.
+        // the Chats hub ordering) can tell which chat an optimistic message
+        // belongs to before the realtime row arrives.
+        [idColumn]: sourceId,
         sender: senderProfile
           ? { id: senderProfile.id, username: senderProfile.username, avatar_url: senderProfile.avatar_url }
           : { id: userId, username: 'You', avatar_url: null },
@@ -314,7 +318,7 @@ export function useChat<T extends ChatMessageBase>(
         throw e;
       }
     },
-    [sourceId, userId, messages, senderProfile, sendMessage],
+    [sourceId, userId, messages, senderProfile, sendMessage, idColumn],
   );
 
   return {

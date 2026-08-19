@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, ChevronRight, Users } from 'lucide-react-native';
@@ -105,6 +105,8 @@ export default function ChatsScreen() {
     loading,
     refreshing,
     refresh,
+    touchLastMessage,
+    setChatUnread,
   } = useChats(user?.id);
 
   const [tab, setTab] = useState<ChatTab>('communities');
@@ -132,6 +134,55 @@ export default function ChatsScreen() {
   const listData: ChatRow[] = isSessionTab
     ? sessions.map((s) => ({ kind: 'session', session: s, unread: sessionUnread[s.id] ?? 0 }))
     : communities.map((c) => ({ kind: 'community', community: c, unread: communityUnread[c.id] ?? 0 }));
+
+  const openChatId = openChat
+    ? openChat.kind === 'community'
+      ? openChat.community.id
+      : openChat.session.id
+    : null;
+
+  // The live message list of the chat whose popup is currently open (null when
+  // none is open). Used to re-order the hub instantly on return — no refetch.
+  const openChatMessages =
+    openChat?.kind === 'community'
+      ? communityChat.messages
+      : openChat?.kind === 'session'
+        ? sessionChat.messages
+        : null;
+
+  // Whenever the open chat gains a newer message (optimistic send, realtime
+  // arrival, or the initial load), bump its "last activity" so it re-sorts to
+  // the top immediately. Guarded by the message's own id column so stale
+  // messages from a previously opened chat can't bump the wrong chat while the
+  // new chat's page is still loading.
+  useEffect(() => {
+    if (!openChat || !openChatMessages || openChatMessages.length === 0) return;
+    const belongs = (m: { session_id?: string; community_id?: string }) =>
+      openChat.kind === 'community'
+        ? m.community_id === openChatId
+        : m.session_id === openChatId;
+    const seen = openChatMessages.filter(belongs);
+    if (seen.length === 0) return;
+    const newest = seen.reduce((a, b) =>
+      new Date(a.created_at).getTime() > new Date(b.created_at).getTime() ? a : b,
+    );
+    touchLastMessage(openChat.kind, openChatId!, newest.created_at);
+  }, [openChat, openChatId, openChatMessages, touchLastMessage]);
+
+  // Mirror the open chat thread's live unread count into the hub badge: it
+  // clears the moment markRead fires (so the badge is gone on return) and bumps
+  // while realtime messages from others land.
+  const openChatUnread =
+    openChat?.kind === 'community'
+      ? communityChat.unreadCount
+      : openChat?.kind === 'session'
+        ? sessionChat.unreadCount
+        : null;
+
+  useEffect(() => {
+    if (!openChat || openChatUnread == null) return;
+    setChatUnread(openChat.kind, openChatId!, openChatUnread);
+  }, [openChat, openChatId, openChatUnread, setChatUnread]);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
