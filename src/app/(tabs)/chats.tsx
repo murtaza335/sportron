@@ -42,6 +42,8 @@ function formatSessionTime(dateString?: string) {
 function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   const theme = useTheme();
   const isCommunity = row.kind === 'community';
+  const isSessionActive =
+    !isCommunity && (row.session.status === 'open' || row.session.status === 'full');
 
   const label = isCommunity
     ? row.community.name
@@ -67,11 +69,21 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           <Image source={{ uri: row.community.image_url }} style={styles.avatar} resizeMode="cover" />
         </View>
       ) : (
-        <View style={[styles.avatarWrap, styles.avatarPlaceholder, { backgroundColor: theme.backgroundSelected }]}>
+        <View
+          style={[
+            styles.avatarWrap,
+            styles.avatarPlaceholder,
+            { backgroundColor: isSessionActive ? '#10B98120' : theme.backgroundSelected },
+          ]}
+        >
           {isCommunity ? (
             <Users size={20} color={theme.textSecondary} strokeWidth={2} />
           ) : (
-            <MessageSquare size={20} color={theme.textSecondary} strokeWidth={2} />
+            <MessageSquare
+              size={20}
+              color={isSessionActive ? '#10B981' : theme.textSecondary}
+              strokeWidth={2}
+            />
           )}
         </View>
       )}
