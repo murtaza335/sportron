@@ -368,6 +368,11 @@ export function ChatPopup<T extends ChatMessageBase>({
   const renderMessage = ({ item, index }: { item: T; index: number }) => {
     const mine = item.sender_id === currentUserId;
     const isSending = item.status === 'sending';
+    // displayMessages is newest-first, so the chronologically-previous message
+    // sits at index + 1. Consecutive messages from the same sender are grouped:
+    // only the FIRST message of a group shows the avatar (and sender name).
+    const prev = displayMessages[index + 1] ?? null;
+    const isGroupStart = !prev || prev.sender_id !== item.sender_id;
     // firstUnreadIndex is an ASCENDING (oldest-first) index; displayMessages is
     // newest-first, so the oldest-unread row maps to (total - 1 - ascIndex).
     const isFirstUnread =
@@ -393,53 +398,65 @@ export function ChatPopup<T extends ChatMessageBase>({
             pressed && { opacity: 0.85 },
           ]}
         >
-          {!mine && (
+          {!mine && isGroupStart && (
             <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
           )}
-          <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
-            {!mine && (
-              <ThemedText variant="caption" muted style={styles.senderName}>
-                {item.sender?.username ?? 'Unknown'}
-              </ThemedText>
-            )}
+          <View
+            style={[
+              styles.bubbleWrap,
+              mine ? styles.bubbleWrapMine : null,
+              !isGroupStart && !mine && styles.groupIndentLeft,
+            ]}
+          >
             <View
               style={[
                 styles.bubble,
                 mine
-                  ? { backgroundColor: '#10B981' }
+                  ? { backgroundColor: '#10B981', borderColor: '#10B981' }
                   : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               ]}
             >
               {renderReplyPreview(item, mine)}
+              {!mine && isGroupStart && (
+                <ThemedText
+                  variant="caption"
+                  style={[styles.bubbleSenderName, { color: theme.textSecondary }]}
+                >
+                  {item.sender?.username ?? 'Unknown'}
+                </ThemedText>
+              )}
               <ThemedText
                 variant="body"
                 style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
               >
                 {item.content}
               </ThemedText>
-            </View>
-            <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
-              {mine && (
-                <View style={styles.msgStatus}>
-                  {item.status === 'failed' ? (
-                    <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
-                      <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
-                    </Pressable>
-                  ) : isSending ? (
-                    <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                  ) : (
-                    <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                  )}
-                </View>
-              )}
-              <ThemedText variant="caption" muted style={styles.msgTime}>
-                {formatMessageTime(item.created_at)}
-              </ThemedText>
+              <View style={styles.bubbleFooter}>
+                {mine && (
+                  <View style={styles.msgStatus}>
+                    {item.status === 'failed' ? (
+                      <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
+                        <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
+                      </Pressable>
+                    ) : isSending ? (
+                      <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                    ) : (
+                      <Check size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                    )}
+                  </View>
+                )}
+                <ThemedText
+                  variant="caption"
+                  style={[
+                    styles.msgTime,
+                    { color: mine ? 'rgba(255,255,255,0.7)' : theme.textSecondary },
+                  ]}
+                >
+                  {formatMessageTime(item.created_at)}
+                </ThemedText>
+              </View>
             </View>
           </View>
-          {mine && (
-            <UserAvatar avatarUrl={profile?.avatar_url ?? null} size={30} style={styles.msgAvatar} />
-          )}
         </Pressable>
       </View>
     );
@@ -899,7 +916,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   msgAvatar: {
-    marginBottom: 18,
+    marginBottom: 0,
   },
   bubbleWrap: {
     maxWidth: '78%',
@@ -908,10 +925,13 @@ const styles = StyleSheet.create({
   bubbleWrapMine: {
     alignItems: 'flex-end',
   },
-  senderName: {
-    marginLeft: 4,
-    fontWeight: '600',
-    fontSize: 11,
+  groupIndentLeft: {
+    marginLeft: 30 + Spacing.sm,
+  },
+  bubbleSenderName: {
+    fontWeight: '700',
+    fontSize: 12,
+    marginBottom: 2,
   },
   bubble: {
     borderRadius: Radius.lg,
@@ -922,6 +942,13 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 20,
+  },
+  bubbleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 3,
+    marginTop: 2,
   },
   replyBlock: {
     borderLeftWidth: 3,
@@ -935,19 +962,6 @@ const styles = StyleSheet.create({
   },
   replyContent: {
     fontSize: 12,
-  },
-  msgMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 1,
-    paddingHorizontal: 4,
-  },
-  msgMetaMine: {
-    alignSelf: 'flex-end',
-  },
-  msgMetaOther: {
-    alignSelf: 'flex-start',
   },
   msgStatus: {
     width: 12,
