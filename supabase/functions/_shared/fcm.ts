@@ -35,15 +35,31 @@ export async function assertServiceRole(req: Request): Promise<void> {
   const token = header.startsWith('Bearer ') ? header.slice('Bearer '.length) : header;
   if (!token) throw new Error('Missing Authorization header');
 
+  // Preferred: verify the JWT signature with the project's JWT secret. Some
+  // projects don't inject SUPABASE_JWT_SECRET (or its encoding differs), so
+  // fall back to an exact match against the service role key that the DB
+  // trigger sends (and that this function already has as an env var).
   const secret = Deno.env.get('SUPABASE_JWT_SECRET');
   if (secret) {
-    const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
-    if (payload.role !== 'service_role') throw new Error('Not a service_role token');
-    return;
+    try {
+      const { payload } = await jwtVerify(token, new TextEncoder().encode(secret));
+      if (payload.role === 'service_role') return;
+    } catch {
+      // fall through to the service-key comparison below
+    }
   }
-  // Fallback when SUPABASE_JWT_SECRET is unavailable: exact match against the
-  // service role key that the trigger sends.
-  if (token !== Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+
+  const serviceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY');
+  if (token !== serviceKey) {
+    console.error('[assertServiceRole] token mismatch', {
+      tokenPrefix: token.slice(0, 24),
+      tokenTail: token.slice(-12),
+      tokenLength: token.length,
+      serviceKeyPrefix: serviceKey?.slice(0, 24),
+      serviceKeyTail: serviceKey?.slice(-12),
+      serviceKeyLength: serviceKey?.length,
+      hasJwtSecret: !!secret,
+    });
     throw new Error('Invalid Authorization token');
   }
 }
