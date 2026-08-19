@@ -143,6 +143,9 @@ export default function ChatsScreen() {
 
   const isSessionTab = tab === 'sessions';
 
+  const communityUnreadTotal = Object.values(communityUnread).reduce((sum, n) => sum + n, 0);
+  const sessionUnreadTotal = Object.values(sessionUnread).reduce((sum, n) => sum + n, 0);
+
   const listData: ChatRow[] = isSessionTab
     ? sessions.map((s) => ({ kind: 'session', session: s, unread: sessionUnread[s.id] ?? 0 }))
     : communities.map((c) => ({ kind: 'community', community: c, unread: communityUnread[c.id] ?? 0 }));
@@ -206,6 +209,10 @@ export default function ChatsScreen() {
           ]}
           value={tab}
           onChange={setTab}
+          unread={{
+            communities: communityUnreadTotal > 0,
+            sessions: sessionUnreadTotal > 0,
+          }}
           compact
         />
 
