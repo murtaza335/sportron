@@ -1,67 +1,10 @@
 import { supabase } from '@/lib/supabase';
 import type { NotificationType } from '@/types';
 
-const supabaseUrl = process.env.EXPO_PUBLIC_SUPABASE_URL ?? '';
-const supabaseAnonKey = process.env.EXPO_PUBLIC_SUPABASE_ANON_KEY ?? '';
-const fcmFunctionUrl = supabaseUrl ? `${supabaseUrl}/functions/v1/send-notification` : '';
-
-export async function pushFcmToUser(
-  userId: string,
-  title: string,
-  body: string,
-  data?: Record<string, unknown>,
-): Promise<void> {
-  return pushFcmToUsers([userId], title, body, data);
-}
-
-export interface PresenceFilter {
-  chat_type: 'session' | 'community';
-  chat_id: string;
-}
-
-// Batches a single edge-function call for many recipients (one JWT, one
-// profiles query, N FCM sends inside the function) instead of N HTTP calls.
-export async function pushFcmToUsers(
-  userIds: string[],
-  title: string,
-  body: string,
-  data?: Record<string, unknown>,
-  presenceFilter?: PresenceFilter,
-): Promise<void> {
-  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) {
-    console.warn('[pushFcmToUsers] skipping push', {
-      fcmFunctionUrl,
-      hasAnonKey: !!supabaseAnonKey,
-      userIds: userIds.length,
-    });
-    return;
-  }
-
-  try {
-    const res = await fetch(fcmFunctionUrl, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${supabaseAnonKey}`,
-      },
-      body: JSON.stringify({
-        user_ids: userIds,
-        title,
-        body,
-        data,
-        presence_filter: presenceFilter ?? undefined,
-      }),
-    });
-    if (!res.ok) {
-      console.warn('[pushFcmToUsers] function error', res.status, await res.text());
-    } else {
-      const body = await res.json().catch(() => ({}));
-      console.warn('[pushFcmToUsers] ok', JSON.stringify(body));
-    }
-  } catch (e) {
-    console.warn('[pushFcmToUsers] fetch failed', e);
-  }
-}
+// Push delivery is now 100% server-side: inserting into `in_app_notifications`
+// (via the `insert_notification` RPC below) fires a Postgres trigger that calls
+// the `send-notification` edge function. No client code triggers FCM anymore,
+// so pushes work regardless of which platform performs the action.
 
 export interface CreateNotificationInput {
   userId: string;
@@ -114,7 +57,7 @@ export async function createNotification(input: CreateNotificationInput): Promis
     throw error;
   }
 
-  pushFcmToUser(input.userId, input.title, input.body, input.data);
+  // No FCM call here — the server-side trigger on in_app_notifications pushes.
 
   return Array.isArray(data) ? data[0] : data;
 }

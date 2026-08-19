@@ -1,6 +1,4 @@
 import { supabase } from '@/lib/supabase';
-import { formatSessionDisplayName } from '@/lib/date';
-import { pushFcmToUsers, type PresenceFilter } from './notifications';
 import type { ChatMessageBase, ChatSender, CommunityChatMessage, SessionChatMessage } from '@/types';
 
 export const MAX_CHAT_MESSAGE_LENGTH = 1000;
@@ -159,15 +157,12 @@ export async function fetchChatLastMessageAt(
 // Chat presence (active-reader heartbeat) — separate from read cursors
 // ---------------------------------------------------------------------------
 
-export function presenceFilterFor(
-  chatType: PresenceFilter['chat_type'],
-  chatId: string,
-): PresenceFilter {
-  return { chat_type: chatType, chat_id: chatId };
-}
+// The push trigger moved server-side (migration 035 + send-chat-notification),
+// which reads this presence table to skip active readers. The client still
+// heartbeats the row while the chat is open and deletes it on clean leave.
 
 export async function upsertChatPresence(
-  chatType: PresenceFilter['chat_type'],
+  chatType: 'session' | 'community',
   chatId: string,
   userId: string,
 ): Promise<void> {
@@ -182,7 +177,7 @@ export async function upsertChatPresence(
 }
 
 export async function deleteChatPresence(
-  chatType: PresenceFilter['chat_type'],
+  chatType: 'session' | 'community',
   chatId: string,
   userId: string,
 ): Promise<void> {
@@ -351,7 +346,7 @@ export async function sendSessionMessage(
 
   const { data: session, error: sessionError } = await supabase
     .from('sessions')
-    .select('id, created_by, title, purpose, date_time, status')
+    .select('id, status')
     .eq('id', sessionId)
     .single();
 
@@ -390,70 +385,11 @@ export async function sendSessionMessage(
       : null,
   };
 
-  try {
-    await notifyChatMembers(session, userId, sender.username ?? 'Someone', trimmed);
-  } catch (e) {
-    console.error('Failed to send chat push notifications:', e);
-  }
-
-  // Notify the person whose message was replied to.
-  const repliedToSenderId = replyTarget?.senderId;
-  if (replyToId && repliedToSenderId && repliedToSenderId !== userId) {
-    try {
-      const sessionName = formatSessionDisplayName(session.purpose, session.date_time, session.title);
-      await pushFcmToUsers(
-        [repliedToSenderId],
-        sessionName,
-        `${sender.username ?? 'Someone'} replied to you: ${trimmed}`,
-        { type: 'session_chat_reply', sessionId, messageId: message.id },
-      );
-    } catch (e) {
-      console.error('Failed to send chat reply notification:', e);
-    }
-  }
+  // FCM pushes are triggered server-side by the insert (migration 035 →
+  // send-chat-notification edge function), so nothing else happens here.
 
   return message;
 }
-
-// Sends an FCM-only push (no in-app notification) to every member of the
-// session (creator + accepted participants), except the sender. One batched
-// edge-function call for all recipients. Active readers (recent presence
-// heartbeat in this chat) are skipped by the edge function via presence_filter.
-async function notifyChatMembers(
-  session: { id: string; created_by: string; purpose: string; date_time: string },
-  senderId: string,
-  senderName: string,
-  content: string,
-): Promise<void> {
-  const { data: accepted, error } = await supabase
-    .from('commitments')
-    .select('user_id')
-    .eq('session_id', session.id)
-    .eq('status', 'accepted');
-
-  if (error) throw error;
-
-  const memberIds = new Set<string>([session.created_by]);
-  for (const c of accepted ?? []) memberIds.add(c.user_id);
-  memberIds.delete(senderId);
-
-  if (memberIds.size === 0) return;
-
-  const sessionName = formatSessionDisplayName(session.purpose, session.date_time);
-  const pushData = { type: 'session_chat_message', sessionId: session.id };
-
-  await pushFcmToUsers(
-    [...memberIds],
-    sessionName,
-    `${senderName}: ${content}`,
-    pushData,
-    presenceFilterFor('session', session.id),
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Community chat
-// ---------------------------------------------------------------------------
 
 export async function sendCommunityMessage(
   communityId: string,
@@ -470,7 +406,7 @@ export async function sendCommunityMessage(
 
   const { data: community, error: communityError } = await supabase
     .from('communities')
-    .select('id, name')
+    .select('id')
     .eq('id', communityId)
     .single();
 
@@ -506,66 +442,8 @@ export async function sendCommunityMessage(
       : null,
   };
 
-  try {
-    await notifyCommunityChatMembers(communityId, userId, sender.username ?? 'Someone', trimmed);
-  } catch (e) {
-    console.error('Failed to send community chat push notifications:', e);
-  }
-
-  // Notify the person whose message was replied to.
-  const repliedToSenderId = replyTarget?.senderId;
-  if (replyToId && repliedToSenderId && repliedToSenderId !== userId) {
-    try {
-      await pushFcmToUsers(
-        [repliedToSenderId],
-        community.name,
-        `${sender.username ?? 'Someone'} replied to you: ${trimmed}`,
-        { type: 'community_chat_reply', communityId, messageId: message.id },
-      );
-    } catch (e) {
-      console.error('Failed to send community chat reply notification:', e);
-    }
-  }
+  // FCM pushes are triggered server-side by the insert (migration 035 →
+  // send-chat-notification edge function), so nothing else happens here.
 
   return message;
-}
-
-// Sends an FCM-only push (no in-app notification) to every approved member of
-// the community, except the sender. One batched edge-function call. Active
-// readers are skipped by the edge function via presence_filter.
-async function notifyCommunityChatMembers(
-  communityId: string,
-  senderId: string,
-  senderName: string,
-  content: string,
-): Promise<void> {
-  const { data: members, error } = await supabase
-    .from('community_members')
-    .select('profile_id')
-    .eq('community_id', communityId)
-    .eq('approval_status', 'approved');
-
-  if (error) throw error;
-
-  const memberIds = new Set<string>();
-  for (const m of members ?? []) memberIds.add(m.profile_id);
-  memberIds.delete(senderId);
-
-  if (memberIds.size === 0) return;
-
-  const { data: community } = await supabase
-    .from('communities')
-    .select('name')
-    .eq('id', communityId)
-    .single();
-
-  const pushData = { type: 'community_chat_message', communityId };
-
-  await pushFcmToUsers(
-    [...memberIds],
-    community?.name ?? 'Community',
-    `${senderName}: ${content}`,
-    pushData,
-    presenceFilterFor('community', communityId),
-  );
 }
