@@ -75,82 +75,35 @@ export async function upsertChatReadCursor(
   if (error) throw error;
 }
 
-// Unread counts for many chats at once (used by the Chats hub). Reads every
-// read cursor the user has for this chat type in one query, then counts
-// messages newer than each cursor in parallel. A chat with no cursor counts as
-// fully unread.
-export async function fetchChatUnreadCounts(
-  messageTable: ChatMessageTable,
-  idColumn: ChatIdColumn,
-  chatIds: string[],
-  userId: string,
-): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
-  if (chatIds.length === 0) return result;
+export type ChatHubStats = {
+  unread: Record<string, number>;
+  lastMessageAt: Record<string, string | null>;
+};
 
-  const readTable = readTableForIdColumn(idColumn);
-  const { data: cursors, error: cursorError } = await supabase
-    .from(readTable)
-    .select(`${idColumn}, last_read_at`)
-    .eq('profile_id', userId);
-
-  if (cursorError) throw cursorError;
-
-  const cursorMap = new Map<string, string | null>();
-  for (const row of cursors ?? []) {
-    cursorMap.set((row as Record<string, unknown>)[idColumn] as string, (row as Record<string, unknown>).last_read_at as string | null);
-  }
-
-  const counts = await Promise.all(
-    chatIds.map(async (chatId) => {
-      let query = supabase
-        .from(messageTable)
-        .select('*', { count: 'exact', head: true })
-        .eq(idColumn, chatId)
-        // A user's own messages are never "unread" for them (they know what
-        // they wrote), so they must not inflate the badge.
-        .neq('sender_id', userId);
-      const lastReadAt = cursorMap.get(chatId);
-      if (lastReadAt) query = query.gt('created_at', lastReadAt);
-      const { count, error } = await query;
-      if (error) throw error;
-      return [chatId, count ?? 0] as const;
-    }),
-  );
-
-  for (const [chatId, count] of counts) {
-    if (count > 0) result[chatId] = count;
-  }
-  return result;
-}
-
-// Timestamp of the most recent message in each chat (null when empty), used to
-// order the Chats hub most-recent-activity first. One query total: rows come
-// back newest-first, so the first row seen per chat is its latest message.
-export async function fetchChatLastMessageAt(
-  messageTable: ChatMessageTable,
-  idColumn: ChatIdColumn,
-  chatIds: string[],
-): Promise<Record<string, string | null>> {
-  const result: Record<string, string | null> = {};
-  if (chatIds.length === 0) return result;
-
-  const { data, error } = await supabase
-    .from(messageTable)
-    .select(`${idColumn}, created_at`)
-    .in(idColumn, chatIds)
-    .order('created_at', { ascending: false });
+// Batched unread counts + most-recent-message timestamps for every chat the
+// caller belongs to (approved communities / sessions they created or were
+// accepted onto). One RPC per chat type instead of one query per chat; rows
+// are scoped to auth.uid() server-side.
+export async function fetchChatHubStats(
+  chatType: 'community' | 'session',
+): Promise<ChatHubStats> {
+  const { data, error } = await supabase.rpc('get_chat_hub_stats', {
+    p_chat_type: chatType,
+  });
 
   if (error) throw error;
 
-  const seen = new Set<string>();
-  for (const row of data ?? []) {
-    const id = (row as Record<string, unknown>)[idColumn] as string;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    result[id] = (row as Record<string, unknown>).created_at as string;
+  const unread: Record<string, number> = {};
+  const lastMessageAt: Record<string, string | null> = {};
+  for (const row of (data ?? []) as {
+    chat_id: string;
+    unread_count: number;
+    last_message_at: string | null;
+  }[]) {
+    if (row.unread_count > 0) unread[row.chat_id] = row.unread_count;
+    lastMessageAt[row.chat_id] = row.last_message_at;
   }
-  return result;
+  return { unread, lastMessageAt };
 }
 
 // ---------------------------------------------------------------------------

@@ -269,7 +269,9 @@ community_chat_read
 
 -- View: community_leaderboard (per-community rank by win_ratio)
 -- RPCs: get_accepted_commitment_counts, close_expired_sessions,
---        create_community_invite, respond_to_community_invite
+--        create_community_invite, respond_to_community_invite,
+--        get_chat_hub_stats (migration 036: batched unread counts +
+--        last-message timestamps for the Chats hub, scoped via auth.uid())
 ```
 
 ### Notification Types
@@ -333,6 +335,7 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 - **Notification state**: actionable notifications are resolved in-place (type → resolved type + `read = true`) both by the `ActivityCard`/`InviteCard` components and by the underlying service actions (`approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, `approveCommunityMatch`/`disputeCommunityMatch`), so the inbox, tab badge, and "Action Required"/"Invites" tabs stay consistent no matter where the action was taken — no local-only UI hacks
 - **Soft delete** keeps a deleted `profiles` row; on next login with the same Google account the profile is re-enabled
 - **Supabase RLS** protects all tables (see `supabase/schema.sql`); the `insert_notification` RPC is SECURITY DEFINER so clients can send push for other users
+- **Chats hub is fast by construction** — unread counts + last-message timestamps come from one batched `get_chat_hub_stats` RPC per chat type (migration 036, scoped via `auth.uid()`), not N+1 per-chat counts; the hub renders community/session rows first and hydrates badges/sort after; a 30s stale-while-revalidate module cache (`src/hooks/useChats.ts`) makes tab revisits instant. Session rows come from the lean `fetchChatSessions` (no commitment embeds / count RPC / expiry RPC). `closeExpiredSessions` is client-side debounced (15s) to collapse the repeated RPC across screens; composite list indexes were added in migration 037.
 - **Session/community chat has no joins / no per-message refetch** — sender name/avatar are snapshotted on the row at insert (migration 026 / 027) and reply previews resolve from the already-loaded message list; this removes the self-join (and its PGRST200 schema-cache dependency) plus one extra round-trip per message
 - **FCM fan-out is batched server-side** — the `send-chat-notification` edge function computes all recipients (creator + accepted participants / approved members, minus sender) in one invocation and sends N FCM messages; it caches its OAuth token (single-flight promise, 5-min refresh margin) so a message costs one JWT, not one per recipient. `send-notification` handles in-app notifications one row at a time (single recipient).
 - **Chat is FCM-only** — chat pushes never touch `in_app_notifications`, so they don't pollute the Activity inbox or drive its unread badge
@@ -352,3 +355,4 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "feat: session chat — optimistic sends (clock → checked), own avatar, long-press reply sheets + reply pushes, batched FCM fan-out (single edge call), sender snapshots with no per-message refetch"
   - "feat: community chat — same shared chat implementation as sessions, scoped to approved community members, FCM-only pushes, chat button next to ping button in community home"
   - "feat: server-side push — all FCM delivery moved out of the client into pg_net triggers (migration 035) + `send-notification`/`send-chat-notification` edge functions, so web sends push to app users identically to native"
+  - "perf: chats hub — batched `get_chat_hub_stats` RPC (migration 036), stale-while-revalidate cache + render-first hydration in `useChats`, lean `fetchChatSessions` for the hub, debounced `closeExpiredSessions`, composite list indexes (migration 037)"

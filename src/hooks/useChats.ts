@@ -1,10 +1,10 @@
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { setChatUnreadCount } from '@/lib/chatUnreadStore';
-import { fetchChatLastMessageAt, fetchChatUnreadCounts } from '@/services/chat';
+import { fetchChatHubStats, type ChatHubStats } from '@/services/chat';
 import { fetchMyCommunities } from '@/services/communities';
-import { fetchJoinedSessions, fetchMySessions } from '@/services/sessions';
+import { fetchChatSessions } from '@/services/sessions';
 import type { Community, Session } from '@/types';
 
 export type ChatKind = 'community' | 'session';
@@ -22,91 +22,179 @@ function sortByLastMessage<T extends { id: string }>(
   });
 }
 
+type ChatHubCache = {
+  userId: string;
+  communities: Community[];
+  sessions: Session[];
+  communityUnread: Record<string, number>;
+  sessionUnread: Record<string, number>;
+  communityLastAt: Record<string, string | null>;
+  sessionLastAt: Record<string, string | null>;
+  fetchedAt: number;
+};
+
+// Stale-while-revalidate cache shared across tab focuses: revisits render the
+// last seen data instantly while a background load quietly refreshes it when it
+// goes stale. Kept in sync with in-screen updates (chat popup reads + messages)
+// so a fast revisit can never revert them.
+let chatsCache: ChatHubCache | null = null;
+
+const CHATS_CACHE_TTL_MS = 30_000;
+
+function buildCache(
+  userId: string,
+  communities: Community[],
+  sessions: Session[],
+  commStats: ChatHubStats,
+  sessStats: ChatHubStats,
+): ChatHubCache {
+  return {
+    userId,
+    communities,
+    sessions,
+    communityUnread: commStats.unread,
+    sessionUnread: sessStats.unread,
+    communityLastAt: commStats.lastMessageAt,
+    sessionLastAt: sessStats.lastMessageAt,
+    fetchedAt: Date.now(),
+  };
+}
+
 // Loads the Chats hub data: communities I'm a member of + sessions I created
 // or am accepted on, each with an unread chat-message count. Pushes the total
 // unread count into the chatUnread external store so the tab badge stays in
 // sync while the screen is focused.
 export function useChats(userId: string | undefined) {
-  const [communities, setCommunities] = useState<Community[]>([]);
-  const [sessions, setSessions] = useState<Session[]>([]);
-  const [communityUnread, setCommunityUnread] = useState<Record<string, number>>({});
-  const [sessionUnread, setSessionUnread] = useState<Record<string, number>>({});
-  const [communityLastAt, setCommunityLastAt] = useState<Record<string, string | null>>({});
-  const [sessionLastAt, setSessionLastAt] = useState<Record<string, string | null>>({});
-  const [loading, setLoading] = useState(true);
+  const initial = chatsCache && chatsCache.userId === userId ? chatsCache : null;
+
+  const [communities, setCommunities] = useState<Community[]>(initial?.communities ?? []);
+  const [sessions, setSessions] = useState<Session[]>(initial?.sessions ?? []);
+  const [communityUnread, setCommunityUnread] = useState<Record<string, number>>(
+    initial?.communityUnread ?? {},
+  );
+  const [sessionUnread, setSessionUnread] = useState<Record<string, number>>(
+    initial?.sessionUnread ?? {},
+  );
+  const [communityLastAt, setCommunityLastAt] = useState<Record<string, string | null>>(
+    initial?.communityLastAt ?? {},
+  );
+  const [sessionLastAt, setSessionLastAt] = useState<Record<string, string | null>>(
+    initial?.sessionLastAt ?? {},
+  );
+  const [loading, setLoading] = useState(!initial);
   const [refreshing, setRefreshing] = useState(false);
+  const loadInFlight = useRef(false);
 
-  const load = useCallback(async () => {
-    if (!userId) {
-      setCommunities([]);
-      setSessions([]);
-      setCommunityUnread({});
-      setSessionUnread({});
-      setCommunityLastAt({});
-      setSessionLastAt({});
-      setChatUnreadCount(0);
-      setLoading(false);
-      return;
-    }
+  const showCache = useCallback((cache: ChatHubCache) => {
+    setCommunities(cache.communities);
+    setSessions(cache.sessions);
+    setCommunityUnread(cache.communityUnread);
+    setSessionUnread(cache.sessionUnread);
+    setCommunityLastAt(cache.communityLastAt);
+    setSessionLastAt(cache.sessionLastAt);
+    const total =
+      Object.values(cache.communityUnread).reduce((sum, n) => sum + n, 0) +
+      Object.values(cache.sessionUnread).reduce((sum, n) => sum + n, 0);
+    setChatUnreadCount(total);
+    setLoading(false);
+  }, []);
 
-    try {
-      const [comm, mine, joined] = await Promise.all([
-        fetchMyCommunities(userId),
-        fetchMySessions(userId),
-        fetchJoinedSessions(userId),
-      ]);
+  const load = useCallback(
+    async (opts?: { silent?: boolean }) => {
+      if (!userId) {
+        chatsCache = null;
+        setCommunities([]);
+        setSessions([]);
+        setCommunityUnread({});
+        setSessionUnread({});
+        setCommunityLastAt({});
+        setSessionLastAt({});
+        setChatUnreadCount(0);
+        setLoading(false);
+        return;
+      }
+      if (loadInFlight.current) return;
+      loadInFlight.current = true;
+      try {
+        // Rows first: communities/sessions render as soon as they arrive.
+        const [comm, sess] = await Promise.all([
+          fetchMyCommunities(userId),
+          // Lean session rows — no commitment embeds or count RPC (~2 queries,
+          // vs ~7 from fetchMySessions + fetchJoinedSessions).
+          fetchChatSessions(userId),
+        ]);
 
-      const sessMap = new Map<string, Session>();
-      for (const session of [...joined, ...mine]) sessMap.set(session.id, session);
-      const sess = [...sessMap.values()];
+        setCommunities(comm);
+        setSessions(sess);
+        setLoading(false);
 
-      const [commUnread, sessUnread, commLastAt, sessLastAt] = await Promise.all([
-        fetchChatUnreadCounts(
-          'community_messages',
-          'community_id',
-          comm.map((c) => c.id),
-          userId,
-        ),
-        fetchChatUnreadCounts(
-          'session_messages',
-          'session_id',
-          sess.map((s) => s.id),
-          userId,
-        ),
-        fetchChatLastMessageAt(
-          'community_messages',
-          'community_id',
-          comm.map((c) => c.id),
-        ),
-        fetchChatLastMessageAt(
-          'session_messages',
-          'session_id',
-          sess.map((s) => s.id),
-        ),
-      ]);
+        // Badges + "latest activity" hydrate as each batched RPC lands; a
+        // failed kind keeps whatever the cache already had.
+        const [commStats, sessStats] = await Promise.all([
+          fetchChatHubStats('community')
+            .then((s) => {
+              setCommunityUnread(s.unread);
+              setCommunityLastAt(s.lastMessageAt);
+              return s;
+            })
+            .catch((e) => {
+              console.error('Failed to load community chat stats:', e);
+              return null;
+            }),
+          fetchChatHubStats('session')
+            .then((s) => {
+              setSessionUnread(s.unread);
+              setSessionLastAt(s.lastMessageAt);
+              return s;
+            })
+            .catch((e) => {
+              console.error('Failed to load session chat stats:', e);
+              return null;
+            }),
+        ]);
 
-      setCommunities(comm);
-      setSessions(sess);
-      setCommunityUnread(commUnread);
-      setSessionUnread(sessUnread);
-      setCommunityLastAt(commLastAt);
-      setSessionLastAt(sessLastAt);
+        const effCommStats: ChatHubStats = commStats ?? {
+          unread: chatsCache?.communityUnread ?? {},
+          lastMessageAt: chatsCache?.communityLastAt ?? {},
+        };
+        const effSessStats: ChatHubStats = sessStats ?? {
+          unread: chatsCache?.sessionUnread ?? {},
+          lastMessageAt: chatsCache?.sessionLastAt ?? {},
+        };
 
-      const total =
-        Object.values(commUnread).reduce((sum, n) => sum + n, 0) +
-        Object.values(sessUnread).reduce((sum, n) => sum + n, 0);
-      setChatUnreadCount(total);
-    } catch (e) {
-      console.error('Failed to load chats:', e);
-    } finally {
-      setLoading(false);
-    }
-  }, [userId]);
+        const total =
+          Object.values(effCommStats.unread).reduce((sum, n) => sum + n, 0) +
+          Object.values(effSessStats.unread).reduce((sum, n) => sum + n, 0);
+        setChatUnreadCount(total);
+
+        chatsCache = buildCache(userId, comm, sess, effCommStats, effSessStats);
+      } catch (e) {
+        console.error('Failed to load chats:', e);
+      } finally {
+        if (!opts?.silent) setLoading(false);
+        loadInFlight.current = false;
+      }
+    },
+    [userId],
+  );
 
   useFocusEffect(
     useCallback(() => {
-      load();
-    }, [load]),
+      if (!userId) {
+        chatsCache = null;
+        return;
+      }
+      const cached = chatsCache && chatsCache.userId === userId ? chatsCache : null;
+      if (cached) {
+        showCache(cached);
+        if (Date.now() - cached.fetchedAt >= CHATS_CACHE_TTL_MS) {
+          load({ silent: true });
+        }
+      } else {
+        setLoading(true);
+        load();
+      }
+    }, [userId, showCache, load]),
   );
 
   const refresh = useCallback(async () => {
@@ -121,10 +209,15 @@ export function useChats(userId: string | undefined) {
   // the moment we close the popup (no spinner).
   const touchLastMessage = useCallback((kind: ChatKind, chatId: string, at: string) => {
     const setter = kind === 'community' ? setCommunityLastAt : setSessionLastAt;
+    const cacheKey = kind === 'community' ? 'communityLastAt' : 'sessionLastAt';
     setter((prev) => {
       const existing = prev[chatId];
       if (existing && existing >= at) return prev;
-      return { ...prev, [chatId]: at };
+      const next = { ...prev, [chatId]: at };
+      if (chatsCache) {
+        chatsCache = { ...chatsCache, [cacheKey]: next };
+      }
+      return next;
     });
   }, []);
 
@@ -133,7 +226,14 @@ export function useChats(userId: string | undefined) {
   // incoming messages land.
   const setChatUnread = useCallback((kind: ChatKind, chatId: string, count: number) => {
     const setter = kind === 'community' ? setCommunityUnread : setSessionUnread;
-    setter((prev) => ({ ...prev, [chatId]: count }));
+    const cacheKey = kind === 'community' ? 'communityUnread' : 'sessionUnread';
+    setter((prev) => {
+      const next = { ...prev, [chatId]: count };
+      if (chatsCache) {
+        chatsCache = { ...chatsCache, [cacheKey]: next };
+      }
+      return next;
+    });
   }, []);
 
   const sortedCommunities = useMemo(

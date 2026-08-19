@@ -15,6 +15,12 @@ type SessionRow = Session & {
   commitments: { id: string; user_id: string; status: string }[] | null;
 };
 
+// Coalesces the close_expired_sessions RPC + notification cleanup across the
+// screens that call it on every focus (session feed scopes, pending feedback,
+// sessions/popups). Multiple calls inside a window collapse into one.
+let lastCloseExpiredAt = 0;
+const CLOSE_EXPIRED_MIN_INTERVAL_MS = 15_000;
+
 function normalizeSession(
   row: SessionRow,
   currentUserId?: string,
@@ -190,6 +196,42 @@ export async function fetchJoinedSessions(userId: string): Promise<Session[]> {
       normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
     ),
   );
+}
+
+// Lean session rows for the Chats hub. The hub only renders title / status /
+// date, so this skips the commitment embeds, the per-session count RPC, and the
+// expiry RPC entirely — just the union of "created by me" + "accepted on".
+export async function fetchChatSessions(userId: string): Promise<Session[]> {
+  const { data: committedRows, error: committedError } = await supabase
+    .from('commitments')
+    .select('session_id')
+    .eq('user_id', userId)
+    .eq('status', 'accepted');
+
+  if (committedError) throw committedError;
+
+  const committedIds = (committedRows ?? []).map((c) => c.session_id);
+
+  let query = supabase
+    .from('sessions')
+    .select(
+      `
+      id, created_by, purpose, title, location, date_time, expires_at,
+      max_participants, description, status, created_at, updated_at,
+      creator:profiles!sessions_created_by_fkey (id, username, avatar_url)
+    `,
+    );
+
+  if (committedIds.length > 0) {
+    query = query.or(`created_by.eq.${userId},id.in.(${committedIds.join(',')})`);
+  } else {
+    query = query.eq('created_by', userId);
+  }
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  return (data ?? []).map((row) => normalizeSession(row as unknown as SessionRow, userId));
 }
 
 // Sessions the user was once part of (as creator or an accepted/left
@@ -712,6 +754,10 @@ export async function checkTimeConflicts(
 }
 
 export async function closeExpiredSessions(currentUserId?: string): Promise<void> {
+  const now = Date.now();
+  if (now - lastCloseExpiredAt < CLOSE_EXPIRED_MIN_INTERVAL_MS) return;
+  lastCloseExpiredAt = now;
+
   const { error } = await supabase.rpc('close_expired_sessions');
   if (error) console.error('Failed to close expired sessions:', error);
 
