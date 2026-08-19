@@ -37,15 +37,10 @@ export function useFCM() {
     async (data: NotificationData) => {
       switch (data.type) {
         case 'ping': {
-          if (data.pingId && data.communityId) {
+          if (data.communityId) {
             router.push({
-              pathname: '/ping-response',
-              params: {
-                pingId: data.pingId,
-                communityId: data.communityId,
-                message: data.message ?? '',
-                senderName: data.senderName ?? 'Someone',
-              },
+              pathname: '/community/[id]',
+              params: { id: data.communityId },
             });
           }
           return;
@@ -103,7 +98,6 @@ export function useFCM() {
         case 'member_removed':
         case 'admin_transferred':
         case 'admin_promoted':
-        case 'ping_response':
         case 'community_invite':
         case 'community_invite_accepted':
         case 'community_invite_rejected':

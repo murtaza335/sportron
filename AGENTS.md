@@ -114,7 +114,7 @@ src/
 - **Members**: sorted me → admins → members; admin long-press for Make Admin / Remove; pending-invite section
 - **Invite Members**: admin can invite by typing username (public or restricted); invitees accept/reject via Invite tab
 - **Join requests**: admin review screen with approve/reject
-- **Pings**: any member can ping the whole community; members respond "Coming"/"Busy" (realtime live responses)
+- **Pings**: any member can ping the whole community (notification to all members); the "reply Coming/Busy" feature and `ping_responses` table were removed (migration 034)
 
 ### 4. Community Matches
 - Recorded **within a community**, opponents limited to community members
@@ -248,10 +248,6 @@ community_invites
 pings
   id, community_id, sender_id, message, created_at
 
-ping_responses
-  id, ping_id (fk, cascade), community_id (fk), respondent_id (fk),
-  response (coming|busy), created_at, unique (ping_id, respondent_id)
-
 in_app_notifications
   id, user_id (fk, cascade), type, title, body, data, read, created_at
   -- inserted via SECURITY DEFINER RPC `insert_notification`
@@ -296,7 +292,7 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 - All Supabase calls go through `src/services/*` (return `{ data, error }`, throw on error)
 - Hooks wrap service calls, expose `{ data, loading, refreshing, refresh }`, reload on focus
 - `useCommunity(communityId, userId)` exposes community, membership, joinRequests + setters
-- Real-time: `supabase.channel` for `ping_responses` (community screen), `session_messages` / `community_messages` (session + community chat), and `in_app_notifications` (`NotificationsProvider`)
+- Real-time: `supabase.channel` for `session_messages` / `community_messages` (session + community chat), and `in_app_notifications` (`NotificationsProvider`)
 - Cross-screen state is shared via React Context (`AuthContext`, `ThemeContext`, `NotificationsContext`) — consume through the matching `use*` hook, never instantiate a fresh copy per screen
 - Tiny external stores via `useSyncExternalStore` for state the header and tabs must agree on: `src/lib/sessionsView.ts` (`'new' | 'history'` toggle)
 

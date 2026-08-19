@@ -183,17 +183,6 @@ function RootNavigator() {
             headerStyle: { backgroundColor: theme.background },
           }}
         />
-        <Stack.Screen
-          name="ping-response"
-          options={{
-            headerShown: true,
-            title: 'Ping Reply',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
       </Stack>
     </View>
   );
