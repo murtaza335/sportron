@@ -148,7 +148,7 @@ src/
 - **My avatar** renders on the right of your own bubbles (from `useAuth().profile`)
 - **Long-press to reply**: long-press any message to open a bottom-sheet "Reply to <name>" option; replies store `reply_to_id` (migration 025) and render a preview block (quoted name/content) inside the bubble
 - **No joins / no per-message refetch**: `sender_username`/`sender_avatar_url` are snapshotted on the row at insert (migrations 026 / 027), so realtime payloads and the initial fetch carry the display name without a join. Reply previews/names resolve client-side from the already-loaded list (`resolveReplyPreview`), so replying to your own message shows your own name. This removed the self-join (`!reply_to_id`) entirely, along with the PGRST200 schema-cache dependency and one extra round-trip per message
-- **Push**: each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. `notifyChatMembers` / `notifyCommunityChatMembers` fan out via **one batched edge-function call** (`pushFcmToUsers`) instead of one HTTP call per recipient. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …")
+- **Push** (server-side, migration 035): each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. A Postgres trigger on `session_messages` / `community_messages` fires the **`send-chat-notification`** edge function via pg_net, which computes recipients (creator + accepted participants / approved members), skips active readers via `chat_presence`, applies per-recipient Android summary bodies, and fans out in one call. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …"). No client code triggers chat pushes — this works identically from web, which has no FCM but can still cause app users to receive pushes
 - **Unread tracking** (migration 028): one row per (chat, user) in `session_chat_read` / `community_chat_read` holding `last_read_at` — O(participants), no per-message receipts. `fetchChatUnreadCount` counts `created_at > last_read_at` (0 when no cursor yet); `fetchChatReadCursor`/`upsertChatReadCursor` read/write the cursor. `useChat` exposes `unreadCount`, `firstUnreadIndex` (index of the oldest unread in the ascending list), and `markRead()` (upsert cursor → now, resets count). `ChatPopup` scrolls to the oldest unread with a "New messages" divider on open, marks read on open + debounced on scroll-end, and skips auto-pin-to-bottom while unread remain; realtime INSERTs from others bump `unreadCount` live so the badge updates even while closed. Unread badges show on the chat button in `community/[id].tsx` (members only) and on the session chat button in `SessionDetailPopup` (`canViewChat`). The `chat` thread is owned by the parent screen and passed into `SessionChatPopup`/`CommunityChatPopup` (no internal hook), so the badge and popup share one subscription
 
 ### 7. Activity (Notifications Inbox)
@@ -162,10 +162,10 @@ src/
 
 ### 8. Push Notifications (FCM)
 - FCM token registered per device (`profiles.fcm_tokens`)
-- `send-notification` Edge Function delivers via Firebase HTTP v1; accepts `user_ids[]` for **batched fan-out** (one invocation, one profiles `.in()` query, N FCM sends) and **caches the OAuth access token** with a single-flight promise (one JWT per hour per warm instance)
-- `pushFcmToUsers(userIds, ...)` batches a whole fan-out in a single edge call; `pushFcmToUser` is a thin wrapper for single recipients
+- **Push delivery is 100% server-side (migration 035) — no client code triggers FCM.** A Postgres trigger on `in_app_notifications` INSERT fires `pg_net.http_post` to the **`send-notification`** edge function with `{ notification_id }`; the function reads the row (recipient, title, body, data) and delivers via Firebase HTTP v1. A trigger on `session_messages` / `community_messages` INSERT fires the **`send-chat-notification`** edge function for FCM-only chat fan-out (see section 6). Both functions require a **service_role** bearer token (sent from Vault by the trigger, verified via `SUPABASE_JWT_SECRET`) and share the FCM plumbing in `supabase/functions/_shared/fcm.ts` (batched fan-out, cached OAuth token with a single-flight promise — one JWT per hour per warm instance)
+- Web cannot **receive** FCM, but it can always **send**: every action on web inserts the DB row, which fires the same server-side push — app users never know the sender was on web
 - Foreground/background/terminated handling; background data-only messages → local notification
-- `session_chat_message` / `session_chat_reply` / `community_chat_message` / `community_chat_reply` pushes are **FCM-only** (sent via `pushFcmToUsers`, never inserted into `in_app_notifications`)
+- `session_chat_message` / `session_chat_reply` / `community_chat_message` / `community_chat_reply` pushes are **FCM-only** (server-triggered, never inserted into `in_app_notifications`). FCM payloads for in-app notifications carry `type` + the row's `data` for tap-routing
 
 ### 9. Profile & Settings
 - **Profile**: view/edit username, bio, role (student/teacher), avatar upload; profile for other users via `/profile/[id]`
@@ -251,6 +251,13 @@ pings
 in_app_notifications
   id, user_id (fk, cascade), type, title, body, data, read, created_at
   -- inserted via SECURITY DEFINER RPC `insert_notification`
+  -- INSERT trigger `trg_fcm_push` → pg_net → `send-notification` edge function (migration 035)
+
+session_messages
+  -- INSERT trigger `trg_session_chat_fcm_push` → pg_net → `send-chat-notification` (migration 035)
+
+community_messages
+  -- INSERT trigger `trg_community_chat_fcm_push` → pg_net → `send-chat-notification` (migration 035)
 
 session_chat_read
   session_id (fk, cascade), profile_id (fk, cascade), last_read_at
@@ -285,7 +292,8 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 
 ### Edge Functions (Supabase)
 - Edge functions live in `supabase/functions/` and deploy **separately** from the app — a Vercel deploy does NOT deploy them. They are never deployed automatically by committing code.
-- **CRITICAL**: any change to an edge function — payload/response contract, request fields, response shape, secrets/env (`FCM_SERVICE_ACCOUNT`), or the function body — takes effect **only after** `supabase functions deploy <name>`. Keep deployed functions backward-compatible with installed app versions (e.g. `send-notification` accepts both `user_id` and `user_ids`); a stale deployed function vs. new client payload = silent 400s = push broken for everyone.
+- **CRITICAL**: any change to an edge function — payload/response contract, request fields, response shape, secrets/env (`FCM_SERVICE_ACCOUNT`), or the function body — takes effect **only after** `supabase functions deploy <name>`. Keep deployed functions backward-compatible with installed app versions; a stale deployed function vs. new client payload = silent 400s = push broken for everyone.
+- **Edge functions are NOT called by the client anymore.** `send-notification` and `send-chat-notification` are only invoked by Postgres triggers via pg_net (migration 035) after a chat/notification row is inserted, so web-sent actions push to app users identically to native. Both require a `service_role` bearer token; the trigger reads the service role key + Supabase URL from Vault secrets (`vault.create_secret('...', 'service_role_key')` and `'supabase_url'`).
 - **Whenever an edge function is edited, the AI must explicitly instruct the user to redeploy it** (e.g. `supabase functions deploy send-notification`) and remind them to verify with a live test afterward.
 
 ### State & Data Patterns
@@ -326,8 +334,9 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 - **Soft delete** keeps a deleted `profiles` row; on next login with the same Google account the profile is re-enabled
 - **Supabase RLS** protects all tables (see `supabase/schema.sql`); the `insert_notification` RPC is SECURITY DEFINER so clients can send push for other users
 - **Session/community chat has no joins / no per-message refetch** — sender name/avatar are snapshotted on the row at insert (migration 026 / 027) and reply previews resolve from the already-loaded message list; this removes the self-join (and its PGRST200 schema-cache dependency) plus one extra round-trip per message
-- **FCM fan-out is batched** — `sendSessionMessage`/`sendCommunityMessage` fan out via a single `send-notification` call for all recipients (`pushFcmToUsers`); the edge function caches its OAuth token (single-flight promise, 5-min refresh margin) so a message costs one JWT, not one per recipient
+- **FCM fan-out is batched server-side** — the `send-chat-notification` edge function computes all recipients (creator + accepted participants / approved members, minus sender) in one invocation and sends N FCM messages; it caches its OAuth token (single-flight promise, 5-min refresh margin) so a message costs one JWT, not one per recipient. `send-notification` handles in-app notifications one row at a time (single recipient).
 - **Chat is FCM-only** — chat pushes never touch `in_app_notifications`, so they don't pollute the Activity inbox or drive its unread badge
+- **No client-side FCM trigger remains** — `src/services/notifications.ts` and `src/services/chat.ts` only insert rows; migration 035 + the `send-notification`/`send-chat-notification` edge functions (invoked by pg_net triggers) handle delivery. This keeps web (which has no FCM send capability beyond the fetch it used to make) from ever blocking app users' pushes.
 
 ---
 
@@ -342,3 +351,4 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "sessions: optional title + required purpose, New/History header toggle, All/Joined/My scopes, active-first sorting"
   - "feat: session chat — optimistic sends (clock → checked), own avatar, long-press reply sheets + reply pushes, batched FCM fan-out (single edge call), sender snapshots with no per-message refetch"
   - "feat: community chat — same shared chat implementation as sessions, scoped to approved community members, FCM-only pushes, chat button next to ping button in community home"
+  - "feat: server-side push — all FCM delivery moved out of the client into pg_net triggers (migration 035) + `send-notification`/`send-chat-notification` edge functions, so web sends push to app users identically to native"
