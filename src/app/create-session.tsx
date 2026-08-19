@@ -53,11 +53,15 @@ export default function CreateSessionScreen() {
   const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
 
   const EXPIRE_OPTIONS = [
-    { label: '15 min', value: 15 },
     { label: '30 min', value: 30 },
     { label: '1 hr', value: 60 },
+    { label: '2 hr', value: 120 },
+    { label: '3 hr', value: 180 },
+    { label: '4 hr', value: 240 },
+    { label: '5 hr', value: 300 },
+    { label: '6 hr', value: 360 },
   ];
-  const [expireIndex, setExpireIndex] = useState(1); // 30 min default
+  const [expireIndex, setExpireIndex] = useState(0); // 30 min default
 
   const handleParticipantsChange = (text: string) => {
     const digits = text.replace(/[^0-9]/g, '');
@@ -247,6 +251,7 @@ export default function CreateSessionScreen() {
                   borderColor: theme.border,
                 },
               ]}
+              autoFocus
             />
             <ThemedText variant="caption" muted style={styles.hintText}>
               {title.length}/{MAX_SESSION_TITLE_LENGTH} characters
@@ -270,7 +275,6 @@ export default function CreateSessionScreen() {
                   borderColor: theme.border,
                 },
               ]}
-              autoFocus
             />
           </View>
 
@@ -409,7 +413,7 @@ export default function CreateSessionScreen() {
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
-              Expire After
+              Duration
             </ThemedText>
             <ScrollView
               horizontal

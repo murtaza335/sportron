@@ -1,6 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import { formatSessionDisplayName } from '@/lib/date';
-import { pushFcmToUsers } from './notifications';
+import { pushFcmToUsers, type PresenceFilter } from './notifications';
 import type { ChatMessageBase, ChatSender, CommunityChatMessage, SessionChatMessage } from '@/types';
 
 export const MAX_CHAT_MESSAGE_LENGTH = 1000;
@@ -77,8 +77,128 @@ export async function upsertChatReadCursor(
   if (error) throw error;
 }
 
+// Unread counts for many chats at once (used by the Chats hub). Reads every
+// read cursor the user has for this chat type in one query, then counts
+// messages newer than each cursor in parallel. A chat with no cursor counts as
+// fully unread.
+export async function fetchChatUnreadCounts(
+  messageTable: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatIds: string[],
+  userId: string,
+): Promise<Record<string, number>> {
+  const result: Record<string, number> = {};
+  if (chatIds.length === 0) return result;
+
+  const readTable = readTableForIdColumn(idColumn);
+  const { data: cursors, error: cursorError } = await supabase
+    .from(readTable)
+    .select(`${idColumn}, last_read_at`)
+    .eq('profile_id', userId);
+
+  if (cursorError) throw cursorError;
+
+  const cursorMap = new Map<string, string | null>();
+  for (const row of cursors ?? []) {
+    cursorMap.set((row as Record<string, unknown>)[idColumn] as string, (row as Record<string, unknown>).last_read_at as string | null);
+  }
+
+  const counts = await Promise.all(
+    chatIds.map(async (chatId) => {
+      let query = supabase
+        .from(messageTable)
+        .select('*', { count: 'exact', head: true })
+        .eq(idColumn, chatId)
+        // A user's own messages are never "unread" for them (they know what
+        // they wrote), so they must not inflate the badge.
+        .neq('sender_id', userId);
+      const lastReadAt = cursorMap.get(chatId);
+      if (lastReadAt) query = query.gt('created_at', lastReadAt);
+      const { count, error } = await query;
+      if (error) throw error;
+      return [chatId, count ?? 0] as const;
+    }),
+  );
+
+  for (const [chatId, count] of counts) {
+    if (count > 0) result[chatId] = count;
+  }
+  return result;
+}
+
+// Timestamp of the most recent message in each chat (null when empty), used to
+// order the Chats hub most-recent-activity first. One query total: rows come
+// back newest-first, so the first row seen per chat is its latest message.
+export async function fetchChatLastMessageAt(
+  messageTable: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatIds: string[],
+): Promise<Record<string, string | null>> {
+  const result: Record<string, string | null> = {};
+  if (chatIds.length === 0) return result;
+
+  const { data, error } = await supabase
+    .from(messageTable)
+    .select(`${idColumn}, created_at`)
+    .in(idColumn, chatIds)
+    .order('created_at', { ascending: false });
+
+  if (error) throw error;
+
+  const seen = new Set<string>();
+  for (const row of data ?? []) {
+    const id = (row as Record<string, unknown>)[idColumn] as string;
+    if (seen.has(id)) continue;
+    seen.add(id);
+    result[id] = (row as Record<string, unknown>).created_at as string;
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Chat presence (active-reader heartbeat) — separate from read cursors
+// ---------------------------------------------------------------------------
+
+export function presenceFilterFor(
+  chatType: PresenceFilter['chat_type'],
+  chatId: string,
+): PresenceFilter {
+  return { chat_type: chatType, chat_id: chatId };
+}
+
+export async function upsertChatPresence(
+  chatType: PresenceFilter['chat_type'],
+  chatId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('chat_presence')
+    .upsert(
+      { chat_type: chatType, chat_id: chatId, profile_id: userId, last_seen_at: new Date().toISOString() },
+      { onConflict: 'chat_type,chat_id,profile_id' },
+    );
+
+  if (error) throw error;
+}
+
+export async function deleteChatPresence(
+  chatType: PresenceFilter['chat_type'],
+  chatId: string,
+  userId: string,
+): Promise<void> {
+  const { error } = await supabase
+    .from('chat_presence')
+    .delete()
+    .eq('chat_type', chatType)
+    .eq('chat_id', chatId)
+    .eq('profile_id', userId);
+
+  if (error) throw error;
+}
+
 // Count of messages newer than the user's last-read cursor. When no cursor has
-// ever been written, count = 0 (nothing is "unread" before their first read).
+// ever been written, count = ALL messages (standard never-read semantics, and
+// matches the edge function's per-recipient summary bodies).
 export async function fetchChatUnreadCount(
   messageTable: ChatMessageTable,
   idColumn: ChatIdColumn,
@@ -89,13 +209,18 @@ export async function fetchChatUnreadCount(
   if (lastReadAt === undefined) {
     lastReadAt = await fetchChatReadCursor(idColumn, chatId, userId);
   }
-  if (!lastReadAt) return 0;
 
-  const { count, error } = await supabase
+  let query = supabase
     .from(messageTable)
     .select('*', { count: 'exact', head: true })
     .eq(idColumn, chatId)
-    .gt('created_at', lastReadAt);
+    // Own messages never count as unread (see fetchChatUnreadCounts).
+    .neq('sender_id', userId);
+  if (lastReadAt) {
+    query = query.gt('created_at', lastReadAt);
+  }
+
+  const { count, error } = await query;
 
   if (error) throw error;
   return count ?? 0;
@@ -142,19 +267,73 @@ async function insertChatMessage(input: {
 }
 
 // ---------------------------------------------------------------------------
-// Session chat
+// Chat messages (paged, newest-first fetch; returned ascending)
 // ---------------------------------------------------------------------------
 
-export async function fetchSessionMessages(sessionId: string): Promise<SessionChatMessage[]> {
-  const { data, error } = await supabase
-    .from('session_messages')
-    .select('*')
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true })
-    .limit(200);
+export const CHAT_PAGE_SIZE = 50;
 
+export type ChatPageOptions = {
+  beforeCreatedAt?: string | null;
+  pageSize?: number;
+};
+
+export type ChatPage<T> = {
+  messages: T[];
+  hasMore: boolean;
+};
+
+async function fetchMessagePage<T extends ChatMessageBase>(
+  table: ChatMessageTable,
+  idColumn: ChatIdColumn,
+  chatId: string,
+  opts: ChatPageOptions = {},
+): Promise<ChatPage<T>> {
+  const pageSize = opts.pageSize ?? CHAT_PAGE_SIZE;
+  let query = supabase
+    .from(table)
+    .select('*')
+    .eq(idColumn, chatId)
+    .order('created_at', { ascending: false })
+    // Deterministic tie-break so pages that share the same created_at boundary
+    // message come back in the same order every time.
+    .order('id', { ascending: false })
+    .limit(pageSize + 1);
+
+  if (opts.beforeCreatedAt) {
+    // INCLUSIVE cursor: paginating on created_at alone can SKIP messages when
+    // several share the exact timestamp at the page boundary (paging lt() drops
+    // every message stamped equal to the cursor). Going <= keeps all boundary
+    // messages reachable; the caller (useChat.loadOlder) dedupes the overlap by
+    // id, so a shared timestamp can never cause a skipped or duplicate bubble.
+    query = query.lte('created_at', opts.beforeCreatedAt);
+  }
+
+  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).map(normalizeChatMessage);
+
+  const rows = data ?? [];
+  const hasMore = rows.length > pageSize;
+  // Slice off the probe row, then reverse to ascending order for display.
+  return { messages: rows.slice(0, pageSize).reverse().map(normalizeChatMessage), hasMore };
+}
+
+export async function fetchSessionMessages(
+  sessionId: string,
+  opts?: ChatPageOptions,
+): Promise<ChatPage<SessionChatMessage>> {
+  return fetchMessagePage<SessionChatMessage>('session_messages', 'session_id', sessionId, opts);
+}
+
+export async function fetchCommunityMessages(
+  communityId: string,
+  opts?: ChatPageOptions,
+): Promise<ChatPage<CommunityChatMessage>> {
+  return fetchMessagePage<CommunityChatMessage>(
+    'community_messages',
+    'community_id',
+    communityId,
+    opts,
+  );
 }
 
 export async function sendSessionMessage(
@@ -238,7 +417,8 @@ export async function sendSessionMessage(
 
 // Sends an FCM-only push (no in-app notification) to every member of the
 // session (creator + accepted participants), except the sender. One batched
-// edge-function call for all recipients.
+// edge-function call for all recipients. Active readers (recent presence
+// heartbeat in this chat) are skipped by the edge function via presence_filter.
 async function notifyChatMembers(
   session: { id: string; created_by: string; purpose: string; date_time: string },
   senderId: string,
@@ -267,24 +447,13 @@ async function notifyChatMembers(
     sessionName,
     `${senderName}: ${content}`,
     pushData,
+    presenceFilterFor('session', session.id),
   );
 }
 
 // ---------------------------------------------------------------------------
 // Community chat
 // ---------------------------------------------------------------------------
-
-export async function fetchCommunityMessages(communityId: string): Promise<CommunityChatMessage[]> {
-  const { data, error } = await supabase
-    .from('community_messages')
-    .select('*')
-    .eq('community_id', communityId)
-    .order('created_at', { ascending: true })
-    .limit(200);
-
-  if (error) throw error;
-  return (data ?? []).map(normalizeChatMessage);
-}
 
 export async function sendCommunityMessage(
   communityId: string,
@@ -362,7 +531,8 @@ export async function sendCommunityMessage(
 }
 
 // Sends an FCM-only push (no in-app notification) to every approved member of
-// the community, except the sender. One batched edge-function call.
+// the community, except the sender. One batched edge-function call. Active
+// readers are skipped by the edge function via presence_filter.
 async function notifyCommunityChatMembers(
   communityId: string,
   senderId: string,
@@ -396,5 +566,6 @@ async function notifyCommunityChatMembers(
     community?.name ?? 'Community',
     `${senderName}: ${content}`,
     pushData,
+    presenceFilterFor('community', communityId),
   );
 }

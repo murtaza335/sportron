@@ -10,7 +10,6 @@ import type {
   CommunityMemberRole,
   CreateCommunityInput,
   Ping,
-  PingResponse,
   Sport,
   UpdateCommunityInput,
 } from '@/types';
@@ -20,7 +19,6 @@ import {
   notifyJoinApproved,
   notifyJoinRejected,
   notifyPing,
-  notifyPingResponse,
   notifyMemberRemoved,
   notifyPromotedToAdmin,
   notifyAdminTransferred,
@@ -602,7 +600,6 @@ export async function sendPing(
           community.name,
           sender?.username ?? 'Someone',
           message.trim(),
-          ping.id,
         );
       }
     }
@@ -623,60 +620,6 @@ export async function fetchPings(communityId: string): Promise<Ping[]> {
     .eq('community_id', communityId)
     .order('created_at', { ascending: false })
     .limit(50);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
-export async function respondToPing(
-  pingId: string,
-  communityId: string,
-  respondentId: string,
-  response: 'coming' | 'busy',
-): Promise<void> {
-  const { error } = await supabase
-    .from('ping_responses')
-    .insert({
-      ping_id: pingId,
-      community_id: communityId,
-      respondent_id: respondentId,
-      response,
-    });
-
-  if (error) throw error;
-
-  try {
-    const respondent = await fetchProfile(respondentId);
-    const { data: ping } = await supabase
-      .from('pings')
-      .select('sender_id, message')
-      .eq('id', pingId)
-      .single();
-
-    if (ping && respondent) {
-      await notifyPingResponse(
-        ping.sender_id,
-        pingId,
-        communityId,
-        respondent?.username ?? 'Someone',
-        response,
-        ping.message,
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send ping response notification:', e);
-  }
-}
-
-export async function fetchPingResponses(pingId: string): Promise<PingResponse[]> {
-  const { data, error } = await supabase
-    .from('ping_responses')
-    .select(`
-      *,
-      respondent:respondent_id(id, username, display_name, avatar_url)
-    `)
-    .eq('ping_id', pingId)
-    .order('created_at', { ascending: true });
 
   if (error) throw error;
   return data ?? [];

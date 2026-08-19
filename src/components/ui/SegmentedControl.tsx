@@ -8,6 +8,8 @@ type SegmentedControlProps<T extends string> = {
   value: T;
   onChange: (value: T) => void;
   compact?: boolean;
+  /** Shows a green "unread" dot next to the label for the given segment values. */
+  unread?: Partial<Record<T, boolean>>;
 };
 
 export function SegmentedControl<T extends string>({
@@ -15,6 +17,7 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   compact = false,
+  unread,
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
 
@@ -22,6 +25,7 @@ export function SegmentedControl<T extends string>({
     <View style={[styles.container, { borderColor: theme.border }]}>
       {options.map((option) => {
         const selected = option.value === value;
+        const hasUnread = !!unread?.[option.value];
         return (
           <Pressable
             key={option.value}
@@ -34,14 +38,17 @@ export function SegmentedControl<T extends string>({
             hitSlop={12}
             accessibilityRole="button"
             accessibilityState={{ selected }}>
-            <Text
-              style={[
-                styles.label,
-                compact && styles.labelCompact,
-                { color: selected ? theme.background : theme.text },
-              ]}>
-              {option.label}
-            </Text>
+            <View style={styles.segmentContent}>
+              <Text
+                style={[
+                  styles.label,
+                  compact && styles.labelCompact,
+                  { color: selected ? theme.background : theme.text },
+                ]}>
+                {option.label}
+              </Text>
+              {hasUnread && <View style={styles.dot} />}
+            </View>
           </Pressable>
         );
       })}
@@ -68,6 +75,17 @@ const styles = StyleSheet.create({
     minHeight: 32,
     paddingVertical: 4,
     paddingHorizontal: Spacing.md,
+  },
+  segmentContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#10B981',
   },
   label: {
     fontSize: 14,

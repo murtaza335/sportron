@@ -16,7 +16,6 @@ export type NotificationType =
   | 'session_reminder'
   | 'feedback_prompt'
   | 'ping'
-  | 'ping_response'
   | 'join_request'
   | 'join_approved'
   | 'join_rejected'
@@ -46,10 +45,7 @@ export interface NotificationData {
   commentId?: string;
   sessionId?: string;
   communityId?: string;
-  pingId?: string;
   message?: string;
-  response?: string;
-  respondentName?: string;
 }
 
 Notifications.setNotificationHandler({
@@ -61,6 +57,21 @@ Notifications.setNotificationHandler({
     shouldShowList: true,
   }),
 });
+
+// Conversation -> latest foreground local-notification id, used to replace
+// older chat notifications instead of stacking them (see scheduleLocalNotification).
+const foregroundNotificationIdByKey = new Map<string, string>();
+
+function localCollapseKeyFor(data?: NotificationData): string | null {
+  if (!data) return null;
+  if ((data.type === 'session_chat_message' || data.type === 'session_chat_reply') && data.sessionId) {
+    return `t3s-session-${data.sessionId}`;
+  }
+  if ((data.type === 'community_chat_message' || data.type === 'community_chat_reply') && data.communityId) {
+    return `t3s-community-${data.communityId}`;
+  }
+  return null;
+}
 
 export async function registerForPushNotificationsAsync(): Promise<string | null> {
   let finalStatus: PermissionStatus = PermissionStatus.DENIED;
@@ -221,10 +232,7 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     commentId: data?.commentId,
     sessionId: data?.sessionId,
     communityId: data?.communityId,
-    pingId: data?.pingId,
     message: data?.message,
-    response: data?.response,
-    respondentName: data?.respondentName,
   };
 
   return { title, body, data: parsedData };
@@ -254,7 +262,24 @@ export async function scheduleLocalNotification(
   body: string,
   data?: NotificationData
 ): Promise<string> {
-  return Notifications.scheduleNotificationAsync({
+  // Emulate Android collapse-key replacement for the foreground path: FCM only
+  // auto-displays and collapses notifications while the app is backgrounded;
+  // when foregrounded the app re-displays each message as a local notification,
+  // and local notifications have no collapse semantics by default (they stack).
+  // Track the latest local-notification id per conversation and dismiss the
+  // previous one before showing the next, mirroring the edge function's keys.
+  const key = localCollapseKeyFor(data);
+  const previousId = key ? foregroundNotificationIdByKey.get(key) : undefined;
+  if (key && previousId) {
+    try {
+      await Notifications.dismissNotificationAsync(previousId);
+    } catch (e) {
+      console.error('Failed to dismiss previous chat notification:', e);
+    }
+    foregroundNotificationIdByKey.delete(key);
+  }
+
+  const id = await Notifications.scheduleNotificationAsync({
     content: {
       title,
       body,
@@ -263,6 +288,9 @@ export async function scheduleLocalNotification(
     },
     trigger: null,
   });
+
+  if (key) foregroundNotificationIdByKey.set(key, id);
+  return id;
 }
 
 export function parseNotificationData(notification: Notifications.Notification): NotificationData | null {

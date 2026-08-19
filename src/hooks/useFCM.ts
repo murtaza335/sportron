@@ -2,9 +2,11 @@ import { useCallback, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { router } from 'expo-router';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { removeFCMToken } from '@/services/profiles';
 import {
   registerForPushNotificationsAsync,
   saveFCMTokenToProfile,
@@ -19,6 +21,11 @@ import {
   NotificationData,
 } from '@/services/fcm';
 
+async function isNotificationsEnabled(): Promise<boolean> {
+  const val = await AsyncStorage.getItem('notifications-enabled');
+  return val !== 'false';
+}
+
 export function useFCM() {
   const { user, refreshProfile } = useAuth();
   const [notificationPermission, setNotificationPermission] = useState<Notifications.PermissionStatus | null>(null);
@@ -30,15 +37,10 @@ export function useFCM() {
     async (data: NotificationData) => {
       switch (data.type) {
         case 'ping': {
-          if (data.pingId && data.communityId) {
+          if (data.communityId) {
             router.push({
-              pathname: '/ping-response',
-              params: {
-                pingId: data.pingId,
-                communityId: data.communityId,
-                message: data.message ?? '',
-                senderName: data.senderName ?? 'Someone',
-              },
+              pathname: '/community/[id]',
+              params: { id: data.communityId },
             });
           }
           return;
@@ -96,7 +98,6 @@ export function useFCM() {
         case 'member_removed':
         case 'admin_transferred':
         case 'admin_promoted':
-        case 'ping_response':
         case 'community_invite':
         case 'community_invite_accepted':
         case 'community_invite_rejected':
@@ -147,6 +148,7 @@ export function useFCM() {
       await setupBackgroundMessageHandler();
 
       const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
+        if (!(await isNotificationsEnabled())) return;
         const parsed = parseRemoteMessageForLocal(remoteMessage);
         if (parsed) {
           await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
@@ -154,7 +156,7 @@ export function useFCM() {
       });
 
       const unsubscribeTokenRefresh = setupTokenRefreshListener(async (token) => {
-        if (user?.id) {
+        if (user?.id && (await isNotificationsEnabled())) {
           await saveFCMTokenToProfile(user.id, token);
         }
       });
@@ -167,17 +169,31 @@ export function useFCM() {
       const permission = await getNotificationPermissions();
       setNotificationPermission(permission);
 
-      if (permission !== 'granted') {
-        const fcmToken = await registerForPushNotificationsAsync();
-        if (fcmToken && user?.id) {
-          await saveFCMTokenToProfile(user.id, fcmToken);
+      const pushEnabled = await isNotificationsEnabled();
+      if (pushEnabled) {
+        if (permission !== 'granted') {
+          const fcmToken = await registerForPushNotificationsAsync();
+          if (fcmToken && user?.id) {
+            await saveFCMTokenToProfile(user.id, fcmToken);
+          }
+          const newPermission = await getNotificationPermissions();
+          setNotificationPermission(newPermission);
+        } else {
+          const fcmToken = await messaging().getToken();
+          if (fcmToken && user?.id) {
+            await saveFCMTokenToProfile(user.id, fcmToken);
+          }
         }
-        const newPermission = await getNotificationPermissions();
-        setNotificationPermission(newPermission);
       } else {
-        const fcmToken = await messaging().getToken();
-        if (fcmToken && user?.id) {
-          await saveFCMTokenToProfile(user.id, fcmToken);
+        // Notifications disabled: make sure this device's token is not
+        // registered so the backend cannot push to it (off survives restarts).
+        try {
+          const fcmToken = await messaging().getToken();
+          if (fcmToken && user?.id) {
+            await removeFCMToken(user.id, fcmToken);
+          }
+        } catch {
+          // ignore
         }
       }
 

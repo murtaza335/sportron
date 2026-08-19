@@ -1,5 +1,5 @@
-import { router, useLocalSearchParams } from 'expo-router';
-import { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
+import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import {
   ActivityIndicator,
   FlatList,
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
 
 import { SessionDetailPopup } from '@/components/SessionDetailPopup';
+import { SessionFeedbackPopup } from '@/components/SessionFeedbackPopup';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -24,7 +25,8 @@ import type { SessionScope } from '@/hooks/useSessions';
 import { getSessionsView, subscribeSessionsView } from '@/lib/sessionsView';
 import type { Session, SessionStatus } from '@/types';
 import { formatSessionPurpose, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
-import { getRemainingTime } from '@/services/sessions';
+import { fetchPendingFeedbackSessions, getRemainingTime } from '@/services/sessions';
+import type { PendingFeedbackSession } from '@/services/sessions';
 
 function formatSessionDate(dateString: string) {
   const date = new Date(dateString);
@@ -186,6 +188,30 @@ export default function SessionsScreen() {
     if (sessionIdParam) router.setParams({ sessionId: undefined });
   };
 
+  // Post-session feedback loop — when the creator opens the Sessions tab, a
+  // popup asks them to mark who attended their ended sessions before anything
+  // else, so they give feedback before creating a new session.
+  const [feedbackSessions, setFeedbackSessions] = useState<PendingFeedbackSession[]>([]);
+  const [feedbackVisible, setFeedbackVisible] = useState(false);
+
+  const loadPendingFeedback = useCallback(async () => {
+    if (!user?.id) return;
+    try {
+      const pending = await fetchPendingFeedbackSessions(user.id);
+      if (pending.length === 0 || detailVisible) return;
+      setFeedbackSessions(pending);
+      setFeedbackVisible(true);
+    } catch (e) {
+      console.error('Failed to check pending session feedback:', e);
+    }
+  }, [user, detailVisible]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadPendingFeedback();
+    }, [loadPendingFeedback]),
+  );
+
   // Countdown ticker — re-renders every 30s to update "closes in X" labels
   const [, setTick] = useState(0);
   useEffect(() => {
@@ -342,6 +368,20 @@ export default function SessionsScreen() {
         currentUserId={user?.id}
         initialSession={selectedSessionData}
         onRefreshFeed={() => {
+          if (!isHistory) refresh();
+          else refreshHistory();
+        }}
+      />
+
+      <SessionFeedbackPopup
+        key={feedbackVisible ? 'session-feedback-open' : 'session-feedback-closed'}
+        sessions={feedbackSessions}
+        visible={feedbackVisible}
+        currentUserId={user?.id}
+        onClose={() => setFeedbackVisible(false)}
+        onDone={() => {
+          setFeedbackSessions([]);
+          setFeedbackVisible(false);
           if (!isHistory) refresh();
           else refreshHistory();
         }}

@@ -14,6 +14,11 @@ export async function pushFcmToUser(
   return pushFcmToUsers([userId], title, body, data);
 }
 
+export interface PresenceFilter {
+  chat_type: 'session' | 'community';
+  chat_id: string;
+}
+
 // Batches a single edge-function call for many recipients (one JWT, one
 // profiles query, N FCM sends inside the function) instead of N HTTP calls.
 export async function pushFcmToUsers(
@@ -21,20 +26,40 @@ export async function pushFcmToUsers(
   title: string,
   body: string,
   data?: Record<string, unknown>,
+  presenceFilter?: PresenceFilter,
 ): Promise<void> {
-  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) return;
+  if (!fcmFunctionUrl || !supabaseAnonKey || userIds.length === 0) {
+    console.warn('[pushFcmToUsers] skipping push', {
+      fcmFunctionUrl,
+      hasAnonKey: !!supabaseAnonKey,
+      userIds: userIds.length,
+    });
+    return;
+  }
 
   try {
-    await fetch(fcmFunctionUrl, {
+    const res = await fetch(fcmFunctionUrl, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${supabaseAnonKey}`,
       },
-      body: JSON.stringify({ user_ids: userIds, title, body, data }),
+      body: JSON.stringify({
+        user_ids: userIds,
+        title,
+        body,
+        data,
+        presence_filter: presenceFilter ?? undefined,
+      }),
     });
-  } catch {
-    // fire-and-forget: silently ignore FCM failures
+    if (!res.ok) {
+      console.warn('[pushFcmToUsers] function error', res.status, await res.text());
+    } else {
+      const body = await res.json().catch(() => ({}));
+      console.warn('[pushFcmToUsers] ok', JSON.stringify(body));
+    }
+  } catch (e) {
+    console.warn('[pushFcmToUsers] fetch failed', e);
   }
 }
 
@@ -240,24 +265,14 @@ export async function notifyJoinRejected(userId: string, communityId: string, co
   });
 }
 
-export async function notifyPing(communityMemberIds: string[], communityId: string, communityName: string, senderName: string, message: string, pingId?: string): Promise<void> {
+export async function notifyPing(communityMemberIds: string[], communityId: string, communityName: string, senderName: string, message: string): Promise<void> {
   await createNotificationForMultipleUsers(
     communityMemberIds,
     'ping',
     `Ping from ${communityName}`,
-    `${senderName}: ${message} — tap to reply`,
-    { communityId, message, senderName, pingId },
+    `${senderName}: ${message}`,
+    { communityId, message, senderName },
   );
-}
-
-export async function notifyPingResponse(senderId: string, pingId: string, communityId: string, respondentName: string, response: 'coming' | 'busy', message: string): Promise<void> {
-  await createNotification({
-    userId: senderId,
-    type: 'ping_response',
-    title: response === 'coming' ? 'Coming!' : 'Busy',
-    body: `${respondentName} is ${response === 'coming' ? 'coming' : 'busy'} — "${message}"`,
-    data: { pingId, communityId, respondentName, response, message },
-  });
 }
 
 export async function notifyCommunityMatchPending(opponentId: string, communityMatchId: string, communityId: string, recorderName: string, communityName: string): Promise<void> {

@@ -114,7 +114,7 @@ src/
 - **Members**: sorted me → admins → members; admin long-press for Make Admin / Remove; pending-invite section
 - **Invite Members**: admin can invite by typing username (public or restricted); invitees accept/reject via Invite tab
 - **Join requests**: admin review screen with approve/reject
-- **Pings**: any member can ping the whole community; members respond "Coming"/"Busy" (realtime live responses)
+- **Pings**: any member can ping the whole community (notification to all members); the "reply Coming/Busy" feature and `ping_responses` table were removed (migration 034)
 
 ### 4. Community Matches
 - Recorded **within a community**, opponents limited to community members
@@ -248,10 +248,6 @@ community_invites
 pings
   id, community_id, sender_id, message, created_at
 
-ping_responses
-  id, ping_id (fk, cascade), community_id (fk), respondent_id (fk),
-  response (coming|busy), created_at, unique (ping_id, respondent_id)
-
 in_app_notifications
   id, user_id (fk, cascade), type, title, body, data, read, created_at
   -- inserted via SECURITY DEFINER RPC `insert_notification`
@@ -281,18 +277,22 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 - Stack screens with `headerShown`: `/settings`, `/discover`, `/community/[id]`, `/community/[id]/members`, `/community/[id]/info`, `/profile/[id]`, `/ping-response`
 - Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`
 - Auth screens: `/login`, `/onboarding`, `/auth/callback`
-- Registration of `notifications` route in `_layout.tsx` is currently dangling (no backing screen)
 
 ### Theme
 - `useTheme()` returns `{ ...Colors[resolvedColorScheme], colorScheme(from origin), resolvedColorScheme, toggleTheme, setTheme }`
 - Colors: `background`, `text`, `backgroundElement`, `border`, `textSecondary`, `tabBar`, `tabBarActive`, `tabBarInactive`, `backgroundSelected`
 - `Colors.light` / `Colors.dark` in `src/constants/theme.ts`
 
+### Edge Functions (Supabase)
+- Edge functions live in `supabase/functions/` and deploy **separately** from the app — a Vercel deploy does NOT deploy them. They are never deployed automatically by committing code.
+- **CRITICAL**: any change to an edge function — payload/response contract, request fields, response shape, secrets/env (`FCM_SERVICE_ACCOUNT`), or the function body — takes effect **only after** `supabase functions deploy <name>`. Keep deployed functions backward-compatible with installed app versions (e.g. `send-notification` accepts both `user_id` and `user_ids`); a stale deployed function vs. new client payload = silent 400s = push broken for everyone.
+- **Whenever an edge function is edited, the AI must explicitly instruct the user to redeploy it** (e.g. `supabase functions deploy send-notification`) and remind them to verify with a live test afterward.
+
 ### State & Data Patterns
 - All Supabase calls go through `src/services/*` (return `{ data, error }`, throw on error)
 - Hooks wrap service calls, expose `{ data, loading, refreshing, refresh }`, reload on focus
 - `useCommunity(communityId, userId)` exposes community, membership, joinRequests + setters
-- Real-time: `supabase.channel` for `ping_responses` (community screen), `session_messages` / `community_messages` (session + community chat), and `in_app_notifications` (`NotificationsProvider`)
+- Real-time: `supabase.channel` for `session_messages` / `community_messages` (session + community chat), and `in_app_notifications` (`NotificationsProvider`)
 - Cross-screen state is shared via React Context (`AuthContext`, `ThemeContext`, `NotificationsContext`) — consume through the matching `use*` hook, never instantiate a fresh copy per screen
 - Tiny external stores via `useSyncExternalStore` for state the header and tabs must agree on: `src/lib/sessionsView.ts` (`'new' | 'history'` toggle)
 
@@ -308,6 +308,7 @@ npm run web        # Web build
 npm run lint       # Expo lint (ESLint)
 npx tsc --noEmit   # TypeScript check
 npx expo install   # Install dependencies matching SDK 57
+supabase functions deploy <name>  # Deploy a changed edge function (e.g. send-notification)
 ```
 
 ### Environment

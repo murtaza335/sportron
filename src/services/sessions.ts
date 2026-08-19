@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Session, Commitment, CreateSessionInput } from '@/types';
+import type { Session, Commitment, CreateSessionInput, FeedbackStatus } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH } from '@/types';
 import { fetchProfile } from './profiles';
 import { formatSessionDisplayName } from '@/lib/date';
@@ -758,4 +758,97 @@ export function getRemainingTime(expiresAt: string | null): string {
     return `closes in ${hours}hr ${remMins}min`;
   }
   return `closes in ${minutes}min`;
+}
+
+// ---------------------------------------------------------------------------
+// Post-session feedback ("who showed up?") — filled in by the session creator
+// ---------------------------------------------------------------------------
+
+export type PendingFeedbackSession = {
+  id: string;
+  title: string | null;
+  purpose: string;
+  location: string;
+  date_time: string;
+  status: Session['status'];
+  commitments: Commitment[];
+};
+
+// Ended sessions the current user created that still have accepted
+// participants without feedback, most recent first.
+export async function fetchPendingFeedbackSessions(
+  userId: string,
+): Promise<PendingFeedbackSession[]> {
+  await closeExpiredSessions(userId);
+
+  const { data: sessionRows, error } = await supabase
+    .from('sessions')
+    .select('id, title, purpose, location, date_time, status')
+    .eq('created_by', userId)
+    .in('status', ['closed', 'completed', 'cancelled']);
+
+  if (error) throw error;
+
+  const sessionIds = (sessionRows ?? []).map((s) => s.id);
+  if (sessionIds.length === 0) return [];
+
+  const { data: commitmentRows, error: commError } = await supabase
+    .from('commitments')
+    .select(
+      `
+      id, session_id, user_id, status, feedback_status, feedback_provided_by,
+      created_at, updated_at,
+      profile:profiles!commitments_user_id_fkey (id, username, avatar_url)
+    `,
+    )
+    .in('session_id', sessionIds)
+    .eq('status', 'accepted')
+    .is('feedback_status', null);
+
+  if (commError) throw commError;
+
+  const bySession = new Map<string, Commitment[]>();
+  for (const row of commitmentRows ?? []) {
+    const list = bySession.get(row.session_id) ?? [];
+    list.push({ ...row, profile: row.profile?.[0] });
+    bySession.set(row.session_id, list);
+  }
+
+  return (sessionRows ?? [])
+    .filter((row) => (bySession.get(row.id)?.length ?? 0) > 0)
+    .sort((a, b) => new Date(b.date_time).getTime() - new Date(a.date_time).getTime())
+    .map((row) => ({
+      id: row.id,
+      title: row.title,
+      purpose: row.purpose,
+      location: row.location,
+      date_time: row.date_time,
+      status: row.status,
+      commitments: bySession.get(row.id) ?? [],
+    }));
+}
+
+// Creator marks which accepted participants attended. RLS allows the session
+// creator to update commitments; the trigger on feedback_status updates the
+// participants' completed-session counters.
+export async function submitSessionFeedback(
+  userId: string,
+  sessionId: string,
+  feedback: { commitmentId: string; status: FeedbackStatus }[],
+): Promise<void> {
+  if (feedback.length === 0) return;
+
+  const results = await Promise.all(
+    feedback.map(({ commitmentId, status }) =>
+      supabase
+        .from('commitments')
+        .update({ feedback_status: status, feedback_provided_by: userId })
+        .eq('id', commitmentId)
+        .eq('session_id', sessionId),
+    ),
+  );
+
+  for (const result of results) {
+    if (result.error) throw result.error;
+  }
 }

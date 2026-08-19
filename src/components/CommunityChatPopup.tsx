@@ -36,6 +36,8 @@ export function CommunityChatPopup({
       headerSubtitle={headerSubtitle || undefined}
       canSend
       chat={chat}
+      chatType="community"
+      chatId={communityId}
     />
   );
 }

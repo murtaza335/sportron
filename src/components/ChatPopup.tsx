@@ -1,14 +1,30 @@
-import { Check, Clock, MessageCircle, Reply, Send, X } from 'lucide-react-native';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { BlurView } from 'expo-blur';
+import {
+  AlertTriangle,
+  Check,
+  ChevronDown,
+  Clock,
+  MessageCircle,
+  RefreshCw,
+  Reply,
+  Send,
+  Trash2,
+  X,
+} from 'lucide-react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   FlatList,
+  GestureResponderEvent,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   StyleSheet,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -18,8 +34,22 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { deleteChatPresence, upsertChatPresence } from '@/services/chat';
 import type { ChatThread } from '@/hooks/useChat';
 import type { ChatMessageBase } from '@/types';
+
+// How often the popup refreshes its presence heartbeat. The edge function's
+// PRESENCE_TTL (60s) only covers abrupt app kills, so a ~20s beat is safe.
+const PRESENCE_HEARTBEAT_MS = 20_000;
+
+// Auto-pin to the bottom within this distance; start loading older messages
+// within this distance of the top.
+const BOTTOM_THRESHOLD = 60;
+const TOP_LOAD_THRESHOLD = 80;
+
+// Long-press context menu (iPhone-style), anchored to the touch point.
+const CONTEXT_CARD_W = 170;
+const CONTEXT_CARD_H = 52;
 
 type ChatPopupProps<T extends ChatMessageBase> = {
   visible: boolean;
@@ -30,6 +60,8 @@ type ChatPopupProps<T extends ChatMessageBase> = {
   canSend: boolean;
   hasLeft?: boolean;
   chat: ChatThread<T>;
+  chatType?: 'session' | 'community';
+  chatId?: string | null;
 };
 
 function formatMessageTime(dateString: string) {
@@ -48,19 +80,51 @@ export function ChatPopup<T extends ChatMessageBase>({
   canSend,
   hasLeft = false,
   chat,
+  chatType,
+  chatId,
 }: ChatPopupProps<T>) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
-  const { messages, loading, sendMessage, firstUnreadIndex, markRead } = chat;
+  const {
+    messages,
+    loading,
+    loadingMore,
+    hasMore,
+    loadOlder,
+    sendMessage,
+    resendMessage,
+    deleteMessage,
+    firstUnreadIndex,
+    markRead,
+  } = chat;
 
   const [draft, setDraft] = useState('');
+  const draftRef = useRef('');
+  const inputRef = useRef<TextInput>(null);
   const [replyTo, setReplyTo] = useState<T | null>(null);
-  const [contextMessage, setContextMessage] = useState<T | null>(null);
+  const [contextMenu, setContextMenu] = useState<{ message: T; x: number; y: number } | null>(null);
+  const [failedMenu, setFailedMenu] = useState<T | null>(null);
+  const [atBottom, setAtBottom] = useState(true);
   const listRef = useRef<FlatList<T>>(null);
+  const { width: windowWidth } = useWindowDimensions();
   const didInitialScrollRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkReadRef = useRef(0);
+  const atBottomRef = useRef(true);
+
+  // The chat list is INVERTED: newest message at index 0 = the scroll origin
+  // (offset 0 = the visual bottom). That makes chats behave natively like
+  // WhatsApp/iMessage — prepending OLDER messages grows the content at the top
+  // and CANNOT move the viewport, so pagination never flashes or jumps. This
+  // list (newest-first) is what the FlatList renders.
+  const displayMessages = useMemo(
+    () =>
+      [...messages].sort(
+        (a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime(),
+      ),
+    [messages],
+  );
 
   const sortedMessages = useMemo(
     () =>
@@ -76,27 +140,71 @@ export function ChatPopup<T extends ChatMessageBase>({
     didInitialScrollRef.current = false;
   }, [visible]);
 
+  // Presence heartbeat: while the popup is open, keep our row fresh in
+  // chat_presence so the push edge function knows this user is reading the chat
+  // and skips pushing them. Cleaned up (row deleted) on close or on signing
+  // out; if the app dies abruptly the row goes stale and the TTL kicks in.
   useEffect(() => {
-    if (!visible || loading || !sortedMessages.length || didInitialScrollRef.current) return;
+    if (!visible || hasLeft || !chatType || !chatId) return;
+    const userId = profile?.id;
+    if (!userId) return;
+
+    const heartbeat = () => {
+      upsertChatPresence(chatType, chatId, userId).catch((e) =>
+        console.error('Failed to update chat presence:', e),
+      );
+    };
+    heartbeat();
+    const timer = setInterval(heartbeat, PRESENCE_HEARTBEAT_MS);
+
+    return () => {
+      clearInterval(timer);
+      deleteChatPresence(chatType, chatId, userId).catch((e) =>
+        console.error('Failed to clear chat presence:', e),
+      );
+    };
+  }, [visible, hasLeft, chatType, chatId, profile?.id]);
+
+  // Positions the list exactly once on open. Inverted list → offset 0 IS the
+  // bottom, and the list starts there by default, so the "caught up" case needs
+  // no scroll at all. Non-animated everywhere so the chat snaps in one frame
+  // (the old stutter came from ANIMATED re-following while rows were measuring).
+  useEffect(() => {
+    if (!visible || loading || !displayMessages.length || didInitialScrollRef.current) return;
     didInitialScrollRef.current = true;
 
     const target = firstUnreadIndex;
     if (target != null && target >= 0) {
-      try {
-        listRef.current?.scrollToIndex({
-          index: target,
-          viewPosition: 0,
-          animated: false,
-        });
-      } catch {
-        // items not measured yet — onScrollToIndexFailed handles the retry
+      // Jump to the "New messages" divider. displayMessages is newest-first, so
+      // the oldest-unread row sits at index (total - 1 - ascIndex); align it to
+      // the top of the screen (viewPosition 1 in an inverted list) so unread
+      // messages fill the viewport below the divider.
+      const descIndex = Math.max(0, displayMessages.length - 1 - target);
+      if (descIndex > 0) {
+        try {
+          listRef.current?.scrollToIndex({
+            index: descIndex,
+            viewPosition: 1,
+            animated: false,
+          });
+        } catch {
+          // Items not measured yet — onScrollToIndexFailed retries.
+        }
       }
+      // Parked at the divider: no auto-follow until the user reaches the bottom
+      // or sends a message (jump button becomes visible immediately).
+      atBottomRef.current = false;
+      requestAnimationFrame(() => setAtBottom(false));
     } else {
-      listRef.current?.scrollToEnd({ animated: false });
+      // Inverted default is already offset 0 = bottom. Explicitly pin it so a
+      // re-open after scrolling elsewhere lands back at the newest message.
+      listRef.current?.scrollToOffset({ offset: 0, animated: false });
+      atBottomRef.current = true;
+      requestAnimationFrame(() => setAtBottom(true));
     }
 
     markRead();
-  }, [visible, loading, sortedMessages.length, firstUnreadIndex, markRead]);
+  }, [visible, loading, displayMessages.length, firstUnreadIndex, markRead]);
 
   // Debounced mark-as-read while scrolling: keeps the cursor advancing as new
   // realtime messages land at the bottom while the user keeps reading.
@@ -134,26 +242,93 @@ export function ChatPopup<T extends ChatMessageBase>({
     return 'Unknown';
   };
 
-  const scrollToEnd = () => {
-    // When opening with unread messages we scroll to the divider instead of
-    // pinning to the bottom, so don't auto-pin on layout/content changes.
-    if (firstUnreadIndex != null && firstUnreadIndex >= 0) return;
-    requestAnimationFrame(() => listRef.current?.scrollToEnd({ animated: true }));
+  // Goes to the very bottom (button tap / after sending) and re-enables
+  // auto-scroll pinning. In inverted lists offset 0 IS the bottom.
+  const scrollToBottom = useCallback((animated: boolean) => {
+    requestAnimationFrame(() => listRef.current?.scrollToOffset({ offset: 0, animated }));
+    atBottomRef.current = true;
+    setAtBottom(true);
+  }, []);
+
+  // Long-press captures the touch position so the floating context menu can
+  // anchor near the finger instead of sliding up a bottom sheet (which would
+  // dismiss the keyboard).
+  const handleLongPress = useCallback((item: T, e: GestureResponderEvent) => {
+    setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+  }, []);
+
+  const replyToContextMessage = useCallback(() => {
+    if (!contextMenu) return;
+    setReplyTo(contextMenu.message);
+    setContextMenu(null);
+    if (canSend) {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
+  }, [contextMenu, canSend]);
+
+  // Clamp the floating card so it stays on screen. Defaults to hovering ABOVE
+  // the touch point; flips below the touch near the top.
+  const contextLayout = useMemo(() => {
+    if (!contextMenu) return null;
+    const { x, y } = contextMenu;
+    const margin = Spacing.sm;
+    const minTop = insets.top + margin;
+    const left = Math.max(
+      margin,
+      Math.min(x - CONTEXT_CARD_W + 24, windowWidth - CONTEXT_CARD_W - margin),
+    );
+    const above = y - CONTEXT_CARD_H - 14 >= minTop;
+    const top = above ? y - CONTEXT_CARD_H - 14 : y + 18;
+    return { left, top };
+  }, [contextMenu, insets.top, windowWidth]);
+
+  // Inverted list scrolling:
+  // - offset 0 = the visual bottom (newest) — being there means "at bottom".
+  // - the visual TOP is the scroll END, so reaching it loads older messages.
+  // - Pagination in an inverted list inserts older rows at the top and NEVER
+  //   moves the viewport natively — no anchor/shift math needed, no flashes.
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const isAtBottom = contentOffset.y < BOTTOM_THRESHOLD;
+    if (isAtBottom !== atBottomRef.current) {
+      atBottomRef.current = isAtBottom;
+      setAtBottom(isAtBottom);
+    }
+
+    // Reading at the bottom advances the read cursor (debounced).
+    if (isAtBottom) handleScrollEndReached();
+
+    // Near the visual top of the list → prefetch older messages.
+    const nearTop =
+      contentSize.height - layoutMeasurement.height - contentOffset.y < TOP_LOAD_THRESHOLD;
+    if (hasMore && !loadingMore && !isAtBottom && nearTop) {
+      loadOlder();
+    }
   };
 
-  const handleSend = async () => {
-    const text = draft.trim();
-    if (!text) return;
+  // The send button is decoupled from the network round-trip: it INSTANTLY
+  // clears the input and lets the chat thread place the optimistic bubble
+  // (clock → check once realtime/DB confirms). The API call then runs in the
+  // background — typing the next message is never blocked on the send, and a
+  // failure (bubble removed by useChat) never restores the cleared text,
+  // because the user may already be typing the next message.
+  const handleSend = () => {
+    // draftRef (not the `draft` state) is the live source of truth for the
+    // input text — read it here so the ref is cleared in this exact tick.
+    const text = draftRef.current.trim();
+    if (!text || !canSend) return;
     const reply = replyTo;
+    draftRef.current = '';
+    // The input is UNCONTROLLED (no `value` prop), so clear() is the only way
+    // the native text ever becomes ''. Nothing can re-assert the old text:
+    // controlled reconciliation or a stale keystroke landing before a re-render.
+    inputRef.current?.clear();
     setDraft('');
     setReplyTo(null);
-    try {
-      await sendMessage(text, reply?.id);
-    } catch (e) {
-      setDraft(text);
-      if (reply) setReplyTo(reply);
-      console.error('Failed to send message:', e);
-    }
+    sendMessage(text, reply?.id).then(
+      () => scrollToBottom(true),
+      (e) => console.error('Failed to send message:', e),
+    );
   };
 
   const renderReplyPreview = (item: T, mine: boolean) => {
@@ -193,7 +368,11 @@ export function ChatPopup<T extends ChatMessageBase>({
   const renderMessage = ({ item, index }: { item: T; index: number }) => {
     const mine = item.sender_id === currentUserId;
     const isSending = item.status === 'sending';
-    const isFirstUnread = firstUnreadIndex != null && index === firstUnreadIndex;
+    // firstUnreadIndex is an ASCENDING (oldest-first) index; displayMessages is
+    // newest-first, so the oldest-unread row maps to (total - 1 - ascIndex).
+    const isFirstUnread =
+      firstUnreadIndex != null &&
+      displayMessages.length - 1 - index === firstUnreadIndex;
     return (
       <View>
         {isFirstUnread && (
@@ -206,7 +385,7 @@ export function ChatPopup<T extends ChatMessageBase>({
           </View>
         )}
         <Pressable
-          onLongPress={() => setContextMessage(item)}
+          onLongPress={(e) => handleLongPress(item, e)}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -242,7 +421,11 @@ export function ChatPopup<T extends ChatMessageBase>({
             <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
               {mine && (
                 <View style={styles.msgStatus}>
-                  {isSending ? (
+                  {item.status === 'failed' ? (
+                    <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
+                      <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
+                    </Pressable>
+                  ) : isSending ? (
                     <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
                   ) : (
                     <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
@@ -267,6 +450,8 @@ export function ChatPopup<T extends ChatMessageBase>({
     : canSend
       ? 'Type a message...'
       : 'Chat is unavailable';
+
+  const sendDisabled = !canSend || !draft.trim();
 
   return (
     <>
@@ -341,27 +526,75 @@ export function ChatPopup<T extends ChatMessageBase>({
               ) : (
                 <FlatList
                   ref={listRef}
-                  data={sortedMessages}
+                  inverted
+                  data={displayMessages}
                   keyExtractor={(item) => item.id}
                   renderItem={renderMessage}
                   contentContainerStyle={styles.listContent}
                   showsVerticalScrollIndicator={false}
-                  onContentSizeChange={scrollToEnd}
-                  onLayout={scrollToEnd}
-                  onEndReached={handleScrollEndReached}
-                  onEndReachedThreshold={0.3}
+                  onScroll={handleScroll}
+                  scrollEventThrottle={16}
                   onScrollToIndexFailed={(info) => {
-                    if (info.index === 0) {
-                      listRef.current?.scrollToEnd({ animated: false });
-                    } else {
-                      listRef.current?.scrollToIndex({
-                        index: Math.max(0, info.index - 1),
-                        viewPosition: 0,
-                        animated: false,
-                      });
-                    }
+                    // No getItemLayout (variable-height messages, reply
+                    // previews), so an unmeasurable divider jump retries until
+                    // the cells are mounted. No offset math — the inverted list
+                    // resolves the target itself.
+                    let attempts = 0;
+                    const retry = () => {
+                      if (attempts >= 4) return;
+                      attempts += 1;
+                      setTimeout(() => {
+                        try {
+                          listRef.current?.scrollToIndex({
+                            index: info.index,
+                            viewPosition: 1,
+                            animated: false,
+                          });
+                        } catch {
+                          retry();
+                        }
+                      }, 100);
+                    };
+                    retry();
                   }}
                 />
+              )}
+
+              {/* Older-page loading pill. Rendered as an OVERLAY (not a list header) so it
+                  never shifts the content layout while old messages load — the
+                  inverted list keeps the viewport pinned on its own. */}
+              {loadingMore && (
+                <View pointerEvents="none" style={styles.loadMoreOverlay}>
+                  <View
+                    style={[
+                      styles.loadMorePill,
+                      {
+                        backgroundColor: theme.backgroundElement,
+                        borderColor: theme.border,
+                      },
+                    ]}
+                  >
+                    <ActivityIndicator size="small" color={theme.textSecondary} />
+                  </View>
+                </View>
+              )}
+
+              {/* Jump-to-bottom button: shown whenever the user is not pinned to
+                  the bottom (scrolled up / parked at the "New messages" divider). */}
+              {!atBottom && (
+                <Pressable
+                  onPress={() => {
+                    scrollToBottom(true);
+                    markRead();
+                  }}
+                  hitSlop={8}
+                  style={[
+                    styles.jumpBtn,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                >
+                  <ChevronDown size={20} color={theme.text} strokeWidth={2.5} />
+                </Pressable>
               )}
             </View>
 
@@ -399,8 +632,11 @@ export function ChatPopup<T extends ChatMessageBase>({
 
               <View style={styles.inputRow}>
                 <TextInput
-                  value={draft}
-                  onChangeText={setDraft}
+                  ref={inputRef}
+                  onChangeText={(text) => {
+                    draftRef.current = text;
+                    setDraft(text);
+                  }}
                   placeholder={placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
@@ -417,54 +653,126 @@ export function ChatPopup<T extends ChatMessageBase>({
                 />
                 <Pressable
                   onPress={handleSend}
-                  disabled={!canSend || !draft.trim()}
+                  // Grey + disabled when the trimmed input is empty and while a
+                  // message is in flight (being added to the UI), otherwise green
+                  // so the input can be reused for the next message immediately.
+                  disabled={sendDisabled}
                   style={({ pressed }) => [
                     styles.sendBtn,
                     {
-                      backgroundColor:
-                        !canSend || !draft.trim() ? theme.backgroundElement : '#10B981',
+                      backgroundColor: sendDisabled ? theme.backgroundElement : '#10B981',
                       opacity: pressed ? 0.8 : 1,
                     },
                   ]}
                 >
-                  <Send size={18} color={!canSend || !draft.trim() ? theme.textSecondary : '#FFFFFF'} />
+                  <Send size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
                 </Pressable>
               </View>
             </View>
           </KeyboardAvoidingView>
-        </View>
-      </Modal>
 
-      {/* Long-press context menu */}
-      <Modal
-        transparent
-        visible={!!contextMessage}
-        animationType="fade"
-        onRequestClose={() => setContextMessage(null)}
-      >
-        <Pressable style={styles.backdrop} onPress={() => setContextMessage(null)}>
-          <Pressable
-            style={[
-              styles.contextSheet,
-              { backgroundColor: theme.background, borderColor: theme.border },
-            ]}
-          >
-            <Pressable
-              style={[styles.contextOption, { borderBottomColor: theme.border }]}
-              onPress={() => {
-                if (contextMessage) setReplyTo(contextMessage);
-                setContextMessage(null);
-              }}
-            >
-              <View style={styles.contextOptionRow}>
-                <Reply size={18} color="#10B981" strokeWidth={2.5} />
-                <ThemedText variant="body" style={[styles.contextOptionText, { color: '#10B981', fontWeight: '600' }]}>
-                  Reply
-                </ThemedText>
+          {/* Floating long-press context menu. Rendered INLINE (not a Modal) so
+              the keyboard stays open while it's showing. On iOS the backdrop is
+              frosted (BlurView); everywhere else it falls back to a dim
+              overlay, so the chat always reads as "background". */}
+          {contextMenu && contextLayout && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Pressable style={styles.contextBackdrop} onPress={() => setContextMenu(null)}>
+                {Platform.OS === 'ios' && (
+                  <BlurView
+                    tint={theme.resolvedColorScheme === 'dark' ? 'dark' : 'light'}
+                    intensity={60}
+                    style={StyleSheet.absoluteFill}
+                  />
+                )}
+                <View
+                  style={[
+                    styles.contextBackdropDim,
+                    {
+                      backgroundColor:
+                        theme.resolvedColorScheme === 'dark'
+                          ? 'rgba(0,0,0,0.5)'
+                          : 'rgba(0,0,0,0.35)',
+                    },
+                  ]}
+                />
+              </Pressable>
+              <View
+                style={[
+                  styles.contextCard,
+                  {
+                    left: contextLayout.left,
+                    top: contextLayout.top,
+                    backgroundColor: theme.background,
+                    borderColor: theme.border,
+                  },
+                ]}
+              >
+                <Pressable style={styles.contextOption} onPress={replyToContextMessage}>
+                  <View style={styles.contextOptionRow}>
+                    <Reply size={18} color="#10B981" strokeWidth={2.5} />
+                    <ThemedText
+                      variant="body"
+                      style={[styles.contextOptionText, { color: '#10B981', fontWeight: '600' }]}
+                    >
+                      Reply
+                    </ThemedText>
+                  </View>
+                </Pressable>
               </View>
-            </Pressable>
-          </Pressable>
-        </Pressable>
+            </View>
+          )}
+
+          {/* Failed-message menu: tapped from the warning icon on a bubble whose
+              write failed. Offers Resend (replaces the bubble in place) or
+              Delete (drops the local bubble). */}
+          {failedMenu && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Pressable style={styles.contextBackdrop} onPress={() => setFailedMenu(null)}>
+                <BlurView
+                  tint={theme.resolvedColorScheme === 'dark' ? 'dark' : 'light'}
+                  intensity={10}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Pressable>
+              <View
+                style={[
+                  styles.failedCard,
+                  { backgroundColor: theme.background, borderColor: theme.border },
+                ]}
+              >
+                <Pressable
+                  style={[styles.failedOption, { borderBottomColor: theme.border }]}
+                  onPress={() => {
+                    resendMessage(failedMenu);
+                    setFailedMenu(null);
+                  }}
+                >
+                  <View style={styles.failedOptionRow}>
+                    <RefreshCw size={18} color="#10B981" strokeWidth={2.5} />
+                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#10B981', fontWeight: '600' }]}>
+                      Resend
+                    </ThemedText>
+                  </View>
+                </Pressable>
+                <Pressable
+                  style={styles.failedOption}
+                  onPress={() => {
+                    deleteMessage(failedMenu.id);
+                    setFailedMenu(null);
+                  }}
+                >
+                  <View style={styles.failedOptionRow}>
+                    <Trash2 size={18} color="#EF4444" strokeWidth={2.5} />
+                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#EF4444', fontWeight: '600' }]}>
+                      Delete
+                    </ThemedText>
+                  </View>
+                </Pressable>
+              </View>
+            </View>
+          )}
+        </View>
       </Modal>
     </>
   );
@@ -523,6 +831,37 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     gap: Spacing.md,
     paddingHorizontal: Spacing.xl,
+  },
+  loadMoreOverlay: {
+    position: 'absolute',
+    top: Spacing.sm,
+    left: 0,
+    right: 0,
+    alignItems: 'center',
+    zIndex: 10,
+  },
+  loadMorePill: {
+    paddingVertical: 8,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    flexDirection: 'row',
+  },
+  jumpBtn: {
+    position: 'absolute',
+    left: Spacing.lg,
+    bottom: Spacing.md,
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    borderWidth: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    shadowOffset: { width: 0, height: 2 },
   },
   emptyText: {
     textAlign: 'center',
@@ -666,25 +1005,26 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
+  contextBackdrop: {
+    ...StyleSheet.absoluteFill,
   },
-  contextSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
-    gap: Spacing.sm,
+  contextBackdropDim: {
+    ...StyleSheet.absoluteFill,
+  },
+  contextCard: {
+    position: 'absolute',
+    width: CONTEXT_CARD_W,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.sm,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
   },
   contextOption: {
     paddingVertical: Spacing.md,
-    gap: 2,
-    borderBottomWidth: StyleSheet.hairlineWidth,
   },
   contextOptionRow: {
     flexDirection: 'row',
@@ -692,6 +1032,33 @@ const styles = StyleSheet.create({
     gap: Spacing.sm,
   },
   contextOptionText: {
+    fontSize: 15,
+  },
+  failedCard: {
+    position: 'absolute',
+    top: '45%',
+    alignSelf: 'center',
+    minWidth: 220,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    paddingHorizontal: Spacing.sm,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  failedOption: {
+    paddingVertical: Spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+  },
+  failedOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  failedOptionText: {
     fontSize: 15,
   },
 });

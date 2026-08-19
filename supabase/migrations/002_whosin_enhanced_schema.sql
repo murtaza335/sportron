@@ -612,25 +612,16 @@ create trigger trg_community_matches_after_approval
 create or replace function public.handle_commitment_feedback()
 returns trigger
 language plpgsql
-security invoker
+security definer
 set search_path = public
 as $$
 begin
-  if new.feedback_status is not null then
-    -- Always increment total_committed (first time feedback given)
-    if old.feedback_status is null then
+  -- Increment completed only when attendance feedback says they showed up
+  if new.feedback_status = 'showed_up' then
+    if old.feedback_status is distinct from 'showed_up' then
       update public.profiles
-      set total_committed_sessions = total_committed_sessions + 1
+      set completed_sessions = completed_sessions + 1
       where id = new.user_id;
-    end if;
-
-    -- Increment completed if showed_up
-    if new.feedback_status = 'showed_up' then
-      if old.feedback_status is distinct from 'showed_up' then
-        update public.profiles
-        set completed_sessions = completed_sessions + 1
-        where id = new.user_id;
-      end if;
     end if;
   end if;
 

@@ -99,7 +99,6 @@ export type NotificationPreferences = {
   session_reminder: boolean;
   feedback_prompt: boolean;
   ping: boolean;
-  ping_response: boolean;
   join_request: boolean;
   join_approved: boolean;
   join_rejected: boolean;
@@ -163,7 +162,6 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   session_reminder: true,
   feedback_prompt: true,
   ping: true,
-  ping_response: true,
   join_request: true,
   join_approved: true,
   join_rejected: true,
@@ -196,7 +194,6 @@ export type NotificationType =
   | 'session_reminder'
   | 'feedback_prompt'
   | 'ping'
-  | 'ping_response'
   | 'join_request'
   | 'join_approved'
   | 'join_rejected'
@@ -314,16 +311,6 @@ export type Ping = {
   sender?: Pick<Profile, 'id' | 'username'> | null;
 };
 
-export type PingResponse = {
-  id: string;
-  ping_id: string;
-  community_id: string;
-  respondent_id: string;
-  response: 'coming' | 'busy';
-  created_at: string;
-  respondent?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
-};
-
 export type CommunityMatch = {
   id: string;
   community_id: string;
@@ -433,7 +420,7 @@ export type ChatMessageBase = {
   sender_avatar_url?: string | null;
   sender?: ChatSender | null;
   reply_to?: ChatReplyRef | null;
-  status?: 'sending' | 'delivered';
+  status?: 'sending' | 'delivered' | 'failed';
   tempId?: string;
 };
 

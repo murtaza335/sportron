@@ -61,6 +61,8 @@ export function SessionChatPopup({
       canSend={canSend}
       hasLeft={hasLeft}
       chat={chat}
+      chatType="session"
+      chatId={sessionId}
     />
   );
 }
