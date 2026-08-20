@@ -13,8 +13,6 @@ import { importPKCS8, SignJWT, jwtVerify } from 'https://esm.sh/jose@5';
 const FCM_SCOPE = 'https://www.googleapis.com/auth/firebase.messaging';
 const TOKEN_URL = 'https://oauth2.googleapis.com/token';
 
-export const SUMMARY_CAP = 4;
-
 export const supabase = createClient(
   Deno.env.get('SUPABASE_URL') ?? '',
   Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
@@ -126,45 +124,77 @@ function getAccessToken(): Promise<string> {
 // FCM HTTP v1 message building + fan-out
 // ---------------------------------------------------------------------------
 
-// FCM collapse key per conversation so successive chat notifications replace
-// each other on the device instead of stacking (WhatsApp-style "latest wins").
-// Only valid on Android while the app is in the background.
-function collapseKeyFor(data?: Record<string, unknown>): string | null {
+// Conversation key so successive chat notifications replace each other on the
+// device instead of stacking (WhatsApp-style "latest wins"). Returned as
+// `chat_room_<id>` and wired into BOTH:
+//   - android.notification.tag — replaces a previously displayed notification
+//     with the same tag in the tray on Android (background/terminated; the FCM
+//     SDK's default FirebaseMessagingService calls
+//     NotificationManager.notify(tag, id, ...) with this tag)
+//   - apns.headers['apns-collapse-id'] — collapses/replaces prior notifications
+//     for the same conversation on iOS
+// It is stable per chat (NOT a per-message UUID), so message #2 replaces
+// message #1 for that room. Reply pushes share the same key as the room's
+// message pushes so a "replied to you" banner replaces the room's message
+// banner rather than stacking on top of it.
+function chatRoomKeyFor(data?: Record<string, unknown>): string | null {
   const type = data?.type;
   if ((type === 'session_chat_message' || type === 'session_chat_reply') && data?.sessionId) {
-    return `t3s-session-${data.sessionId}`;
+    return `chat_room_${data.sessionId}`;
   }
   if ((type === 'community_chat_message' || type === 'community_chat_reply') && data?.communityId) {
-    return `t3s-community-${data.communityId}`;
+    return `chat_room_${data.communityId}`;
   }
   return null;
 }
 
-// Android shows the cumulative summary body; iOS keeps the per-message body
-// (iOS has no collapse key, so stacking stays readable as individual messages).
+// Android body is ALWAYS the actual messages, never a "N new messages" count.
+//
+// HYBRID payload (chat pushes):
+//   - `notification` block present => the OS / Google Play Services auto-displays
+//     the banner even when the app process is DEAD (force-stopped excepted).
+//     This is the fix for "no notifications when the app isn't running": a
+//     data-only message needs the app to be started, and Android often refuses
+//     to start it (OEM battery killers, Doze).
+//   - `android.notification.tag` => consecutive OS-displayed banners for the
+//     same chat replace each other in the tray instead of stacking.
+//   - `data.body` carries the ACCUMULATED unread messages (server-computed from
+//     read cursors), so when the app IS running (foreground) RNFirebase
+//     delivers the payload to JS and the app re-posts it under a stable
+//     per-chat identifier — the user reads every unread message in one banner.
+//   - iOS always displays via the system `aps.alert`; `apns-collapse-id`
+//     replaces the previous banner for the same chat.
 function buildMessage(
   token: string,
   title: string,
-  androidBody: string,
-  apnsBody: string,
+  body: string,
   data?: Record<string, unknown>,
 ) {
-  const collapseKey = collapseKeyFor(data);
+  const roomKey = chatRoomKeyFor(data);
+  const stringData = Object.fromEntries(
+    Object.entries(data ?? {}).map(([k, v]) => [k, String(v)]),
+  );
   return {
     message: {
       token,
-      notification: { title, body: androidBody },
-      data: Object.fromEntries(
-        Object.entries(data ?? {}).map(([k, v]) => [k, String(v)]),
-      ),
+      notification: { title, body },
+      data: { ...stringData, title, body },
       android: {
         priority: 'high',
-        ...(collapseKey ? { collapseKey } : {}),
+        // collapseKey only dedupes messages still in FCM's transit queue for a
+        // dead/offline device; in-place replacement of the visible banner is
+        // handled by android.notification.tag (OS path) and the client's stable
+        // identifier (app-running path).
+        ...(roomKey ? { collapseKey: roomKey } : {}),
+        ...(roomKey ? { notification: { tag: roomKey } } : {}),
       },
       apns: {
+        // apns-collapse-id header: successive pushes for the same conversation
+        // overwrite the older one in Notification Center.
+        ...(roomKey ? { headers: { 'apns-collapse-id': roomKey } } : {}),
         payload: {
           aps: {
-            alert: { title, body: apnsBody },
+            alert: { title, body },
             sound: 'default',
             badge: 1,
           },
@@ -174,19 +204,12 @@ function buildMessage(
   };
 }
 
-// Android summary body: 1 -> the message itself, 2-4 -> exact count, 5+ -> "4+".
-export function summaryBodyFor(count: number, perMessageBody: string): string {
-  if (count <= 1) return perMessageBody;
-  if (count <= SUMMARY_CAP) return `${count} new messages`;
-  return `${SUMMARY_CAP}+ new messages`;
-}
-
-// Sends to many tokens in one fan-out. `tokenRows` may carry a per-recipient
-// Android summary body (chat); non-chat pushes pass the plain body.
+// Sends to many tokens in one fan-out. `tokenRows` carries a per-token body
+// (chat pushes have a per-recipient accumulated-unread body); it is used for
+// both the Android/`notification` payload and the iOS `aps.alert` payload.
 export async function pushToTokens(
-  tokenRows: { token: string; androidBody: string }[],
+  tokenRows: { token: string; body: string }[],
   title: string,
-  apnsBody: string,
   data?: Record<string, unknown>,
 ): Promise<{ sent: number; failed: number; total: number }> {
   if (tokenRows.length === 0) return { sent: 0, failed: 0, total: 0 };
@@ -196,14 +219,14 @@ export async function pushToTokens(
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
   const results = await Promise.allSettled(
-    tokenRows.map(async ({ token, androidBody }) => {
+    tokenRows.map(async ({ token, body }) => {
       const res = await fetch(fcmUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
           Authorization: `Bearer ${accessToken}`,
         },
-        body: JSON.stringify(buildMessage(token, title, androidBody, apnsBody, data)),
+        body: JSON.stringify(buildMessage(token, title, body, data)),
       });
       if (!res.ok) {
         const bodyText = await res.text();

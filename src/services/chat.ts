@@ -145,8 +145,7 @@ export async function deleteChatPresence(
 }
 
 // Count of messages newer than the user's last-read cursor. When no cursor has
-// ever been written, count = ALL messages (standard never-read semantics, and
-// matches the edge function's per-recipient summary bodies).
+// ever been written, count = ALL messages (standard never-read semantics).
 export async function fetchChatUnreadCount(
   messageTable: ChatMessageTable,
   idColumn: ChatIdColumn,

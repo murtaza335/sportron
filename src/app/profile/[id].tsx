@@ -16,12 +16,21 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchProfile } from '@/services/profiles';
-import { fetchCommunityById, fetchCommunityMember } from '@/services/communities';
-import type { Community, CommunityMember, Profile } from '@/types';
+import {
+  fetchCommunityById,
+  fetchCommunityMember,
+  fetchCommunityMemberStats,
+} from '@/services/communities';
+import type {
+  Community,
+  CommunityMember,
+  CommunityMemberStats,
+  Profile,
+} from '@/types';
 import { SPORT_LABELS } from '@/types';
 import { formatDate } from '@/lib/date';
 
-function formatWinRatio(value: CommunityMember['win_ratio'] | null | undefined): string {
+function formatWinRatio(value: number | null | undefined): string {
   if (value == null) return '—';
   const n = Number(value);
   if (Number.isNaN(n)) return '—';
@@ -37,6 +46,7 @@ export default function PublicProfileScreen() {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [communityInfo, setCommunityInfo] = useState<Community | null>(null);
   const [memberStats, setMemberStats] = useState<CommunityMember | null>(null);
+  const [computedStats, setComputedStats] = useState<CommunityMemberStats | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -44,15 +54,17 @@ export default function PublicProfileScreen() {
     let cancelled = false;
     (async () => {
       try {
-        const [profile, info, stats] = await Promise.all([
+        const [profile, info, stats, computed] = await Promise.all([
           fetchProfile(id),
           community ? fetchCommunityById(community) : Promise.resolve(null),
           community ? fetchCommunityMember(community, id) : Promise.resolve(null),
+          community ? fetchCommunityMemberStats(community, id) : Promise.resolve(null),
         ]);
         if (cancelled) return;
         setProfile(profile);
         setCommunityInfo(info);
         setMemberStats(stats);
+        setComputedStats(computed);
       } catch (e) {
         console.error('Failed to load profile:', e);
       } finally {
@@ -142,7 +154,7 @@ export default function PublicProfileScreen() {
               <View style={styles.statsGrid}>
                 <View style={styles.statItem}>
                   <ThemedText variant="heading" style={styles.statValue}>
-                    {memberStats.matches_played}
+                    {computedStats?.matches_played ?? 0}
                   </ThemedText>
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Matches
@@ -150,7 +162,7 @@ export default function PublicProfileScreen() {
                 </View>
                 <View style={styles.statItem}>
                   <ThemedText variant="heading" style={styles.statValue}>
-                    {memberStats.wins}
+                    {computedStats?.wins ?? 0}
                   </ThemedText>
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Wins
@@ -158,7 +170,7 @@ export default function PublicProfileScreen() {
                 </View>
                 <View style={styles.statItem}>
                   <ThemedText variant="heading" style={styles.statValue}>
-                    {memberStats.losses}
+                    {computedStats?.losses ?? 0}
                   </ThemedText>
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Losses
@@ -174,7 +186,7 @@ export default function PublicProfileScreen() {
                     Win rate
                   </ThemedText>
                   <ThemedText variant="body" style={styles.statRowValue}>
-                    {formatWinRatio(memberStats.win_ratio)}
+                    {formatWinRatio(computedStats?.win_ratio)}
                   </ThemedText>
                 </View>
                 <View style={styles.statRow}>

@@ -259,6 +259,13 @@ export type CommunityMember = {
   profile?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
 };
 
+export type CommunityMemberStats = {
+  matches_played: number;
+  wins: number;
+  losses: number;
+  win_ratio: number;
+};
+
 export type CreateCommunityInput = {
   name: string;
   description?: string;

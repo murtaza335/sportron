@@ -10,9 +10,8 @@
 // The function computes everything itself from the DB:
 //   - recipients (session creator + accepted participants, or approved
 //     community members) minus the sender
-//   - chat title / sender name / body
+//   - chat title / sender name / accumulated-unread body
 //   - presence skip (chat_presence heartbeat TTL) for active readers
-//   - per-recipient Android summary bodies from read cursors (028)
 //   - a session_chat_reply / community_chat_reply push when reply_to_id is set
 //
 // Required Supabase secrets:
@@ -21,7 +20,7 @@
 // Requires a service_role bearer token (the DB trigger sends the service role
 // key from Vault).
 
-import { supabase, assertServiceRole, chatTablesFor, pushToTokens, summaryBodyFor } from '../_shared/fcm.ts';
+import { supabase, assertServiceRole, chatTablesFor, pushToTokens } from '../_shared/fcm.ts';
 
 interface ChatNotificationPayload {
   chat_type: 'session' | 'community';
@@ -34,6 +33,11 @@ interface ChatNotificationPayload {
 // must not be pushed. The client deletes its row on clean leave and heartbeats
 // every ~20s while open, so this TTL only covers abrupt app termination.
 const PRESENCE_TTL_MS = 60_000;
+
+// How many recent messages we consider when assembling a recipient's unread
+// body, and the max body length (FCM data payloads cap at 4KB).
+const UNREAD_MAX_MESSAGES = 50;
+const MAX_UNREAD_BODY_CHARS = 2000;
 
 function ordinalSuffix(n: number): string {
   const suffixes = ['th', 'st', 'nd', 'rd'];
@@ -167,7 +171,6 @@ Deno.serve(async (req: Request) => {
 
   const remaining = recipients.filter((id) => !skipIds.has(id));
 
-  const body = `${senderName}: ${message.content}`;
   const pushData = chat_type === 'session'
     ? { type: 'session_chat_message', sessionId: chat_id }
     : { type: 'community_chat_message', communityId: chat_id };
@@ -175,51 +178,65 @@ Deno.serve(async (req: Request) => {
   let mainResult = { sent: 0, failed: 0, total: 0 };
 
   if (remaining.length > 0) {
-    const { data: profiles } = await supabase
-      .from('profiles')
-      .select('id, fcm_tokens')
-      .in('id', remaining);
+    const [profilesResult, messagesResult, cursorsResult] = await Promise.all([
+      supabase
+        .from('profiles')
+        .select('id, fcm_tokens')
+        .in('id', remaining),
+      supabase
+        .from(tables.messageTable)
+        .select('sender_username, content, created_at')
+        .eq(tables.messageIdColumn, chat_id)
+        .order('created_at', { ascending: false })
+        .limit(UNREAD_MAX_MESSAGES),
+      supabase
+        .from(tables.readTable)
+        .select('profile_id, last_read_at')
+        .eq(tables.readIdColumn, chat_id)
+        .in('profile_id', remaining),
+    ]);
 
-    // Per-recipient Android summary bodies based on their read cursor.
-    const androidBodyByProfile = new Map<string, string>();
-    if (profiles && profiles.length > 0) {
-      const [cursorsResult, messagesResult] = await Promise.all([
-        supabase
-          .from(tables.readTable)
-          .select('profile_id, last_read_at')
-          .eq(tables.readIdColumn, chat_id)
-          .in('profile_id', profiles.map((p) => p.id)),
-        supabase
-          .from(tables.messageTable)
-          .select('created_at')
-          .eq(tables.messageIdColumn, chat_id),
-      ]);
+    // Newest-last ascending list of the recent messages (each "<sender>: <content>").
+    const recentMessages = (messagesResult.data ?? [])
+      .reverse()
+      .map((m) => ({
+        text: `${m.sender_username ?? 'Someone'}: ${m.content}`,
+        at: new Date(m.created_at).getTime(),
+      }));
 
-      const readAtByProfile = new Map<string, number>();
-      for (const row of cursorsResult.data ?? []) {
-        readAtByProfile.set(row.profile_id, new Date(row.last_read_at).getTime());
-      }
-
-      const messageTimes = (messagesResult.data ?? [])
-        .map((m) => new Date(m.created_at).getTime())
-        .sort((a, b) => a - b);
-
-      for (const p of profiles) {
-        const readAt = readAtByProfile.get(p.id) ?? -Infinity; // never-opened => everything unread
-        const unreadCount = messageTimes.filter((t) => t > readAt).length;
-        androidBodyByProfile.set(p.id, summaryBodyFor(unreadCount, body));
-      }
+    const readAtByProfile = new Map<string, number>();
+    for (const row of cursorsResult.data ?? []) {
+      readAtByProfile.set(row.profile_id, new Date(row.last_read_at).getTime());
     }
 
-    const tokenRows: { token: string; androidBody: string }[] = [];
-    for (const p of profiles ?? []) {
-      const androidBody = androidBodyByProfile.get(p.id) ?? body;
+    // Never-opened chat => readAt is -Infinity => every recent message is unread.
+    // Accumulate ALL unread messages into the body so a single banner contains
+    // every message the user hasn't seen yet (the newest last).
+    function accumulateUnreadBody(readAt: number): string {
+      const lines = recentMessages.filter((m) => m.at > readAt).map((m) => m.text);
+      if (lines.length === 0) return `${senderName}: ${message.content}`;
+      let body = lines.join('\n');
+      // Drop oldest lines first to stay under the FCM data limit.
+      while (body.length > MAX_UNREAD_BODY_CHARS && lines.length > 1) {
+        lines.shift();
+        body = lines.join('\n');
+      }
+      if (body.length > MAX_UNREAD_BODY_CHARS) {
+        body = `${body.slice(0, MAX_UNREAD_BODY_CHARS)}…`;
+      }
+      return body;
+    }
+
+    const tokenRows: { token: string; body: string }[] = [];
+    for (const p of profilesResult.data ?? []) {
+      const readAt = readAtByProfile.get(p.id) ?? -Infinity;
+      const body = accumulateUnreadBody(readAt);
       for (const token of (p.fcm_tokens ?? []) as string[]) {
-        tokenRows.push({ token, androidBody });
+        tokenRows.push({ token, body });
       }
     }
 
-    mainResult = await pushToTokens(tokenRows, chatName, body, pushData);
+    mainResult = await pushToTokens(tokenRows, chatName, pushData);
   }
 
   let replyResult = { sent: 0, failed: 0, total: 0 };
@@ -237,10 +254,10 @@ Deno.serve(async (req: Request) => {
 
     const tokenRows = ((replyProfile?.fcm_tokens ?? []) as string[]).map((token) => ({
       token,
-      androidBody: replyBody,
+      body: replyBody,
     }));
 
-    replyResult = await pushToTokens(tokenRows, chatName, replyBody, replyPushData);
+    replyResult = await pushToTokens(tokenRows, chatName, replyPushData);
   }
 
   const result = {
