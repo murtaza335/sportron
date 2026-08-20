@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/lib/supabase';
+import { setChatUnreadCountFor } from '@/lib/chatUnreadStore';
 import {
   fetchChatReadCursor,
   fetchChatUnreadCount,
@@ -65,6 +66,8 @@ export function useChat<T extends ChatMessageBase>(
   senderProfile?: SenderProfile | null,
 ): ChatThread<T> {
   const { sourceId, table, idColumn, channelPrefix, fetchMessages, sendMessage } = config;
+  const chatKind: 'community' | 'session' =
+    table === 'session_messages' ? 'session' : 'community';
   // Renamed in the returned thread: config.deleteMessage is the server-backed
   // op, while the thread exposes `deleteMessage` (handles failed/temp messages
   // locally) and `editMessage` (optimistic with revert).
@@ -96,6 +99,10 @@ export function useChat<T extends ChatMessageBase>(
           fetchChatUnreadCount(table, idColumn, sourceId, userId),
         ]);
         setUnreadCount(count);
+        // Authoritative from the DB — publish into the shared store so the
+        // Chats tab badge reflects it (no refetch). A 0 here is a real "all
+        // read" marker, not an uninitialized value (that only happens pre-load).
+        setChatUnreadCountFor(chatKind, sourceId, count);
         // Index (in the ascending messages list) of the oldest unread message.
         // null means the user is fully caught up (scroll to bottom on open).
         if (cursor) {
@@ -111,7 +118,7 @@ export function useChat<T extends ChatMessageBase>(
     } finally {
       setLoading(false);
     }
-  }, [sourceId, fetchMessages, idColumn, table, userId]);
+  }, [sourceId, fetchMessages, idColumn, table, userId, chatKind]);
 
   // Loads the page of messages older than the oldest one already shown and
   // prepends it, so scrolling up paginates instead of pulling the whole chat.
@@ -148,9 +155,12 @@ export function useChat<T extends ChatMessageBase>(
   const markRead = useCallback(() => {
     if (!sourceId || !userId) return;
     upsertChatReadCursor(idColumn, sourceId, userId)
-      .then(() => setUnreadCount(0))
+      .then(() => {
+        setUnreadCount(0);
+        setChatUnreadCountFor(chatKind, sourceId, 0);
+      })
       .catch((e) => console.error('Failed to mark chat read:', e));
-  }, [sourceId, userId, idColumn]);
+  }, [sourceId, userId, idColumn, chatKind]);
 
   // Subscribes to realtime for this chat, then closes any OTHER channel still
   // registered for the same chat ("close existing, open current"). The unique
@@ -225,7 +235,11 @@ export function useChat<T extends ChatMessageBase>(
             // Live badge: new messages from other people bump the unread count.
             // The popup resets it to 0 via markRead on open / on scroll.
             if (raw.sender_id && raw.sender_id !== userId) {
-              setUnreadCount((prev) => prev + 1);
+              setUnreadCount((prev) => {
+                const next = prev + 1;
+                setChatUnreadCountFor(chatKind, sourceId, next);
+                return next;
+              });
             }
           }
         },
@@ -274,7 +288,7 @@ export function useChat<T extends ChatMessageBase>(
         supabase.removeChannel(other);
       }
     }
-  }, [sourceId, subscribe, table, idColumn, channelPrefix, userId]);
+  }, [sourceId, subscribe, table, idColumn, channelPrefix, userId, chatKind]);
 
   useEffect(() => {
     if (!sourceId || !subscribe) return;

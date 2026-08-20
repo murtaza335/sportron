@@ -1,7 +1,12 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { setChatUnreadCount } from '@/lib/chatUnreadStore';
+import {
+  getChatUnreadCountsByKind,
+  replaceChatUnreadCounts,
+  resetChatUnreadCounts,
+  setChatUnreadCountFor,
+} from '@/lib/chatUnreadStore';
 import { fetchChatHubStats, type ChatHubStats } from '@/services/chat';
 import { fetchMyCommunities } from '@/services/communities';
 import { fetchChatSessions } from '@/services/sessions';
@@ -88,14 +93,16 @@ export function useChats(userId: string | undefined) {
   const showCache = useCallback((cache: ChatHubCache) => {
     setCommunities(cache.communities);
     setSessions(cache.sessions);
-    setCommunityUnread(cache.communityUnread);
-    setSessionUnread(cache.sessionUnread);
+    // The cache may predate a read done in a chat opened elsewhere (e.g. via
+    // /chat or a community popup). Those reads live in the per-chat store, so
+    // overlay them on top of the cached snapshot — a "0" entry keeps a cleared
+    // chat cleared instead of resurrecting the stale count.
+    setCommunityUnread({ ...cache.communityUnread, ...getChatUnreadCountsByKind('community') });
+    setSessionUnread({ ...cache.sessionUnread, ...getChatUnreadCountsByKind('session') });
     setCommunityLastAt(cache.communityLastAt);
     setSessionLastAt(cache.sessionLastAt);
-    const total =
-      Object.values(cache.communityUnread).reduce((sum, n) => sum + n, 0) +
-      Object.values(cache.sessionUnread).reduce((sum, n) => sum + n, 0);
-    setChatUnreadCount(total);
+    // NB: do NOT touch the store here — a stale cache render must never revert
+    // a fresher per-chat count that the badge is already showing.
     setLoading(false);
   }, []);
 
@@ -109,7 +116,7 @@ export function useChats(userId: string | undefined) {
         setSessionUnread({});
         setCommunityLastAt({});
         setSessionLastAt({});
-        setChatUnreadCount(0);
+        resetChatUnreadCounts();
         setLoading(false);
         return;
       }
@@ -129,12 +136,14 @@ export function useChats(userId: string | undefined) {
         setLoading(false);
 
         // Badges + "latest activity" hydrate as each batched RPC lands; a
-        // failed kind keeps whatever the cache already had.
+        // failed kind keeps whatever the cache already had (and leaves the
+        // store's per-chat counts untouched).
         const [commStats, sessStats] = await Promise.all([
           fetchChatHubStats('community')
             .then((s) => {
               setCommunityUnread(s.unread);
               setCommunityLastAt(s.lastMessageAt);
+              replaceChatUnreadCounts('community', s.unread);
               return s;
             })
             .catch((e) => {
@@ -145,6 +154,7 @@ export function useChats(userId: string | undefined) {
             .then((s) => {
               setSessionUnread(s.unread);
               setSessionLastAt(s.lastMessageAt);
+              replaceChatUnreadCounts('session', s.unread);
               return s;
             })
             .catch((e) => {
@@ -161,11 +171,6 @@ export function useChats(userId: string | undefined) {
           unread: chatsCache?.sessionUnread ?? {},
           lastMessageAt: chatsCache?.sessionLastAt ?? {},
         };
-
-        const total =
-          Object.values(effCommStats.unread).reduce((sum, n) => sum + n, 0) +
-          Object.values(effSessStats.unread).reduce((sum, n) => sum + n, 0);
-        setChatUnreadCount(total);
 
         chatsCache = buildCache(userId, comm, sess, effCommStats, effSessStats);
       } catch (e) {
@@ -234,6 +239,9 @@ export function useChats(userId: string | undefined) {
       }
       return next;
     });
+    // Publish into the shared store too so the tab badge reacts the moment a
+    // chat is read (or bumps while a realtime message lands) — no refetch.
+    setChatUnreadCountFor(kind, chatId, count);
   }, []);
 
   const sortedCommunities = useMemo(
