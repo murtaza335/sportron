@@ -25,6 +25,7 @@ src/
 │   ├── create-community.tsx    # New community (modal)
 │   ├── create-session.tsx      # New session (modal)
 │   ├── discover.tsx            # Browse/search public communities
+│   ├── chat.tsx                # Full-screen chat opened from chat push notifications
 │   ├── ping-response.tsx       # Respond "coming"/"busy" to a ping
 │   ├── settings.tsx            # Notification prefs, about, delete account
 │   ├── auth/callback.tsx       # OAuth deep-link handler (t3s://auth/callback)
@@ -288,7 +289,8 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/updates` (Activity), `/profile`
 - Stack screens with `headerShown`: `/settings`, `/discover`, `/community/[id]`, `/community/[id]/members`, `/community/[id]/info`, `/profile/[id]`, `/ping-response`
-- Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`
+- Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`, `/chat`
+- `src/app/chat.tsx` reads `{ type: 'community' | 'session', id }` and renders the matching `CommunityChatPopup` / `SessionChatPopup` full screen. Chat **push notification** taps (`session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply`) navigate here directly via `useFCM.navigateToNotification` (previously they opened the community/history screen).
 - Auth screens: `/login`, `/onboarding`, `/auth/callback`
 
 ### Theme
