@@ -73,9 +73,6 @@ export function OpponentSelector({
                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
                   {item.username}
                 </ThemedText>
-                <ThemedText variant="caption" muted>
-                  {item.role}
-                </ThemedText>
               </View>
               {selected ? <Check size={18} color={theme.text} /> : null}
             </Pressable>

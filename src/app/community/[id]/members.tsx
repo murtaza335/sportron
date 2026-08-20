@@ -203,7 +203,12 @@ export default function CommunityMembersScreen() {
             ) : null}
             renderItem={({ item }) => (
               <Pressable
-                onPress={() => router.push(`/profile/${item.profile_id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: { id: item.profile_id, community: id },
+                  })
+                }
                 onLongPress={() => {
                   if (isAdmin && item.profile_id !== userId) {
                     setContextMember(item);

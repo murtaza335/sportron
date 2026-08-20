@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase';
 import type {
   Community,
   CommunityInvite,
+  CommunityMemberStats,
   Profile,
   CommunityJoinRequest,
   CommunityMatch,
@@ -269,6 +270,63 @@ export async function fetchCommunityMember(
 
   if (error) throw error;
   return data;
+}
+
+/**
+ * Compute a member's stats straight from the community's approved matches where
+ * they participated (as player, partner, or opponent — singles and doubles).
+ * This avoids relying on `community_members.matches_played`, which is only
+ * maintained for win/loss outcomes and therefore undercounts draws.
+ */
+export async function fetchCommunityMemberStats(
+  communityId: string,
+  profileId: string,
+): Promise<CommunityMemberStats> {
+  const { data, error } = await supabase
+    .from('community_matches')
+    .select(
+      'player_id, player_partner_id, opponent_id, opponent_partner_id, player_score, opponent_score',
+    )
+    .eq('community_id', communityId)
+    .eq('approval_status', 'approved')
+    .or(
+      `player_id.eq.${profileId},player_partner_id.eq.${profileId},opponent_id.eq.${profileId},opponent_partner_id.eq.${profileId}`,
+    );
+
+  if (error) throw error;
+
+  const matches = data ?? [];
+  let wins = 0;
+  let losses = 0;
+
+  for (const match of matches) {
+    const onPlayerSide =
+      match.player_id === profileId || match.player_partner_id === profileId;
+    const onOpponentSide =
+      match.opponent_id === profileId || match.opponent_partner_id === profileId;
+    if (!onPlayerSide && !onOpponentSide) continue;
+
+    if (match.player_score > match.opponent_score) {
+      if (onPlayerSide) wins++;
+      else losses++;
+    } else if (match.opponent_score > match.player_score) {
+      if (onOpponentSide) wins++;
+      else losses++;
+    }
+    // Draw — counts as played but neither a win nor a loss.
+  }
+
+  const winRatio =
+    wins + losses > 0
+      ? Math.round((wins / (wins + losses)) * 100 * 100) / 100
+      : 0;
+
+  return {
+    matches_played: matches.length,
+    wins,
+    losses,
+    win_ratio: winRatio,
+  };
 }
 
 export async function joinCommunity(communityId: string, userId: string): Promise<void> {

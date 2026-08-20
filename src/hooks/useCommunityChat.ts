@@ -1,7 +1,9 @@
 import { useChat, type ChatThread } from '@/hooks/useChat';
 import {
+  deleteCommunityMessage,
   fetchCommunityMessages,
   sendCommunityMessage,
+  updateCommunityMessage,
 } from '@/services/chat';
 import type { CommunityChatMessage } from '@/types';
 
@@ -21,6 +23,8 @@ export function useCommunityChat(
       channelPrefix: 'community-chat-',
       fetchMessages: fetchCommunityMessages,
       sendMessage: sendCommunityMessage,
+      updateMessage: updateCommunityMessage,
+      deleteMessage: deleteCommunityMessage,
     },
     userId,
     subscribe,

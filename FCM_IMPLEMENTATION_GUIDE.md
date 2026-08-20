@@ -141,7 +141,9 @@ File: `supabase/functions/send-chat-notification/index.ts`
 - Triggered by `trg_session_chat_fcm_push` / `trg_community_chat_fcm_push` after a `session_messages` / `community_messages` INSERT
 - Requires a `service_role` bearer token. Accepts `{ chat_type, chat_id, message_id }`.
 - Computes recipients itself (session creator + accepted participants, or community approved members, minus the sender), the chat title, and the body (`<sender>: <content>`)
-- Skips active readers via `chat_presence` (60s TTL) and builds per-recipient Android summary bodies from the read-cursor tables (migrations 028 / 031)
+- Skips active readers via `chat_presence` (60s TTL)
+- Assembles the body as the **server-accumulated list of ALL unread messages** per recipient (from `*_chat_read` cursors, newest last) so one banner carries every unread message; capped for the 4KB FCM data limit
+- Sends a **hybrid** payload: a `notification` block (so the OS displays it even when the app process is dead) + `data` (tap-routing + foreground rendering), with `android.notification.tag` / `apns-collapse-id` for OS-level replacement
 - Handles `session_chat_reply` / `community_chat_reply` pushes when `reply_to_id` is set
 - Deploy: `supabase functions deploy send-chat-notification`
 
@@ -154,10 +156,11 @@ File: `supabase/functions/_shared/fcm.ts` — OAuth token caching (single-flight
 ### Core module: `src/services/fcm.ts`
 - `registerForPushNotificationsAsync()` — Android channels (default, match-updates), permission request, `messaging().getToken()`
 - `saveFCMTokenToProfile` / `removeFCMTokenFromProfile` — deduplicated array updates on `profiles.fcm_tokens`
-- `setupBackgroundMessageHandler()` — data-only messages schedule a local notification
+- `setupBackgroundMessageHandler()` — only fired for purely data-only messages (hybrid chat pushes carry a `notification` block, so the OS displays them); on Android these are rendered under the stable per-chat identifier
 - `setupForegroundMessageHandler()` — `messaging().onMessage`
 - `setupTokenRefreshListener()` — refetch on token refresh
-- `scheduleLocalNotification()`, `getNotificationPermissions()`, `parseNotificationData/ResponseData()`
+- `scheduleLocalNotification()` — WhatsApp-style: chat notifications are re-scheduled with a **stable identifier per chat** (`chat_room_<id>`), so a new message replaces the previous banner instead of stacking; the body passed through verbatim is the server-accumulated unread-message list
+- `getNotificationPermissions()`, `parseNotificationData/ResponseData()`
 - Sets the global `Notifications.setNotificationHandler` (alerts/sound/badge/banner)
 
 ### Hook: `src/hooks/useFCM.ts`

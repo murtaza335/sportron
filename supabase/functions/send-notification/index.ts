@@ -72,10 +72,10 @@ Deno.serve(async (req: Request) => {
     type: notification.type,
   };
 
-  const tokenRows = tokens.map((token) => ({ token, androidBody: notification.body }));
+  const tokenRows = tokens.map((token) => ({ token, body: notification.body }));
 
   try {
-    const result = await pushToTokens(tokenRows, notification.title, notification.body, data);
+    const result = await pushToTokens(tokenRows, notification.title, data);
     return new Response(JSON.stringify(result), {
       headers: { 'Content-Type': 'application/json' },
     });

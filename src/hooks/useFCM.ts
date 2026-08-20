@@ -81,13 +81,21 @@ export function useFCM() {
         case 'session_rejected':
         case 'session_left':
         case 'session_reminder':
-        case 'feedback_prompt':
-        case 'session_chat_message':
-        case 'session_chat_reply': {
+        case 'feedback_prompt': {
           if (data.sessionId) {
             router.navigate({
               pathname: '/history',
               params: { sessionId: data.sessionId },
+            });
+          }
+          return;
+        }
+        case 'session_chat_message':
+        case 'session_chat_reply': {
+          if (data.sessionId) {
+            router.push({
+              pathname: '/chat',
+              params: { type: 'session', id: data.sessionId },
             });
           }
           return;
@@ -100,13 +108,21 @@ export function useFCM() {
         case 'admin_promoted':
         case 'community_invite':
         case 'community_invite_accepted':
-        case 'community_invite_rejected':
-        case 'community_chat_message':
-        case 'community_chat_reply': {
+        case 'community_invite_rejected': {
           if (data.communityId) {
             router.push({
               pathname: '/community/[id]',
               params: { id: data.communityId },
+            });
+          }
+          return;
+        }
+        case 'community_chat_message':
+        case 'community_chat_reply': {
+          if (data.communityId) {
+            router.push({
+              pathname: '/chat',
+              params: { type: 'community', id: data.communityId },
             });
           }
           return;

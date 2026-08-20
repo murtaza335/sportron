@@ -174,6 +174,14 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="chat"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+            animationDuration: 50,
+          }}
+        />
+        <Stack.Screen
           name="profile/[id]"
           options={{
             headerShown: true,

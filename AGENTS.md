@@ -25,6 +25,7 @@ src/
 │   ├── create-community.tsx    # New community (modal)
 │   ├── create-session.tsx      # New session (modal)
 │   ├── discover.tsx            # Browse/search public communities
+│   ├── chat.tsx                # Full-screen chat opened from chat push notifications
 │   ├── ping-response.tsx       # Respond "coming"/"busy" to a ping
 │   ├── settings.tsx            # Notification prefs, about, delete account
 │   ├── auth/callback.tsx       # OAuth deep-link handler (t3s://auth/callback)
@@ -52,7 +53,7 @@ src/
 │   ├── InviteCard.tsx          # Community invite accept/decline
 │   ├── InviteMemberModal.tsx   # Admin invite-by-username modal
 │   ├── CommunityCard.tsx       # Community list card
-│   ├── ProfileForm.tsx         # Username/bio/role form + avatar upload
+│   ├── ProfileForm.tsx         # Username/bio form + avatar upload
 │   ├── FCMInitializer.tsx      # Wires FCM once a session exists
 │   └── ui/                     # Button, Card, SegmentedControl, Text
 ├── contexts/
@@ -143,12 +144,12 @@ src/
 - **Session scope**: session **creator + accepted participants** only (RLS enforces both read and write). Users who **left** can still read history up to the moment they left (`created_at <=` their commitment's `updated_at`) but cannot send; the client skips its realtime subscription and shows a "you left" banner, and they receive no further FCM pushes
 - **Community scope**: any **approved community member** (RLS enforces both read and write); the chat button sits next to the ping button on the community screen and opens `CommunityChatPopup`
 - Chat button sits in the `SessionDetailPopup` header (next to close); opens a full-screen `SessionChatPopup`
-- Text only, max 1000 chars, permanent (no delete/edit); sending disabled once a session is closed/completed/cancelled
+- Text only, max 1000 chars; sending disabled once a session is closed/completed/cancelled. **Own-message edit + delete**: the sender can edit content within 15 minutes of sending (bubble shows an *Edited* mark, stamped via `edited_at` by a DB trigger, migration 039) and hard-delete within 24 hours (bubble disappears for everyone via realtime DELETE). Both are enforced server-side by RLS + triggers on `session_messages`/`community_messages`, and the client applies them optimistically with revert (see `useChat`)
 - **Optimistic UI** (`src/hooks/useChat.ts`): sending adds a temp bubble instantly with a **clock** (sending) → **check** (delivered) mark, then swaps to the real row with **no refetch**. Failure removes the temp and restores the draft + reply. A realtime INSERT for your own just-sent message is matched to the temp (by content + `reply_to_id`) and upgrades its id in place — never a second bubble, never a lost mark
 - **My avatar** renders on the right of your own bubbles (from `useAuth().profile`)
 - **Long-press to reply**: long-press any message to open a bottom-sheet "Reply to <name>" option; replies store `reply_to_id` (migration 025) and render a preview block (quoted name/content) inside the bubble
 - **No joins / no per-message refetch**: `sender_username`/`sender_avatar_url` are snapshotted on the row at insert (migrations 026 / 027), so realtime payloads and the initial fetch carry the display name without a join. Reply previews/names resolve client-side from the already-loaded list (`resolveReplyPreview`), so replying to your own message shows your own name. This removed the self-join (`!reply_to_id`) entirely, along with the PGRST200 schema-cache dependency and one extra round-trip per message
-- **Push** (server-side, migration 035): each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. A Postgres trigger on `session_messages` / `community_messages` fires the **`send-chat-notification`** edge function via pg_net, which computes recipients (creator + accepted participants / approved members), skips active readers via `chat_presence`, applies per-recipient Android summary bodies, and fans out in one call. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …"). No client code triggers chat pushes — this works identically from web, which has no FCM but can still cause app users to receive pushes
+- **Push** (server-side, migration 035): each message sends an FCM-only push (no in-app notification, so it does **not** appear in the Activity inbox) to every recipient except the sender — title = session name / community name, body = `<sender>: <content>`. A Postgres trigger on `session_messages` / `community_messages` fires the **`send-chat-notification`** edge function via pg_net, which computes recipients (creator + accepted participants / approved members), skips active readers via `chat_presence`, and fans out in one call. Chat pushes are **hybrid**: they carry both a `notification` block (so the OS/GMS auto-displays them even when the app process is dead — the fix for "no notifs when the app isn't running") and `data`. The body is the **server-accumulated list of ALL unread messages** for that recipient (computed from `*_chat_read` cursors, newest last — every unread message readable in one banner), never a "N new messages" count. Replacement is dual-path: `android.notification.tag` / `apns-collapse-id` handle it at the OS level (background/terminated), and when the app is running the JS re-posts under a **stable per-chat identifier (`chat_room_<id>`)**. Replying sends a `session_chat_reply` / `community_chat_reply` push to the replied-to author ("<sender> replied to you: …"). No client code triggers chat pushes — this works identically from web, which has no FCM but can still cause app users to receive pushes
 - **Unread tracking** (migration 028): one row per (chat, user) in `session_chat_read` / `community_chat_read` holding `last_read_at` — O(participants), no per-message receipts. `fetchChatUnreadCount` counts `created_at > last_read_at` (0 when no cursor yet); `fetchChatReadCursor`/`upsertChatReadCursor` read/write the cursor. `useChat` exposes `unreadCount`, `firstUnreadIndex` (index of the oldest unread in the ascending list), and `markRead()` (upsert cursor → now, resets count). `ChatPopup` scrolls to the oldest unread with a "New messages" divider on open, marks read on open + debounced on scroll-end, and skips auto-pin-to-bottom while unread remain; realtime INSERTs from others bump `unreadCount` live so the badge updates even while closed. Unread badges show on the chat button in `community/[id].tsx` (members only) and on the session chat button in `SessionDetailPopup` (`canViewChat`). The `chat` thread is owned by the parent screen and passed into `SessionChatPopup`/`CommunityChatPopup` (no internal hook), so the badge and popup share one subscription
 
 ### 7. Activity (Notifications Inbox)
@@ -168,7 +169,7 @@ src/
 - `session_chat_message` / `session_chat_reply` / `community_chat_message` / `community_chat_reply` pushes are **FCM-only** (server-triggered, never inserted into `in_app_notifications`). FCM payloads for in-app notifications carry `type` + the row's `data` for tap-routing
 
 ### 9. Profile & Settings
-- **Profile**: view/edit username, bio, role (student/teacher), avatar upload; profile for other users via `/profile/[id]`
+- **Profile**: view/edit username, bio, avatar upload; profile for other users via `/profile/[id]`
 - **Theme picker**: Light / Dark / System (bottom sheet, persisted)
 - **Push notification master toggle** + per-type preferences in Advanced Settings
 - **Delete account** (soft delete); re-enabled on re-login
@@ -182,7 +183,7 @@ Current live tables (legacy `matches`/`match_likes`/`match_comments` were droppe
 ```sql
 -- Already implemented tables
 profiles
-  id, username (unique, was renamed from display_name), bio, avatar_url, role,
+  id, username (unique, was renamed from display_name), bio, avatar_url,
   fcm_tokens text[], notification_preferences jsonb,
   sport_interests text[], completed_sessions, total_committed_sessions,
   deleted_at, created_at, updated_at
@@ -201,19 +202,23 @@ commitments
 session_messages
   id, session_id (fk, cascade), sender_id (fk, cascade), content,
   reply_to_id (self fk, ON DELETE SET NULL, migration 025),
+  edited_at (set by the edit trigger, migration 039),
   created_at
   -- sender snapshot: sender_username, sender_avatar_url (migration 026) — written
   -- at insert so realtime payloads/reads carry the display name with no join
   -- live text chat; readable/writable only by the session creator + accepted
-  -- participants (RLS); added to the supabase_realtime publication (migration 021)
+  -- participants (RLS); added to the supabase_realtime publication (migration 021);
+  -- UPDATE restricted to the sender within 15 min, DELETE within 24 h (RLS + triggers, migration 039)
 
 community_messages
   id, community_id (fk, cascade), sender_id (fk, cascade), content,
   reply_to_id (self fk, ON DELETE SET NULL), sender_username, sender_avatar_url,
+  edited_at (set by the edit trigger, migration 039),
   created_at
   -- live text chat; readable/writable only by approved community members (RLS);
   -- composite index (community_id, created_at); added to the supabase_realtime
-  -- publication (migration 027)
+  -- publication (migration 027);
+  -- UPDATE restricted to the sender within 15 min, DELETE within 24 h (RLS + triggers, migration 039)
 
 communities
   id, name, description, organization, location, image_url,
@@ -269,7 +274,9 @@ community_chat_read
 
 -- View: community_leaderboard (per-community rank by win_ratio)
 -- RPCs: get_accepted_commitment_counts, close_expired_sessions,
---        create_community_invite, respond_to_community_invite
+--        create_community_invite, respond_to_community_invite,
+--        get_chat_hub_stats (migration 036: batched unread counts +
+--        last-message timestamps for the Chats hub, scoped via auth.uid())
 ```
 
 ### Notification Types
@@ -279,10 +286,17 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 
 ## Key Conventions
 
+### Backward Compatibility (mandatory)
+- **Every new migration, feature, and Supabase edge function change must keep backward compatibility with already-installed app builds** (in stores/Play) and already-deployed infrastructure in mind.
+- **Migrations**: never make a column NOT NULL or drop/rename a column or RPC/function that deployed clients still send/read. When a type/not-null constraint would block a change the client no longer sends (e.g. dropping a field from a form), make the column nullable with a documented migration instead. New columns/RPCs must be additive; old clients using `select('*')` must still work. If existing DB objects (views, RPCs, triggers, functions) depend on a column you change, update or drop them in the migration too — verify with a grep across `supabase/`.
+- **Edge functions**: deployment is separate from the app — a stale deployed function vs. new/old client payload = silent 400s. Keep payload/response contracts backward-compatible with all installed app versions, and never remove request fields or change response shapes that older clients rely on. (See also "Edge Functions (Supabase)" below.)
+- **Client changes**: when removing a feature (e.g. the profile role), the old code path is gone in the new build but old builds still send/read the old fields — the server/schema must tolerate both.
+
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/updates` (Activity), `/profile`
 - Stack screens with `headerShown`: `/settings`, `/discover`, `/community/[id]`, `/community/[id]/members`, `/community/[id]/info`, `/profile/[id]`, `/ping-response`
-- Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`
+- Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`, `/chat`
+- `src/app/chat.tsx` reads `{ type: 'community' | 'session', id }` and renders the matching `CommunityChatPopup` / `SessionChatPopup` full screen. Chat **push notification** taps (`session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply`) navigate here directly via `useFCM.navigateToNotification` (previously they opened the community/history screen).
 - Auth screens: `/login`, `/onboarding`, `/auth/callback`
 
 ### Theme
@@ -333,6 +347,7 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 - **Notification state**: actionable notifications are resolved in-place (type → resolved type + `read = true`) both by the `ActivityCard`/`InviteCard` components and by the underlying service actions (`approveCommitment`/`rejectCommitment`, `respondToJoinRequest`, `approveCommunityMatch`/`disputeCommunityMatch`), so the inbox, tab badge, and "Action Required"/"Invites" tabs stay consistent no matter where the action was taken — no local-only UI hacks
 - **Soft delete** keeps a deleted `profiles` row; on next login with the same Google account the profile is re-enabled
 - **Supabase RLS** protects all tables (see `supabase/schema.sql`); the `insert_notification` RPC is SECURITY DEFINER so clients can send push for other users
+- **Chats hub is fast by construction** — unread counts + last-message timestamps come from one batched `get_chat_hub_stats` RPC per chat type (migration 036, scoped via `auth.uid()`), not N+1 per-chat counts; the hub renders community/session rows first and hydrates badges/sort after; a 30s stale-while-revalidate module cache (`src/hooks/useChats.ts`) makes tab revisits instant. Session rows come from the lean `fetchChatSessions` (no commitment embeds / count RPC / expiry RPC). `closeExpiredSessions` is client-side debounced (15s) to collapse the repeated RPC across screens; composite list indexes were added in migration 037.
 - **Session/community chat has no joins / no per-message refetch** — sender name/avatar are snapshotted on the row at insert (migration 026 / 027) and reply previews resolve from the already-loaded message list; this removes the self-join (and its PGRST200 schema-cache dependency) plus one extra round-trip per message
 - **FCM fan-out is batched server-side** — the `send-chat-notification` edge function computes all recipients (creator + accepted participants / approved members, minus sender) in one invocation and sends N FCM messages; it caches its OAuth token (single-flight promise, 5-min refresh margin) so a message costs one JWT, not one per recipient. `send-notification` handles in-app notifications one row at a time (single recipient).
 - **Chat is FCM-only** — chat pushes never touch `in_app_notifications`, so they don't pollute the Activity inbox or drive its unread badge
@@ -352,3 +367,4 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "feat: session chat — optimistic sends (clock → checked), own avatar, long-press reply sheets + reply pushes, batched FCM fan-out (single edge call), sender snapshots with no per-message refetch"
   - "feat: community chat — same shared chat implementation as sessions, scoped to approved community members, FCM-only pushes, chat button next to ping button in community home"
   - "feat: server-side push — all FCM delivery moved out of the client into pg_net triggers (migration 035) + `send-notification`/`send-chat-notification` edge functions, so web sends push to app users identically to native"
+  - "perf: chats hub — batched `get_chat_hub_stats` RPC (migration 036), stale-while-revalidate cache + render-first hydration in `useChats`, lean `fetchChatSessions` for the hub, debounced `closeExpiredSessions`, composite list indexes (migration 037)"

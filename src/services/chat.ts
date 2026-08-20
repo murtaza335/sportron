@@ -75,82 +75,35 @@ export async function upsertChatReadCursor(
   if (error) throw error;
 }
 
-// Unread counts for many chats at once (used by the Chats hub). Reads every
-// read cursor the user has for this chat type in one query, then counts
-// messages newer than each cursor in parallel. A chat with no cursor counts as
-// fully unread.
-export async function fetchChatUnreadCounts(
-  messageTable: ChatMessageTable,
-  idColumn: ChatIdColumn,
-  chatIds: string[],
-  userId: string,
-): Promise<Record<string, number>> {
-  const result: Record<string, number> = {};
-  if (chatIds.length === 0) return result;
+export type ChatHubStats = {
+  unread: Record<string, number>;
+  lastMessageAt: Record<string, string | null>;
+};
 
-  const readTable = readTableForIdColumn(idColumn);
-  const { data: cursors, error: cursorError } = await supabase
-    .from(readTable)
-    .select(`${idColumn}, last_read_at`)
-    .eq('profile_id', userId);
-
-  if (cursorError) throw cursorError;
-
-  const cursorMap = new Map<string, string | null>();
-  for (const row of cursors ?? []) {
-    cursorMap.set((row as Record<string, unknown>)[idColumn] as string, (row as Record<string, unknown>).last_read_at as string | null);
-  }
-
-  const counts = await Promise.all(
-    chatIds.map(async (chatId) => {
-      let query = supabase
-        .from(messageTable)
-        .select('*', { count: 'exact', head: true })
-        .eq(idColumn, chatId)
-        // A user's own messages are never "unread" for them (they know what
-        // they wrote), so they must not inflate the badge.
-        .neq('sender_id', userId);
-      const lastReadAt = cursorMap.get(chatId);
-      if (lastReadAt) query = query.gt('created_at', lastReadAt);
-      const { count, error } = await query;
-      if (error) throw error;
-      return [chatId, count ?? 0] as const;
-    }),
-  );
-
-  for (const [chatId, count] of counts) {
-    if (count > 0) result[chatId] = count;
-  }
-  return result;
-}
-
-// Timestamp of the most recent message in each chat (null when empty), used to
-// order the Chats hub most-recent-activity first. One query total: rows come
-// back newest-first, so the first row seen per chat is its latest message.
-export async function fetchChatLastMessageAt(
-  messageTable: ChatMessageTable,
-  idColumn: ChatIdColumn,
-  chatIds: string[],
-): Promise<Record<string, string | null>> {
-  const result: Record<string, string | null> = {};
-  if (chatIds.length === 0) return result;
-
-  const { data, error } = await supabase
-    .from(messageTable)
-    .select(`${idColumn}, created_at`)
-    .in(idColumn, chatIds)
-    .order('created_at', { ascending: false });
+// Batched unread counts + most-recent-message timestamps for every chat the
+// caller belongs to (approved communities / sessions they created or were
+// accepted onto). One RPC per chat type instead of one query per chat; rows
+// are scoped to auth.uid() server-side.
+export async function fetchChatHubStats(
+  chatType: 'community' | 'session',
+): Promise<ChatHubStats> {
+  const { data, error } = await supabase.rpc('get_chat_hub_stats', {
+    p_chat_type: chatType,
+  });
 
   if (error) throw error;
 
-  const seen = new Set<string>();
-  for (const row of data ?? []) {
-    const id = (row as Record<string, unknown>)[idColumn] as string;
-    if (seen.has(id)) continue;
-    seen.add(id);
-    result[id] = (row as Record<string, unknown>).created_at as string;
+  const unread: Record<string, number> = {};
+  const lastMessageAt: Record<string, string | null> = {};
+  for (const row of (data ?? []) as {
+    chat_id: string;
+    unread_count: number;
+    last_message_at: string | null;
+  }[]) {
+    if (row.unread_count > 0) unread[row.chat_id] = row.unread_count;
+    lastMessageAt[row.chat_id] = row.last_message_at;
   }
-  return result;
+  return { unread, lastMessageAt };
 }
 
 // ---------------------------------------------------------------------------
@@ -192,8 +145,7 @@ export async function deleteChatPresence(
 }
 
 // Count of messages newer than the user's last-read cursor. When no cursor has
-// ever been written, count = ALL messages (standard never-read semantics, and
-// matches the edge function's per-recipient summary bodies).
+// ever been written, count = ALL messages (standard never-read semantics).
 export async function fetchChatUnreadCount(
   messageTable: ChatMessageTable,
   idColumn: ChatIdColumn,
@@ -259,6 +211,71 @@ async function insertChatMessage(input: {
   if (error) throw error;
 
   return { messageId: (inserted as InsertedMessage).id, sender };
+}
+
+// ---------------------------------------------------------------------------
+// Chat message edit + delete (own messages)
+// ---------------------------------------------------------------------------
+
+// Edits the content of a chat message. RLS + the edit trigger restrict this to
+// the sender within 15 minutes of sending; the trigger stamps `edited_at`.
+async function updateChatMessage(
+  table: 'session_messages' | 'community_messages',
+  messageId: string,
+  content: string,
+): Promise<void> {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message cannot be empty.');
+  if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+    throw new Error(`Message is too long (max ${MAX_CHAT_MESSAGE_LENGTH} characters).`);
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .update({ content: trimmed })
+    .eq('id', messageId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  // No row came back — RLS excluded the row, i.e. it's not ours, not in the
+  // chat, or the 15-minute edit window has passed.
+  if (!data) throw new Error('Messages can only be edited within 15 minutes of sending.');
+}
+
+// Hard-deletes a chat message. RLS + the delete trigger restrict this to the
+// sender within 24 hours of sending; everyone sees the bubble disappear via
+// realtime DELETE.
+async function deleteChatMessage(
+  table: 'session_messages' | 'community_messages',
+  messageId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from(table)
+    .delete()
+    .eq('id', messageId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  // No row came back — not ours or the 24-hour delete window has passed.
+  if (!data) throw new Error('Messages can only be deleted within 24 hours of sending.');
+}
+
+export function updateSessionMessage(messageId: string, content: string): Promise<void> {
+  return updateChatMessage('session_messages', messageId, content);
+}
+
+export function updateCommunityMessage(messageId: string, content: string): Promise<void> {
+  return updateChatMessage('community_messages', messageId, content);
+}
+
+export function deleteSessionMessage(messageId: string): Promise<void> {
+  return deleteChatMessage('session_messages', messageId);
+}
+
+export function deleteCommunityMessage(messageId: string): Promise<void> {
+  return deleteChatMessage('community_messages', messageId);
 }
 
 // ---------------------------------------------------------------------------

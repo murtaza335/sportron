@@ -394,7 +394,12 @@ export default function CommunityInfoScreen() {
             {displayMembers.map((member) => (
               <Pressable
                 key={member.profile_id}
-                onPress={() => router.push(`/profile/${member.profile_id}`)}
+                onPress={() =>
+                  router.push({
+                    pathname: '/profile/[id]',
+                    params: { id: member.profile_id, community: id },
+                  })
+                }
                 onLongPress={() => {
                   if (isAdmin && member.profile_id !== user?.id) {
                     Alert.alert(

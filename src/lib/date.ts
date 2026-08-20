@@ -31,3 +31,13 @@ export function formatSessionDisplayName(
   const month = d.toLocaleDateString(undefined, { month: 'long' });
   return `${purpose} ${day} ${month} session`;
 }
+
+export function formatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '—';
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}

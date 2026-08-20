@@ -65,7 +65,6 @@ export default function AddMatchScreen() {
           username: m.profile?.username ?? '',
           display_name: m.profile?.display_name ?? null,
           bio: null,
-          role: 'student' as const,
           avatar_url: m.profile?.avatar_url ?? null,
           fcm_tokens: [],
           notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },

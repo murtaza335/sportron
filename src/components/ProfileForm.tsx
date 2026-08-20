@@ -10,17 +10,15 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
 import { isUsernameAvailable } from '@/services/profiles';
-import type { UserRole } from '@/types';
 
 type ProfileFormProps = {
   initialName?: string;
   initialBio?: string;
-  initialRole?: UserRole;
   initialAvatar?: string | null;
   submitLabel?: string;
   loading?: boolean;
   excludeUsername?: string;
-  onSubmit: (data: { username: string; bio: string; role: UserRole; avatarUrl?: string | null }) => void;
+  onSubmit: (data: { username: string; bio: string; avatarUrl?: string | null }) => void;
 };
 
 // Extracted for clean SVG math
@@ -30,7 +28,6 @@ const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 export function ProfileForm({
   initialName = '',
   initialBio = '',
-  initialRole = 'student',
   initialAvatar = null,
   submitLabel = 'Continue',
   loading = false,
@@ -40,7 +37,6 @@ export function ProfileForm({
   const theme = useTheme();
   const [username, setUsername] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
-  const [role, setRole] = useState<UserRole>(initialRole);
 const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const [uploadingAvatar, setUploadingAvatar] = useState(false);
   const [uploadProgress, setUploadProgress] = useState<UploadProgress | null>(null);
@@ -242,39 +238,6 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         />
       </View>
 
-      <View style={styles.field}>
-        <ThemedText variant="label" muted>
-          Role
-        </ThemedText>
-        <View style={[styles.roleRow, { borderColor: theme.border }]}>
-          {(['student', 'teacher'] as UserRole[]).map((option) => {
-            const selected = role === option;
-            return (
-              <Pressable
-                key={option}
-                onPress={() => setRole(option)}
-                style={[
-                  styles.roleOption,
-                  selected && { backgroundColor: theme.text },
-                ]}
-                hitSlop={16}
-                accessibilityRole="button"
-                accessibilityState={{ selected }}>
-                <ThemedText
-                  variant="body"
-                  style={{
-                    color: selected ? theme.background : theme.text,
-                    fontWeight: '700',
-                    textTransform: 'capitalize',
-                  }}>
-                  {option}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-      </View>
-
       <Button
         label={submitLabel}
         loading={loading}
@@ -283,7 +246,6 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           onSubmit({
             username: username.trim().toLowerCase(),
             bio: bio.trim(),
-            role,
             avatarUrl,
           })
         }
@@ -360,18 +322,5 @@ const styles = StyleSheet.create({
   textArea: {
     minHeight: 100,
     textAlignVertical: 'top',
-  },
-  roleRow: {
-    flexDirection: 'row',
-    borderWidth: 1,
-    borderRadius: Radius.md,
-    overflow: 'hidden',
-  },
-  roleOption: {
-    flex: 1,
-    minHeight: 56,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: Spacing.md,
   },
 });

@@ -78,7 +78,7 @@ export default function ProfileScreen() {
     }
   };
 
-  const handleSave = async (data: { username: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
+  const handleSave = async (data: { username: string; bio: string; avatarUrl?: string | null }) => {
     if (!profile?.id) {
       return;
     }
@@ -89,7 +89,6 @@ export default function ProfileScreen() {
       await updateProfile(profile.id, {
         username: data.username,
         bio: data.bio,
-        role: data.role,
         avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();
@@ -128,9 +127,6 @@ export default function ProfileScreen() {
               </Pressable>
             </View>
             <ThemedText variant="heading" style={styles.name}>{profile?.username}</ThemedText>
-            <ThemedText variant="caption" muted style={styles.role}>
-              {profile?.role}
-            </ThemedText>
             {profile?.bio ? (
               <ThemedText variant="body" muted style={styles.bio}>
                 {profile.bio}
@@ -141,7 +137,6 @@ export default function ProfileScreen() {
           <ProfileForm
             initialName={profile?.username}
             initialBio={profile?.bio ?? ''}
-            initialRole={profile?.role}
             initialAvatar={profile?.avatar_url ?? null}
             submitLabel="Save changes"
             excludeUsername={profile?.username}
@@ -204,7 +199,7 @@ export default function ProfileScreen() {
                   </Pressable>
                 </View>
                 <View style={styles.modalOptions}>
-                  {(['light', 'dark', 'system'] as const).map((option) => (
+                  {(['light', 'dark'] as const).map((option) => (
                     <Pressable
                       key={option}
                       onPress={() => { setTheme(option); setShowThemeModal(false); }}
@@ -218,9 +213,8 @@ export default function ProfileScreen() {
                       <View style={styles.modalOptionContent}>
                         {option === 'light' && <Sun size={22} color={theme.text} />}
                         {option === 'dark' && <Moon size={22} color={theme.text} />}
-                        {option === 'system' && <Palette size={22} color={theme.text} />}
                         <ThemedText variant="body" style={{ marginLeft: Spacing.md, fontWeight: colorScheme === option ? '700' : '500' }}>
-                          {option === 'light' ? 'Light' : option === 'dark' ? 'Dark' : 'System'}
+                          {option === 'light' ? 'Light' : 'Dark'}
                         </ThemedText>
                       </View>
                       {colorScheme === option && <Check size={22} color="#10B981" />}
@@ -322,10 +316,6 @@ const styles = StyleSheet.create({
   },
   name: {
     textAlign: 'center',
-  },
-  role: {
-    textTransform: 'capitalize',
-    fontWeight: '700',
   },
   bio: {
     marginTop: Spacing.xs,

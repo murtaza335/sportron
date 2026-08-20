@@ -2,9 +2,11 @@ import { BlurView } from 'expo-blur';
 import {
   AlertTriangle,
   Check,
+  CheckCheck,
   ChevronDown,
   Clock,
   MessageCircle,
+  Pencil,
   RefreshCw,
   Reply,
   Send,
@@ -49,7 +51,28 @@ const TOP_LOAD_THRESHOLD = 80;
 
 // Long-press context menu (iPhone-style), anchored to the touch point.
 const CONTEXT_CARD_W = 170;
-const CONTEXT_CARD_H = 52;
+const CONTEXT_OPTION_H = 52;
+
+// Two taps within this window count as a double-tap that opens the same
+// options popup as a long-press.
+const DOUBLE_TAP_MS = 300;
+
+// Own-message edit/delete windows (mirrors the DB/enforced server-side). The
+// client checks with a small grace so a borderline query doesn't show an option
+// that the server then rejects; the server stays authoritative.
+const EDIT_WINDOW_MS = 15 * 60 * 1000;
+const DELETE_WINDOW_MS = 24 * 60 * 60 * 1000;
+const WINDOW_GRACE_MS = 5 * 1000;
+
+function isWithinWindow(createdAt: string, windowMs: number): boolean {
+  return Date.now() - new Date(createdAt).getTime() <= windowMs + WINDOW_GRACE_MS;
+}
+
+// Only optimistic bubbles carry a status; realtime/fetched rows have none until
+// a send marks them. "Delivered" = everything that isn't still sending or failed.
+function isDeliveredMessage<T extends { status?: string }>(m: T): boolean {
+  return m.status !== 'sending' && m.status !== 'failed';
+}
 
 type ChatPopupProps<T extends ChatMessageBase> = {
   visible: boolean;
@@ -95,6 +118,7 @@ export function ChatPopup<T extends ChatMessageBase>({
     sendMessage,
     resendMessage,
     deleteMessage,
+    editMessage,
     firstUnreadIndex,
     markRead,
   } = chat;
@@ -103,8 +127,11 @@ export function ChatPopup<T extends ChatMessageBase>({
   const draftRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [replyTo, setReplyTo] = useState<T | null>(null);
+  const [editingMessage, setEditingMessage] = useState<T | null>(null);
   const [contextMenu, setContextMenu] = useState<{ message: T; x: number; y: number } | null>(null);
   const [failedMenu, setFailedMenu] = useState<T | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<T | null>(null);
+  const [actionError, setActionError] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const listRef = useRef<FlatList<T>>(null);
   const { width: windowWidth } = useWindowDimensions();
@@ -112,6 +139,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkReadRef = useRef(0);
   const atBottomRef = useRef(true);
+  const lastPressRef = useRef(0);
 
   // The chat list is INVERTED: newest message at index 0 = the scroll origin
   // (offset 0 = the visual bottom). That makes chats behave natively like
@@ -138,6 +166,22 @@ export function ChatPopup<T extends ChatMessageBase>({
   // then mark everything read. Subsequent opens reset so it re-evaluates.
   useEffect(() => {
     didInitialScrollRef.current = false;
+  }, [visible]);
+
+  // On close, drop any in-flight edit/reply/delete state so a reopen (possibly
+  // for a different chat) starts clean. Deferred a tick to avoid the
+  // set-state-in-effect cascade; invisible to users either way.
+  useEffect(() => {
+    if (visible) return;
+    const timer = setTimeout(() => {
+      setEditingMessage(null);
+      setReplyTo(null);
+      setDeleteConfirm(null);
+      setActionError(null);
+      setFailedMenu(null);
+      setContextMenu(null);
+    }, 0);
+    return () => clearTimeout(timer);
   }, [visible]);
 
   // Presence heartbeat: while the popup is open, keep our row fresh in
@@ -257,30 +301,111 @@ export function ChatPopup<T extends ChatMessageBase>({
     setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
   }, []);
 
+  // Double-tap opens the same options popup (convenience on top of long-press).
+  // Works with the keyboard open thanks to `keyboardShouldPersistTaps="handled"`
+  // on the list, which delivers taps to the bubbles instead of eating the first
+  // tap to dismiss the keyboard.
+  const handleMessagePress = useCallback((item: T, e: GestureResponderEvent) => {
+    const now = Date.now();
+    if (now - lastPressRef.current < DOUBLE_TAP_MS) {
+      lastPressRef.current = 0;
+      setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+    } else {
+      lastPressRef.current = now;
+    }
+  }, []);
+
   const replyToContextMessage = useCallback(() => {
     if (!contextMenu) return;
     setReplyTo(contextMenu.message);
     setContextMenu(null);
+    setEditingMessage(null);
     if (canSend) {
       requestAnimationFrame(() => inputRef.current?.focus());
     }
   }, [contextMenu, canSend]);
 
-  // Clamp the floating card so it stays on screen. Defaults to hovering ABOVE
-  // the touch point; flips below the touch near the top.
-  const contextLayout = useMemo(() => {
-    if (!contextMenu) return null;
-    const { x, y } = contextMenu;
-    const margin = Spacing.sm;
-    const minTop = insets.top + margin;
-    const left = Math.max(
-      margin,
-      Math.min(x - CONTEXT_CARD_W + 24, windowWidth - CONTEXT_CARD_W - margin),
-    );
-    const above = y - CONTEXT_CARD_H - 14 >= minTop;
-    const top = above ? y - CONTEXT_CARD_H - 14 : y + 18;
-    return { left, top };
-  }, [contextMenu, insets.top, windowWidth]);
+  // Starts editing a message: pre-fills the (uncontrolled) input via
+  // setNativeProps so the edit bar + bubble are in sync without switching to a
+  // controlled TextInput.
+  const startEditing = useCallback(() => {
+    if (!contextMenu) return;
+    const msg = contextMenu.message;
+    setEditingMessage(msg);
+    setContextMenu(null);
+    setReplyTo(null);
+    setActionError(null);
+    draftRef.current = msg.content;
+    setDraft(msg.content);
+    inputRef.current?.setNativeProps({ text: msg.content });
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, [contextMenu]);
+
+  const cancelEditing = useCallback(() => {
+    setEditingMessage(null);
+    draftRef.current = '';
+    setDraft('');
+    inputRef.current?.clear();
+  }, []);
+
+  const promptDeleteContextMessage = useCallback(() => {
+    if (!contextMenu) return;
+    setDeleteConfirm(contextMenu.message);
+    setContextMenu(null);
+  }, [contextMenu]);
+
+  const confirmDelete = useCallback(() => {
+    if (!deleteConfirm) return;
+    const messageId = deleteConfirm.id;
+    const isRealMessage = !messageId.startsWith('temp-') && isDeliveredMessage(deleteConfirm);
+    setDeleteConfirm(null);
+    deleteMessage(messageId)
+      .catch((e) => {
+        console.error('Failed to delete message:', e);
+        // Only surface an error for real (persisted) messages; failed/temp
+        // bubbles disappear locally on their own.
+        if (isRealMessage) {
+          setActionError(e instanceof Error ? e.message : 'Could not delete message.');
+        }
+      });
+  }, [deleteConfirm, deleteMessage]);
+
+// Which options the long-press menu shows for the currently-selected message.
+// Always Reply; Edit only for own delivered messages still inside the 15-minute
+// window; Delete only for own delivered messages still inside the 24-hour window.
+const contextOptions = useMemo(() => {
+  if (!contextMenu) return [];
+  const msg = contextMenu.message;
+  const mine = msg.sender_id === currentUserId;
+  const delivered = isDeliveredMessage(msg);
+  const options: { id: 'reply' | 'edit' | 'delete'; label: string; icon: typeof Reply }[] = [
+    { id: 'reply', label: 'Reply', icon: Reply },
+  ];
+  if (mine && delivered && canSend && isWithinWindow(msg.created_at, EDIT_WINDOW_MS)) {
+    options.push({ id: 'edit', label: 'Edit', icon: Pencil });
+  }
+  if (mine && delivered && isWithinWindow(msg.created_at, DELETE_WINDOW_MS)) {
+    options.push({ id: 'delete', label: 'Delete', icon: Trash2 });
+  }
+  return options;
+}, [contextMenu, currentUserId, canSend]);
+
+// Clamp the floating card so it stays on screen. Defaults to hovering ABOVE
+// the touch point; flips below the touch near the top.
+const contextLayout = useMemo(() => {
+  if (!contextMenu) return null;
+  const { x, y } = contextMenu;
+  const margin = Spacing.sm;
+  const minTop = insets.top + margin;
+  const cardH = Math.max(1, contextOptions.length) * CONTEXT_OPTION_H;
+  const left = Math.max(
+    margin,
+    Math.min(x - CONTEXT_CARD_W + 24, windowWidth - CONTEXT_CARD_W - margin),
+  );
+  const above = y - cardH - 14 >= minTop;
+  const top = above ? y - cardH - 14 : y + 18;
+  return { left, top };
+}, [contextMenu, insets.top, windowWidth, contextOptions.length]);
 
   // Inverted list scrolling:
   // - offset 0 = the visual bottom (newest) — being there means "at bottom".
@@ -311,12 +436,25 @@ export function ChatPopup<T extends ChatMessageBase>({
   // (clock → check once realtime/DB confirms). The API call then runs in the
   // background — typing the next message is never blocked on the send, and a
   // failure (bubble removed by useChat) never restores the cleared text,
-  // because the user may already be typing the next message.
+  // because the user may already be typing the next message. When editing a
+  // message, the same button commits the edit (optimistic, with revert).
   const handleSend = () => {
     // draftRef (not the `draft` state) is the live source of truth for the
     // input text — read it here so the ref is cleared in this exact tick.
     const text = draftRef.current.trim();
     if (!text || !canSend) return;
+
+    const editing = editingMessage;
+    if (editing) {
+      cancelEditing();
+      setActionError(null);
+      editMessage(editing.id, text).catch((e) => {
+        console.error('Failed to edit message:', e);
+        setActionError(e instanceof Error ? e.message : 'Could not edit message.');
+      });
+      return;
+    }
+
     const reply = replyTo;
     draftRef.current = '';
     // The input is UNCONTROLLED (no `value` prop), so clear() is the only way
@@ -325,6 +463,13 @@ export function ChatPopup<T extends ChatMessageBase>({
     inputRef.current?.clear();
     setDraft('');
     setReplyTo(null);
+    // On web the send-button tap can steal focus and collapse the keyboard.
+    // The button is excluded from focus (tabIndex -1) so THIS never happens —
+    // this focus() is only a no-op safety net when focus was already on the
+    // input, and never causes a flash by itself.
+    if (Platform.OS === 'web') {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
     sendMessage(text, reply?.id).then(
       () => scrollToBottom(true),
       (e) => console.error('Failed to send message:', e),
@@ -368,6 +513,11 @@ export function ChatPopup<T extends ChatMessageBase>({
   const renderMessage = ({ item, index }: { item: T; index: number }) => {
     const mine = item.sender_id === currentUserId;
     const isSending = item.status === 'sending';
+    // displayMessages is newest-first, so the chronologically-previous message
+    // sits at index + 1. Consecutive messages from the same sender are grouped:
+    // only the FIRST message of a group shows the avatar (and sender name).
+    const prev = displayMessages[index + 1] ?? null;
+    const isGroupStart = !prev || prev.sender_id !== item.sender_id;
     // firstUnreadIndex is an ASCENDING (oldest-first) index; displayMessages is
     // newest-first, so the oldest-unread row maps to (total - 1 - ascIndex).
     const isFirstUnread =
@@ -386,6 +536,7 @@ export function ChatPopup<T extends ChatMessageBase>({
         )}
         <Pressable
           onLongPress={(e) => handleLongPress(item, e)}
+          onPress={(e) => handleMessagePress(item, e)}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -393,53 +544,77 @@ export function ChatPopup<T extends ChatMessageBase>({
             pressed && { opacity: 0.85 },
           ]}
         >
-          {!mine && (
+          {!mine && isGroupStart && (
             <UserAvatar avatarUrl={item.sender?.avatar_url} size={30} style={styles.msgAvatar} />
           )}
-          <View style={[styles.bubbleWrap, mine && styles.bubbleWrapMine]}>
-            {!mine && (
-              <ThemedText variant="caption" muted style={styles.senderName}>
-                {item.sender?.username ?? 'Unknown'}
-              </ThemedText>
-            )}
+          <View
+            style={[
+              styles.bubbleWrap,
+              mine ? styles.bubbleWrapMine : null,
+              !isGroupStart && !mine && styles.groupIndentLeft,
+            ]}
+          >
             <View
               style={[
                 styles.bubble,
                 mine
-                  ? { backgroundColor: '#10B981' }
+                  ? { backgroundColor: '#10B981', borderColor: '#10B981' }
                   : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               ]}
             >
               {renderReplyPreview(item, mine)}
+              {!mine && isGroupStart && (
+                <ThemedText
+                  variant="caption"
+                  style={[styles.bubbleSenderName, { color: theme.textSecondary }]}
+                >
+                  {item.sender?.username ?? 'Unknown'}
+                </ThemedText>
+              )}
               <ThemedText
                 variant="body"
                 style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
               >
                 {item.content}
               </ThemedText>
-            </View>
-            <View style={[styles.msgMeta, mine ? styles.msgMetaMine : styles.msgMetaOther]}>
-              {mine && (
-                <View style={styles.msgStatus}>
-                  {item.status === 'failed' ? (
-                    <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
-                      <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
-                    </Pressable>
-                  ) : isSending ? (
-                    <Clock size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                  ) : (
-                    <Check size={12} color={theme.textSecondary} strokeWidth={2.5} />
-                  )}
-                </View>
-              )}
-              <ThemedText variant="caption" muted style={styles.msgTime}>
-                {formatMessageTime(item.created_at)}
-              </ThemedText>
+              <View style={styles.bubbleFooter}>
+                {mine && (
+                  <View style={styles.msgStatus}>
+                    {item.status === 'failed' ? (
+                      <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
+                        <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
+                      </Pressable>
+                    ) : isSending ? (
+                      <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                    ) : (
+                      <Check size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                    )}
+                  </View>
+                )}
+                <ThemedText
+                  variant="caption"
+                  style={[
+                    styles.msgTime,
+                    { color: mine ? 'rgba(255,255,255,0.7)' : theme.textSecondary },
+                  ]}
+                >
+                  {formatMessageTime(item.created_at)}
+                </ThemedText>
+                {item.edited_at && (
+                  <ThemedText
+                    variant="caption"
+                    style={[
+                      styles.msgTime,
+                      styles.editedMark,
+                      { color: mine ? 'rgba(255,255,255,0.7)' : theme.textSecondary },
+                    ]}
+                  >
+                    Edited
+                  </ThemedText>
+                )}
+              </View>
             </View>
           </View>
-          {mine && (
-            <UserAvatar avatarUrl={profile?.avatar_url ?? null} size={30} style={styles.msgAvatar} />
-          )}
         </Pressable>
       </View>
     );
@@ -534,6 +709,10 @@ export function ChatPopup<T extends ChatMessageBase>({
                   showsVerticalScrollIndicator={false}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
+                  // Keep the keyboard open while the user taps/holds a message —
+                  // with the default ("never") the FIRST tap is swallowed to
+                  // dismiss the keyboard and the long-press never fires.
+                  keyboardShouldPersistTaps="handled"
                   onScrollToIndexFailed={(info) => {
                     // No getItemLayout (variable-height messages, reply
                     // previews), so an unmeasurable divider jump retries until
@@ -630,6 +809,39 @@ export function ChatPopup<T extends ChatMessageBase>({
                 </View>
               )}
 
+              {editingMessage && (
+                <View
+                  style={[
+                    styles.replyBar,
+                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                >
+                  <Pencil size={14} color="#3B82F6" strokeWidth={2.5} />
+                  <View style={styles.replyBarText}>
+                    <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: '#3B82F6' }]}>
+                      Editing message
+                    </ThemedText>
+                    <ThemedText variant="caption" muted numberOfLines={1}>
+                      {editingMessage.content}
+                    </ThemedText>
+                  </View>
+                  <Pressable onPress={cancelEditing} hitSlop={10}>
+                    <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+              )}
+
+              {actionError && (
+                <View style={styles.errorRow}>
+                  <ThemedText variant="caption" style={[styles.errorText, { color: '#EF4444' }]}>
+                    {actionError}
+                  </ThemedText>
+                  <Pressable onPress={() => setActionError(null)} hitSlop={10}>
+                    <X size={14} color="#EF4444" strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+              )}
+
               <View style={styles.inputRow}>
                 <TextInput
                   ref={inputRef}
@@ -653,6 +865,12 @@ export function ChatPopup<T extends ChatMessageBase>({
                 />
                 <Pressable
                   onPress={handleSend}
+                  onPointerDown={(e) => {
+                    // Web-only: block the button's default mouse-down action so
+                    // the TextInput never blurs → no keyboard flash. onPress
+                    // still fires; only the native focus-move is suppressed.
+                    if (Platform.OS === 'web') e.preventDefault();
+                  }}
                   // Grey + disabled when the trimmed input is empty and while a
                   // message is in flight (being added to the UI), otherwise green
                   // so the input can be reused for the next message immediately.
@@ -665,7 +883,11 @@ export function ChatPopup<T extends ChatMessageBase>({
                     },
                   ]}
                 >
-                  <Send size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
+                  {editingMessage ? (
+                    <CheckCheck size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
+                  ) : (
+                    <Send size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
+                  )}
                 </Pressable>
               </View>
             </View>
@@ -708,17 +930,36 @@ export function ChatPopup<T extends ChatMessageBase>({
                   },
                 ]}
               >
-                <Pressable style={styles.contextOption} onPress={replyToContextMessage}>
-                  <View style={styles.contextOptionRow}>
-                    <Reply size={18} color="#10B981" strokeWidth={2.5} />
-                    <ThemedText
-                      variant="body"
-                      style={[styles.contextOptionText, { color: '#10B981', fontWeight: '600' }]}
+                {contextOptions.map((option, idx) => {
+                  const Icon = option.icon;
+                  return (
+                    <Pressable
+                      key={option.id}
+                      style={[
+                        styles.contextOption,
+                        idx < contextOptions.length - 1 && {
+                          borderBottomWidth: StyleSheet.hairlineWidth,
+                          borderBottomColor: theme.border,
+                        },
+                      ]}
+                      onPress={() => {
+                        if (option.id === 'reply') replyToContextMessage();
+                        else if (option.id === 'edit') startEditing();
+                        else if (option.id === 'delete') promptDeleteContextMessage();
+                      }}
                     >
-                      Reply
-                    </ThemedText>
-                  </View>
-                </Pressable>
+                      <View style={styles.contextOptionRow}>
+                        <Icon size={18} color={theme.text} strokeWidth={2.5} />
+                        <ThemedText
+                          variant="body"
+                          style={[styles.contextOptionText, { color: theme.text, fontWeight: '600' }]}
+                        >
+                          {option.label}
+                        </ThemedText>
+                      </View>
+                    </Pressable>
+                  );
+                })}
               </View>
             </View>
           )}
@@ -769,6 +1010,58 @@ export function ChatPopup<T extends ChatMessageBase>({
                     </ThemedText>
                   </View>
                 </Pressable>
+              </View>
+            </View>
+          )}
+
+          {/* Delete-confirmation card: shown after picking Delete on an own
+              delivered message. Delete for everyone is permanent, so this
+              double-checks before the bubble is removed (hard delete). */}
+          {deleteConfirm && (
+            <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Pressable style={styles.contextBackdrop} onPress={() => setDeleteConfirm(null)}>
+                <BlurView
+                  tint={theme.resolvedColorScheme === 'dark' ? 'dark' : 'light'}
+                  intensity={10}
+                  style={StyleSheet.absoluteFill}
+                />
+              </Pressable>
+              <View
+                style={[
+                  styles.deleteConfirmCard,
+                  { backgroundColor: theme.background, borderColor: theme.border },
+                ]}
+              >
+                <ThemedText
+                  variant="body"
+                  style={[styles.deleteConfirmTitle, { color: '#EF4444', fontWeight: '700' }]}
+                >
+                  Delete this message?
+                </ThemedText>
+                <ThemedText variant="caption" muted style={styles.deleteConfirmSubtitle}>
+                  This will delete the message for everyone. This action cannot be undone.
+                </ThemedText>
+                <View style={styles.deleteConfirmActions}>
+                  <Pressable
+                    style={[
+                      styles.deleteConfirmBtn,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                    ]}
+                    onPress={() => setDeleteConfirm(null)}
+                  >
+                    <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                      Cancel
+                    </ThemedText>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.deleteConfirmBtn, { backgroundColor: '#EF4444' }]}
+                    onPress={confirmDelete}
+                  >
+                    <ThemedText variant="body" style={{ color: '#FFFFFF', fontWeight: '700' }}>
+                      Delete
+                    </ThemedText>
+                  </Pressable>
+                </View>
               </View>
             </View>
           )}
@@ -899,7 +1192,7 @@ const styles = StyleSheet.create({
     justifyContent: 'flex-start',
   },
   msgAvatar: {
-    marginBottom: 18,
+    marginBottom: 0,
   },
   bubbleWrap: {
     maxWidth: '78%',
@@ -908,10 +1201,13 @@ const styles = StyleSheet.create({
   bubbleWrapMine: {
     alignItems: 'flex-end',
   },
-  senderName: {
-    marginLeft: 4,
-    fontWeight: '600',
-    fontSize: 11,
+  groupIndentLeft: {
+    marginLeft: 30 + Spacing.sm,
+  },
+  bubbleSenderName: {
+    fontWeight: '700',
+    fontSize: 12,
+    marginBottom: 2,
   },
   bubble: {
     borderRadius: Radius.lg,
@@ -922,6 +1218,13 @@ const styles = StyleSheet.create({
   bubbleText: {
     fontSize: 15,
     lineHeight: 20,
+  },
+  bubbleFooter: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'flex-end',
+    gap: 3,
+    marginTop: 2,
   },
   replyBlock: {
     borderLeftWidth: 3,
@@ -936,19 +1239,6 @@ const styles = StyleSheet.create({
   replyContent: {
     fontSize: 12,
   },
-  msgMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 3,
-    marginTop: 1,
-    paddingHorizontal: 4,
-  },
-  msgMetaMine: {
-    alignSelf: 'flex-end',
-  },
-  msgMetaOther: {
-    alignSelf: 'flex-start',
-  },
   msgStatus: {
     width: 12,
     height: 12,
@@ -958,6 +1248,10 @@ const styles = StyleSheet.create({
   msgTime: {
     fontSize: 10,
     marginLeft: 1,
+  },
+  editedMark: {
+    fontStyle: 'italic',
+    marginLeft: 4,
   },
   inputBar: {
     paddingHorizontal: Spacing.lg,
@@ -981,6 +1275,17 @@ const styles = StyleSheet.create({
   replyBarName: {
     fontWeight: '700',
     fontSize: 11,
+  },
+  errorRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.sm,
+    paddingHorizontal: Spacing.md,
+  },
+  errorText: {
+    flex: 1,
+    fontSize: 12,
   },
   inputRow: {
     flexDirection: 'row',
@@ -1060,5 +1365,40 @@ const styles = StyleSheet.create({
   },
   failedOptionText: {
     fontSize: 15,
+  },
+  deleteConfirmCard: {
+    position: 'absolute',
+    top: '40%',
+    alignSelf: 'center',
+    width: 300,
+    borderRadius: Radius.lg,
+    borderWidth: StyleSheet.hairlineWidth,
+    padding: Spacing.lg,
+    gap: Spacing.sm,
+    elevation: 12,
+    shadowColor: '#000',
+    shadowOpacity: 0.25,
+    shadowRadius: 16,
+    shadowOffset: { width: 0, height: 6 },
+  },
+  deleteConfirmTitle: {
+    textAlign: 'center',
+    fontSize: 16,
+  },
+  deleteConfirmSubtitle: {
+    textAlign: 'center',
+  },
+  deleteConfirmActions: {
+    flexDirection: 'row',
+    gap: Spacing.sm,
+    marginTop: Spacing.sm,
+  },
+  deleteConfirmBtn: {
+    flex: 1,
+    paddingVertical: Spacing.md,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: StyleSheet.hairlineWidth,
   },
 });

@@ -1,4 +1,3 @@
-export type UserRole = 'student' | 'teacher';
 export type MatchFormat = 'singles' | 'doubles';
 
 export type Sport =
@@ -77,7 +76,6 @@ export type Profile = {
   username: string;
   display_name: string | null;
   bio: string | null;
-  role: UserRole;
   avatar_url: string | null;
   fcm_tokens: string[];
   notification_preferences: NotificationPreferences;
@@ -145,7 +143,6 @@ export type MatchWithProfiles = Match & {
 export type CreateProfileInput = {
   username: string;
   bio?: string;
-  role: UserRole;
   avatarUrl?: string;
 };
 
@@ -257,6 +254,13 @@ export type CommunityMember = {
   win_ratio: number;
   joined_at: string;
   profile?: Pick<Profile, 'id' | 'username' | 'display_name' | 'avatar_url'> | null;
+};
+
+export type CommunityMemberStats = {
+  matches_played: number;
+  wins: number;
+  losses: number;
+  win_ratio: number;
 };
 
 export type CreateCommunityInput = {
@@ -415,6 +419,7 @@ export type ChatMessageBase = {
   sender_id: string;
   content: string;
   created_at: string;
+  edited_at?: string | null;
   reply_to_id?: string | null;
   sender_username?: string | null;
   sender_avatar_url?: string | null;

@@ -58,17 +58,17 @@ Notifications.setNotificationHandler({
   }),
 });
 
-// Conversation -> latest foreground local-notification id, used to replace
-// older chat notifications instead of stacking them (see scheduleLocalNotification).
-const foregroundNotificationIdByKey = new Map<string, string>();
-
+// Conversation -> stable notification identifier. Re-scheduling a local
+// notification with the same identifier replaces the previously shown one
+// (WhatsApp-style "latest wins" per chat) on both Android (same notify id) and
+// iOS (same UNNotificationRequest identifier).
 function localCollapseKeyFor(data?: NotificationData): string | null {
   if (!data) return null;
   if ((data.type === 'session_chat_message' || data.type === 'session_chat_reply') && data.sessionId) {
-    return `t3s-session-${data.sessionId}`;
+    return `chat_room_${data.sessionId}`;
   }
   if ((data.type === 'community_chat_message' || data.type === 'community_chat_reply') && data.communityId) {
-    return `t3s-community-${data.communityId}`;
+    return `chat_room_${data.communityId}`;
   }
   return null;
 }
@@ -204,9 +204,13 @@ export function setupNotificationListeners(
 
 export async function setupBackgroundMessageHandler(): Promise<void> {
   messaging().setBackgroundMessageHandler(async (remoteMessage: FirebaseMessagingTypes.RemoteMessage) => {
-    // System auto-handles notification payloads in background — only schedule
-    // a local notification for data-only messages to avoid duplicates.
+    // Hybrid chat pushes include a `notification` block, so the OS / GMS
+    // auto-displays them (with android.notification.tag replacement) even when
+    // the app process is dead — do not double-handle them here. This branch
+    // only covers purely data-only messages (e.g. an older deployed edge
+    // function), rendered under the stable per-chat identifier.
     if (remoteMessage.notification) return;
+    if (Platform.OS !== 'android') return;
 
     const parsed = parseRemoteMessageForLocal(remoteMessage);
     if (parsed) {
@@ -262,24 +266,15 @@ export async function scheduleLocalNotification(
   body: string,
   data?: NotificationData
 ): Promise<string> {
-  // Emulate Android collapse-key replacement for the foreground path: FCM only
-  // auto-displays and collapses notifications while the app is backgrounded;
-  // when foregrounded the app re-displays each message as a local notification,
-  // and local notifications have no collapse semantics by default (they stack).
-  // Track the latest local-notification id per conversation and dismiss the
-  // previous one before showing the next, mirroring the edge function's keys.
+  // WhatsApp/Instagram-style replacement: re-scheduling with the SAME
+  // identifier per chat replaces the previously shown notification instead of
+  // stacking a new banner. The server-computed cumulative body ("N new
+  // messages") is passed through verbatim, so no counting happens on-device.
   const key = localCollapseKeyFor(data);
-  const previousId = key ? foregroundNotificationIdByKey.get(key) : undefined;
-  if (key && previousId) {
-    try {
-      await Notifications.dismissNotificationAsync(previousId);
-    } catch (e) {
-      console.error('Failed to dismiss previous chat notification:', e);
-    }
-    foregroundNotificationIdByKey.delete(key);
-  }
+  const identifier = key ?? `sportron-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 
-  const id = await Notifications.scheduleNotificationAsync({
+  await Notifications.scheduleNotificationAsync({
+    identifier,
     content: {
       title,
       body,
@@ -289,8 +284,7 @@ export async function scheduleLocalNotification(
     trigger: null,
   });
 
-  if (key) foregroundNotificationIdByKey.set(key, id);
-  return id;
+  return identifier;
 }
 
 export function parseNotificationData(notification: Notifications.Notification): NotificationData | null {
