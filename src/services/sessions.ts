@@ -856,7 +856,8 @@ export async function fetchPendingFeedbackSessions(
   const bySession = new Map<string, Commitment[]>();
   for (const row of commitmentRows ?? []) {
     const list = bySession.get(row.session_id) ?? [];
-    list.push({ ...row, profile: row.profile?.[0] });
+    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
+    list.push({ ...row, profile: profile ?? null });
     bySession.set(row.session_id, list);
   }
 
