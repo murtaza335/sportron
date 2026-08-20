@@ -23,7 +23,7 @@ We collect only the information necessary to operate the App (a multi-sport soci
 
 ### 2.1 Information You Provide Directly
 - **Google account profile:** When you sign in using Google, we obtain your Google account name and email address and use it to create your account. We do not access your Google password.
-- **Profile information:** Your chosen username, bio, and role (e.g., student or teacher), which you provide and manage yourself.
+- **Profile information:** Your chosen username, bio, and optional photo, which you provide and manage yourself.
 - **Profile photo / community cover photos:** Photos you upload. These are stored and served by our image-processing provider (Cloudinary) and displayed to other users where relevant.
 - **Community content:** Community names, descriptions, and the sport each community is linked to.
 - **User-generated content:** Details you post and share — including recording a match, creating a session, posting a ping, writing comments, and adding likes. Depending on the feature, this content may be visible to other members of the relevant community or to the public.
@@ -106,7 +106,7 @@ We retain your information only as long as necessary to:
 You have the following rights, subject to the legal grounds:
 
 - **Access and portability:** Receive a copy of the information we hold about you.
-- **Correction:** Update or correct inaccurate personal information (you can edit your username, bio, and role in Profile).
+- **Correction:** Update or correct inaccurate personal information (you can edit your username, bio, and photo in Profile).
 - **Deletion:** Request that we delete your account and associated records (see Section 6).
 - **Restriction / objection:** Request that we limit how we process your data in certain circumstances.
 - **Withdrawal of consent:** Withdraw consent provided for specific processing (e.g., push notifications) at any time in Settings; this does not affect the lawfulness of processing based on consent before its withdrawal.

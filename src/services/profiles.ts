@@ -67,7 +67,6 @@ export async function createProfile(userId: string, input: CreateProfileInput): 
       id: userId,
       username: input.username.trim().toLowerCase(),
       bio: input.bio?.trim() || null,
-      role: input.role,
       avatar_url: input.avatarUrl || null,
     })
     .select()
@@ -91,9 +90,6 @@ export async function updateProfile(
   }
   if (input.bio !== undefined) {
     updates.bio = input.bio.trim() || null;
-  }
-  if (input.role !== undefined) {
-    updates.role = input.role;
   }
   if (input.avatarUrl !== undefined) {
     updates.avatar_url = input.avatarUrl;

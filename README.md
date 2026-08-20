@@ -74,7 +74,7 @@ Full details: [Privacy Policy](PRIVACY_POLICY.md)
 ## How to Use
 
 1. **Sign in** with your Google account — no separate auth needed.
-2. **Complete your profile** — username, bio, role (student/teacher), photo.
+2. **Complete your profile** — username, bio, photo.
 3. **Explore communities** via the Communities tab or Discover.
 4. **Join a community** or **create a community** (you must be a member to record matches).
 5. **Record a match** from within a community so your opponent can approve it.

@@ -1,4 +1,3 @@
-export type UserRole = 'student' | 'teacher';
 export type MatchFormat = 'singles' | 'doubles';
 
 export type Sport =
@@ -77,7 +76,6 @@ export type Profile = {
   username: string;
   display_name: string | null;
   bio: string | null;
-  role: UserRole;
   avatar_url: string | null;
   fcm_tokens: string[];
   notification_preferences: NotificationPreferences;
@@ -145,7 +143,6 @@ export type MatchWithProfiles = Match & {
 export type CreateProfileInput = {
   username: string;
   bio?: string;
-  role: UserRole;
   avatarUrl?: string;
 };
 

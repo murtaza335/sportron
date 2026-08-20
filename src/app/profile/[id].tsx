@@ -113,13 +113,6 @@ export default function PublicProfileScreen() {
                 {profile.display_name}
               </ThemedText>
             )}
-            {profile.role && (
-              <View style={[styles.roleBadge, { backgroundColor: '#3B82F620' }]}>
-                <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700' }}>
-                  {profile.role === 'student' ? 'Student' : 'Teacher'}
-                </ThemedText>
-              </View>
-            )}
           </View>
 
           {profile.bio && (
@@ -232,11 +225,6 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     alignSelf: 'stretch',
     maxWidth: '100%',
-  },
-  roleBadge: {
-    paddingHorizontal: Spacing.md,
-    paddingVertical: 4,
-    borderRadius: Radius.sm,
   },
   fullWidthCard: {
     width: '100%',

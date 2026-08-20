@@ -16,7 +16,7 @@ export default function OnboardingScreen() {
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
 
-  const handleSubmit = async (data: { username: string; bio: string; role: 'student' | 'teacher'; avatarUrl?: string | null }) => {
+  const handleSubmit = async (data: { username: string; bio: string; avatarUrl?: string | null }) => {
     if (!user?.id) {
       return;
     }
@@ -26,7 +26,6 @@ export default function OnboardingScreen() {
       await createProfile(user.id, {
         username: data.username,
         bio: data.bio,
-        role: data.role,
         avatarUrl: data.avatarUrl ?? undefined,
       });
       await refreshProfile();

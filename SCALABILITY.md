@@ -11,7 +11,7 @@ The Sportron/T3Seecs app is built on a **modular, multi-sport foundation**. It w
 - **Communities**: sport-linked, public/restricted visibility, cover photos, member roles
 - **Sessions**: pickup-play sessions with commitments, expiry, time-conflict checks
 - **Social**: likes, comments, approval workflow per community match
-- **Profiles**: role-based (student/teacher)
+- **Profiles**: username, bio, avatar
 - **Notifications**: in-app notifications + FCM push
 
 ### Scope Decisions Going Forward
@@ -213,7 +213,7 @@ CREATE TABLE training_sessions (
 
 ### Profile & Auth
 - ✅ Google OAuth (Supabase)
-- ✅ Profile CRUD (username, bio, role, avatar)
+- ✅ Profile CRUD (username, bio, avatar)
 - ✅ Cloudinary image upload with progress
 - ✅ Theme persistence (light/dark/system)
 - ✅ Soft-delete account + re-enable on login

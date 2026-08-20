@@ -53,7 +53,7 @@ src/
 │   ├── InviteCard.tsx          # Community invite accept/decline
 │   ├── InviteMemberModal.tsx   # Admin invite-by-username modal
 │   ├── CommunityCard.tsx       # Community list card
-│   ├── ProfileForm.tsx         # Username/bio/role form + avatar upload
+│   ├── ProfileForm.tsx         # Username/bio form + avatar upload
 │   ├── FCMInitializer.tsx      # Wires FCM once a session exists
 │   └── ui/                     # Button, Card, SegmentedControl, Text
 ├── contexts/
@@ -169,7 +169,7 @@ src/
 - `session_chat_message` / `session_chat_reply` / `community_chat_message` / `community_chat_reply` pushes are **FCM-only** (server-triggered, never inserted into `in_app_notifications`). FCM payloads for in-app notifications carry `type` + the row's `data` for tap-routing
 
 ### 9. Profile & Settings
-- **Profile**: view/edit username, bio, role (student/teacher), avatar upload; profile for other users via `/profile/[id]`
+- **Profile**: view/edit username, bio, avatar upload; profile for other users via `/profile/[id]`
 - **Theme picker**: Light / Dark / System (bottom sheet, persisted)
 - **Push notification master toggle** + per-type preferences in Advanced Settings
 - **Delete account** (soft delete); re-enabled on re-login
@@ -183,7 +183,7 @@ Current live tables (legacy `matches`/`match_likes`/`match_comments` were droppe
 ```sql
 -- Already implemented tables
 profiles
-  id, username (unique, was renamed from display_name), bio, avatar_url, role,
+  id, username (unique, was renamed from display_name), bio, avatar_url,
   fcm_tokens text[], notification_preferences jsonb,
   sport_interests text[], completed_sessions, total_committed_sessions,
   deleted_at, created_at, updated_at
@@ -285,6 +285,12 @@ See `NotificationType` in `src/types/index.ts` (all 32 types, from `match_pendin
 ---
 
 ## Key Conventions
+
+### Backward Compatibility (mandatory)
+- **Every new migration, feature, and Supabase edge function change must keep backward compatibility with already-installed app builds** (in stores/Play) and already-deployed infrastructure in mind.
+- **Migrations**: never make a column NOT NULL or drop/rename a column or RPC/function that deployed clients still send/read. When a type/not-null constraint would block a change the client no longer sends (e.g. dropping a field from a form), make the column nullable with a documented migration instead. New columns/RPCs must be additive; old clients using `select('*')` must still work. If existing DB objects (views, RPCs, triggers, functions) depend on a column you change, update or drop them in the migration too — verify with a grep across `supabase/`.
+- **Edge functions**: deployment is separate from the app — a stale deployed function vs. new/old client payload = silent 400s. Keep payload/response contracts backward-compatible with all installed app versions, and never remove request fields or change response shapes that older clients rely on. (See also "Edge Functions (Supabase)" below.)
+- **Client changes**: when removing a feature (e.g. the profile role), the old code path is gone in the new build but old builds still send/read the old fields — the server/schema must tolerate both.
 
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/updates` (Activity), `/profile`

@@ -46,7 +46,6 @@ type SlotCardProps = {
   onPress?: () => void;
   onDelete?: () => void;
   locked?: boolean;
-  showRole?: boolean;
 };
 
 function SlotCard({
@@ -56,7 +55,6 @@ function SlotCard({
   onPress,
   onDelete,
   locked = false,
-  showRole = true,
 }: SlotCardProps) {
   const theme = useTheme();
 
@@ -66,11 +64,6 @@ function SlotCard({
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
         {profile.username}
       </ThemedText>
-      {showRole ? (
-        <ThemedText variant="caption" muted>
-          {profile.role}
-        </ThemedText>
-      ) : null}
     </>
   ) : (
     <>
@@ -274,7 +267,6 @@ export function MatchLineupSelector({
                 username: currentUserName,
                 display_name: null,
                 bio: null,
-                role: 'student',
                 avatar_url: currentUserAvatar ?? null,
                 fcm_tokens: [],
                 notification_preferences: { ...DEFAULT_NOTIFICATION_PREFERENCES },
@@ -284,7 +276,6 @@ export function MatchLineupSelector({
               }}
               helperText=""
               locked
-              showRole={false}
             />
           </View>
 
@@ -424,11 +415,7 @@ export function MatchLineupSelector({
                         <ThemedText variant="caption" muted>
                           {item.display_name}
                         </ThemedText>
-                      ) : (
-                        <ThemedText variant="caption" muted>
-                          {item.role}
-                        </ThemedText>
-                      )}
+                      ) : null}
                     </View>
                     {isSelected && <Check size={18} color={theme.text} />}
                   </Pressable>
