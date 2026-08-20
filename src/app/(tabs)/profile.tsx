@@ -204,7 +204,7 @@ export default function ProfileScreen() {
                   </Pressable>
                 </View>
                 <View style={styles.modalOptions}>
-                  {(['light', 'dark', 'system'] as const).map((option) => (
+                  {(['light', 'dark'] as const).map((option) => (
                     <Pressable
                       key={option}
                       onPress={() => { setTheme(option); setShowThemeModal(false); }}
@@ -218,9 +218,8 @@ export default function ProfileScreen() {
                       <View style={styles.modalOptionContent}>
                         {option === 'light' && <Sun size={22} color={theme.text} />}
                         {option === 'dark' && <Moon size={22} color={theme.text} />}
-                        {option === 'system' && <Palette size={22} color={theme.text} />}
                         <ThemedText variant="body" style={{ marginLeft: Spacing.md, fontWeight: colorScheme === option ? '700' : '500' }}>
-                          {option === 'light' ? 'Light' : option === 'dark' ? 'Dark' : 'System'}
+                          {option === 'light' ? 'Light' : 'Dark'}
                         </ThemedText>
                       </View>
                       {colorScheme === option && <Check size={22} color="#10B981" />}
