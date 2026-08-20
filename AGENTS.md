@@ -143,7 +143,7 @@ src/
 - **Session scope**: session **creator + accepted participants** only (RLS enforces both read and write). Users who **left** can still read history up to the moment they left (`created_at <=` their commitment's `updated_at`) but cannot send; the client skips its realtime subscription and shows a "you left" banner, and they receive no further FCM pushes
 - **Community scope**: any **approved community member** (RLS enforces both read and write); the chat button sits next to the ping button on the community screen and opens `CommunityChatPopup`
 - Chat button sits in the `SessionDetailPopup` header (next to close); opens a full-screen `SessionChatPopup`
-- Text only, max 1000 chars, permanent (no delete/edit); sending disabled once a session is closed/completed/cancelled
+- Text only, max 1000 chars; sending disabled once a session is closed/completed/cancelled. **Own-message edit + delete**: the sender can edit content within 15 minutes of sending (bubble shows an *Edited* mark, stamped via `edited_at` by a DB trigger, migration 039) and hard-delete within 24 hours (bubble disappears for everyone via realtime DELETE). Both are enforced server-side by RLS + triggers on `session_messages`/`community_messages`, and the client applies them optimistically with revert (see `useChat`)
 - **Optimistic UI** (`src/hooks/useChat.ts`): sending adds a temp bubble instantly with a **clock** (sending) → **check** (delivered) mark, then swaps to the real row with **no refetch**. Failure removes the temp and restores the draft + reply. A realtime INSERT for your own just-sent message is matched to the temp (by content + `reply_to_id`) and upgrades its id in place — never a second bubble, never a lost mark
 - **My avatar** renders on the right of your own bubbles (from `useAuth().profile`)
 - **Long-press to reply**: long-press any message to open a bottom-sheet "Reply to <name>" option; replies store `reply_to_id` (migration 025) and render a preview block (quoted name/content) inside the bubble
@@ -201,19 +201,23 @@ commitments
 session_messages
   id, session_id (fk, cascade), sender_id (fk, cascade), content,
   reply_to_id (self fk, ON DELETE SET NULL, migration 025),
+  edited_at (set by the edit trigger, migration 039),
   created_at
   -- sender snapshot: sender_username, sender_avatar_url (migration 026) — written
   -- at insert so realtime payloads/reads carry the display name with no join
   -- live text chat; readable/writable only by the session creator + accepted
-  -- participants (RLS); added to the supabase_realtime publication (migration 021)
+  -- participants (RLS); added to the supabase_realtime publication (migration 021);
+  -- UPDATE restricted to the sender within 15 min, DELETE within 24 h (RLS + triggers, migration 039)
 
 community_messages
   id, community_id (fk, cascade), sender_id (fk, cascade), content,
   reply_to_id (self fk, ON DELETE SET NULL), sender_username, sender_avatar_url,
+  edited_at (set by the edit trigger, migration 039),
   created_at
   -- live text chat; readable/writable only by approved community members (RLS);
   -- composite index (community_id, created_at); added to the supabase_realtime
-  -- publication (migration 027)
+  -- publication (migration 027);
+  -- UPDATE restricted to the sender within 15 min, DELETE within 24 h (RLS + triggers, migration 039)
 
 communities
   id, name, description, organization, location, image_url,

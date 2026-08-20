@@ -1,7 +1,9 @@
 import { useChat, type ChatThread } from '@/hooks/useChat';
 import {
+  deleteSessionMessage,
   fetchSessionMessages,
   sendSessionMessage,
+  updateSessionMessage,
 } from '@/services/chat';
 import type { SessionChatMessage } from '@/types';
 
@@ -21,6 +23,8 @@ export function useSessionChat(
       channelPrefix: 'session-chat-',
       fetchMessages: fetchSessionMessages,
       sendMessage: sendSessionMessage,
+      updateMessage: updateSessionMessage,
+      deleteMessage: deleteSessionMessage,
     },
     userId,
     subscribe,

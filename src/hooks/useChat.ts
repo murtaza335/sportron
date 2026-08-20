@@ -38,6 +38,8 @@ export type ChatSourceConfig<T extends ChatMessageBase> = {
     replyToId?: string | null,
     replyTarget?: ReplyTargetInfo | null,
   ) => Promise<T | null>;
+  updateMessage: (messageId: string, content: string) => Promise<void>;
+  deleteMessage: (messageId: string) => Promise<void>;
 };
 
 export type ChatThread<T extends ChatMessageBase> = {
@@ -48,7 +50,8 @@ export type ChatThread<T extends ChatMessageBase> = {
   loadOlder: () => void;
   sendMessage: (content: string, replyToId?: string | null) => Promise<T | null>;
   resendMessage: (message: T) => void;
-  deleteMessage: (messageId: string) => void;
+  deleteMessage: (messageId: string) => Promise<void>;
+  editMessage: (messageId: string, newContent: string) => Promise<void>;
   refresh: () => void;
   unreadCount: number;
   firstUnreadIndex: number | null;
@@ -62,6 +65,11 @@ export function useChat<T extends ChatMessageBase>(
   senderProfile?: SenderProfile | null,
 ): ChatThread<T> {
   const { sourceId, table, idColumn, channelPrefix, fetchMessages, sendMessage } = config;
+  // Renamed in the returned thread: config.deleteMessage is the server-backed
+  // op, while the thread exposes `deleteMessage` (handles failed/temp messages
+  // locally) and `editMessage` (optimistic with revert).
+  const updateMessage = config.updateMessage;
+  const deleteServerMessage = config.deleteMessage;
   const [messages, setMessages] = useState<T[]>([]);
   const [loading, setLoading] = useState(false);
   const [loadingMore, setLoadingMore] = useState(false);
@@ -222,6 +230,40 @@ export function useChat<T extends ChatMessageBase>(
           }
         },
       )
+      .on(
+        'postgres_changes',
+        {
+          event: 'UPDATE',
+          schema: 'public',
+          table,
+          filter: `${idColumn}=eq.${sourceId}`,
+        },
+        (payload) => {
+          const raw = normalizeChatMessage(payload.new as T);
+          // A sender's edit arrives here (content + edited_at) — sync it for
+          // everyone in place. Own optimistic edits are simply reconciled with
+          // the authoritative row.
+          setMessages((prev) =>
+            prev.some((m) => m.id === raw.id)
+              ? prev.map((m) => (m.id === raw.id ? raw : m))
+              : prev,
+          );
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: 'DELETE',
+          schema: 'public',
+          table,
+          filter: `${idColumn}=eq.${sourceId}`,
+        },
+        (payload) => {
+          const { id } = payload.old as { id: string };
+          // A sender's delete arrives here — drop the bubble for everyone.
+          setMessages((prev) => prev.filter((m) => m.id !== id));
+        },
+      )
       .subscribe();
 
     channelRef.current = channel;
@@ -364,11 +406,71 @@ export function useChat<T extends ChatMessageBase>(
     [send],
   );
 
-  // Removes a local (failed) message bubble without touching the server — a
-  // failed write never reached the DB, so there is nothing to delete remotely.
-  const deleteMessage = useCallback((messageId: string) => {
-    setMessages((prev) => prev.filter((m) => m.id !== messageId));
-  }, []);
+  // Deletes a message. Optimistically removes the bubble, then calls the
+  // server-backed delete. Failed/temp messages never reached the DB, so they're
+  // dropped locally without a server call. On failure the bubble is re-inserted
+  // at its original position so nothing is silently lost.
+  const deleteMessage = useCallback(
+    async (messageId: string): Promise<void> => {
+      if (!sourceId || !userId) return;
+      const target = messages.find((m) => m.id === messageId);
+      const isLocalOnly =
+        !target ||
+        target.status === 'failed' ||
+        target.status === 'sending' ||
+        messageId.startsWith('temp-');
+      setMessages((prev) => prev.filter((m) => m.id !== messageId));
+      if (isLocalOnly) return;
+
+      const createdAt = target.created_at;
+      try {
+        await deleteServerMessage(messageId);
+      } catch (e) {
+        // Re-insert the bubble where it sat chronologically.
+        setMessages((prev) => {
+          const rest = prev.filter((m) => m.id !== messageId);
+          const idx = rest.findIndex(
+            (m) => new Date(m.created_at).getTime() > new Date(createdAt).getTime(),
+          );
+          rest.splice(idx === -1 ? rest.length : idx, 0, target);
+          return rest;
+        });
+        throw e;
+      }
+    },
+    [sourceId, userId, messages, deleteServerMessage],
+  );
+
+  // Edits a message's content. Optimistically updates the bubble (content +
+  // edited_at so the mark shows instantly); on failure it reverts and rethrows.
+  // Nothing depends on the response — the realtime UPDATE reconciles the row.
+  const editMessage = useCallback(
+    async (messageId: string, newContent: string): Promise<void> => {
+      const trimmed = newContent.trim();
+      if (!trimmed) throw new Error('Message cannot be empty.');
+      if (!sourceId || !userId) return;
+      const current = messages.find((m) => m.id === messageId);
+      if (!current) return;
+      if (trimmed === current.content) return;
+      const previous = { content: current.content, edited_at: current.edited_at };
+      setMessages((prev) =>
+        prev.map((m) =>
+          m.id === messageId
+            ? { ...m, content: trimmed, edited_at: new Date().toISOString() }
+            : m,
+        ),
+      );
+      try {
+        await updateMessage(messageId, trimmed);
+      } catch (e) {
+        setMessages((prev) =>
+          prev.map((m) => (m.id === messageId ? { ...m, ...previous } : m)),
+        );
+        throw e;
+      }
+    },
+    [sourceId, userId, messages, updateMessage],
+  );
 
   return {
     messages,
@@ -379,6 +481,7 @@ export function useChat<T extends ChatMessageBase>(
     sendMessage: send,
     resendMessage,
     deleteMessage,
+    editMessage,
     refresh: load,
     unreadCount,
     firstUnreadIndex,

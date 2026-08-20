@@ -214,6 +214,71 @@ async function insertChatMessage(input: {
 }
 
 // ---------------------------------------------------------------------------
+// Chat message edit + delete (own messages)
+// ---------------------------------------------------------------------------
+
+// Edits the content of a chat message. RLS + the edit trigger restrict this to
+// the sender within 15 minutes of sending; the trigger stamps `edited_at`.
+async function updateChatMessage(
+  table: 'session_messages' | 'community_messages',
+  messageId: string,
+  content: string,
+): Promise<void> {
+  const trimmed = content.trim();
+  if (!trimmed) throw new Error('Message cannot be empty.');
+  if (trimmed.length > MAX_CHAT_MESSAGE_LENGTH) {
+    throw new Error(`Message is too long (max ${MAX_CHAT_MESSAGE_LENGTH} characters).`);
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .update({ content: trimmed })
+    .eq('id', messageId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  // No row came back — RLS excluded the row, i.e. it's not ours, not in the
+  // chat, or the 15-minute edit window has passed.
+  if (!data) throw new Error('Messages can only be edited within 15 minutes of sending.');
+}
+
+// Hard-deletes a chat message. RLS + the delete trigger restrict this to the
+// sender within 24 hours of sending; everyone sees the bubble disappear via
+// realtime DELETE.
+async function deleteChatMessage(
+  table: 'session_messages' | 'community_messages',
+  messageId: string,
+): Promise<void> {
+  const { data, error } = await supabase
+    .from(table)
+    .delete()
+    .eq('id', messageId)
+    .select('id')
+    .maybeSingle();
+
+  if (error) throw error;
+  // No row came back — not ours or the 24-hour delete window has passed.
+  if (!data) throw new Error('Messages can only be deleted within 24 hours of sending.');
+}
+
+export function updateSessionMessage(messageId: string, content: string): Promise<void> {
+  return updateChatMessage('session_messages', messageId, content);
+}
+
+export function updateCommunityMessage(messageId: string, content: string): Promise<void> {
+  return updateChatMessage('community_messages', messageId, content);
+}
+
+export function deleteSessionMessage(messageId: string): Promise<void> {
+  return deleteChatMessage('session_messages', messageId);
+}
+
+export function deleteCommunityMessage(messageId: string): Promise<void> {
+  return deleteChatMessage('community_messages', messageId);
+}
+
+// ---------------------------------------------------------------------------
 // Chat messages (paged, newest-first fetch; returned ascending)
 // ---------------------------------------------------------------------------
 

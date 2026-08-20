@@ -422,6 +422,7 @@ export type ChatMessageBase = {
   sender_id: string;
   content: string;
   created_at: string;
+  edited_at?: string | null;
   reply_to_id?: string | null;
   sender_username?: string | null;
   sender_avatar_url?: string | null;
