@@ -51,6 +51,10 @@ const TOP_LOAD_THRESHOLD = 80;
 const CONTEXT_CARD_W = 170;
 const CONTEXT_CARD_H = 52;
 
+// Two taps within this window count as a double-tap that opens the same
+// options popup as a long-press.
+const DOUBLE_TAP_MS = 300;
+
 type ChatPopupProps<T extends ChatMessageBase> = {
   visible: boolean;
   onClose: () => void;
@@ -112,6 +116,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkReadRef = useRef(0);
   const atBottomRef = useRef(true);
+  const lastPressRef = useRef(0);
 
   // The chat list is INVERTED: newest message at index 0 = the scroll origin
   // (offset 0 = the visual bottom). That makes chats behave natively like
@@ -257,6 +262,20 @@ export function ChatPopup<T extends ChatMessageBase>({
     setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
   }, []);
 
+  // Double-tap opens the same options popup (convenience on top of long-press).
+  // Works with the keyboard open thanks to `keyboardShouldPersistTaps="handled"`
+  // on the list, which delivers taps to the bubbles instead of eating the first
+  // tap to dismiss the keyboard.
+  const handleMessagePress = useCallback((item: T, e: GestureResponderEvent) => {
+    const now = Date.now();
+    if (now - lastPressRef.current < DOUBLE_TAP_MS) {
+      lastPressRef.current = 0;
+      setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
+    } else {
+      lastPressRef.current = now;
+    }
+  }, []);
+
   const replyToContextMessage = useCallback(() => {
     if (!contextMenu) return;
     setReplyTo(contextMenu.message);
@@ -325,6 +344,13 @@ export function ChatPopup<T extends ChatMessageBase>({
     inputRef.current?.clear();
     setDraft('');
     setReplyTo(null);
+    // On web the send-button tap can steal focus and collapse the keyboard.
+    // The button is excluded from focus (tabIndex -1) so THIS never happens —
+    // this focus() is only a no-op safety net when focus was already on the
+    // input, and never causes a flash by itself.
+    if (Platform.OS === 'web') {
+      requestAnimationFrame(() => inputRef.current?.focus());
+    }
     sendMessage(text, reply?.id).then(
       () => scrollToBottom(true),
       (e) => console.error('Failed to send message:', e),
@@ -391,6 +417,7 @@ export function ChatPopup<T extends ChatMessageBase>({
         )}
         <Pressable
           onLongPress={(e) => handleLongPress(item, e)}
+          onPress={(e) => handleMessagePress(item, e)}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -551,6 +578,10 @@ export function ChatPopup<T extends ChatMessageBase>({
                   showsVerticalScrollIndicator={false}
                   onScroll={handleScroll}
                   scrollEventThrottle={16}
+                  // Keep the keyboard open while the user taps/holds a message —
+                  // with the default ("never") the FIRST tap is swallowed to
+                  // dismiss the keyboard and the long-press never fires.
+                  keyboardShouldPersistTaps="handled"
                   onScrollToIndexFailed={(info) => {
                     // No getItemLayout (variable-height messages, reply
                     // previews), so an unmeasurable divider jump retries until
@@ -670,6 +701,12 @@ export function ChatPopup<T extends ChatMessageBase>({
                 />
                 <Pressable
                   onPress={handleSend}
+                  onPointerDown={(e) => {
+                    // Web-only: block the button's default mouse-down action so
+                    // the TextInput never blurs → no keyboard flash. onPress
+                    // still fires; only the native focus-move is suppressed.
+                    if (Platform.OS === 'web') e.preventDefault();
+                  }}
                   // Grey + disabled when the trimmed input is empty and while a
                   // message is in flight (being added to the UI), otherwise green
                   // so the input can be reused for the next message immediately.
