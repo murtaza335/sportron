@@ -1,4 +1,5 @@
 import { AlertTriangle, Calendar, Check, Clock, Globe, Heart, Lock, User, X } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -68,6 +69,7 @@ export function MatchDetailPopup({
   recordedByName,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
+  const router = useRouter();
   const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
   const [comments, setComments] = useState<CommunityMatchComment[]>([]);
@@ -281,8 +283,14 @@ export function MatchDetailPopup({
               <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
                 <View style={styles.teamLeft}>
                   <View style={styles.avatarGroup}>
-                    <UserAvatar avatarUrl={match.player?.avatar_url} size={32} />
-                    {match.playerPartner && <UserAvatar avatarUrl={match.playerPartner.avatar_url} size={32} style={styles.avatarOverlap} />}
+                    <Pressable disabled={!match.player?.id} onPress={() => { if (match.player?.id) router.push(`/profile/${match.player.id}`); }}>
+                      <UserAvatar avatarUrl={match.player?.avatar_url} size={32} />
+                    </Pressable>
+                    {match.playerPartner && (
+                      <Pressable disabled={!match.playerPartner.id} onPress={() => { if (match.playerPartner?.id) router.push(`/profile/${match.playerPartner.id}`); }} style={styles.avatarOverlap}>
+                        <UserAvatar avatarUrl={match.playerPartner.avatar_url} size={32} />
+                      </Pressable>
+                    )}
                   </View>
                   <ThemedText variant="body" numberOfLines={2} style={[styles.teamName, playerWon && styles.winningTeamName]}>
                     {teamAName}
@@ -310,8 +318,14 @@ export function MatchDetailPopup({
 
                 <View style={styles.teamRight}>
                   <View style={styles.avatarGroup}>
-                    <UserAvatar avatarUrl={match.opponent?.avatar_url} size={32} />
-                    {match.opponentPartner && <UserAvatar avatarUrl={match.opponentPartner.avatar_url} size={32} style={styles.avatarOverlap} />}
+                    <Pressable disabled={!match.opponent?.id} onPress={() => { if (match.opponent?.id) router.push(`/profile/${match.opponent.id}`); }}>
+                      <UserAvatar avatarUrl={match.opponent?.avatar_url} size={32} />
+                    </Pressable>
+                    {match.opponentPartner && (
+                      <Pressable disabled={!match.opponentPartner.id} onPress={() => { if (match.opponentPartner?.id) router.push(`/profile/${match.opponentPartner.id}`); }} style={styles.avatarOverlap}>
+                        <UserAvatar avatarUrl={match.opponentPartner.avatar_url} size={32} />
+                      </Pressable>
+                    )}
                   </View>
                   <ThemedText variant="body" numberOfLines={2} style={[styles.teamName, opponentWon && styles.winningTeamName, styles.alignRight]}>
                     {teamBName}
@@ -355,11 +369,18 @@ export function MatchDetailPopup({
 
                 <Divider spacing={Spacing.xs} />
 
-                <View style={styles.detailItem}>
+                <Pressable
+                  style={styles.detailItem}
+                  disabled={!match.recorder?.id && !match.player?.id}
+                  onPress={() => {
+                    const creatorId = match.recorder?.id ?? match.player?.id;
+                    if (creatorId) router.push(`/profile/${creatorId}`);
+                  }}
+                >
                   <User size={15} color={theme.textSecondary} />
                   <ThemedText variant="caption" muted style={styles.detailLabel}>Recorded by</ThemedText>
                   <ThemedText variant="body" style={styles.detailValue}>{creatorName}</ThemedText>
-                </View>
+                </Pressable>
 
                 <Divider spacing={Spacing.xs} />
 

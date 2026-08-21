@@ -1,4 +1,5 @@
 import { Heart, MessageSquare } from 'lucide-react-native';
+import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -50,6 +51,7 @@ function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
 
 export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress }: MatchCardProps) {
   const theme = useTheme();
+  const router = useRouter();
   const playerName = getTeamAName(match, currentUserId);
   const opponentName = getOpponentName(match, currentUserId);
   const opponentCaptain = getOpponentCaptain(match);
@@ -145,17 +147,23 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
       <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
         {/* Post Header */}
         <View style={styles.header}>
-          <View style={styles.authorRow}>
-            <UserAvatar avatarUrl={recorderAvatar} size={36} />
-            <View style={styles.authorTextCol}>
-              <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
-                {recorderName}
-              </ThemedText>
-              <ThemedText variant="caption" muted style={styles.timeAgo}>
-                {formatRelativeTime(match.created_at)}
-              </ThemedText>
-            </View>
-          </View>
+           <Pressable
+             style={styles.authorRow}
+             disabled={!recorderProfile?.id}
+             onPress={() => {
+               if (recorderProfile?.id) router.push(`/profile/${recorderProfile.id}`);
+             }}
+           >
+             <UserAvatar avatarUrl={recorderAvatar} size={36} />
+             <View style={styles.authorTextCol}>
+               <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
+                 {recorderName}
+               </ThemedText>
+               <ThemedText variant="caption" muted style={styles.timeAgo}>
+                 {formatRelativeTime(match.created_at)}
+               </ThemedText>
+             </View>
+           </Pressable>
 
           <View style={styles.badges}>
             
