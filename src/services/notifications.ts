@@ -334,3 +334,69 @@ export async function notifyCommunityInviteResponse(
     data: { communityId },
   });
 }
+
+// Streak notifications
+const STREAK_MOTIVATIONAL_LINES = [
+  "Your streak is waiting — one match keeps it alive! 🔥",
+  "Don't let the streak die. Play today! 💪",
+  "Champions show up daily. Your turn! 🏆",
+  "One game. That's all it takes to extend your streak. 🎯",
+  "Your future self will thank you for playing today. ✨",
+  "Streak on the line. Make it count! ⚡",
+  "Every legend started with a single day. Keep going! 🌟",
+];
+
+const STREAK_AT_RISK_LINES = [
+  "⚠️ Your {streak}-day streak ends at midnight! One match saves it.",
+  "🚨 {hours}h left to save your {streak}-day streak!",
+  "⏰ Streak emergency: {streak} days on the line. Play now!",
+];
+
+const STREAK_MILESTONE_LINES: Record<number, string> = {
+  3: "🎉 3-day streak! You're building a habit!",
+  7: "🔥 Week warrior! 7 days straight!",
+  14: "💪 Two weeks strong! Consistency is key!",
+  30: "🏆 30 days! You're a streak legend!",
+  60: "⚡ 60 days! Unstoppable!",
+  100: "🌟 CENTURY! 100-day streak achieved!",
+};
+
+function getRandomLine(lines: string[]): string {
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+export async function notifyStreakReminder(userId: string, streakCount: number): Promise<void> {
+  await createNotification({
+    userId,
+    type: 'streak_reminder',
+    title: 'Keep Your Streak Alive! 🔥',
+    body: getRandomLine(STREAK_MOTIVATIONAL_LINES),
+    data: { streakCount },
+  });
+}
+
+export async function notifyStreakAtRisk(userId: string, streakCount: number, hoursLeft: number): Promise<void> {
+  const line = getRandomLine(STREAK_AT_RISK_LINES)
+    .replace('{streak}', streakCount.toString())
+    .replace('{hours}', hoursLeft.toString());
+  
+  await createNotification({
+    userId,
+    type: 'streak_at_risk',
+    title: 'Streak at Risk! ⚠️',
+    body: line,
+    data: { streakCount, hoursLeft },
+  });
+}
+
+export async function notifyStreakMilestone(userId: string, streakCount: number): Promise<void> {
+  const message = STREAK_MILESTONE_LINES[streakCount] || `🎉 Amazing! ${streakCount}-day streak!`;
+  
+  await createNotification({
+    userId,
+    type: 'streak_milestone',
+    title: 'Streak Milestone! 🏆',
+    body: message,
+    data: { streakCount },
+  });
+}

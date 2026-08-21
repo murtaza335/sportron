@@ -29,6 +29,7 @@ import type {
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 import { formatDate } from '@/lib/date';
+import { StreakDisplay } from '@/components/StreakDisplay';
 
 function formatWinRatio(value: number | null | undefined): string {
   if (value == null) return '—';
@@ -120,6 +121,8 @@ export default function PublicProfileScreen() {
               <ThemedText variant="body">{profile.bio}</ThemedText>
             </Card>
           )}
+
+          <StreakDisplay profile={profile} />
 
           {memberStats && (
             <Card style={styles.fullWidthCard}>

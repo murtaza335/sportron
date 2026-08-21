@@ -82,6 +82,10 @@ export type Profile = {
   deleted_at: string | null;
   created_at: string;
   updated_at: string;
+  streak_count: number;
+  longest_streak: number;
+  last_activity_date: string | null;
+  streak_updated_at: string | null;
 };
 
 export type NotificationPreferences = {
@@ -105,9 +109,16 @@ export type NotificationPreferences = {
   match_disputed: boolean;
   member_removed: boolean;
   admin_transferred: boolean;
+  admin_promoted: boolean;
   community_match_pending: boolean;
   community_match_approved: boolean;
   community_match_disputed: boolean;
+  community_invite: boolean;
+  community_invite_accepted: boolean;
+  community_invite_rejected: boolean;
+  streak_reminder: boolean;
+  streak_at_risk: boolean;
+  streak_milestone: boolean;
 };
 
 export type Match = {
@@ -167,9 +178,16 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   match_disputed: true,
   member_removed: true,
   admin_transferred: true,
+  admin_promoted: true,
   community_match_pending: true,
   community_match_approved: true,
   community_match_disputed: true,
+  community_invite: true,
+  community_invite_accepted: true,
+  community_invite_rejected: true,
+  streak_reminder: true,
+  streak_at_risk: true,
+  streak_milestone: true,
 };
 
 export type MatchStats = {
@@ -209,7 +227,10 @@ export type NotificationType =
   | 'session_chat_message'
   | 'session_chat_reply'
   | 'community_chat_message'
-  | 'community_chat_reply';
+  | 'community_chat_reply'
+  | 'streak_reminder'
+  | 'streak_at_risk'
+  | 'streak_milestone';
 
 export type InAppNotification = {
   id: string;

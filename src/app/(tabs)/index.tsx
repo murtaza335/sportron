@@ -3,6 +3,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
+import { StreakHeader } from '@/components/StreakHeader';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -25,6 +26,7 @@ export default function CommunitiesScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
         }
       >
+        <StreakHeader />
         {loading ? (
           <ActivityIndicator color={theme.text} style={styles.loader} />
         ) : communities.length === 0 ? (

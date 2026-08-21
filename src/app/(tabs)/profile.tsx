@@ -5,6 +5,7 @@ import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-na
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { UserAvatar } from '@/components/UserAvatar';
+import { StreakDisplay } from '@/components/StreakDisplay';
 import { Button } from '@/components/ui/Button';
 import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -132,6 +133,7 @@ export default function ProfileScreen() {
                 {profile.bio}
               </ThemedText>
             ) : null}
+            {profile && <StreakDisplay profile={profile} compact />}
           </View>
         ) : (
           <ProfileForm

@@ -71,6 +71,10 @@ export default function AddMatchScreen() {
           deleted_at: null,
           created_at: '',
           updated_at: '',
+          streak_count: 0,
+          longest_streak: 0,
+          last_activity_date: null,
+          streak_updated_at: null,
         }));
     },
     [communityId, user?.id],

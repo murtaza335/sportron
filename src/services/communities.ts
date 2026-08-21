@@ -31,6 +31,7 @@ import {
   notifyCommunityInvite,
   notifyCommunityInviteResponse,
 } from './notifications';
+import { updateStreak } from './streak';
 
 type CommunityRow = Community & {
   member_count: { count: number }[] | null;
@@ -735,6 +736,13 @@ export async function recordCommunityMatch(input: {
     }
   } catch (e) {
     console.error('Failed to send community match notification:', e);
+  }
+
+  // Update streak for the person recording the match
+  try {
+    await updateStreak(input.recorded_by, 'match_recorded');
+  } catch (e) {
+    console.error('Failed to update streak for match recording:', e);
   }
 
   return data;
