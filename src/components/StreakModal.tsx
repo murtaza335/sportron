@@ -3,12 +3,14 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
   Modal,
+  Platform,
   Pressable,
   Share,
   StyleSheet,
   Text,
   View,
 } from 'react-native';
+import { BlurView } from 'expo-blur';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -115,15 +117,35 @@ export function StreakModal({
 
   if (!visible) return null;
 
+  const isDark = theme.resolvedColorScheme === 'dark';
   const hasStreak = streakCount > 0;
   const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
+
+  const cardBackgroundColor = isDark ? '#1C1C1E' : theme.background;
+  const cardBorderColor = isDark ? '#2C2C2E' : theme.border;
+  const buttonBgColor = isDark ? '#FFFFFF' : '#000000';
+  const buttonTextColor = isDark ? '#000000' : '#FFFFFF';
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
       <View style={styles.overlay}>
+        <BlurView
+          tint="dark"
+          intensity={50}
+          style={StyleSheet.absoluteFill}
+        />
+        <View style={[StyleSheet.absoluteFill, styles.darkenOverlay]} />
         <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close modal backdrop" />
 
-        <View style={[styles.card, { backgroundColor: theme.background }]}>
+        <View
+          style={[
+            styles.card,
+            {
+              backgroundColor: cardBackgroundColor,
+              borderColor: cardBorderColor,
+            },
+          ]}
+        >
           {/* Header */}
           <View style={styles.header}>
             <ThemedText variant="heading" style={styles.headerTitle}>Your streak</ThemedText>
@@ -192,12 +214,13 @@ export function StreakModal({
             onPress={onClose}
             style={({ pressed }) => [
               styles.blackButton,
+              { backgroundColor: buttonBgColor },
               pressed && styles.blackButtonPressed,
             ]}
             accessibilityRole="button"
             accessibilityLabel="Close streak modal"
           >
-            <Text style={styles.blackButtonText}>Close</Text>
+            <Text style={[styles.blackButtonText, { color: buttonTextColor }]}>Close</Text>
           </Pressable>
         </View>
       </View>
@@ -210,10 +233,12 @@ const screenWidth = Dimensions.get('window').width;
 const styles = StyleSheet.create({
   overlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
     justifyContent: 'center',
     alignItems: 'center',
     paddingHorizontal: Spacing.md,
+  },
+  darkenOverlay: {
+    backgroundColor: 'rgba(0, 0, 0, 0.65)',
   },
   card: {
     width: '100%',
@@ -221,9 +246,10 @@ const styles = StyleSheet.create({
     borderRadius: Radius.lg,
     padding: Spacing.md,
     gap: Spacing.xs,
+    borderWidth: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.25,
     shadowRadius: 16,
     elevation: 8,
   },
