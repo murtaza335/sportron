@@ -1,24 +1,23 @@
+import { Bell, Check, Cog, Moon, Palette, Pencil, Sun, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Bell, Cog, Pencil, Sun, Moon, Palette, X, Check } from 'lucide-react-native';
 
 import { ProfileForm } from '@/components/ProfileForm';
 import { UserAvatar } from '@/components/UserAvatar';
-import { StreakDisplay } from '@/components/StreakDisplay';
 import { Button } from '@/components/ui/Button';
 import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
-import { useAuth } from '@/contexts/AuthContext';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
-import { signOut } from '@/services/auth';
-import { updateProfile, removeFCMToken, updateNotificationPreferences } from '@/services/profiles';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useFCM } from '@/hooks/useFCM';
+import { signOut } from '@/services/auth';
+import { removeFCMToken, updateNotificationPreferences, updateProfile } from '@/services/profiles';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
-import { router } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
+import { router } from 'expo-router';
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -133,7 +132,6 @@ export default function ProfileScreen() {
                 {profile.bio}
               </ThemedText>
             ) : null}
-            {profile && <StreakDisplay profile={profile} compact />}
           </View>
         ) : (
           <ProfileForm

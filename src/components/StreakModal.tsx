@@ -1,4 +1,4 @@
-import { Flame, Share2, Sparkles, Trophy, X } from 'lucide-react-native';
+import { Flame, Sparkles, Trophy, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
@@ -187,20 +187,18 @@ export function StreakModal({
             </ThemedText>
           </View>
 
-          {/* Share Button (temporarily disabled) */}
-          {/* <Pressable
-            onPress={handleShare}
+          {/* Bottom Action Button */}
+          <Pressable
+            onPress={onClose}
             style={({ pressed }) => [
               styles.blackButton,
               pressed && styles.blackButtonPressed,
             ]}
             accessibilityRole="button"
-            accessibilityLabel="Share streak"
-            hitSlop={8}
+            accessibilityLabel="Close streak modal"
           >
-            <Share2 size={16} color="#FFFFFF" strokeWidth={2.2} />
-            <Text style={styles.blackButtonText}>Share</Text>
-          </Pressable> */}
+            <Text style={styles.blackButtonText}>Close</Text>
+          </Pressable>
         </View>
       </View>
     </Modal>
@@ -235,8 +233,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   headerTitle: {
+    flex: 1,
     fontWeight: '700',
     fontSize: 18,
+    lineHeight: 24,
     letterSpacing: -0.3,
   },
   closeIconButton: {
