@@ -1,14 +1,15 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
+import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
 import { useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { UserAvatar } from '@/components/UserAvatar';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useStreak } from '@/hooks/useStreak';
 import {
   getChatUnreadCount,
   subscribeChatUnreadCount,
@@ -77,19 +78,37 @@ function CommunitiesHeaderProfile() {
   );
 }
 
-function CommunitiesHeaderAdd() {
+function CommunitiesHeaderStreak() {
   const theme = useTheme();
+  const { streakCount } = useStreak();
+  const hasStreak = streakCount > 0;
+  const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
 
   return (
-    <Pressable
-      onPress={() => router.navigate('/create-community')}
-      style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
-      hitSlop={16}
-      accessibilityLabel="Create community"
-      accessibilityRole="button"
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        marginLeft: Spacing.md,
+        paddingTop: Platform.OS === 'ios' ? 4 : 0,
+        gap: 6,
+        backgroundColor: theme.backgroundElement,
+        paddingHorizontal: 10,
+        paddingVertical: 5,
+        borderRadius: Radius.full,
+      }}
+      accessibilityLabel={`${streakCount} day streak`}
     >
-      <Plus size={24} color={theme.text} strokeWidth={3} />
-    </Pressable>
+      <Flame
+        size={22}
+        color={streakColor}
+        fill={streakColor}
+        strokeWidth={0}
+      />
+      <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
+        {streakCount}
+      </Text>
+    </View>
   );
 }
 
@@ -141,7 +160,7 @@ export default function TabLayout() {
           title: 'Communities',
           tabBarLabel: 'Communities',
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
-          headerLeft: () => <CommunitiesHeaderAdd />,
+          headerLeft: () => <CommunitiesHeaderStreak />,
           headerRight: () => <CommunitiesHeaderProfile />,
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
         }}

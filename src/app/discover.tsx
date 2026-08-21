@@ -1,5 +1,7 @@
+import { router, Stack } from 'expo-router';
+import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
@@ -48,6 +50,44 @@ export default function DiscoverScreen() {
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
+      <Stack.Screen
+        options={{
+          title: 'Discover',
+          headerStyle: { backgroundColor: theme.background },
+          headerShadowVisible: false,
+          headerTintColor: theme.text,
+          headerRight: () => (
+            <Pressable
+              onPress={() => router.push('/create-community')}
+              style={{
+                marginRight: Spacing.md,
+                paddingTop: Platform.OS === 'ios' ? 2 : 0,
+              }}
+              hitSlop={12}
+              accessibilityLabel="Create community"
+              accessibilityRole="button"
+            >
+              <View
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: '#2563EB',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  shadowColor: '#2563EB',
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.4,
+                  shadowRadius: 4,
+                  elevation: 4,
+                }}
+              >
+                <Plus size={20} color="#FFFFFF" strokeWidth={3} />
+              </View>
+            </Pressable>
+          ),
+        }}
+      />
       <View style={[styles.searchContainer, { borderBottomColor: theme.border }]}>
         <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           <TextInput
