@@ -1,9 +1,10 @@
 import { router, Tabs } from 'expo-router';
 import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
 import { Platform, Pressable, Text, View } from 'react-native';
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StreakModal } from '@/components/StreakModal';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -80,35 +81,50 @@ function CommunitiesHeaderProfile() {
 
 function CommunitiesHeaderStreak() {
   const theme = useTheme();
-  const { streakCount } = useStreak();
+  const { streakCount, longestStreak, lastActivityDate } = useStreak();
+  const [modalVisible, setModalVisible] = useState(false);
   const hasStreak = streakCount > 0;
   const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
 
   return (
-    <View
-      style={{
-        flexDirection: 'row',
-        alignItems: 'center',
-        marginLeft: Spacing.md,
-        paddingTop: Platform.OS === 'ios' ? 4 : 0,
-        gap: 6,
-        backgroundColor: theme.backgroundElement,
-        paddingHorizontal: 10,
-        paddingVertical: 5,
-        borderRadius: Radius.full,
-      }}
-      accessibilityLabel={`${streakCount} day streak`}
-    >
-      <Flame
-        size={22}
-        color={streakColor}
-        fill={streakColor}
-        strokeWidth={0}
+    <>
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginLeft: Spacing.md,
+          paddingTop: Platform.OS === 'ios' ? 4 : 0,
+          gap: 6,
+          backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: Radius.full,
+          transform: pressed ? [{ scale: 0.96 }] : [],
+        })}
+        hitSlop={12}
+        accessibilityLabel={`${streakCount} day streak`}
+        accessibilityRole="button"
+      >
+        <Flame
+          size={22}
+          color={streakColor}
+          fill={streakColor}
+          strokeWidth={0}
+        />
+        <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
+          {streakCount}
+        </Text>
+      </Pressable>
+
+      <StreakModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        streakCount={streakCount}
+        longestStreak={longestStreak}
+        lastActivityDate={lastActivityDate}
       />
-      <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
-        {streakCount}
-      </Text>
-    </View>
+    </>
   );
 }
 
