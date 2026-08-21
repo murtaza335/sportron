@@ -419,24 +419,38 @@ export function MatchDetailPopup({
                 </ThemedText>
               ) : (
                 <View style={styles.commentsContainer}>
-                  {comments.map((comment) => (
-                    <View key={comment.id} style={styles.commentRow}>
-                      <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
-                      <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
-                        <View style={styles.commentMeta}>
-                          <ThemedText variant="caption" style={styles.commentAuthor}>
-                            {comment.profile?.username ?? 'Player'}
-                          </ThemedText>
-                          <ThemedText variant="caption" muted style={styles.commentTime}>
-                            {new Date(comment.created_at).toLocaleDateString()}
-                          </ThemedText>
-                        </View>
-                        <ThemedText variant="body" style={styles.commentContent}>
-                          {comment.content}
-                        </ThemedText>
-                      </View>
-                    </View>
-                  ))}
+                   {comments.map((comment) => (
+                     <View key={comment.id} style={styles.commentRow}>
+                       <Pressable
+                         disabled={!comment.profile?.id}
+                         onPress={() => {
+                           if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
+                         }}
+                       >
+                         <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
+                       </Pressable>
+                       <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
+                         <View style={styles.commentMeta}>
+                           <Pressable
+                             disabled={!comment.profile?.id}
+                             onPress={() => {
+                               if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
+                             }}
+                           >
+                             <ThemedText variant="caption" style={styles.commentAuthor}>
+                               {comment.profile?.username ?? 'Player'}
+                             </ThemedText>
+                           </Pressable>
+                           <ThemedText variant="caption" muted style={styles.commentTime}>
+                             {new Date(comment.created_at).toLocaleDateString()}
+                           </ThemedText>
+                         </View>
+                         <ThemedText variant="body" style={styles.commentContent}>
+                           {comment.content}
+                         </ThemedText>
+                       </View>
+                     </View>
+                   ))}
                 </View>
               )}
             </ScrollView>
