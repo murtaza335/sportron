@@ -100,7 +100,7 @@ export default function CommunityDetailScreen() {
   const [loadingMore, setLoadingMore] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [popupVisible, setPopupVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'approved' | 'pending'>('approved');
+  const [activeTab, setActiveTab] = useState<'feed' | 'pending'>('feed');
 
   const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
@@ -136,7 +136,7 @@ export default function CommunityDetailScreen() {
     await loadMatches(matchesPage + 1, true);
   };
 
-  const approvedMatches = matches.filter((m) => m.approval_status === 'approved');
+  const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
 
   const pendingMatches = matches.filter(
     (m) =>
@@ -144,7 +144,7 @@ export default function CommunityDetailScreen() {
       (m.opponent_id === user?.id || m.recorded_by === user?.id),
   );
 
-  const displayMatches = activeTab === 'pending' ? pendingMatches : approvedMatches;
+  const displayMatches = activeTab === 'pending' ? pendingMatches : feedMatches;
 
   const toMatchWithProfiles = useCallback(
     (cm: CommunityMatch): MatchWithProfiles => {
@@ -549,19 +549,19 @@ export default function CommunityDetailScreen() {
               <Pressable
                 style={[
                   styles.tab,
-                  activeTab === 'approved' && { borderBottomColor: theme.text },
+                  activeTab === 'feed' && { borderBottomColor: theme.text },
                 ]}
-                onPress={() => setActiveTab('approved')}
+                onPress={() => setActiveTab('feed')}
               >
                 <ThemedText
                   variant="label"
                   style={[
                     styles.tabText,
-                    activeTab === 'approved' && { color: theme.text },
-                    activeTab !== 'approved' && { color: theme.textSecondary },
+                    activeTab === 'feed' && { color: theme.text },
+                    activeTab !== 'feed' && { color: theme.textSecondary },
                   ]}
                 >
-                  Approved ({approvedMatches.length})
+                  Feed ({feedMatches.length})
                 </ThemedText>
               </Pressable>
               <Pressable
@@ -601,7 +601,7 @@ export default function CommunityDetailScreen() {
                     showYoursBadge={false}
                   />
                 ))}
-                {activeTab === 'approved' && hasMoreMatches && (
+                {activeTab === 'feed' && hasMoreMatches && (
                   <Pressable
                     onPress={handleLoadMore}
                     style={[styles.loadMoreButton, { borderColor: theme.border }]}
