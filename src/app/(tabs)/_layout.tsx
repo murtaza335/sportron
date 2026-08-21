@@ -1,7 +1,7 @@
 import { router, Tabs } from 'expo-router';
 import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
-import { Platform, Pressable, Text, View } from 'react-native';
-import { useState, useSyncExternalStore } from 'react';
+import { Animated, Platform, Pressable, Text, View } from 'react-native';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StreakModal } from '@/components/StreakModal';
@@ -65,16 +65,39 @@ function SessionsHeaderRight() {
 
 function CommunitiesHeaderProfile() {
   const { profile } = useAuth();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 8,
+    }).start();
+  };
 
   return (
     <Pressable
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={() => router.navigate('/profile')}
       style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
       hitSlop={12}
       accessibilityLabel="Open profile"
       accessibilityRole="button"
     >
-      <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+      </Animated.View>
     </Pressable>
   );
 }
