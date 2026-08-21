@@ -9,6 +9,7 @@ import {
   notifySessionRejected,
   notifySessionLeft,
 } from './notifications';
+import { updateStreak } from './streak';
 
 type SessionRow = Session & {
   creator: { id: string; username: string; avatar_url: string | null } | null;
@@ -335,6 +336,14 @@ export async function createSession(
     .single();
 
   if (error) throw error;
+
+  // Update streak for the session creator
+  try {
+    await updateStreak(userId, 'session_created');
+  } catch (e) {
+    console.error('Failed to update streak for session creation:', e);
+  }
+
   return { ...data, commitment_count: 0 };
 }
 
@@ -458,6 +467,13 @@ export async function approveCommitment(
         .eq('id', commitment.session_id);
       if (statusError) console.error('Failed to mark session as full:', statusError);
     }
+  }
+
+  // Update streak for the user whose commitment was accepted (they're attending)
+  try {
+    await updateStreak(commitment.user_id, 'session_joined');
+  } catch (e) {
+    console.error('Failed to update streak for session join:', e);
   }
 
   await resolveSessionApplicationNotification(

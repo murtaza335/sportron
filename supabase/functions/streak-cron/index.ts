@@ -1,0 +1,181 @@
+// @ts-nocheck — Supabase Edge Function for streak notifications
+// Runs on a cron schedule (pg_cron) to send daily streak reminders
+// and at-risk alerts. Creates in_app_notification rows which trigger
+// the existing send-notification edge function via DB trigger.
+
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { assertServiceRole } from '../_shared/fcm.ts';
+
+const supabase = createClient(
+  Deno.env.get('SUPABASE_URL') ?? '',
+  Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') ?? '',
+);
+
+const STREAK_MOTIVATIONAL_LINES = [
+  "Your streak is waiting — one match keeps it alive! 🔥",
+  "Don't let the streak die. Play today! 💪",
+  "Champions show up daily. Your turn! 🏆",
+  "One game. That's all it takes to extend your streak. 🎯",
+  "Your future self will thank you for playing today. ✨",
+  "Streak on the line. Make it count! ⚡",
+  "Every legend started with a single day. Keep going! 🌟",
+];
+
+const STREAK_AT_RISK_LINES = [
+  "⚠️ Your {streak}-day streak ends at midnight! One match saves it.",
+  "🚨 {hours}h left to save your {streak}-day streak!",
+  "⏰ Streak emergency: {streak} days on the line. Play now!",
+];
+
+function getRandomLine(lines: string[]): string {
+  return lines[Math.floor(Math.random() * lines.length)];
+}
+
+function getTodayUTC(): string {
+  return new Date().toISOString().split('T')[0];
+}
+
+function getYesterdayUTC(): string {
+  const yesterday = new Date();
+  yesterday.setUTCDate(yesterday.getUTCDate() - 1);
+  return yesterday.toISOString().split('T')[0];
+}
+
+async function createNotification(
+  userId: string,
+  type: string,
+  title: string,
+  body: string,
+  data?: Record<string, unknown>
+): Promise<void> {
+  await supabase.rpc('insert_notification', {
+    p_user_id: userId,
+    p_type: type,
+    p_title: title,
+    p_body: body,
+    p_data: data ?? null,
+  });
+}
+
+async function sendDailyNudge() {
+  const today = getTodayUTC();
+  
+  // Get users with active streaks who haven't been active today
+  // and have streak_reminder preference enabled
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('id, username, streak_count, last_activity_date, fcm_tokens, notification_preferences')
+    .gt('streak_count', 0)
+    .neq('last_activity_date', today)
+    .is('deleted_at', null);
+
+  if (error) {
+    console.error('[streak-cron] Failed to fetch users for daily nudge:', error);
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const user of users ?? []) {
+    const prefs = user.notification_preferences as Record<string, boolean> | null;
+    if (!prefs?.streak_reminder) continue;
+
+    try {
+      await createNotification(
+        user.id,
+        'streak_reminder',
+        'Keep Your Streak Alive! 🔥',
+        getRandomLine(STREAK_MOTIVATIONAL_LINES),
+        { streakCount: user.streak_count }
+      );
+      sent++;
+    } catch (e) {
+      console.error(`[streak-cron] Failed to send daily nudge to ${user.id}:`, e);
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+
+async function sendAtRiskAlerts() {
+  const yesterday = getYesterdayUTC();
+  
+  // Get users at risk (last activity before yesterday, streak > 0)
+  // who have streak_at_risk preference enabled
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('id, username, streak_count, last_activity_date, fcm_tokens, notification_preferences')
+    .gt('streak_count', 0)
+    .lt('last_activity_date', yesterday)
+    .is('deleted_at', null);
+
+  if (error) {
+    console.error('[streak-cron] Failed to fetch at-risk users:', error);
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const user of users ?? []) {
+    const prefs = user.notification_preferences as Record<string, boolean> | null;
+    if (!prefs?.streak_at_risk) continue;
+
+    // Calculate hours since last activity
+    const lastActive = new Date(`${user.last_activity_date}T00:00:00Z`);
+    const now = new Date();
+    const diffMs = now.getTime() - lastActive.getTime();
+    const hoursLeft = Math.max(0, 24 - Math.floor(diffMs / (1000 * 60 * 60)));
+
+    try {
+      const line = getRandomLine(STREAK_AT_RISK_LINES)
+        .replace('{streak}', user.streak_count.toString())
+        .replace('{hours}', hoursLeft.toString());
+      
+      await createNotification(
+        user.id,
+        'streak_at_risk',
+        'Streak at Risk! ⚠️',
+        line,
+        { streakCount: user.streak_count, hoursLeft }
+      );
+      sent++;
+    } catch (e) {
+      console.error(`[streak-cron] Failed to send at-risk alert to ${user.id}:`, e);
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+
+Deno.serve(async (req: Request) => {
+  if (req.method !== 'POST') {
+    return new Response('Method not allowed', { status: 405 });
+  }
+
+  try {
+    await assertServiceRole(req);
+  } catch (err) {
+    return new Response(err instanceof Error ? err.message : String(err), { status: 401 });
+  }
+
+  const body = await req.json().catch(() => ({}));
+  const { mode } = body as { mode?: 'daily' | 'at-risk' | 'both' };
+
+  const results: Record<string, { sent: number; failed: number }> = {};
+
+  if (mode === 'daily' || mode === 'both' || !mode) {
+    results.daily_nudge = await sendDailyNudge();
+  }
+
+  if (mode === 'at-risk' || mode === 'both' || !mode) {
+    results.at_risk = await sendAtRiskAlerts();
+  }
+
+  return new Response(JSON.stringify(results), {
+    headers: { 'Content-Type': 'application/json' },
+  });
+});

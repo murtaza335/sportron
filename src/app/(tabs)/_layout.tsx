@@ -1,14 +1,16 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
-import { Platform, Pressable, Text, View } from 'react-native';
-import { useSyncExternalStore } from 'react';
+import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
+import { Animated, Platform, Pressable, Text, View } from 'react-native';
+import { useRef, useState, useSyncExternalStore } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { StreakModal } from '@/components/StreakModal';
 import { UserAvatar } from '@/components/UserAvatar';
-import { Spacing } from '@/constants/theme';
+import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
+import { useStreak } from '@/hooks/useStreak';
 import {
   getChatUnreadCount,
   subscribeChatUnreadCount,
@@ -63,33 +65,89 @@ function SessionsHeaderRight() {
 
 function CommunitiesHeaderProfile() {
   const { profile } = useAuth();
+  const scaleAnim = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 0.9,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 8,
+    }).start();
+  };
 
   return (
     <Pressable
+      onPressIn={handlePressIn}
+      onPressOut={handlePressOut}
       onPress={() => router.navigate('/profile')}
       style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
       hitSlop={12}
       accessibilityLabel="Open profile"
       accessibilityRole="button"
     >
-      <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+        <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+      </Animated.View>
     </Pressable>
   );
 }
 
-function CommunitiesHeaderAdd() {
+function CommunitiesHeaderStreak() {
   const theme = useTheme();
+  const { streakCount, longestStreak, lastActivityDate } = useStreak();
+  const [modalVisible, setModalVisible] = useState(false);
+  const hasStreak = streakCount > 0;
+  const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
 
   return (
-    <Pressable
-      onPress={() => router.navigate('/create-community')}
-      style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
-      hitSlop={16}
-      accessibilityLabel="Create community"
-      accessibilityRole="button"
-    >
-      <Plus size={24} color={theme.text} strokeWidth={3} />
-    </Pressable>
+    <>
+      <Pressable
+        onPress={() => setModalVisible(true)}
+        style={({ pressed }) => ({
+          flexDirection: 'row',
+          alignItems: 'center',
+          marginLeft: Spacing.md,
+          paddingTop: Platform.OS === 'ios' ? 4 : 0,
+          gap: 6,
+          backgroundColor: pressed ? theme.backgroundSelected : theme.backgroundElement,
+          paddingHorizontal: 10,
+          paddingVertical: 5,
+          borderRadius: Radius.full,
+          transform: pressed ? [{ scale: 0.96 }] : [],
+        })}
+        hitSlop={12}
+        accessibilityLabel={`${streakCount} day streak`}
+        accessibilityRole="button"
+      >
+        <Flame
+          size={22}
+          color={streakColor}
+          fill={streakColor}
+          strokeWidth={0}
+        />
+        <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
+          {streakCount}
+        </Text>
+      </Pressable>
+
+      <StreakModal
+        visible={modalVisible}
+        onClose={() => setModalVisible(false)}
+        streakCount={streakCount}
+        longestStreak={longestStreak}
+        lastActivityDate={lastActivityDate}
+      />
+    </>
   );
 }
 
@@ -141,7 +199,7 @@ export default function TabLayout() {
           title: 'Communities',
           tabBarLabel: 'Communities',
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
-          headerLeft: () => <CommunitiesHeaderAdd />,
+          headerLeft: () => <CommunitiesHeaderStreak />,
           headerRight: () => <CommunitiesHeaderProfile />,
           tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
         }}
