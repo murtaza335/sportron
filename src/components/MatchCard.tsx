@@ -1,11 +1,13 @@
-import { Globe, Heart, Lock, MessageSquare } from 'lucide-react-native';
-import { useState, useMemo } from 'react';
+import { Heart, MessageSquare } from 'lucide-react-native';
+import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
+import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { formatRelativeTime } from '@/lib/date';
 import { toggleCommunityMatchLike } from '@/services/communities';
 import type { MatchWithProfiles, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
@@ -46,15 +48,6 @@ function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
   return [p1, p2].filter(Boolean).join(' + ');
 }
 
-function formatDate(dateString: string) {
-  const date = new Date(dateString);
-  return date.toLocaleDateString(undefined, {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
 export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress }: MatchCardProps) {
   const theme = useTheme();
   const playerName = getTeamAName(match, currentUserId);
@@ -82,16 +75,25 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
     (currentUserId === match.opponent_id || currentUserId === match.opponent_partner_id),
   [currentUserId, match.opponent_id, match.opponent_partner_id]);
 
+  const playerWon = match.player_score > match.opponent_score;
+  const opponentWon = match.opponent_score > match.player_score;
+
   const resultLabel = useMemo((): 'Win' | 'Loss' | 'Draw' | null => {
     if (!isParticipant) return null;
     if (match.player_score === match.opponent_score) return 'Draw';
-    if (isPlayerTeam) return match.player_score > match.opponent_score ? 'Win' : 'Loss';
-    if (isOpponentTeam) return match.opponent_score > match.player_score ? 'Win' : 'Loss';
+    if (isPlayerTeam) return playerWon ? 'Win' : 'Loss';
+    if (isOpponentTeam) return opponentWon ? 'Win' : 'Loss';
     return null;
-  }, [isParticipant, isPlayerTeam, isOpponentTeam, match.player_score, match.opponent_score]);
+  }, [isParticipant, isPlayerTeam, isOpponentTeam, playerWon, opponentWon, match.player_score, match.opponent_score]);
 
   const isMine = currentUserId === match.created_by;
   const formatLabel = match.match_format === 'doubles' ? 'Doubles' : 'Singles';
+  const sportLabel = SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport;
+
+  // Header user info
+  const recorderProfile = match.recorder ?? match.player;
+  const recorderName = recorderProfile?.username ?? playerName;
+  const recorderAvatar = recorderProfile?.avatar_url;
 
   const handleLike = async () => {
     if (!currentUserId) return;
@@ -103,11 +105,33 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
       await toggleCommunityMatchLike(match.id, currentUserId, nextLiked);
     } catch (error) {
       console.error('Failed to toggle like:', error);
-      // Revert state
       setLiked(!nextLiked);
       setLikesCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
     }
   };
+
+  const statusStyle = useMemo(() => {
+    switch (match.verification_status) {
+      case 'disputed':
+        return {
+          bg: '#DC26261F',
+          color: '#EF4444',
+          label: 'Disputed',
+        };
+      case 'pending':
+        return {
+          bg: '#D977061F',
+          color: '#D97706',
+          label: 'Pending',
+        };
+      default:
+        return {
+          bg: '#10B9811F',
+          color: '#10B981',
+          label: 'Verified',
+        };
+    }
+  }, [match.verification_status]);
 
   return (
     <Pressable
@@ -118,72 +142,50 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
         pressed && styles.pressed,
       ]}
     >
-      <Card style={styles.card}>
+      <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+        {/* Post Header */}
         <View style={styles.header}>
-          <View style={styles.headerLeft}>
-            <ThemedText variant="caption" muted style={styles.dateText}>
-              {formatDate(match.created_at)}
-            </ThemedText>
-            {match.is_public ? (
-              <Globe size={12} color={theme.textSecondary} />
-            ) : (
-              <Lock size={12} color={theme.textSecondary} />
-            )}
+          <View style={styles.authorRow}>
+            <UserAvatar avatarUrl={recorderAvatar} size={36} />
+            <View style={styles.authorTextCol}>
+              <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
+                {recorderName}
+              </ThemedText>
+              <ThemedText variant="caption" muted style={styles.timeAgo}>
+                {formatRelativeTime(match.created_at)}
+              </ThemedText>
+            </View>
           </View>
 
           <View style={styles.badges}>
-            <ThemedText
-              variant="caption"
-              style={[
-                styles.badge,
-                { backgroundColor: theme.backgroundElement, color: theme.textSecondary }
-              ]}
-            >
-              {SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport}
-            </ThemedText>
-            <ThemedText
-              variant="caption"
-              style={[
-                styles.badge,
-                { backgroundColor: theme.backgroundElement, color: theme.textSecondary }
-              ]}
-            >
-              {formatLabel}
-            </ThemedText>
-            <ThemedText
-              variant="caption"
-              style={[
-                styles.badge,
-                { borderWidth: 1, textTransform: 'capitalize' },
-                match.verification_status === 'verified' && { borderColor: theme.border, color: theme.textSecondary },
-                match.verification_status === 'pending' && { borderColor: theme.border, color: '#D97706' },
-                match.verification_status === 'disputed' && { borderColor: theme.border, color: '#DC2626' },
-              ]}
-            >
-              {match.verification_status}
-            </ThemedText>
-            {isMine && showYoursBadge ? (
-              <ThemedText
-                variant="caption"
-                style={[
-                  styles.badge,
-                  { backgroundColor: theme.text, color: theme.background }
-                ]}
-              >
-                Yours
+            
+
+            <View style={[styles.badgePill, { backgroundColor: statusStyle.bg }]}>
+              <ThemedText variant="caption" style={[styles.badgeText, { color: statusStyle.color, fontWeight: '700' }]}>
+                {statusStyle.label}
               </ThemedText>
+            </View>
+
+            {isMine && showYoursBadge ? (
+              <View style={[styles.badgePill, { backgroundColor: theme.text }]}>
+                <ThemedText variant="caption" style={[styles.badgeText, { color: theme.background, fontWeight: '700' }]}>
+                  Yours
+                </ThemedText>
+              </View>
             ) : null}
           </View>
         </View>
 
-        <View style={styles.bodyRow}>
+        {/* Matchup Score Box */}
+        <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
           <View style={styles.teamLeft}>
             <ThemedText
               variant="body"
               numberOfLines={2}
               style={[
                 styles.teamName,
-                isPlayerTeam && styles.teamNameActive
+                playerWon && styles.winningTeamName,
+                isPlayerTeam && !playerWon && styles.userTeamName,
               ]}
             >
               {playerName}
@@ -196,17 +198,17 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
             </ThemedText>
 
             {resultLabel === 'Win' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#10B98115' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
                 <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
               </View>
             )}
             {resultLabel === 'Loss' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#EF444415' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
                 <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
               </View>
             )}
             {resultLabel === 'Draw' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#6B728015' }]}>
+              <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
                 <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
               </View>
             )}
@@ -218,8 +220,9 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
               numberOfLines={2}
               style={[
                 styles.teamName,
-                isOpponentTeam && styles.teamNameActive,
-                { textAlign: 'right' }
+                opponentWon && styles.winningTeamName,
+                isOpponentTeam && !opponentWon && styles.userTeamName,
+                { textAlign: 'right' },
               ]}
             >
               {opponentName}
@@ -232,15 +235,15 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
           </View>
         </View>
 
-        {/* Social Row */}
-        <View style={[styles.socialRow, { borderTopColor: theme.border }]}>
+        {/* Social Row Footer */}
+        <View style={styles.socialRow}>
           <Pressable
             onPress={handleLike}
-            hitSlop={12}
+            hitSlop={8}
             style={styles.socialAction}
           >
             <Heart
-              size={13}
+              size={16}
               color={liked ? '#EF4444' : theme.textSecondary}
               fill={liked ? '#EF4444' : 'none'}
             />
@@ -250,7 +253,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
           </Pressable>
 
           <View style={styles.socialAction}>
-            <MessageSquare size={13} color={theme.textSecondary} />
+            <MessageSquare size={16} color={theme.textSecondary} />
             <ThemedText variant="caption" muted style={styles.socialText}>
               {match.comments_count || 0} {match.comments_count === 1 ? 'comment' : 'comments'}
             </ThemedText>
@@ -264,49 +267,61 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 const styles = StyleSheet.create({
   pressable: {
     width: '100%',
+    marginBottom: Spacing.sm,
   },
   pressed: {
-    opacity: 0.85,
-    transform: [{ scale: 0.985 }],
+    opacity: 0.92,
+    transform: [{ scale: 0.99 }],
   },
   card: {
-    paddingVertical: Spacing.sm + 2,
-    paddingHorizontal: Spacing.md,
-    gap: Spacing.xs,
+    padding: Spacing.md,
+    borderRadius: Radius.lg,
+    gap: Spacing.sm,
   },
   header: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 2,
   },
-  headerLeft: {
+  authorRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: Spacing.sm,
+    flex: 1,
   },
-  dateText: {
-    fontSize: 12,
-    fontWeight: '500',
+  authorTextCol: {
+    justifyContent: 'center',
+  },
+  authorName: {
+    fontSize: 13.5,
+    fontWeight: '600',
+    lineHeight: 18,
+  },
+  timeAgo: {
+    fontSize: 11,
+    fontWeight: '400',
   },
   badges: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
   },
-  badge: {
-    fontSize: 9,
-    fontWeight: '800',
-    paddingHorizontal: Spacing.xs + 2,
-    paddingVertical: 1,
-    borderRadius: Radius.sm,
-    textTransform: 'uppercase',
+  badgePill: {
+    paddingHorizontal: Spacing.xs + 3,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
   },
-  bodyRow: {
+  badgeText: {
+    fontSize: 10,
+    fontWeight: '600',
+  },
+  matchupContainer: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingVertical: Spacing.xs,
+    paddingVertical: Spacing.sm + 2,
+    paddingHorizontal: Spacing.md,
+    borderRadius: Radius.md,
     gap: Spacing.xs,
   },
   teamLeft: {
@@ -322,46 +337,46 @@ const styles = StyleSheet.create({
     lineHeight: 18,
     fontWeight: '500',
   },
-  teamNameActive: {
-    fontWeight: '700',
+  winningTeamName: {
+    fontWeight: '800',
+  },
+  userTeamName: {
+    fontWeight: '600',
   },
   scoreCenter: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    gap: 2,
-    minWidth: 74,
+    gap: 3,
+    minWidth: 70,
   },
   scoreText: {
-    fontSize: 18,
+    fontSize: 19,
     fontWeight: '900',
     letterSpacing: -0.5,
   },
   resultBadge: {
-    paddingHorizontal: Spacing.sm - 2,
-    paddingVertical: 1,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 1.5,
     borderRadius: Radius.full,
   },
   resultText: {
-    fontSize: 9,
+    fontSize: 9.5,
     fontWeight: '800',
     textTransform: 'uppercase',
   },
   socialRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.md,
-    marginTop: Spacing.xs,
-    paddingTop: Spacing.xs,
-    borderTopWidth: 1,
+    gap: Spacing.lg,
+    paddingTop: 2,
   },
   socialAction: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: Spacing.xs,
+    gap: 6,
   },
   socialText: {
-    fontSize: 11,
+    fontSize: 12,
     fontWeight: '600',
   },
 });

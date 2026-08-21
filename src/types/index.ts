@@ -146,6 +146,7 @@ export type MatchWithProfiles = Match & {
   playerPartner: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
   opponent: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
   opponentPartner: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  recorder?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
   likes_count: number;
   comments_count: number;
   is_liked_by_user: boolean;
