@@ -20,6 +20,7 @@ import {
   parseRemoteMessageForLocal,
   NotificationData,
 } from '@/services/fcm';
+import { requestPushPermissionAndGetToken, setupWebForegroundHandler, setupWebTokenRefreshListener } from '@/utils/pushNotifications';
 
 async function isNotificationsEnabled(): Promise<boolean> {
   const val = await AsyncStorage.getItem('notifications-enabled');
@@ -161,63 +162,89 @@ export function useFCM() {
     setIsLoading(true);
 
     try {
-      await setupBackgroundMessageHandler();
+      if (Platform.OS === 'web') {
+        // Web: set up foreground handler and token refresh listener
+        // Only if notifications are enabled and permission is granted
+        const pushEnabled = await isNotificationsEnabled();
+        if (pushEnabled && Notification.permission === 'granted') {
+          const unsubscribeForeground = await setupWebForegroundHandler(async (payload: unknown) => {
+            if (!(await isNotificationsEnabled())) return;
+            // Handle foreground notification on web
+            // The payload from Firebase web SDK has a different structure
+            console.log('Foreground notification (Web):', payload);
+          });
 
-      const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
-        if (!(await isNotificationsEnabled())) return;
-        const parsed = parseRemoteMessageForLocal(remoteMessage);
-        if (parsed) {
-          await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
-        }
-      });
+          const unsubscribeTokenRefresh = await setupWebTokenRefreshListener(async (token: string) => {
+            if (user?.id && (await isNotificationsEnabled())) {
+              await saveFCMTokenToProfile(user.id, token);
+            }
+          });
 
-      const unsubscribeTokenRefresh = setupTokenRefreshListener(async (token) => {
-        if (user?.id && (await isNotificationsEnabled())) {
-          await saveFCMTokenToProfile(user.id, token);
-        }
-      });
-
-      const cleanupListeners = setupNotificationListeners(
-        handleNotificationReceived,
-        handleNotificationResponse
-      );
-
-      const permission = await getNotificationPermissions();
-      setNotificationPermission(permission);
-
-      const pushEnabled = await isNotificationsEnabled();
-      if (pushEnabled) {
-        if (permission !== 'granted') {
-          const fcmToken = await registerForPushNotificationsAsync();
-          if (fcmToken && user?.id) {
-            await saveFCMTokenToProfile(user.id, fcmToken);
-          }
-          const newPermission = await getNotificationPermissions();
-          setNotificationPermission(newPermission);
-        } else {
-          const fcmToken = await messaging().getToken();
-          if (fcmToken && user?.id) {
-            await saveFCMTokenToProfile(user.id, fcmToken);
-          }
+          return () => {
+            unsubscribeForeground();
+            unsubscribeTokenRefresh();
+          };
         }
       } else {
-        // Notifications disabled: make sure this device's token is not
-        // registered so the backend cannot push to it (off survives restarts).
-        try {
-          const fcmToken = await messaging().getToken();
-          if (fcmToken && user?.id) {
-            await removeFCMToken(user.id, fcmToken);
-          }
-        } catch {
-          // ignore
-        }
-      }
+        // Native platforms
+        await setupBackgroundMessageHandler();
 
-      return () => {
-        unsubscribeForeground();
-        unsubscribeTokenRefresh();
-        cleanupListeners();
-      };
+        const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
+          if (!(await isNotificationsEnabled())) return;
+          const parsed = parseRemoteMessageForLocal(remoteMessage);
+          if (parsed) {
+            await scheduleLocalNotification(parsed.title, parsed.body, parsed.data);
+          }
+        });
+
+        const unsubscribeTokenRefresh = setupTokenRefreshListener(async (token) => {
+          if (user?.id && (await isNotificationsEnabled())) {
+            await saveFCMTokenToProfile(user.id, token);
+          }
+        });
+
+        const cleanupListeners = setupNotificationListeners(
+          handleNotificationReceived,
+          handleNotificationResponse
+        );
+
+        const permission = await getNotificationPermissions();
+        setNotificationPermission(permission);
+
+        const pushEnabled = await isNotificationsEnabled();
+        if (pushEnabled) {
+          if (permission !== 'granted') {
+            const fcmToken = await registerForPushNotificationsAsync();
+            if (fcmToken && user?.id) {
+              await saveFCMTokenToProfile(user.id, fcmToken);
+            }
+            const newPermission = await getNotificationPermissions();
+            setNotificationPermission(newPermission);
+          } else {
+            const fcmToken = await messaging().getToken();
+            if (fcmToken && user?.id) {
+              await saveFCMTokenToProfile(user.id, fcmToken);
+            }
+          }
+        } else {
+          // Notifications disabled: make sure this device's token is not
+          // registered so the backend cannot push to it (off survives restarts).
+          try {
+            const fcmToken = await messaging().getToken();
+            if (fcmToken && user?.id) {
+              await removeFCMToken(user.id, fcmToken);
+            }
+          } catch {
+            // ignore
+          }
+        }
+
+        return () => {
+          unsubscribeForeground();
+          unsubscribeTokenRefresh();
+          cleanupListeners();
+        };
+      }
     } catch (error) {
       console.error('FCM initialization error:', error);
     } finally {
@@ -227,16 +254,23 @@ export function useFCM() {
 
   const requestPermissions = useCallback(async () => {
     if (!user?.id) return;
-    if (Platform.OS === 'web') return;
 
     setIsLoading(true);
     try {
-      const fcmToken = await registerForPushNotificationsAsync();
-      if (fcmToken) {
-        await saveFCMTokenToProfile(user.id, fcmToken);
-        await refreshProfile();
-        const permission = await getNotificationPermissions();
-        setNotificationPermission(permission);
+      if (Platform.OS === 'web') {
+        const token = await requestPushPermissionAndGetToken();
+        if (token) {
+          await saveFCMTokenToProfile(user.id, token);
+          await refreshProfile();
+        }
+      } else {
+        const fcmToken = await registerForPushNotificationsAsync();
+        if (fcmToken) {
+          await saveFCMTokenToProfile(user.id, fcmToken);
+          await refreshProfile();
+          const permission = await getNotificationPermissions();
+          setNotificationPermission(permission);
+        }
       }
     } catch (error) {
       console.error('Permission request error:', error);

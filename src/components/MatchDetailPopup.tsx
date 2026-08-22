@@ -115,10 +115,12 @@ export function MatchDetailPopup({
 
   useEffect(() => {
     if (visible && match) {
-      setLiked(match.is_liked_by_user);
-      setLikesCount(match.likes_count);
-      setNewCommentText('');
-      setVerificationStatus(match.verification_status);
+      setTimeout(() => {
+        setLiked(match.is_liked_by_user);
+        setLikesCount(match.likes_count);
+        setNewCommentText('');
+        setVerificationStatus(match.verification_status);
+      }, 0);
 
       const loadComments = async () => {
         setLoadingComments(true);
@@ -133,8 +135,10 @@ export function MatchDetailPopup({
       };
       loadComments();
     } else {
-      setComments([]);
-      setNewCommentText('');
+      setTimeout(() => {
+        setComments([]);
+        setNewCommentText('');
+      }, 0);
     }
   }, [visible, match]);
 
@@ -218,7 +222,7 @@ export function MatchDetailPopup({
       else await disputeCommunityMatch(match.id, currentUserId);
       setVerificationStatus(status);
       onRefreshFeed?.();
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);

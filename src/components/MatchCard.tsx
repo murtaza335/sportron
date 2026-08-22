@@ -10,8 +10,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/date';
 import { toggleCommunityMatchLike } from '@/services/communities';
-import type { MatchWithProfiles, Sport } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import type { MatchWithProfiles } from '@/types';
 
 type MatchCardProps = {
   match: MatchWithProfiles;
@@ -89,8 +88,6 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
   }, [isParticipant, isPlayerTeam, isOpponentTeam, playerWon, opponentWon, match.player_score, match.opponent_score]);
 
   const isMine = currentUserId === match.created_by;
-  const formatLabel = match.match_format === 'doubles' ? 'Doubles' : 'Singles';
-  const sportLabel = SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport;
 
   // Header user info
   const recorderProfile = match.recorder ?? match.player;

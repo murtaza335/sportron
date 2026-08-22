@@ -19,41 +19,41 @@ export default function CommunitiesScreen() {
   const insets = useSafeAreaInsets();
   const { communities, loading, refreshing, refresh } = useMyCommunities(user?.id);
 
-  const rotateAnim = useRef(new Animated.Value(0)).current;
-  const colorAnim = useRef(new Animated.Value(0)).current;
-  const iconScaleAnim = useRef(new Animated.Value(1)).current;
+  const rotateAnim = useRef(new Animated.Value(0));
+  const colorAnim = useRef(new Animated.Value(0));
+  const iconScaleAnim = useRef(new Animated.Value(1));
 
   useFocusEffect(
     useCallback(() => {
-      rotateAnim.setValue(0);
-      colorAnim.setValue(0);
-      iconScaleAnim.setValue(1);
+      rotateAnim.current.setValue(0);
+      colorAnim.current.setValue(0);
+      iconScaleAnim.current.setValue(1);
 
       const timer = setTimeout(() => {
         Animated.parallel([
-          Animated.timing(rotateAnim, {
+          Animated.timing(rotateAnim.current, {
             toValue: 1,
             duration: 1000,
             easing: Easing.out(Easing.cubic),
             useNativeDriver: false,
           }),
           Animated.sequence([
-            Animated.timing(colorAnim, {
+            Animated.timing(colorAnim.current, {
               toValue: 1, // #3B82F6 Electric Blue
               duration: 250,
               useNativeDriver: false,
             }),
-            Animated.timing(colorAnim, {
+            Animated.timing(colorAnim.current, {
               toValue: 2, // #06B6D4 Neon Cyan
               duration: 250,
               useNativeDriver: false,
             }),
-            Animated.timing(colorAnim, {
+            Animated.timing(colorAnim.current, {
               toValue: 3, // #10B981 Bright Green
               duration: 250,
               useNativeDriver: false,
             }),
-            Animated.timing(colorAnim, {
+            Animated.timing(colorAnim.current, {
               toValue: 4, // Back to base theme.text
               duration: 250,
               useNativeDriver: false,
@@ -62,19 +62,19 @@ export default function CommunitiesScreen() {
         ]).start(() => {
           // Compress & release effect on Plus icon after 1 round cycle finishes
           Animated.sequence([
-            Animated.timing(iconScaleAnim, {
+            Animated.timing(iconScaleAnim.current, {
               toValue: 0.75, // Compress
               duration: 120,
               easing: Easing.inOut(Easing.quad),
               useNativeDriver: false,
             }),
-            Animated.timing(iconScaleAnim, {
+            Animated.timing(iconScaleAnim.current, {
               toValue: 1.15, // Release bounce
               duration: 150,
               easing: Easing.out(Easing.back(1.5)),
               useNativeDriver: false,
             }),
-            Animated.timing(iconScaleAnim, {
+            Animated.timing(iconScaleAnim.current, {
               toValue: 1.0, // Settle
               duration: 100,
               easing: Easing.out(Easing.quad),
@@ -85,23 +85,8 @@ export default function CommunitiesScreen() {
       }, 600);
 
       return () => clearTimeout(timer);
-    }, [rotateAnim, colorAnim, iconScaleAnim])
+    }, [])
   );
-
-  const spin = rotateAnim.interpolate({
-    inputRange: [0, 1],
-    outputRange: ['0deg', '360deg'],
-  });
-
-  const animatedBgColor = colorAnim.interpolate({
-    inputRange: [0, 1, 2, 3, 4],
-    outputRange: [theme.text, '#3B82F6', '#06B6D4', '#10B981', theme.text],
-  });
-
-  const animatedIconColor = colorAnim.interpolate({
-    inputRange: [0, 1, 2, 3, 4],
-    outputRange: [theme.background, '#FFFFFF', '#FFFFFF', '#FFFFFF', theme.background],
-  });
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -141,8 +126,20 @@ export default function CommunitiesScreen() {
         style={[
           styles.fab,
           {
-            backgroundColor: animatedBgColor,
-            transform: [{ rotate: spin }],
+            // eslint-disable-next-line react-hooks/refs
+            backgroundColor: colorAnim.current.interpolate({
+              inputRange: [0, 1, 2, 3, 4],
+              outputRange: [theme.text, '#3B82F6', '#06B6D4', '#10B981', theme.text],
+            }),
+            transform: [
+              {
+                // eslint-disable-next-line react-hooks/refs
+                rotate: rotateAnim.current.interpolate({
+                  inputRange: [0, 1],
+                  outputRange: ['0deg', '360deg'],
+                }),
+              },
+            ],
           },
         ]}
       >
@@ -153,8 +150,17 @@ export default function CommunitiesScreen() {
           accessibilityLabel="Discover communities"
           accessibilityRole="button"
         >
-          <Animated.View style={{ transform: [{ scale: iconScaleAnim }] }}>
-            <AnimatedPlus size={34} color={animatedIconColor} strokeWidth={3} />
+          {/* eslint-disable-next-line react-hooks/refs */}
+          <Animated.View style={{ transform: [{ scale: iconScaleAnim.current }] }}>
+            <AnimatedPlus
+              size={34}
+              // eslint-disable-next-line react-hooks/refs
+              color={colorAnim.current.interpolate({
+                inputRange: [0, 1, 2, 3, 4],
+                outputRange: [theme.background, '#FFFFFF', '#FFFFFF', '#FFFFFF', theme.background],
+              })}
+              strokeWidth={3}
+            />
           </Animated.View>
         </Pressable>
       </Animated.View>
