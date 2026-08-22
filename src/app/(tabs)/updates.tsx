@@ -30,6 +30,8 @@ export default function UpdatesScreen() {
   const pastActivity = notifications.filter(
     (n) => !ACTION_REQUIRED_TYPES.includes(n.type) && !INVITE_TYPES.includes(n.type)
   );
+  
+  const pastUnreadCount = pastActivity.filter((n) => !n.read).length;
 
   const handleActionComplete = useCallback(
     () => {
@@ -119,6 +121,9 @@ export default function UpdatesScreen() {
           >
             Past Activity
           </ThemedText>
+          {pastUnreadCount > 0 && (
+            <View style={[styles.badgeDot, { backgroundColor: '#3B82F6' }]} />
+          )}
         </Pressable>
       </View>
 
@@ -243,6 +248,11 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontWeight: '700',
     lineHeight: 14,
+  },
+  badgeDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
   },
   content: {
     flexGrow: 1,
