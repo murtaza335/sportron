@@ -5,9 +5,11 @@ import { useTheme } from '@/hooks/use-theme';
 export type ThemedTextProps = TextProps & {
   variant?: 'body' | 'caption' | 'label' | 'heading' | 'title' | 'hero';
   muted?: boolean;
+  ellipsizeMode?: 'head' | 'middle' | 'tail' | 'clip';
+  selectable?: boolean;
 };
 
-export function ThemedText({ style, variant = 'body', muted = false, ...rest }: ThemedTextProps) {
+export function ThemedText({ style, variant = 'body', muted = false, ellipsizeMode, selectable = false, ...rest }: ThemedTextProps) {
   const theme = useTheme();
 
   return (
@@ -22,6 +24,8 @@ export function ThemedText({ style, variant = 'body', muted = false, ...rest }: 
         variant === 'hero' && styles.hero,
         style,
       ]}
+      ellipsizeMode={ellipsizeMode}
+      selectable={selectable}
       {...rest}
     />
   );

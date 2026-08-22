@@ -3,9 +3,7 @@ import { useEffect, useMemo, useState } from 'react';
 import {
   Dimensions,
   Modal,
-  Platform,
   Pressable,
-  Share,
   StyleSheet,
   Text,
   View,
@@ -36,7 +34,7 @@ export function StreakModal({
 
   useEffect(() => {
     if (!visible) return;
-    setNowTs(Date.now());
+    setTimeout(() => setNowTs(Date.now()), 0);
     const interval = setInterval(() => {
       setNowTs(Date.now());
     }, 30000);
@@ -93,27 +91,6 @@ export function StreakModal({
     }
     return `${hours}h ${minutes}m`;
   }, [streakCount, lastActivityDate, nowTs]);
-
-  const handleShare = async () => {
-    try {
-      const shareMessage =
-        streakCount > 0
-          ? `🔥 I'm on a ${streakCount}-day streak on Sportron! 🏆\n\nDaily matches and sports sessions keep the streak alive. Join me on Sportron!`
-          : `🔥 Start your sports streak on Sportron! Play matches and join sessions daily.`;
-
-      await Share.share(
-        {
-          message: shareMessage,
-          title: `${streakCount}-Day Streak on Sportron`,
-        },
-        {
-          dialogTitle: 'Share your streak',
-        },
-      );
-    } catch (error) {
-      console.error('Error sharing streak:', error);
-    }
-  };
 
   if (!visible) return null;
 

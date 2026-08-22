@@ -1,5 +1,5 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -18,6 +18,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
 import {
   fetchCommunityMembers,
   fetchPendingInvites,
@@ -82,6 +83,32 @@ export default function CommunityMembersScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (!id || !userId) return;
+
+    const channel = supabase
+      .channel(`pending-invites-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_invites',
+          filter: `community_id=eq.${id}`,
+        },
+        () => {
+          if (isAdmin) {
+            load();
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, userId, isAdmin, load]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

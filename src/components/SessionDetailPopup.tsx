@@ -21,6 +21,7 @@ import { SessionChatPopup } from '@/components/SessionChatPopup';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useSessionChat } from '@/hooks/useSessionChat';
+import { supabase } from '@/lib/supabase';
 import {
   approveCommitment,
   checkTimeConflicts,
@@ -148,6 +149,44 @@ export function SessionDetailPopup({
       .then(setCommitments)
       .catch((e) => console.error('Failed to load commitments:', e));
   }, [reloadKey, isCreator, sessionId]);
+
+  // Realtime: listen for commitment changes (new applicants, status updates)
+  useEffect(() => {
+    if (!visible || !sessionId) return;
+
+    const channel = supabase
+      .channel(`session-commitments-${sessionId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'commitments',
+          filter: `session_id=eq.${sessionId}`,
+        },
+        () => {
+          if (sessionId) {
+            fetchSessionCommitments(sessionId)
+              .then(setCommitments)
+              .catch((e) => console.error('Failed to load commitments:', e));
+            // Also refresh session to update commitment_count and my_commitment
+            fetchSessionById(sessionId, currentUserId)
+              .then((data) => {
+                if (sessionId === data?.id) {
+                  setSession(data);
+                  setMyCommitmentStatus(data?.my_commitment?.status ?? null);
+                }
+              })
+              .catch((e) => console.error('Failed to reload session:', e));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, sessionId, currentUserId]);
 
   // Animate sheet
   useEffect(() => {

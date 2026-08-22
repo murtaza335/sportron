@@ -65,10 +65,10 @@ function SessionsHeaderRight() {
 
 function CommunitiesHeaderProfile() {
   const { profile } = useAuth();
-  const scaleAnim = useRef(new Animated.Value(1)).current;
+  const scaleAnim = useRef(new Animated.Value(1));
 
   const handlePressIn = () => {
-    Animated.spring(scaleAnim, {
+    Animated.spring(scaleAnim.current, {
       toValue: 0.9,
       useNativeDriver: true,
       speed: 50,
@@ -77,7 +77,7 @@ function CommunitiesHeaderProfile() {
   };
 
   const handlePressOut = () => {
-    Animated.spring(scaleAnim, {
+    Animated.spring(scaleAnim.current, {
       toValue: 1,
       useNativeDriver: true,
       speed: 20,
@@ -95,7 +95,8 @@ function CommunitiesHeaderProfile() {
       accessibilityLabel="Open profile"
       accessibilityRole="button"
     >
-      <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
+      {/* eslint-disable-next-line react-hooks/refs */}
+      <Animated.View style={{ transform: [{ scale: scaleAnim.current }] }}>
         <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
       </Animated.View>
     </Pressable>

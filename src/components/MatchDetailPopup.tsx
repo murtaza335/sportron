@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
 import {
   addCommunityMatchComment,
   approveCommunityMatch,
@@ -41,6 +42,7 @@ type MatchDetailPopupProps = {
   currentUserId?: string;
   onRefreshFeed?: () => void;
   recordedByName?: string;
+  communityId?: string;
 };
 
 function formatDate(dateString: string) {
@@ -67,6 +69,7 @@ export function MatchDetailPopup({
   currentUserId,
   onRefreshFeed,
   recordedByName,
+  communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -115,10 +118,12 @@ export function MatchDetailPopup({
 
   useEffect(() => {
     if (visible && match) {
-      setLiked(match.is_liked_by_user);
-      setLikesCount(match.likes_count);
-      setNewCommentText('');
-      setVerificationStatus(match.verification_status);
+      setTimeout(() => {
+        setLiked(match.is_liked_by_user);
+        setLikesCount(match.likes_count);
+        setNewCommentText('');
+        setVerificationStatus(match.verification_status);
+      }, 0);
 
       const loadComments = async () => {
         setLoadingComments(true);
@@ -133,9 +138,76 @@ export function MatchDetailPopup({
       };
       loadComments();
     } else {
-      setComments([]);
-      setNewCommentText('');
+      setTimeout(() => {
+        setComments([]);
+        setNewCommentText('');
+      }, 0);
     }
+  }, [visible, match]);
+
+  // Realtime: listen for likes changes on this match
+  useEffect(() => {
+    if (!visible || !match) return;
+
+    const channel = supabase
+      .channel(`match-likes-${match.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_match_likes',
+          filter: `community_match_id=eq.${match.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setLikesCount((prev) => prev + 1);
+            if (payload.new.profile_id === currentUserId) setLiked(true);
+          } else if (payload.eventType === 'DELETE') {
+            setLikesCount((prev) => Math.max(0, prev - 1));
+            if (payload.old.profile_id === currentUserId) setLiked(false);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, match, currentUserId]);
+
+  // Realtime: listen for comments changes on this match
+  useEffect(() => {
+    if (!visible || !match) return;
+
+    const channel = supabase
+      .channel(`match-comments-${match.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_match_comments',
+          filter: `community_match_id=eq.${match.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newComment = payload.new as CommunityMatchComment;
+            // Avoid duplicate if we just added it optimistically
+            setComments((prev) =>
+              prev.some((c) => c.id === newComment.id) ? prev : [...prev, newComment],
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id;
+            setComments((prev) => prev.filter((c) => c.id !== deletedId));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [visible, match]);
 
   useEffect(() => {
@@ -218,7 +290,7 @@ export function MatchDetailPopup({
       else await disputeCommunityMatch(match.id, currentUserId);
       setVerificationStatus(status);
       onRefreshFeed?.();
-    } catch (error) {
+    } catch (_error) {
       Alert.alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);
@@ -283,11 +355,11 @@ export function MatchDetailPopup({
               <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
                 <View style={styles.teamLeft}>
                   <View style={styles.avatarGroup}>
-                    <Pressable disabled={!match.player?.id} onPress={() => { if (match.player?.id) router.push(`/profile/${match.player.id}`); }}>
+                    <Pressable disabled={!match.player?.id} onPress={() => { if (match.player?.id) router.push(`/profile/${match.player.id}${communityId ? `?community=${communityId}` : ''}`); }}>
                       <UserAvatar avatarUrl={match.player?.avatar_url} size={32} />
                     </Pressable>
                     {match.playerPartner && (
-                      <Pressable disabled={!match.playerPartner.id} onPress={() => { if (match.playerPartner?.id) router.push(`/profile/${match.playerPartner.id}`); }} style={styles.avatarOverlap}>
+                      <Pressable disabled={!match.playerPartner.id} onPress={() => { if (match.playerPartner?.id) router.push(`/profile/${match.playerPartner.id}${communityId ? `?community=${communityId}` : ''}`); }} style={styles.avatarOverlap}>
                         <UserAvatar avatarUrl={match.playerPartner.avatar_url} size={32} />
                       </Pressable>
                     )}
@@ -318,11 +390,11 @@ export function MatchDetailPopup({
 
                 <View style={styles.teamRight}>
                   <View style={styles.avatarGroup}>
-                    <Pressable disabled={!match.opponent?.id} onPress={() => { if (match.opponent?.id) router.push(`/profile/${match.opponent.id}`); }}>
+                    <Pressable disabled={!match.opponent?.id} onPress={() => { if (match.opponent?.id) router.push(`/profile/${match.opponent.id}${communityId ? `?community=${communityId}` : ''}`); }}>
                       <UserAvatar avatarUrl={match.opponent?.avatar_url} size={32} />
                     </Pressable>
                     {match.opponentPartner && (
-                      <Pressable disabled={!match.opponentPartner.id} onPress={() => { if (match.opponentPartner?.id) router.push(`/profile/${match.opponentPartner.id}`); }} style={styles.avatarOverlap}>
+                      <Pressable disabled={!match.opponentPartner.id} onPress={() => { if (match.opponentPartner?.id) router.push(`/profile/${match.opponentPartner.id}${communityId ? `?community=${communityId}` : ''}`); }} style={styles.avatarOverlap}>
                         <UserAvatar avatarUrl={match.opponentPartner.avatar_url} size={32} />
                       </Pressable>
                     )}
@@ -374,7 +446,7 @@ export function MatchDetailPopup({
                   disabled={!match.recorder?.id && !match.player?.id}
                   onPress={() => {
                     const creatorId = match.recorder?.id ?? match.player?.id;
-                    if (creatorId) router.push(`/profile/${creatorId}`);
+                    if (creatorId) router.push(`/profile/${creatorId}${communityId ? `?community=${communityId}` : ''}`);
                   }}
                 >
                   <User size={15} color={theme.textSecondary} />
@@ -419,24 +491,24 @@ export function MatchDetailPopup({
                 </ThemedText>
               ) : (
                 <View style={styles.commentsContainer}>
-                   {comments.map((comment) => (
-                     <View key={comment.id} style={styles.commentRow}>
-                       <Pressable
-                         disabled={!comment.profile?.id}
-                         onPress={() => {
-                           if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
-                         }}
-                       >
-                         <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
-                       </Pressable>
-                       <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
-                         <View style={styles.commentMeta}>
-                           <Pressable
-                             disabled={!comment.profile?.id}
-                             onPress={() => {
-                               if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
-                             }}
-                           >
+{comments.map((comment) => (
+                      <View key={comment.id} style={styles.commentRow}>
+                        <Pressable
+                          disabled={!comment.profile?.id}
+                          onPress={() => {
+                            if (comment.profile?.id) router.push(`/profile/${comment.profile.id}${communityId ? `?community=${communityId}` : ''}`);
+                          }}
+                        >
+                          <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
+                        </Pressable>
+                        <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
+                          <View style={styles.commentMeta}>
+                            <Pressable
+                              disabled={!comment.profile?.id}
+                              onPress={() => {
+                                if (comment.profile?.id) router.push(`/profile/${comment.profile.id}${communityId ? `?community=${communityId}` : ''}`);
+                              }}
+                            >
                              <ThemedText variant="caption" style={styles.commentAuthor}>
                                {comment.profile?.username ?? 'Player'}
                              </ThemedText>

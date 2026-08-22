@@ -1,5 +1,5 @@
 import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +16,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
 import { fetchJoinRequests, respondToJoinRequest } from '@/services/communities';
 import type { CommunityJoinRequest } from '@/types';
 
@@ -43,6 +44,30 @@ export default function CommunityJoinRequestsScreen() {
       load();
     }, [load]),
   );
+
+  useEffect(() => {
+    if (!id) return;
+
+    const channel = supabase
+      .channel(`join-requests-${id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_join_requests',
+          filter: `community_id=eq.${id}`,
+        },
+        () => {
+          load();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [id, load]);
 
   const handleRefresh = async () => {
     setRefreshing(true);

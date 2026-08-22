@@ -26,8 +26,8 @@ import {
   Pressable,
   StyleSheet,
   TextInput,
-  useWindowDimensions,
   View,
+  Dimensions,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -47,6 +47,9 @@ const PRESENCE_HEARTBEAT_MS = 20_000;
 // Auto-pin to the bottom within this distance; start loading older messages
 // within this distance of the top.
 const BOTTOM_THRESHOLD = 60;
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
+const MAX_BUBBLE_WIDTH = Math.floor(SCREEN_WIDTH * 0.8);
 const TOP_LOAD_THRESHOLD = 80;
 
 // Long-press context menu (iPhone-style), anchored to the touch point.
@@ -134,7 +137,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   const [actionError, setActionError] = useState<string | null>(null);
   const [atBottom, setAtBottom] = useState(true);
   const listRef = useRef<FlatList<T>>(null);
-  const { width: windowWidth } = useWindowDimensions();
+  const windowWidth = Dimensions.get('window').width;
   const didInitialScrollRef = useRef(false);
   const markReadTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const lastMarkReadRef = useRef(0);
@@ -503,6 +506,8 @@ const contextLayout = useMemo(() => {
           variant="caption"
           numberOfLines={1}
           style={[styles.replyContent, { color: mine ? 'rgba(255,255,255,0.8)' : theme.textSecondary }]}
+          ellipsizeMode="tail"
+          selectable={true}
         >
           {preview.content}
         </ThemedText>
@@ -574,6 +579,8 @@ const contextLayout = useMemo(() => {
               <ThemedText
                 variant="body"
                 style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
+                ellipsizeMode="tail"
+                selectable={true}
               >
                 {item.content}
               </ThemedText>
@@ -1195,7 +1202,7 @@ const styles = StyleSheet.create({
     marginBottom: 0,
   },
   bubbleWrap: {
-    maxWidth: '78%',
+    maxWidth: MAX_BUBBLE_WIDTH,
     gap: 2,
   },
   bubbleWrapMine: {
@@ -1212,12 +1219,13 @@ const styles = StyleSheet.create({
   bubble: {
     borderRadius: Radius.lg,
     paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
+    paddingVertical: Spacing.md,
     borderWidth: 1,
   },
   bubbleText: {
     fontSize: 15,
-    lineHeight: 20,
+    lineHeight: 22,
+    paddingBottom: 2,
   },
   bubbleFooter: {
     flexDirection: 'row',
@@ -1238,6 +1246,7 @@ const styles = StyleSheet.create({
   },
   replyContent: {
     fontSize: 12,
+    lineHeight: 18,
   },
   msgStatus: {
     width: 12,

@@ -68,6 +68,7 @@ export default function CommunityDetailScreen() {
     joinRequests,
     myPendingInvite,
     myJoinRequest,
+    pendingMatches,
     loading,
     refresh,
     setMembership,
@@ -137,12 +138,6 @@ export default function CommunityDetailScreen() {
   };
 
   const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
-
-  const pendingMatches = matches.filter(
-    (m) =>
-      m.approval_status === 'pending' &&
-      (m.opponent_id === user?.id || m.recorded_by === user?.id),
-  );
 
   const displayMatches = activeTab === 'pending' ? pendingMatches : feedMatches;
 
@@ -599,6 +594,7 @@ export default function CommunityDetailScreen() {
                       setPopupVisible(true);
                     }}
                     showYoursBadge={false}
+                    communityId={id}
                   />
                 ))}
                 {activeTab === 'feed' && hasMoreMatches && (
@@ -687,6 +683,7 @@ export default function CommunityDetailScreen() {
         onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
+        communityId={id}
       />
 
       <CommunityChatPopup
