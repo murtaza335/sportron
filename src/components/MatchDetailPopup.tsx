@@ -22,6 +22,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { supabase } from '@/lib/supabase';
 import {
   addCommunityMatchComment,
   approveCommunityMatch,
@@ -140,6 +141,71 @@ export function MatchDetailPopup({
         setNewCommentText('');
       }, 0);
     }
+  }, [visible, match]);
+
+  // Realtime: listen for likes changes on this match
+  useEffect(() => {
+    if (!visible || !match) return;
+
+    const channel = supabase
+      .channel(`match-likes-${match.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_match_likes',
+          filter: `community_match_id=eq.${match.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setLikesCount((prev) => prev + 1);
+            if (payload.new.profile_id === currentUserId) setLiked(true);
+          } else if (payload.eventType === 'DELETE') {
+            setLikesCount((prev) => Math.max(0, prev - 1));
+            if (payload.old.profile_id === currentUserId) setLiked(false);
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [visible, match, currentUserId]);
+
+  // Realtime: listen for comments changes on this match
+  useEffect(() => {
+    if (!visible || !match) return;
+
+    const channel = supabase
+      .channel(`match-comments-${match.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_match_comments',
+          filter: `community_match_id=eq.${match.id}`,
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            const newComment = payload.new as CommunityMatchComment;
+            // Avoid duplicate if we just added it optimistically
+            setComments((prev) =>
+              prev.some((c) => c.id === newComment.id) ? prev : [...prev, newComment],
+            );
+          } else if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id: string }).id;
+            setComments((prev) => prev.filter((c) => c.id !== deletedId));
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
   }, [visible, match]);
 
   useEffect(() => {

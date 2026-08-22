@@ -1,6 +1,7 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
+import { supabase } from '@/lib/supabase';
 import {
   fetchOpenSessions,
   fetchMySessions,
@@ -45,6 +46,43 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
       load();
     }, [load]),
   );
+
+  // Realtime: listen for session changes (new sessions, status updates, commitment count changes)
+  useEffect(() => {
+    if (!userId) return;
+
+    const channel = supabase
+      .channel(`session-feed-${userId}-${scope}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'sessions',
+          filter: `created_by=eq.${userId}`,
+        },
+        () => {
+          load();
+        },
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'commitments',
+          filter: `user_id=eq.${userId}`,
+        },
+        () => {
+          load();
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [userId, scope, load]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);
