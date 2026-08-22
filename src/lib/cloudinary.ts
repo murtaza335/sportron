@@ -1,4 +1,5 @@
 import { Platform } from 'react-native';
+import * as ImageManipulator from 'expo-image-manipulator';
 
 const CLOUDINARY_CLOUD_NAME = process.env.EXPO_PUBLIC_CLOUDINARY_CLOUD_NAME;
 const CLOUDINARY_UPLOAD_PRESET = process.env.EXPO_PUBLIC_CLOUDINARY_UPLOAD_PRESET;
@@ -9,9 +10,36 @@ export interface UploadProgress {
   percentage: number;
 }
 
+interface CompressOptions {
+  maxWidth?: number;
+  maxHeight?: number;
+  quality?: number;
+  format?: ImageManipulator.SaveFormat;
+}
+
+const DEFAULT_COMPRESS_OPTIONS: CompressOptions = {
+  maxWidth: 1280,
+  maxHeight: 1280,
+  quality: 0.7,
+  format: ImageManipulator.SaveFormat.JPEG,
+};
+
+async function compressImage(uri: string, options: CompressOptions = DEFAULT_COMPRESS_OPTIONS): Promise<string> {
+  const { maxWidth, maxHeight, quality, format } = { ...DEFAULT_COMPRESS_OPTIONS, ...options };
+  
+  const result = await ImageManipulator.manipulateAsync(
+    uri,
+    [{ resize: { width: maxWidth, height: maxHeight } }],
+    { compress: quality, format, base64: false }
+  );
+  
+  return result.uri;
+}
+
 export async function uploadImageFromUri(
   uri: string,
-  onProgress?: (progress: UploadProgress) => void
+  onProgress?: (progress: UploadProgress) => void,
+  compressOptions?: CompressOptions
 ): Promise<string | null> {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     console.error('Cloudinary environment variables are missing.');
@@ -19,15 +47,18 @@ export async function uploadImageFromUri(
   }
 
   try {
+    // Compress image before upload
+    const compressedUri = await compressImage(uri, compressOptions);
+    
     const formData = new FormData();
 
     if (Platform.OS === 'web') {
-      const response = await fetch(uri);
+      const response = await fetch(compressedUri);
       const fileBlob = await response.blob();
       formData.append('file', fileBlob, `avatar_${Date.now()}.jpg`);
     } else {
       const fileObject = {
-        uri,
+        uri: compressedUri,
         name: `avatar_${Date.now()}.jpg`,
         type: 'image/jpeg',
       };
@@ -42,7 +73,6 @@ export async function uploadImageFromUri(
       
       xhr.upload.addEventListener('progress', (event) => {
         if (event.lengthComputable && onProgress) {
-          // Safeguard against event.total being 0, which results in NaN
           const total = event.total > 0 ? event.total : 1;
           const percentage = Math.max(0, Math.min(100, Math.round((event.loaded / total) * 100)));
           
