@@ -594,6 +594,7 @@ export default function CommunityDetailScreen() {
                       setPopupVisible(true);
                     }}
                     showYoursBadge={false}
+                    communityId={id}
                   />
                 ))}
                 {activeTab === 'feed' && hasMoreMatches && (
@@ -682,6 +683,7 @@ export default function CommunityDetailScreen() {
         onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
+        communityId={id}
       />
 
       <CommunityChatPopup

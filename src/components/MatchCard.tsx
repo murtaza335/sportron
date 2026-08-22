@@ -17,6 +17,7 @@ type MatchCardProps = {
   currentUserId?: string;
   showYoursBadge?: boolean;
   onPress?: () => void;
+  communityId?: string;
 };
 
 function getOpponentName(match: MatchWithProfiles, currentUserId?: string) {
@@ -48,7 +49,7 @@ function getTeamAName(match: MatchWithProfiles, currentUserId?: string) {
   return [p1, p2].filter(Boolean).join(' + ');
 }
 
-export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress }: MatchCardProps) {
+export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress, communityId }: MatchCardProps) {
   const theme = useTheme();
   const router = useRouter();
   const playerName = getTeamAName(match, currentUserId);
@@ -133,140 +134,197 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
   }, [match.verification_status]);
 
   return (
-    <Pressable
-      onPress={onPress}
-      disabled={!onPress}
-      style={({ pressed }) => [
-        styles.pressable,
-        pressed && styles.pressed,
-      ]}
-    >
-      <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
-        {/* Post Header */}
-        <View style={styles.header}>
-           <Pressable
-             style={styles.authorRow}
-             disabled={!recorderProfile?.id}
-             onPress={() => {
-               if (recorderProfile?.id) router.push(`/profile/${recorderProfile.id}`);
-             }}
-           >
-             <UserAvatar avatarUrl={recorderAvatar} size={36} />
-             <View style={styles.authorTextCol}>
-               <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
-                 {recorderName}
-               </ThemedText>
-               <ThemedText variant="caption" muted style={styles.timeAgo}>
-                 {formatRelativeTime(match.created_at)}
-               </ThemedText>
-             </View>
-           </Pressable>
-
-          <View style={styles.badges}>
-            
-
-            <View style={[styles.badgePill, { backgroundColor: statusStyle.bg }]}>
-              <ThemedText variant="caption" style={[styles.badgeText, { color: statusStyle.color, fontWeight: '700' }]}>
-                {statusStyle.label}
-              </ThemedText>
-            </View>
-
-            {isMine && showYoursBadge ? (
-              <View style={[styles.badgePill, { backgroundColor: theme.text }]}>
-                <ThemedText variant="caption" style={[styles.badgeText, { color: theme.background, fontWeight: '700' }]}>
-                  Yours
+    <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+      {/* Post Header */}
+      <View style={styles.header}>
+<Pressable
+              style={styles.authorRow}
+              disabled={!recorderProfile?.id}
+              onPress={() => {
+                if (recorderProfile?.id) router.push(`/profile/${recorderProfile.id}${communityId ? `?community=${communityId}` : ''}`);
+              }}
+            >
+              <UserAvatar avatarUrl={recorderAvatar} size={36} />
+              <View style={styles.authorTextCol}>
+                <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
+                  {recorderName}
+                </ThemedText>
+                <ThemedText variant="caption" muted style={styles.timeAgo}>
+                  {formatRelativeTime(match.created_at)}
                 </ThemedText>
               </View>
-            ) : null}
-          </View>
-        </View>
+            </Pressable>
 
-        {/* Matchup Score Box */}
-        <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
-          <View style={styles.teamLeft}>
-            <ThemedText
-              variant="body"
-              numberOfLines={2}
-              style={[
-                styles.teamName,
-                playerWon && styles.winningTeamName,
-                isPlayerTeam && !playerWon && styles.userTeamName,
-              ]}
-            >
-              {playerName}
-            </ThemedText>
-          </View>
+           <View style={styles.badges}>
+             
+             <View style={[styles.badgePill, { backgroundColor: statusStyle.bg }]}>
+               <ThemedText variant="caption" style={[styles.badgeText, { color: statusStyle.color, fontWeight: '700' }]}>
+                 {statusStyle.label}
+               </ThemedText>
+             </View>
 
-          <View style={styles.scoreCenter}>
-            <ThemedText style={styles.scoreText}>
-              {match.player_score} – {match.opponent_score}
-            </ThemedText>
+             {isMine && showYoursBadge ? (
+               <View style={[styles.badgePill, { backgroundColor: theme.text }]}>
+                 <ThemedText variant="caption" style={[styles.badgeText, { color: theme.background, fontWeight: '700' }]}>
+                   Yours
+                 </ThemedText>
+               </View>
+             ) : null}
+           </View>
+         </View>
 
-            {resultLabel === 'Win' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
-                <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
-              </View>
-            )}
-            {resultLabel === 'Loss' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
-                <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
-              </View>
-            )}
-            {resultLabel === 'Draw' && (
-              <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
-                <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
-              </View>
-            )}
-          </View>
+         {/* Matchup Score Box - clickable for match detail */}
+         {onPress ? (
+           <Pressable
+             onPress={onPress}
+             style={({ pressed }) => [
+               styles.matchupContainer,
+               { backgroundColor: theme.background },
+               pressed && styles.pressedContent,
+             ]}
+           >
+             <View style={styles.teamLeft}>
+               <ThemedText
+                 variant="body"
+                 numberOfLines={2}
+                 style={[
+                   styles.teamName,
+                   playerWon && styles.winningTeamName,
+                   isPlayerTeam && !playerWon && styles.userTeamName,
+                 ]}
+               >
+                 {playerName}
+               </ThemedText>
+             </View>
 
-          <View style={styles.teamRight}>
-            <ThemedText
-              variant="body"
-              numberOfLines={2}
-              style={[
-                styles.teamName,
-                opponentWon && styles.winningTeamName,
-                isOpponentTeam && !opponentWon && styles.userTeamName,
-                { textAlign: 'right' },
-              ]}
-            >
-              {opponentName}
-            </ThemedText>
-            {opponentCaptain && (
-              <ThemedText variant="caption" muted style={{ textAlign: 'right', fontSize: 11 }}>
-                {opponentCaptain}
-              </ThemedText>
-            )}
-          </View>
-        </View>
+             <View style={styles.scoreCenter}>
+               <ThemedText style={styles.scoreText}>
+                 {match.player_score} – {match.opponent_score}
+               </ThemedText>
 
-        {/* Social Row Footer */}
-        <View style={styles.socialRow}>
-          <Pressable
-            onPress={handleLike}
-            hitSlop={8}
-            style={styles.socialAction}
-          >
-            <Heart
-              size={16}
-              color={liked ? '#EF4444' : theme.textSecondary}
-              fill={liked ? '#EF4444' : 'none'}
-            />
-            <ThemedText variant="caption" style={[styles.socialText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
-              {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-            </ThemedText>
-          </Pressable>
+               {resultLabel === 'Win' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
+                 </View>
+               )}
+               {resultLabel === 'Loss' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
+                 </View>
+               )}
+               {resultLabel === 'Draw' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
+                 </View>
+               )}
+             </View>
 
-          <View style={styles.socialAction}>
-            <MessageSquare size={16} color={theme.textSecondary} />
-            <ThemedText variant="caption" muted style={styles.socialText}>
-              {match.comments_count || 0} {match.comments_count === 1 ? 'comment' : 'comments'}
-            </ThemedText>
-          </View>
-        </View>
-      </Card>
-    </Pressable>
-  );
+             <View style={styles.teamRight}>
+               <ThemedText
+                 variant="body"
+                 numberOfLines={2}
+                 style={[
+                   styles.teamName,
+                   opponentWon && styles.winningTeamName,
+                   isOpponentTeam && !opponentWon && styles.userTeamName,
+                   { textAlign: 'right' },
+                 ]}
+               >
+                 {opponentName}
+               </ThemedText>
+               {opponentCaptain && (
+                 <ThemedText variant="caption" muted style={{ textAlign: 'right', fontSize: 11 }}>
+                   {opponentCaptain}
+                 </ThemedText>
+               )}
+             </View>
+           </Pressable>
+         ) : (
+           <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
+             <View style={styles.teamLeft}>
+               <ThemedText
+                 variant="body"
+                 numberOfLines={2}
+                 style={[
+                   styles.teamName,
+                   playerWon && styles.winningTeamName,
+                   isPlayerTeam && !playerWon && styles.userTeamName,
+                 ]}
+               >
+                 {playerName}
+               </ThemedText>
+             </View>
+
+             <View style={styles.scoreCenter}>
+               <ThemedText style={styles.scoreText}>
+                 {match.player_score} – {match.opponent_score}
+               </ThemedText>
+
+               {resultLabel === 'Win' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
+                 </View>
+               )}
+               {resultLabel === 'Loss' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
+                 </View>
+               )}
+               {resultLabel === 'Draw' && (
+                 <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
+                   <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
+                 </View>
+               )}
+             </View>
+
+             <View style={styles.teamRight}>
+               <ThemedText
+                 variant="body"
+                 numberOfLines={2}
+                 style={[
+                   styles.teamName,
+                   opponentWon && styles.winningTeamName,
+                   isOpponentTeam && !opponentWon && styles.userTeamName,
+                   { textAlign: 'right' },
+                 ]}
+               >
+                 {opponentName}
+               </ThemedText>
+               {opponentCaptain && (
+                 <ThemedText variant="caption" muted style={{ textAlign: 'right', fontSize: 11 }}>
+                   {opponentCaptain}
+                 </ThemedText>
+               )}
+             </View>
+           </View>
+         )}
+
+         {/* Social Row Footer */}
+         <View style={styles.socialRow}>
+           <Pressable
+             onPress={handleLike}
+             hitSlop={8}
+             style={styles.socialAction}
+           >
+             <Heart
+               size={16}
+               color={liked ? '#EF4444' : theme.textSecondary}
+               fill={liked ? '#EF4444' : 'none'}
+             />
+             <ThemedText variant="caption" style={[styles.socialText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
+               {likesCount} {likesCount === 1 ? 'like' : 'likes'}
+             </ThemedText>
+           </Pressable>
+
+           <View style={styles.socialAction}>
+             <MessageSquare size={16} color={theme.textSecondary} />
+             <ThemedText variant="caption" muted style={styles.socialText}>
+               {match.comments_count || 0} {match.comments_count === 1 ? 'comment' : 'comments'}
+             </ThemedText>
+           </View>
+         </View>
+       </Card>
+    );
 }
 
 const styles = StyleSheet.create({
@@ -277,6 +335,9 @@ const styles = StyleSheet.create({
   pressed: {
     opacity: 0.92,
     transform: [{ scale: 0.99 }],
+  },
+  pressedContent: {
+    opacity: 0.92,
   },
   card: {
     padding: Spacing.md,

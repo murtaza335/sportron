@@ -42,6 +42,7 @@ type MatchDetailPopupProps = {
   currentUserId?: string;
   onRefreshFeed?: () => void;
   recordedByName?: string;
+  communityId?: string;
 };
 
 function formatDate(dateString: string) {
@@ -68,6 +69,7 @@ export function MatchDetailPopup({
   currentUserId,
   onRefreshFeed,
   recordedByName,
+  communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
   const router = useRouter();
@@ -353,11 +355,11 @@ export function MatchDetailPopup({
               <View style={[styles.matchupContainer, { backgroundColor: theme.background }]}>
                 <View style={styles.teamLeft}>
                   <View style={styles.avatarGroup}>
-                    <Pressable disabled={!match.player?.id} onPress={() => { if (match.player?.id) router.push(`/profile/${match.player.id}`); }}>
+                    <Pressable disabled={!match.player?.id} onPress={() => { if (match.player?.id) router.push(`/profile/${match.player.id}${communityId ? `?community=${communityId}` : ''}`); }}>
                       <UserAvatar avatarUrl={match.player?.avatar_url} size={32} />
                     </Pressable>
                     {match.playerPartner && (
-                      <Pressable disabled={!match.playerPartner.id} onPress={() => { if (match.playerPartner?.id) router.push(`/profile/${match.playerPartner.id}`); }} style={styles.avatarOverlap}>
+                      <Pressable disabled={!match.playerPartner.id} onPress={() => { if (match.playerPartner?.id) router.push(`/profile/${match.playerPartner.id}${communityId ? `?community=${communityId}` : ''}`); }} style={styles.avatarOverlap}>
                         <UserAvatar avatarUrl={match.playerPartner.avatar_url} size={32} />
                       </Pressable>
                     )}
@@ -388,11 +390,11 @@ export function MatchDetailPopup({
 
                 <View style={styles.teamRight}>
                   <View style={styles.avatarGroup}>
-                    <Pressable disabled={!match.opponent?.id} onPress={() => { if (match.opponent?.id) router.push(`/profile/${match.opponent.id}`); }}>
+                    <Pressable disabled={!match.opponent?.id} onPress={() => { if (match.opponent?.id) router.push(`/profile/${match.opponent.id}${communityId ? `?community=${communityId}` : ''}`); }}>
                       <UserAvatar avatarUrl={match.opponent?.avatar_url} size={32} />
                     </Pressable>
                     {match.opponentPartner && (
-                      <Pressable disabled={!match.opponentPartner.id} onPress={() => { if (match.opponentPartner?.id) router.push(`/profile/${match.opponentPartner.id}`); }} style={styles.avatarOverlap}>
+                      <Pressable disabled={!match.opponentPartner.id} onPress={() => { if (match.opponentPartner?.id) router.push(`/profile/${match.opponentPartner.id}${communityId ? `?community=${communityId}` : ''}`); }} style={styles.avatarOverlap}>
                         <UserAvatar avatarUrl={match.opponentPartner.avatar_url} size={32} />
                       </Pressable>
                     )}
@@ -444,7 +446,7 @@ export function MatchDetailPopup({
                   disabled={!match.recorder?.id && !match.player?.id}
                   onPress={() => {
                     const creatorId = match.recorder?.id ?? match.player?.id;
-                    if (creatorId) router.push(`/profile/${creatorId}`);
+                    if (creatorId) router.push(`/profile/${creatorId}${communityId ? `?community=${communityId}` : ''}`);
                   }}
                 >
                   <User size={15} color={theme.textSecondary} />
@@ -489,24 +491,24 @@ export function MatchDetailPopup({
                 </ThemedText>
               ) : (
                 <View style={styles.commentsContainer}>
-                   {comments.map((comment) => (
-                     <View key={comment.id} style={styles.commentRow}>
-                       <Pressable
-                         disabled={!comment.profile?.id}
-                         onPress={() => {
-                           if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
-                         }}
-                       >
-                         <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
-                       </Pressable>
-                       <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
-                         <View style={styles.commentMeta}>
-                           <Pressable
-                             disabled={!comment.profile?.id}
-                             onPress={() => {
-                               if (comment.profile?.id) router.push(`/profile/${comment.profile.id}`);
-                             }}
-                           >
+{comments.map((comment) => (
+                      <View key={comment.id} style={styles.commentRow}>
+                        <Pressable
+                          disabled={!comment.profile?.id}
+                          onPress={() => {
+                            if (comment.profile?.id) router.push(`/profile/${comment.profile.id}${communityId ? `?community=${communityId}` : ''}`);
+                          }}
+                        >
+                          <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
+                        </Pressable>
+                        <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
+                          <View style={styles.commentMeta}>
+                            <Pressable
+                              disabled={!comment.profile?.id}
+                              onPress={() => {
+                                if (comment.profile?.id) router.push(`/profile/${comment.profile.id}${communityId ? `?community=${communityId}` : ''}`);
+                              }}
+                            >
                              <ThemedText variant="caption" style={styles.commentAuthor}>
                                {comment.profile?.username ?? 'Player'}
                              </ThemedText>
