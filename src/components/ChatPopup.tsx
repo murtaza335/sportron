@@ -1233,8 +1233,8 @@ const styles = StyleSheet.create({
   },
   bubble: {
     borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
     borderWidth: 1,
   },
   bubbleText: {
