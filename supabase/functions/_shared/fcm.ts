@@ -181,12 +181,19 @@ function buildMessage(
       data: { ...stringData, title, body },
       android: {
         priority: 'high',
+        // Always set channel_id so FCM delivers to the 'default' channel
+        // (created client-side with AndroidImportance.MAX) instead of the
+        // auto-generated "Miscellaneous" channel (IMPORTANCE_DEFAULT).
+        notification: {
+          channel_id: 'default',
+          sound: 'default',
+          ...(roomKey ? { tag: roomKey } : {}),
+        },
         // collapseKey only dedupes messages still in FCM's transit queue for a
         // dead/offline device; in-place replacement of the visible banner is
         // handled by android.notification.tag (OS path) and the client's stable
         // identifier (app-running path).
         ...(roomKey ? { collapseKey: roomKey } : {}),
-        ...(roomKey ? { notification: { tag: roomKey } } : {}),
       },
       apns: {
         // apns-collapse-id header: successive pushes for the same conversation

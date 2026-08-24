@@ -282,6 +282,9 @@ export async function scheduleLocalNotification(
       sound: true,
     },
     trigger: null,
+    // Explicitly target the 'default' channel (created with MAX importance)
+    // so heads-up popups appear on Android 8.0+ regardless of app state.
+    ...(Platform.OS === 'android' ? { android: { channelId: 'default' } } : {}),
   });
 
   return identifier;
