@@ -146,6 +146,15 @@ export default function ProfileScreen() {
                     <ThemedText variant="caption" style={{ color: theme.background, opacity: 0.9 }}>
                       Get push notifications, offline access, and native performance with our mobile app.
                     </ThemedText>
+                    <Pressable
+                      onPress={() => { if (typeof window !== 'undefined') window.location.href = '/android'; }}
+                      style={styles.webPromptLink}
+                      hitSlop={8}
+                    >
+                      <ThemedText variant="caption" style={{ color: theme.background, textDecorationLine: 'underline' }}>
+                        Get it on Google Play
+                      </ThemedText>
+                    </Pressable>
                   </View>
                 </>
               )}
@@ -472,5 +481,9 @@ const styles = StyleSheet.create({
   webPromptDismiss: {
     marginTop: 2,
     padding: Spacing.xs,
+  },
+  webPromptLink: {
+    marginTop: Spacing.xs,
+    paddingTop: Spacing.xs,
   },
 });
