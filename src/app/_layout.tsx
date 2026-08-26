@@ -71,7 +71,7 @@ function RootNavigator() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {Platform.OS !== 'web' && <FCMInitializer />}
-      <StatusBar style="auto" />
+      <StatusBar style={theme.resolvedColorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{
         headerShown: false,
         animationDuration: 50,

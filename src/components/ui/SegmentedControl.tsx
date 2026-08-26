@@ -47,7 +47,7 @@ export function SegmentedControl<T extends string>({
                 ]}>
                 {option.label}
               </Text>
-              {hasUnread && <View style={styles.dot} />}
+              {hasUnread && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
             </View>
           </Pressable>
         );
@@ -85,7 +85,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
   },
   label: {
     fontSize: 14,

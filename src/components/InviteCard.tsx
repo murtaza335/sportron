@@ -75,13 +75,13 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
   };
 
   const isDark = theme.resolvedColorScheme === 'dark';
-  const unreadBg = isDark ? 'rgba(59, 130, 246, 0.08)' : '#F8FAFF';
+  const unreadBg = isDark ? 'rgba(0, 168, 181, 0.08)' : 'rgba(0, 168, 181, 0.04)';
 
   return (
     <Pressable
       onPress={() => markAsRead(notificationId)}
       style={{
-        backgroundColor: actionResult ? theme.background : unreadBg,
+        backgroundColor: actionResult ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
         paddingHorizontal: Spacing.lg,
@@ -94,7 +94,7 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
             width: 40,
             height: 40,
             borderRadius: Radius.full,
-            backgroundColor: theme.backgroundElement,
+            backgroundColor: theme.backgroundSelected,
             alignItems: 'center',
             justifyContent: 'center',
           }}
@@ -109,7 +109,10 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
           >
             {inviterName} invited you to {communityName}
           </ThemedText>
-          <ThemedText variant="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
+          <ThemedText
+            variant="caption"
+            style={{ fontSize: 12, fontWeight: '500', marginTop: 2, color: theme.textSecondary }}
+          >
             {formatRelativeTime(createdAt)}
           </ThemedText>
         </View>
@@ -118,10 +121,10 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
       {actionResult === 'accepted' ? (
         <View style={{ marginTop: Spacing.md, marginLeft: 52 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <CheckCircle size={16} color="#16A34A" strokeWidth={2.5} />
+            <CheckCircle size={16} color={theme.success} strokeWidth={2.5} />
             <ThemedText
               variant="caption"
-              style={{ fontWeight: '700', fontSize: 13, color: '#16A34A' }}
+              style={{ fontWeight: '700', fontSize: 13, color: theme.success }}
             >
               Invitation Accepted
             </ThemedText>
@@ -130,10 +133,10 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
       ) : actionResult === 'rejected' ? (
         <View style={{ marginTop: Spacing.md, marginLeft: 52 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <XCircle size={16} color="#DC2626" strokeWidth={2.5} />
+            <XCircle size={16} color={theme.error} strokeWidth={2.5} />
             <ThemedText
               variant="caption"
-              style={{ fontWeight: '700', fontSize: 13, color: '#DC2626' }}
+              style={{ fontWeight: '700', fontSize: 13, color: theme.error }}
             >
               Invitation Declined
             </ThemedText>
@@ -159,9 +162,9 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
               paddingVertical: Spacing.sm,
               paddingHorizontal: Spacing.md,
               borderRadius: Radius.sm,
-              backgroundColor: pressed ? theme.backgroundSelected : '#16A34A',
+              backgroundColor: pressed ? theme.backgroundSelected : theme.success,
               borderWidth: 1,
-              borderColor: '#16A34A',
+              borderColor: theme.success,
               opacity: actionLoading ? 0.5 : 1,
             })}
             hitSlop={8}

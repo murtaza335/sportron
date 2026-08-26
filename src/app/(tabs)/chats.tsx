@@ -73,7 +73,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           style={[
             styles.avatarWrap,
             styles.avatarPlaceholder,
-            { backgroundColor: isSessionActive ? '#10B98120' : theme.backgroundSelected },
+            { backgroundColor: isSessionActive ? `${theme.success}20` : theme.backgroundSelected },
           ]}
         >
           {isCommunity ? (
@@ -81,7 +81,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           ) : (
             <MessageSquare
               size={20}
-              color={isSessionActive ? '#10B981' : theme.textSecondary}
+              color={isSessionActive ? theme.success : theme.textSecondary}
               strokeWidth={2}
             />
           )}
@@ -96,7 +96,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
         </ThemedText>
       </View>
       {row.unread > 0 ? (
-        <View style={styles.unreadBadge}>
+        <View style={[styles.unreadBadge, { backgroundColor: theme.success }]}>
           <Text style={styles.unreadBadgeText}>{row.unread > 99 ? '99+' : row.unread}</Text>
         </View>
       ) : null}
@@ -348,7 +348,6 @@ const styles = StyleSheet.create({
     height: 24,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
   },

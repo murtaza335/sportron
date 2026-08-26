@@ -72,17 +72,17 @@ export default function DiscoverScreen() {
                   width: 36,
                   height: 36,
                   borderRadius: 18,
-                  backgroundColor: '#2563EB',
+                  backgroundColor: theme.accent,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  shadowColor: '#2563EB',
+                  shadowColor: theme.accent,
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.4,
                   shadowRadius: 4,
                   elevation: 4,
                 }}
               >
-                <Plus size={20} color="#FFFFFF" strokeWidth={3} />
+                <Plus size={20} color={theme.chatBubbleMineText} strokeWidth={3} />
               </View>
             </Pressable>
           ),

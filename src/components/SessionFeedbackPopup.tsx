@@ -109,8 +109,8 @@ export function SessionFeedbackPopup({
 
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
-              <View style={[styles.headerIcon, { backgroundColor: '#10B98120' }]}>
-                <ClipboardCheck size={18} color="#10B981" strokeWidth={2.5} />
+              <View style={[styles.headerIcon, { backgroundColor: `${theme.success}20` }]}>
+                <ClipboardCheck size={18} color={theme.success} strokeWidth={2.5} />
               </View>
               <ThemedText variant="heading" style={styles.headerTitle} numberOfLines={1}>
                 Attended the session?
@@ -170,11 +170,11 @@ export function SessionFeedbackPopup({
                     onPress={() => setMark(c.id, 'showed_up')}
                     style={[
                       styles.markChip,
-                      { borderColor: marks[c.id] === 'showed_up' ? '#10B981' : theme.border, backgroundColor: marks[c.id] === 'showed_up' ? '#10B98120' : theme.background },
+                      { borderColor: marks[c.id] === 'showed_up' ? theme.success : theme.border, backgroundColor: marks[c.id] === 'showed_up' ? `${theme.success}20` : theme.background },
                     ]}
                   >
-                    <Check size={14} color={marks[c.id] === 'showed_up' ? '#10B981' : theme.textSecondary} strokeWidth={3} />
-                    <ThemedText variant="caption" style={{ color: marks[c.id] === 'showed_up' ? '#10B981' : theme.textSecondary, fontWeight: '700' }}>
+                    <Check size={14} color={marks[c.id] === 'showed_up' ? theme.success : theme.textSecondary} strokeWidth={3} />
+                    <ThemedText variant="caption" style={{ color: marks[c.id] === 'showed_up' ? theme.success : theme.textSecondary, fontWeight: '700' }}>
                       Came
                     </ThemedText>
                   </Pressable>
@@ -182,11 +182,11 @@ export function SessionFeedbackPopup({
                     onPress={() => setMark(c.id, 'no_show')}
                     style={[
                       styles.markChip,
-                      { borderColor: marks[c.id] === 'no_show' ? '#EF4444' : theme.border, backgroundColor: marks[c.id] === 'no_show' ? '#EF444420' : theme.background },
+                      { borderColor: marks[c.id] === 'no_show' ? theme.error : theme.border, backgroundColor: marks[c.id] === 'no_show' ? `${theme.error}20` : theme.background },
                     ]}
                   >
-                    <X size={14} color={marks[c.id] === 'no_show' ? '#EF4444' : theme.textSecondary} strokeWidth={3} />
-                    <ThemedText variant="caption" style={{ color: marks[c.id] === 'no_show' ? '#EF4444' : theme.textSecondary, fontWeight: '700' }}>
+                    <X size={14} color={marks[c.id] === 'no_show' ? theme.error : theme.textSecondary} strokeWidth={3} />
+                    <ThemedText variant="caption" style={{ color: marks[c.id] === 'no_show' ? theme.error : theme.textSecondary, fontWeight: '700' }}>
                       Didn&apos;t come
                     </ThemedText>
                   </Pressable>

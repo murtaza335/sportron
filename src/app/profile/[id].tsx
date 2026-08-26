@@ -140,8 +140,8 @@ export default function PublicProfileScreen() {
               </View>
 
               {memberStats.role === 'admin' && (
-                <View style={[styles.adminBadge, { backgroundColor: '#D9770620' }]}>
-                  <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700' }}>
+                <View style={[styles.adminBadge, { backgroundColor: `${theme.warning}20` }]}>
+                  <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700' }}>
                     Admin
                   </ThemedText>
                 </View>

@@ -173,7 +173,14 @@ export default function CommunityMembersScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={({ pressed }) => [
+                { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+                pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+              ]}
+            >
               <ChevronLeft size={24} color={theme.text} />
             </Pressable>
           ),
@@ -201,7 +208,7 @@ export default function CommunityMembersScreen() {
                   style={styles.inviteButton}
                   hitSlop={8}
                 >
-                  <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '700' }}>
+                  <ThemedText variant="body" style={{ color: theme.info, fontWeight: '700' }}>
                     + Invite Member by Username
                   </ThemedText>
                 </Pressable>
@@ -225,7 +232,7 @@ export default function CommunityMembersScreen() {
                           </ThemedText>
                         </View>
                         <View style={styles.pendingBadge}>
-                          <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700', fontSize: 11 }}>
+                          <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '700', fontSize: 11 }}>
                             Invited
                           </ThemedText>
                         </View>
@@ -268,8 +275,8 @@ export default function CommunityMembersScreen() {
                   )}
                 </View>
                 {item.role === 'admin' && (
-                  <View style={[styles.roleBadge, { backgroundColor: '#D9770620' }]}>
-                    <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                  <View style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
+                    <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin
                     </ThemedText>
                   </View>
@@ -313,7 +320,7 @@ export default function CommunityMembersScreen() {
               style={styles.contextOption}
               onPress={() => contextMember && handleRemove(contextMember)}
             >
-              <ThemedText variant="body" style={{ color: '#EF4444', fontWeight: '600' }}>
+              <ThemedText variant="body" style={{ color: theme.error, fontWeight: '600' }}>
                 Remove from community
               </ThemedText>
               <ThemedText variant="caption" muted>Kick this member out</ThemedText>

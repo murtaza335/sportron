@@ -93,7 +93,14 @@ export default function CommunityJoinRequestsScreen() {
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
-      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => [
+          { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+          pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+        ]}
+      >
         <ChevronLeft size={24} color={theme.text} />
       </Pressable>
     ),

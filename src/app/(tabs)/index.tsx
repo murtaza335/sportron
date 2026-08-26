@@ -127,7 +127,7 @@ export default function CommunitiesScreen() {
             // eslint-disable-next-line react-hooks/refs
             backgroundColor: colorAnim.current.interpolate({
               inputRange: [0, 1, 2, 3, 4],
-              outputRange: [theme.text, '#3B82F6', '#06B6D4', '#10B981', theme.text],
+              outputRange: [theme.text, theme.accent, theme.info, theme.success, theme.text],
             }),
             transform: [
               {

@@ -110,31 +110,33 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
     }
   };
 
+  const isDark = theme.resolvedColorScheme === 'dark';
+
   const statusStyle = useMemo(() => {
     switch (match.verification_status) {
       case 'disputed':
         return {
-          bg: '#DC26261F',
-          color: '#EF4444',
+          bg: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(220, 38, 38, 0.1)',
+          color: isDark ? '#EF4444' : '#DC2626',
           label: 'Disputed',
         };
       case 'pending':
         return {
-          bg: '#D977061F',
-          color: '#D97706',
+          bg: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(217, 119, 6, 0.1)',
+          color: isDark ? '#FBBF24' : '#D97706',
           label: 'Pending',
         };
       default:
         return {
-          bg: '#10B9811F',
-          color: '#10B981',
+          bg: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+          color: isDark ? '#34D399' : '#10B981',
           label: 'Verified',
         };
     }
-  }, [match.verification_status]);
+  }, [match.verification_status, isDark]);
 
   return (
-    <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement }]}>
+    <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border, borderWidth: 1 }]}>
       {/* Post Header */}
       <View style={styles.header}>
 <Pressable
@@ -202,21 +204,21 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
                  {match.player_score} – {match.opponent_score}
                </ThemedText>
 
-               {resultLabel === 'Win' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
-                 </View>
-               )}
-               {resultLabel === 'Loss' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
-                 </View>
-               )}
-               {resultLabel === 'Draw' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
-                 </View>
-               )}
+                {resultLabel === 'Win' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: isDark ? '#34D399' : '#10B981' }]}>Win</ThemedText>
+                  </View>
+                )}
+                {resultLabel === 'Loss' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(220, 38, 38, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: isDark ? '#EF4444' : '#DC2626' }]}>Loss</ThemedText>
+                  </View>
+                )}
+                {resultLabel === 'Draw' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(100, 116, 139, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: theme.textSecondary }]}>Draw</ThemedText>
+                  </View>
+                )}
              </View>
 
              <View style={styles.teamRight}>
@@ -260,21 +262,21 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
                  {match.player_score} – {match.opponent_score}
                </ThemedText>
 
-               {resultLabel === 'Win' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#10B9811F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#10B981' }]}>Win</ThemedText>
-                 </View>
-               )}
-               {resultLabel === 'Loss' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#EF44441F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#EF4444' }]}>Loss</ThemedText>
-                 </View>
-               )}
-               {resultLabel === 'Draw' && (
-                 <View style={[styles.resultBadge, { backgroundColor: '#6B72801F' }]}>
-                   <ThemedText style={[styles.resultText, { color: '#6B7280' }]}>Draw</ThemedText>
-                 </View>
-               )}
+                {resultLabel === 'Win' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: isDark ? '#34D399' : '#10B981' }]}>Win</ThemedText>
+                  </View>
+                )}
+                {resultLabel === 'Loss' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(220, 38, 38, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: isDark ? '#EF4444' : '#DC2626' }]}>Loss</ThemedText>
+                  </View>
+                )}
+                {resultLabel === 'Draw' && (
+                  <View style={[styles.resultBadge, { backgroundColor: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(100, 116, 139, 0.1)' }]}>
+                    <ThemedText style={[styles.resultText, { color: theme.textSecondary }]}>Draw</ThemedText>
+                  </View>
+                )}
              </View>
 
              <View style={styles.teamRight}>
@@ -306,12 +308,12 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
              hitSlop={8}
              style={styles.socialAction}
            >
-             <Heart
-               size={16}
-               color={liked ? '#EF4444' : theme.textSecondary}
-               fill={liked ? '#EF4444' : 'none'}
-             />
-             <ThemedText variant="caption" style={[styles.socialText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
+              <Heart
+                size={16}
+                color={liked ? theme.error : theme.textSecondary}
+                fill={liked ? theme.error : 'none'}
+              />
+              <ThemedText variant="caption" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
                {likesCount} {likesCount === 1 ? 'like' : 'likes'}
              </ThemedText>
            </Pressable>

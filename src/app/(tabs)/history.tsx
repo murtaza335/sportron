@@ -44,17 +44,41 @@ function formatSessionTime(dateString: string) {
   });
 }
 
-const STATUS_STYLES: Record<SessionStatus, { bg: string; fg: string; label: string }> = {
-  open: { bg: '#10B98120', fg: '#10B981', label: 'Open' },
-  full: { bg: '#D9770620', fg: '#D97706', label: 'Full' },
-  completed: { bg: '#3B82F620', fg: '#3B82F6', label: 'Completed' },
-  cancelled: { bg: '#DC262620', fg: '#DC2626', label: 'Cancelled' },
-  closed: { bg: '#6B728020', fg: '#6B7280', label: 'Closed' },
-};
+function getStatusStyles(theme: ReturnType<typeof useTheme>): Record<SessionStatus, { bg: string; fg: string; label: string }> {
+  const isDark = theme.resolvedColorScheme === 'dark';
+  return {
+    open: {
+      bg: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)',
+      fg: isDark ? '#34D399' : '#10B981',
+      label: 'Open',
+    },
+    full: {
+      bg: isDark ? 'rgba(245, 158, 11, 0.15)' : 'rgba(217, 119, 6, 0.1)',
+      fg: isDark ? '#FBBF24' : '#D97706',
+      label: 'Full',
+    },
+    completed: {
+      bg: isDark ? 'rgba(0, 168, 181, 0.15)' : 'rgba(0, 168, 181, 0.1)',
+      fg: isDark ? '#2DD4BF' : '#00A8B5',
+      label: 'Completed',
+    },
+    cancelled: {
+      bg: isDark ? 'rgba(239, 68, 68, 0.15)' : 'rgba(220, 38, 38, 0.1)',
+      fg: isDark ? '#EF4444' : '#DC2626',
+      label: 'Cancelled',
+    },
+    closed: {
+      bg: isDark ? 'rgba(148, 163, 184, 0.15)' : 'rgba(100, 116, 139, 0.1)',
+      fg: theme.textSecondary,
+      label: 'Closed',
+    },
+  };
+}
 
 function SessionCard({ session, onPress }: { session: Session; onPress: () => void }) {
   const theme = useTheme();
-  const statusStyle = STATUS_STYLES[session.status] ?? STATUS_STYLES.closed;
+  const isDark = theme.resolvedColorScheme === 'dark';
+  const statusStyle = getStatusStyles(theme)[session.status] ?? getStatusStyles(theme).closed;
   const isActive = session.status === 'open' || session.status === 'full';
 
   return (
@@ -74,8 +98,21 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
           </View>
         </View>
 
-        <View style={[styles.purposePill, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-          <ThemedText variant="caption" style={[styles.purposePillText, { color: theme.textSecondary }]}>
+        {/* Sport purpose pill — capsule, semi-transparent accent */}
+        <View
+          style={[
+            styles.sportPill,
+            {
+              backgroundColor: isDark
+                ? 'rgba(0, 168, 181, 0.15)'
+                : 'rgba(0, 168, 181, 0.1)',
+            },
+          ]}
+        >
+          <ThemedText
+            variant="caption"
+            style={[styles.sportPillText, { color: isDark ? '#2DD4BF' : '#00A8B5' }]}
+          >
             {formatSessionPurpose(session.purpose)}
           </ThemedText>
         </View>
@@ -83,19 +120,28 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
         <View style={styles.cardDetails}>
           <View style={styles.detailRow}>
             <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
+            <ThemedText
+              variant="caption"
+              style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+            >
               {session.location}
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
             <Calendar size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
+            <ThemedText
+              variant="caption"
+              style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+            >
               {formatSessionDate(session.date_time)}
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
             <Clock size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
+            <ThemedText
+              variant="caption"
+              style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+            >
               {formatSessionTime(session.date_time)}
             </ThemedText>
           </View>
@@ -104,22 +150,28 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
         <View style={styles.cardFooter}>
           <View style={styles.footerLeft}>
             {isActive && session.expires_at && (
-              <View style={[styles.expiryBadge, { backgroundColor: '#D9770620' }]}>
-                <Timer size={12} color="#D97706" strokeWidth={2} />
+              <View style={[styles.expiryBadge, { backgroundColor: `${theme.warning}20` }]}>
+                <Timer size={12} color={theme.warning} strokeWidth={2} />
                 <ThemedText
                   variant="caption"
-                  style={{ color: '#D97706', fontWeight: '700', fontSize: 10 }}
+                  style={{ color: theme.warning, fontWeight: '700', fontSize: 10 }}
                 >
                   {getRemainingTime(session.expires_at)}
                 </ThemedText>
               </View>
             )}
             <Users size={14} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
+            <ThemedText
+              variant="caption"
+              style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+            >
               {session.commitment_count ?? 0} / {session.max_participants}
             </ThemedText>
           </View>
-          <ThemedText variant="caption" muted>
+          <ThemedText
+            variant="caption"
+            style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+          >
             by {session.creator?.username ?? 'Unknown'}
           </ThemedText>
         </View>
@@ -572,32 +624,32 @@ const styles = StyleSheet.create({
   },
   purposeName: {
     fontSize: 20,
-    fontWeight: '800',
+    fontWeight: '700',
     flexShrink: 1,
   },
-  purposePill: {
+  sportPill: {
     alignSelf: 'flex-start',
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
   },
-  purposePillText: {
+  sportPillText: {
     fontWeight: '700',
-    fontSize: 11,
+    fontSize: 10,
+    textTransform: 'uppercase',
   },
   expiryBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
   },
   statusBadge: {
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
   },
   statusText: {
     fontSize: 10,

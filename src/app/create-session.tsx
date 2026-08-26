@@ -176,15 +176,15 @@ export default function CreateSessionScreen() {
           keyboardShouldPersistTaps="handled"
         >
           {conflicts.length > 0 && (
-            <Card style={styles.conflictCard}>
-              <ThemedText variant="body" style={{ color: '#DC2626', fontWeight: '700' }}>
+            <Card style={[styles.conflictCard, { backgroundColor: `${theme.error}08`, borderColor: `${theme.error}30` }]}>
+              <ThemedText variant="body" style={{ color: theme.error, fontWeight: '700' }}>
                 Time Conflict Detected
               </ThemedText>
               <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
                 You already have a session within ±30 minutes of this time:
               </ThemedText>
               {conflicts.map((c, i) => (
-                <View key={i} style={styles.conflictItem}>
+                <View key={i} style={[styles.conflictItem, { backgroundColor: `${theme.error}15` }]}>
                   <ThemedText variant="body" style={{ fontWeight: '600' }}>
                     {c.purpose}
                   </ThemedText>
@@ -381,7 +381,7 @@ export default function CreateSessionScreen() {
               }}
               style={styles.doneButton}
             >
-              <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '600' }}>
+              <ThemedText variant="body" style={{ color: theme.info, fontWeight: '600' }}>
                 Done
               </ThemedText>
             </Pressable>
@@ -573,14 +573,11 @@ const styles = StyleSheet.create({
     borderWidth: 1,
   },
   conflictCard: {
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
     gap: Spacing.xs,
   },
   conflictItem: {
     marginTop: Spacing.sm,
     padding: Spacing.sm,
-    backgroundColor: '#FEE2E2',
     borderRadius: Radius.sm,
     gap: 2,
   },

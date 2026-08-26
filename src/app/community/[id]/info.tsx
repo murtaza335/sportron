@@ -245,7 +245,14 @@ export default function CommunityInfoScreen() {
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
-      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => [
+          { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+          pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+        ]}
+      >
         <ChevronLeft size={24} color={theme.text} />
       </Pressable>
     ),
@@ -323,21 +330,21 @@ export default function CommunityInfoScreen() {
             style={[
               styles.badge,
               {
-                backgroundColor: community.visibility === 'public' ? '#10B9811A' : '#D977061A',
-                borderColor: community.visibility === 'public' ? '#10B98140' : '#D9770640',
+                backgroundColor: community.visibility === 'public' ? `${theme.success}1A` : `${theme.warning}1A`,
+                borderColor: community.visibility === 'public' ? `${theme.success}40` : `${theme.warning}40`,
               },
             ]}
           >
             {community.visibility === 'public' ? (
-              <Globe size={14} color="#10B981" strokeWidth={2} />
+              <Globe size={14} color={theme.success} strokeWidth={2} />
             ) : (
-              <Lock size={14} color="#D97706" strokeWidth={2} />
+              <Lock size={14} color={theme.warning} strokeWidth={2} />
             )}
             <ThemedText
               variant="caption"
               style={[
                 styles.badgeText,
-                { color: community.visibility === 'public' ? '#10B981' : '#D97706' },
+                { color: community.visibility === 'public' ? theme.success : theme.warning },
               ]}
             >
               {community.visibility === 'public' ? 'Public' : 'Restricted'}
@@ -387,7 +394,7 @@ export default function CommunityInfoScreen() {
           </ThemedText>
           {(hasMoreMembers || isAdmin) && (
             <Pressable onPress={() => router.navigate(`/community/${id}/members`)}>
-              <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '600' }}>
+              <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '600' }}>
                 {isAdmin ? 'View All Members' : 'View All'}
               </ThemedText>
             </Pressable>
@@ -443,8 +450,8 @@ export default function CommunityInfoScreen() {
                   )}
                 </View>
                 {member.role === 'admin' && (
-                  <View style={[styles.adminBadge, { backgroundColor: '#D9770620' }]}>
-                    <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                  <View style={[styles.adminBadge, { backgroundColor: `${theme.warning}20` }]}>
+                    <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin
                     </ThemedText>
                   </View>
@@ -456,10 +463,10 @@ export default function CommunityInfoScreen() {
                 onPress={() => router.navigate(`/community/${id}/members`)}
                 style={styles.viewAllRow}
               >
-                <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '600' }}>
+                <ThemedText variant="body" style={{ color: theme.info, fontWeight: '600' }}>
                   View All Members
                 </ThemedText>
-                <ChevronRight size={16} color="#3B82F6" strokeWidth={2} />
+                <ChevronRight size={16} color={theme.info} strokeWidth={2} />
               </Pressable>
             )}
           </Card>
@@ -509,7 +516,7 @@ export default function CommunityInfoScreen() {
                   <Switch
                     value={pingsEnabled}
                     onValueChange={handleTogglePings}
-                    trackColor={{ false: theme.border, true: '#10B981' }}
+                    trackColor={{ false: theme.border, true: theme.success }}
                     thumbColor="#FFFFFF"
                     ios_backgroundColor={theme.border}
                   />
@@ -528,8 +535,8 @@ export default function CommunityInfoScreen() {
                   style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
                   onPress={handleDelete}
                 >
-                  <Trash2 size={20} color="#EF4444" strokeWidth={2} />
-                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: '#EF4444' }}>
+                  <Trash2 size={20} color={theme.error} strokeWidth={2} />
+                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
                     Delete Community
                   </ThemedText>
                 </Pressable>
@@ -540,8 +547,8 @@ export default function CommunityInfoScreen() {
                 style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
                 onPress={handleLeave}
               >
-                <LogOut size={20} color="#EF4444" strokeWidth={2} />
-                <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: '#EF4444' }}>
+                <LogOut size={20} color={theme.error} strokeWidth={2} />
+                <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
                   Leave Community
                 </ThemedText>
               </Pressable>

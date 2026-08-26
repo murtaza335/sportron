@@ -44,8 +44,8 @@ export default function UpdatesScreen() {
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {unreadCount > 0 && (
         <Pressable onPress={markAllAsRead} style={styles.markAllButton} hitSlop={8}>
-          <CheckCheck size={14} color="#3B82F6" strokeWidth={2.5} />
-          <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700' }}>
+          <CheckCheck size={14} color={theme.info} strokeWidth={2.5} />
+          <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '700' }}>
             Mark all as read
           </ThemedText>
         </Pressable>
@@ -70,7 +70,7 @@ export default function UpdatesScreen() {
             Action Required
           </ThemedText>
           {actionRequired.length > 0 && (
-            <View style={[styles.badge, { backgroundColor: '#DC2626' }]}>
+            <View style={[styles.badge, { backgroundColor: theme.error }]}>
               <ThemedText style={styles.badgeText}>
                 {actionRequired.length > 99 ? '99+' : actionRequired.length}
               </ThemedText>
@@ -96,7 +96,7 @@ export default function UpdatesScreen() {
             Invites
           </ThemedText>
           {invites.length > 0 && (
-            <View style={[styles.badge, { backgroundColor: '#3B82F6' }]}>
+            <View style={[styles.badge, { backgroundColor: theme.info }]}>
               <ThemedText style={styles.badgeText}>
                 {invites.length > 99 ? '99+' : invites.length}
               </ThemedText>
@@ -122,7 +122,7 @@ export default function UpdatesScreen() {
             Past Activity
           </ThemedText>
           {pastUnreadCount > 0 && (
-            <View style={[styles.badgeDot, { backgroundColor: '#3B82F6' }]} />
+            <View style={[styles.badgeDot, { backgroundColor: theme.info }]} />
           )}
         </Pressable>
       </View>

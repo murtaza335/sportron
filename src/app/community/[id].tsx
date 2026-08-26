@@ -298,7 +298,14 @@ export default function CommunityDetailScreen() {
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
-      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => [
+          { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+          pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+        ]}
+      >
         <ChevronLeft size={24} color={theme.text} />
       </Pressable>
     ),
@@ -385,19 +392,19 @@ export default function CommunityDetailScreen() {
                   style={[
                     styles.visibilityBadgeSmall,
                     {
-                      backgroundColor: community.visibility === 'public' ? '#10B98120' : '#D9770620',
+                      backgroundColor: community.visibility === 'public' ? `${theme.success}20` : `${theme.warning}20`,
                     },
                   ]}
                 >
                   {community.visibility === 'public' ? (
-                    <Globe size={12} color="#10B981" strokeWidth={2.5} />
+                    <Globe size={12} color={theme.success} strokeWidth={2.5} />
                   ) : (
-                    <Lock size={12} color="#D97706" strokeWidth={2.5} />
+                    <Lock size={12} color={theme.warning} strokeWidth={2.5} />
                   )}
                   <ThemedText
                     variant="caption"
                     style={{
-                      color: community.visibility === 'public' ? '#10B981' : '#D97706',
+                      color: community.visibility === 'public' ? theme.success : theme.warning,
                       fontWeight: '700',
                       fontSize: 11,
                     }}
@@ -500,7 +507,7 @@ export default function CommunityDetailScreen() {
             </View>
             <View style={styles.joinRequestsLinkRight}>
               {joinRequests.length > 0 && (
-                <View style={[styles.requestCountBadge, { backgroundColor: '#DC2626' }]}>
+                <View style={[styles.requestCountBadge, { backgroundColor: theme.error }]}>
                   <ThemedText style={styles.requestCountText}>
                     {joinRequests.length > 99 ? '99+' : joinRequests.length}
                   </ThemedText>
@@ -528,7 +535,7 @@ export default function CommunityDetailScreen() {
               >
                 <MessageCircle size={20} color={theme.text} strokeWidth={2} />
                 {communityChat.unreadCount > 0 && (
-                  <View style={styles.chatUnreadBadge}>
+                  <View style={[styles.chatUnreadBadge, { backgroundColor: theme.error }]}>
                     <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
                       {communityChat.unreadCount > 99 ? '99+' : communityChat.unreadCount}
                     </ThemedText>
@@ -541,7 +548,7 @@ export default function CommunityDetailScreen() {
                   style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
                 >
                   <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                  <View style={styles.pingDot} />
+                  <View style={[styles.pingDot, { backgroundColor: theme.error }]} />
                 </Pressable>
               )}
             </View>

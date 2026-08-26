@@ -294,7 +294,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   // tuned for the bubble background in both light and dark mode.
   const senderNamePalette =
     theme.resolvedColorScheme === 'dark'
-      ? ['#F472B6', '#60A5FA', '#A78BFA', '#FBBF24', '#FB923C', '#34D399', '#22D3EE', '#F87171']
+      ? ['#F472B6', '#2DD4BF', '#A78BFA', '#FBBF24', '#FB923C', '#34D399', '#22D3EE', '#F87171']
       : ['#C2185B', '#1565C0', '#6A1B9A', '#B45309', '#C2410C', '#15803D', '#0E7490', '#D32F2F'];
   const senderNameColor = (name: string): string => {
     let hash = 0;
@@ -548,7 +548,7 @@ const contextLayout = useMemo(() => {
         {isFirstUnread && (
           <View style={styles.unreadDivider}>
             <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
-            <ThemedText variant="caption" style={[styles.unreadDividerText, { color: '#10B981' }]}>
+            <ThemedText variant="caption" style={[styles.unreadDividerText, { color: theme.success }]}>
               New messages
             </ThemedText>
             <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
@@ -578,7 +578,7 @@ const contextLayout = useMemo(() => {
               style={[
                 styles.bubble,
                 mine
-                  ? { backgroundColor: '#10B981', borderColor: '#10B981' }
+                  ? { backgroundColor: theme.chatBubbleMine, borderColor: theme.chatBubbleMine }
                   : { backgroundColor: theme.backgroundElement, borderColor: theme.border },
               ]}
             >
@@ -593,7 +593,7 @@ const contextLayout = useMemo(() => {
               )}
               <ThemedText
                 variant="body"
-                style={[styles.bubbleText, mine ? { color: '#FFFFFF' } : null]}
+                style={[styles.bubbleText, mine ? { color: theme.chatBubbleMineText } : null]}
                 ellipsizeMode="tail"
                 selectable={true}
               >
@@ -604,7 +604,7 @@ const contextLayout = useMemo(() => {
                   <View style={styles.msgStatus}>
                     {item.status === 'failed' ? (
                       <Pressable onPress={() => setFailedMenu(item)} hitSlop={10}>
-                        <AlertTriangle size={12} color="#EF4444" strokeWidth={2.5} />
+                        <AlertTriangle size={12} color={theme.error} strokeWidth={2.5} />
                       </Pressable>
                     ) : isSending ? (
                       <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
@@ -697,12 +697,12 @@ const contextLayout = useMemo(() => {
                 <View
                   style={[
                     styles.leftBanner,
-                    { backgroundColor: '#A855F715', borderColor: '#A855F730' },
+                    { backgroundColor: `${theme.info}15`, borderColor: `${theme.info}30` },
                   ]}
                 >
                   <ThemedText
                     variant="caption"
-                    style={{ color: '#A855F7', textAlign: 'center', fontWeight: '600' }}
+                    style={{ color: theme.info, textAlign: 'center', fontWeight: '600' }}
                   >
                     You left this chat so you will not receive any further messages
                   </ThemedText>
@@ -816,9 +816,9 @@ const contextLayout = useMemo(() => {
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                   ]}
                 >
-                  <Reply size={14} color="#10B981" strokeWidth={2.5} />
-                  <View style={styles.replyBarText}>
-                    <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: '#10B981' }]}>
+                   <Reply size={14} color={theme.success} strokeWidth={2.5} />
+                   <View style={styles.replyBarText}>
+                     <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: theme.success }]}>
                       Replying to {resolveMessageName(replyTo)}
                     </ThemedText>
                     <ThemedText variant="caption" muted numberOfLines={1}>
@@ -838,9 +838,9 @@ const contextLayout = useMemo(() => {
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
                   ]}
                 >
-                  <Pencil size={14} color="#3B82F6" strokeWidth={2.5} />
-                  <View style={styles.replyBarText}>
-                    <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: '#3B82F6' }]}>
+                   <Pencil size={14} color={theme.accent} strokeWidth={2.5} />
+                   <View style={styles.replyBarText}>
+                     <ThemedText variant="caption" numberOfLines={1} style={[styles.replyBarName, { color: theme.accent }]}>
                       Editing message
                     </ThemedText>
                     <ThemedText variant="caption" muted numberOfLines={1}>
@@ -855,11 +855,11 @@ const contextLayout = useMemo(() => {
 
               {actionError && (
                 <View style={styles.errorRow}>
-                  <ThemedText variant="caption" style={[styles.errorText, { color: '#EF4444' }]}>
+                   <ThemedText variant="caption" style={[styles.errorText, { color: theme.error }]}>
                     {actionError}
                   </ThemedText>
                   <Pressable onPress={() => setActionError(null)} hitSlop={10}>
-                    <X size={14} color="#EF4444" strokeWidth={2.5} />
+                     <X size={14} color={theme.error} strokeWidth={2.5} />
                   </Pressable>
                 </View>
               )}
@@ -900,15 +900,15 @@ const contextLayout = useMemo(() => {
                   style={({ pressed }) => [
                     styles.sendBtn,
                     {
-                      backgroundColor: sendDisabled ? theme.backgroundElement : '#10B981',
+                      backgroundColor: sendDisabled ? theme.backgroundElement : theme.success,
                       opacity: pressed ? 0.8 : 1,
                     },
                   ]}
                 >
                   {editingMessage ? (
-                    <CheckCheck size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
+                    <CheckCheck size={18} color={sendDisabled ? theme.textSecondary : theme.chatBubbleMineText} />
                   ) : (
-                    <Send size={18} color={sendDisabled ? theme.textSecondary : '#FFFFFF'} />
+                    <Send size={18} color={sendDisabled ? theme.textSecondary : theme.chatBubbleMineText} />
                   )}
                 </Pressable>
               </View>
@@ -1012,8 +1012,8 @@ const contextLayout = useMemo(() => {
                   }}
                 >
                   <View style={styles.failedOptionRow}>
-                    <RefreshCw size={18} color="#10B981" strokeWidth={2.5} />
-                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#10B981', fontWeight: '600' }]}>
+                     <RefreshCw size={18} color={theme.success} strokeWidth={2.5} />
+                     <ThemedText variant="body" style={[styles.failedOptionText, { color: theme.success, fontWeight: '600' }]}>
                       Resend
                     </ThemedText>
                   </View>
@@ -1026,8 +1026,8 @@ const contextLayout = useMemo(() => {
                   }}
                 >
                   <View style={styles.failedOptionRow}>
-                    <Trash2 size={18} color="#EF4444" strokeWidth={2.5} />
-                    <ThemedText variant="body" style={[styles.failedOptionText, { color: '#EF4444', fontWeight: '600' }]}>
+                     <Trash2 size={18} color={theme.error} strokeWidth={2.5} />
+                     <ThemedText variant="body" style={[styles.failedOptionText, { color: theme.error, fontWeight: '600' }]}>
                       Delete
                     </ThemedText>
                   </View>
@@ -1056,7 +1056,7 @@ const contextLayout = useMemo(() => {
               >
                 <ThemedText
                   variant="body"
-                  style={[styles.deleteConfirmTitle, { color: '#EF4444', fontWeight: '700' }]}
+                   style={[styles.deleteConfirmTitle, { color: theme.error, fontWeight: '700' }]}
                 >
                   Delete this message?
                 </ThemedText>
@@ -1076,10 +1076,10 @@ const contextLayout = useMemo(() => {
                     </ThemedText>
                   </Pressable>
                   <Pressable
-                    style={[styles.deleteConfirmBtn, { backgroundColor: '#EF4444' }]}
-                    onPress={confirmDelete}
-                  >
-                    <ThemedText variant="body" style={{ color: '#FFFFFF', fontWeight: '700' }}>
+                     style={[styles.deleteConfirmBtn, { backgroundColor: theme.error }]}
+                     onPress={confirmDelete}
+                   >
+                     <ThemedText variant="body" style={{ color: theme.chatBubbleMineText, fontWeight: '700' }}>
                       Delete
                     </ThemedText>
                   </Pressable>

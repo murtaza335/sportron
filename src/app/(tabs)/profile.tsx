@@ -272,7 +272,7 @@ export default function ProfileScreen() {
                           {option === 'light' ? 'Light' : 'Dark'}
                         </ThemedText>
                       </View>
-                      {colorScheme === option && <Check size={22} color="#10B981" />}
+                      {colorScheme === option && <Check size={22} color={theme.success} />}
                     </Pressable>
                   ))}
                 </View>
@@ -301,8 +301,8 @@ export default function ProfileScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={handleNotificationsToggle}
-              trackColor={{ false: '#9CA3AF', true: '#3B82F6' }}
-              thumbColor="#F9FAFB"
+              trackColor={{ false: theme.borderMuted, true: theme.accent }}
+              thumbColor={theme.background}
             />
           </View>
         </Card>
@@ -324,8 +324,8 @@ export default function ProfileScreen() {
           loading={signingOut}
           onPress={handleSignOut}
           buttonStyle={{
-            borderColor: '#DC2626',
-            backgroundColor: 'rgba(220, 38, 38, 0.08)',
+            borderColor: theme.error,
+            backgroundColor: `${theme.error}0D`,
           }}
         />
       </ScrollView>

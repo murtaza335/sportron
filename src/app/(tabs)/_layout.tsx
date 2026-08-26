@@ -108,7 +108,7 @@ function CommunitiesHeaderStreak() {
   const { streakCount, longestStreak, lastActivityDate } = useStreak();
   const [modalVisible, setModalVisible] = useState(false);
   const hasStreak = streakCount > 0;
-  const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
+  const streakColor = hasStreak ? theme.error : theme.textSecondary;
 
   return (
     <>
@@ -246,7 +246,7 @@ export default function TabLayout() {
                   paddingHorizontal: 4,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#10B981',
+                   backgroundColor: theme.success,
                 }}>
                   <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
@@ -274,7 +274,7 @@ export default function TabLayout() {
                   width: 10,
                   height: 10,
                   borderRadius: 5,
-                  backgroundColor: '#DC2626',
+                   backgroundColor: theme.error,
                 }} />
               )}
             </View>

@@ -162,8 +162,8 @@ export function InviteMemberModal({
             showsVerticalScrollIndicator={false}
           >
             {error && (
-              <View style={styles.error}>
-                <ThemedText variant="body" style={{ color: '#DC2626', fontWeight: '600' }}>
+              <View style={[styles.error, { backgroundColor: `${theme.error}08`, borderColor: `${theme.error}30` }]}>
+                <ThemedText variant="body" style={{ color: theme.error, fontWeight: '600' }}>
                   {error}
                 </ThemedText>
               </View>
@@ -232,7 +232,7 @@ export function InviteMemberModal({
                         )}
                       </View>
                       {inviting === profile.username ? (
-                        <ThemedText variant="caption" style={{ fontWeight: '600', color: '#3B82F6' }}>
+                        <ThemedText variant="caption" style={{ fontWeight: '600', color: theme.info }}>
                           Sending...
                         </ThemedText>
                       ) : isInvited ? (
@@ -347,8 +347,6 @@ const styles = StyleSheet.create({
   },
   error: {
     padding: Spacing.md,
-    backgroundColor: '#FEF2F2',
-    borderColor: '#FECACA',
     borderWidth: 1,
     borderRadius: Radius.md,
   },

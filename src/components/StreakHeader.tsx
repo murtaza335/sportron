@@ -21,7 +21,7 @@ export function StreakHeader() {
       style={[
         styles.container,
         { backgroundColor: theme.backgroundElement },
-        isAtRisk && styles.atRisk,
+        isAtRisk && [styles.atRisk, { borderColor: theme.error }],
       ]}
       hitSlop={12}
       accessibilityLabel={hasStreak ? `${streakCount} day streak` : 'Start your streak'}
@@ -30,7 +30,7 @@ export function StreakHeader() {
       <View style={styles.flameWrapper}>
         <Flame
           size={24}
-          color={isAtRisk ? '#FF3B30' : theme.tabBarActive}
+          color={isAtRisk ? theme.error : theme.tabBarActive}
           strokeWidth={2}
           fill={hasStreak ? theme.tabBarActive : 'none'}
         />
@@ -68,8 +68,8 @@ export function StreakHeader() {
 
       {isAtRisk && (
         <View style={styles.atRiskBadge}>
-          <Zap size={14} color="#FF3B30" strokeWidth={2} />
-          <ThemedText variant="caption" style={{ color: '#FF3B30', fontWeight: '600' }}>
+          <Zap size={14} color={theme.error} strokeWidth={2} />
+          <ThemedText variant="caption" style={{ color: theme.error, fontWeight: '600' }}>
             At Risk
           </ThemedText>
         </View>
@@ -106,7 +106,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   atRisk: {
-    borderColor: '#FF3B30',
+    borderColor: 'transparent',
   },
   flameWrapper: {
     width: 40,

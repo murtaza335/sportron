@@ -263,13 +263,13 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   };
 
   const isDark = theme.resolvedColorScheme === 'dark';
-  const unreadBg = isDark ? 'rgba(59, 130, 246, 0.08)' : '#F8FAFF';
+  const unreadBg = isDark ? 'rgba(0, 168, 181, 0.08)' : 'rgba(0, 168, 181, 0.04)';
 
   return (
     <Pressable
       onPress={() => markAsRead(notification.id)}
       style={{
-        backgroundColor: notification.read ? theme.background : unreadBg,
+        backgroundColor: notification.read ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
         paddingHorizontal: Spacing.lg,
@@ -281,7 +281,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           width: 40,
           height: 40,
           borderRadius: Radius.full,
-          backgroundColor: theme.backgroundElement,
+          backgroundColor: theme.backgroundSelected,
           alignItems: 'center',
           justifyContent: 'center',
         }}>
@@ -290,19 +290,22 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         <View style={{ flex: 1, gap: 2 }}>
           {sessionInfoLoading ? (
             <View style={{ gap: 6 }}>
-              <View style={{ height: 14, width: '85%', borderRadius: 4, backgroundColor: theme.backgroundElement }} />
-              <View style={{ height: 14, width: '60%', borderRadius: 4, backgroundColor: theme.backgroundElement }} />
+              <View style={{ height: 14, width: '85%', borderRadius: 4, backgroundColor: theme.backgroundSelected }} />
+              <View style={{ height: 14, width: '60%', borderRadius: 4, backgroundColor: theme.backgroundSelected }} />
             </View>
           ) : (
             <ThemedText
               variant="body"
-              style={{ fontWeight: '600', fontSize: 15, lineHeight: 22 }}
+              style={{ fontWeight: '600', fontSize: 15, lineHeight: 22, color: theme.text }}
               numberOfLines={3}
             >
               {displayBody()}
             </ThemedText>
           )}
-          <ThemedText variant="caption" muted style={{ fontSize: 11, marginTop: 2 }}>
+          <ThemedText
+            variant="caption"
+            style={{ fontSize: 12, fontWeight: '500', marginTop: 2, color: theme.textSecondary }}
+          >
             {formatRelativeTime(notification.created_at)}
           </ThemedText>
         </View>
@@ -311,7 +314,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
             width: 8,
             height: 8,
             borderRadius: 4,
-            backgroundColor: '#3B82F6',
+            backgroundColor: theme.info,
             marginTop: 6,
           }} />
         )}
@@ -321,15 +324,15 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         <View style={{ marginTop: Spacing.md, marginLeft: 52 }}>
           {actionResult === 'accepted' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <CheckCircle size={16} color="#16A34A" strokeWidth={2.5} />
-              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: '#16A34A' }}>
+              <CheckCircle size={16} color={theme.success} strokeWidth={2.5} />
+              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: theme.success }}>
                 {getAcceptLabel(notification.type)}ed
               </ThemedText>
             </View>
           ) : actionResult === 'declined' ? (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <XCircle size={16} color="#DC2626" strokeWidth={2.5} />
-              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: '#DC2626' }}>
+              <XCircle size={16} color={theme.error} strokeWidth={2.5} />
+              <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 13, color: theme.error }}>
                 {getDeclineLabel(notification.type)}ed
               </ThemedText>
             </View>
