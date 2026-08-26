@@ -334,6 +334,7 @@ export function SessionDetailPopup({
     (maxParticipants != null && commitmentCount >= maxParticipants);
 
   const sessionStatus = session?.status ?? initialSession?.status;
+  const isClosed = sessionStatus === 'closed' || sessionStatus === 'completed' || sessionStatus === 'cancelled';
   const canSendChat =
     canViewChat &&
     (isCreator || myCommitmentStatus === 'accepted') &&
@@ -448,8 +449,8 @@ export function SessionDetailPopup({
               <ActivityIndicator color={theme.text} style={styles.dynamicLoader} />
             ) : (
               <>
-                {/* Applicants section — visible to creator */}
-                {isCreator && (
+                {/* Applicants section — visible to creator when session is active */}
+                {isCreator && !isClosed && (
                   <View style={styles.applicantsSection}>
                     <ThemedText variant="label" muted style={styles.sectionTitle}>
                       Applicants
@@ -650,8 +651,8 @@ export function SessionDetailPopup({
                   </View>
                 )}
 
-                {/* Delete — visible to creator */}
-                {isCreator && (
+                {/* Delete — visible to creator when session is active */}
+                {isCreator && !isClosed && (
                   <>
                     {hasAcceptedParticipants ? (
                       <View
@@ -685,8 +686,8 @@ export function SessionDetailPopup({
                   </>
                 )}
 
-                {/* Action section — visible to non-creators */}
-                {!isCreator && currentUserId && (
+                {/* Action section — visible to non-creators when session is active */}
+                {!isCreator && currentUserId && !isClosed && (
                   <>
                     {myCommitmentStatus === 'accepted' && (
                       <Button
