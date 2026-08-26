@@ -1,4 +1,5 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ChevronLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
@@ -170,6 +171,12 @@ export default function CommunityMembersScreen() {
           headerStyle: { backgroundColor: theme.background },
           headerShadowVisible: false,
           headerTintColor: theme.text,
+          headerTitleStyle: { color: theme.text },
+          headerLeft: () => (
+            <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+              <ChevronLeft size={24} color={theme.text} />
+            </Pressable>
+          ),
         }}
       />
       {loading ? (

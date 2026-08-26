@@ -1,6 +1,7 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Building2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Globe,
@@ -242,6 +243,12 @@ export default function CommunityInfoScreen() {
     headerStyle: { backgroundColor: theme.background },
     headerShadowVisible: false,
     headerTintColor: theme.text,
+    headerTitleStyle: { color: theme.text },
+    headerLeft: () => (
+      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+        <ChevronLeft size={24} color={theme.text} />
+      </Pressable>
+    ),
   };
 
   if (loading) {

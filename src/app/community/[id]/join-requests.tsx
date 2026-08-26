@@ -1,4 +1,4 @@
-import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -8,7 +8,7 @@ import {
   StyleSheet,
   View,
 } from 'react-native';
-import { Check, UserPlus, X } from 'lucide-react-native';
+import { Check, ChevronLeft, UserPlus, X } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
 import { Card } from '@/components/ui/Card';
@@ -91,6 +91,12 @@ export default function CommunityJoinRequestsScreen() {
     headerStyle: { backgroundColor: theme.background },
     headerShadowVisible: false,
     headerTintColor: theme.text,
+    headerTitleStyle: { color: theme.text },
+    headerLeft: () => (
+      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+        <ChevronLeft size={24} color={theme.text} />
+      </Pressable>
+    ),
   };
 
   return (
