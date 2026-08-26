@@ -61,7 +61,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
-        pressed && { backgroundColor: theme.backgroundElement },
+        { backgroundColor: pressed ? theme.backgroundElement : 'transparent' },
       ]}
     >
       {isCommunity && row.community.image_url ? (
@@ -100,7 +100,6 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           <Text style={styles.unreadBadgeText}>{row.unread > 99 ? '99+' : row.unread}</Text>
         </View>
       ) : null}
-      <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2.5} />
     </Pressable>
   );
 }
@@ -296,7 +295,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   loader: {
     marginTop: Spacing.xxl,
