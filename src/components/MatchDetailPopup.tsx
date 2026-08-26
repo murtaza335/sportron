@@ -81,6 +81,7 @@ export function MatchDetailPopup({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [liking, setLiking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -252,7 +253,8 @@ export function MatchDetailPopup({
   const creatorName = recordedByName ?? match.recorder?.username ?? match.player?.username ?? 'Unknown';
 
   const handleLike = async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || liking) return;
+    setLiking(true);
     const nextLiked = !liked;
     setLiked(nextLiked);
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
@@ -264,6 +266,8 @@ export function MatchDetailPopup({
       console.error('Failed to toggle like:', error);
       setLiked(!nextLiked);
       setLikesCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -474,7 +478,12 @@ export function MatchDetailPopup({
                 <ThemedText variant="body" style={styles.sectionTitle}>
                   Comments ({comments.length})
                 </ThemedText>
-                <Pressable onPress={handleLike} style={styles.likeActionBtn} hitSlop={8}>
+                <Pressable
+                  onPress={handleLike}
+                  disabled={liking}
+                  style={({ pressed }) => [styles.likeActionBtn, pressed && { opacity: 0.6 }]}
+                  hitSlop={8}
+                >
                   <Heart size={15} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
                   <ThemedText variant="caption" style={[styles.likeText, { color: liked ? theme.error : theme.textSecondary }]}>
                     {likesCount} {likesCount === 1 ? 'like' : 'likes'}

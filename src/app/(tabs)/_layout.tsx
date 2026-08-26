@@ -38,7 +38,7 @@ function SessionsHeaderRight() {
   return (
     <Pressable
       onPress={() => setSessionsView(isHistory ? 'new' : 'history')}
-      style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+      style={({ pressed }) => [{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }, pressed && { opacity: 0.6 }]}
       hitSlop={12}
       accessibilityLabel={isHistory ? 'Show open sessions' : 'Show session history'}
       accessibilityRole="button"
@@ -215,7 +215,7 @@ export default function TabLayout() {
           headerLeft: () => (
             <Pressable
               onPress={() => router.navigate('/create-session')}
-              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
+              style={({ pressed }) => [{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }, pressed && { opacity: 0.6 }]}
               hitSlop={16}
               accessibilityLabel="Create session"
               accessibilityRole="button"

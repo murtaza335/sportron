@@ -268,13 +268,15 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
   return (
     <Pressable
       onPress={() => markAsRead(notification.id)}
-      style={{
+      style={({ pressed }) => ({
         backgroundColor: notification.read ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
         paddingHorizontal: Spacing.lg,
         paddingVertical: Spacing.md,
-      }}
+        opacity: pressed ? 0.85 : 1,
+      })}
+      hitSlop={4}
     >
       <View style={{ flexDirection: 'row', gap: Spacing.md }}>
         <View style={{

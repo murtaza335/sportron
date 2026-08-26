@@ -59,10 +59,11 @@ export default function DiscoverScreen() {
           headerRight: () => (
             <Pressable
               onPress={() => router.push('/create-community')}
-              style={{
+              style={({ pressed }) => ({
                 marginRight: Spacing.md,
                 paddingTop: Platform.OS === 'ios' ? 2 : 0,
-              }}
+                opacity: pressed ? 0.6 : 1,
+              })}
               hitSlop={12}
               accessibilityLabel="Create community"
               accessibilityRole="button"

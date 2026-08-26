@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
@@ -162,13 +162,16 @@ export default function SettingsScreen() {
             </View>
           </View>
           <View style={styles.deleteButtonContainer}>
-            <ThemedText
-              variant="body"
-              style={[styles.deleteButton, { color: theme.error, borderColor: theme.error, backgroundColor: `${theme.error}08` }]}
+            <Pressable
               onPress={handleDeleteAccount}
+              style={({ pressed }) => [styles.deleteButton, { color: theme.error, borderColor: theme.error, backgroundColor: `${theme.error}08` }, pressed && { opacity: 0.7 }]}
+              hitSlop={12}
+              accessibilityRole="button"
             >
-              Delete My Account
-            </ThemedText>
+              <ThemedText variant="body" style={{ color: theme.error, fontWeight: '600' }}>
+                Delete My Account
+              </ThemedText>
+            </Pressable>
           </View>
         </Card>
       </ScrollView>

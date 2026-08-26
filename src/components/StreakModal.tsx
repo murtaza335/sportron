@@ -128,7 +128,7 @@ export function StreakModal({
             <Pressable
               onPress={onClose}
               hitSlop={12}
-              style={styles.closeIconButton}
+              style={({ pressed }) => [styles.closeIconButton, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
               accessibilityLabel="Close"
             >

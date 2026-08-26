@@ -393,7 +393,7 @@ export default function CommunityInfoScreen() {
             {sortedMembers.length} Member{sortedMembers.length !== 1 ? 's' : ''}
           </ThemedText>
           {(hasMoreMembers || isAdmin) && (
-            <Pressable onPress={() => router.navigate(`/community/${id}/members`)}>
+            <Pressable onPress={() => router.navigate(`/community/${id}/members`)} style={({ pressed }) => pressed && { opacity: 0.6 }} hitSlop={8}>
               <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '600' }}>
                 {isAdmin ? 'View All Members' : 'View All'}
               </ThemedText>
@@ -414,6 +414,8 @@ export default function CommunityInfoScreen() {
                     params: { id: member.profile_id, community: id },
                   })
                 }
+                style={({ pressed }) => [styles.memberRow, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
+                hitSlop={8}
                 onLongPress={() => {
                   if (isAdmin && member.profile_id !== user?.id) {
                     alert(
@@ -434,7 +436,6 @@ export default function CommunityInfoScreen() {
                     );
                   }
                 }}
-                style={[styles.memberRow, { borderBottomColor: theme.border }]}
               >
                 <UserAvatar avatarUrl={member.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
@@ -522,8 +523,9 @@ export default function CommunityInfoScreen() {
                   />
                 </View>
                 <Pressable
-                  style={[styles.settingRow, { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement }]}
+                  style={({ pressed }) => [styles.settingRow, { borderBottomColor: theme.border, backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                   onPress={() => router.push(`/community/${id}/edit`)}
+                  hitSlop={8}
                 >
                   <Pencil size={20} color={theme.text} strokeWidth={2} />
                   <ThemedText variant="body" style={{ fontWeight: '600', flex: 1 }}>
@@ -532,8 +534,9 @@ export default function CommunityInfoScreen() {
                   <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
                 </Pressable>
                 <Pressable
-                  style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
+                  style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                   onPress={handleDelete}
+                  hitSlop={8}
                 >
                   <Trash2 size={20} color={theme.error} strokeWidth={2} />
                   <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
@@ -544,8 +547,9 @@ export default function CommunityInfoScreen() {
             )}
             {!isAdmin && (
               <Pressable
-                style={[styles.settingRow, { backgroundColor: theme.backgroundElement }]}
+                style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                 onPress={handleLeave}
+                hitSlop={8}
               >
                 <LogOut size={20} color={theme.error} strokeWidth={2} />
                 <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>

@@ -159,7 +159,7 @@ export default function CreateSessionScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Session</ThemedText>
@@ -379,7 +379,8 @@ export default function CreateSessionScreen() {
                 setShowDatePicker(false);
                 setShowTimePicker(false);
               }}
-              style={styles.doneButton}
+              style={({ pressed }) => [styles.doneButton, pressed && { opacity: 0.6 }]}
+              hitSlop={8}
             >
               <ThemedText variant="body" style={{ color: theme.info, fontWeight: '600' }}>
                 Done

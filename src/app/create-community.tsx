@@ -112,7 +112,7 @@ export default function CreateCommunityScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12}>
+        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Community</ThemedText>
@@ -141,14 +141,14 @@ export default function CreateCommunityScreen() {
                 />
                 <Pressable
                   onPress={removeImage}
-                  style={[styles.imageRemoveButton, { backgroundColor: theme.background }]}
+                  style={({ pressed }) => [styles.imageRemoveButton, { backgroundColor: theme.background }, pressed && { opacity: 0.6 }]}
                   hitSlop={12}
                 >
                   <X size={14} color={theme.text} strokeWidth={2.5} />
                 </Pressable>
                 <Pressable
                   onPress={pickImage}
-                  style={[styles.imageChangeButton, { backgroundColor: theme.background }]}
+                  style={({ pressed }) => [styles.imageChangeButton, { backgroundColor: theme.background }, pressed && { opacity: 0.6 }]}
                   hitSlop={12}
                 >
                   <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
@@ -159,10 +159,12 @@ export default function CreateCommunityScreen() {
             ) : (
               <Pressable
                 onPress={pickImage}
-                style={[
+                style={({ pressed }) => [
                   styles.imagePicker,
                   { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  pressed && { opacity: 0.7 },
                 ]}
+                hitSlop={8}
               >
                 <ImageIcon size={24} color={theme.textSecondary} strokeWidth={1.5} />
                 <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
@@ -273,11 +275,13 @@ export default function CreateCommunityScreen() {
                   <Pressable
                     key={s}
                     onPress={() => setSport(s)}
-                    style={[
+                    style={({ pressed }) => [
                       styles.sportPill,
                       { borderColor: theme.border },
                       selected && { backgroundColor: theme.text, borderColor: theme.text },
+                      pressed && { opacity: 0.7 },
                     ]}
+                    hitSlop={4}
                   >
                     <ThemedText
                       variant="caption"
@@ -301,14 +305,16 @@ export default function CreateCommunityScreen() {
             <View style={styles.visibilityRow}>
               <Pressable
                 onPress={() => setVisibility('public')}
-                style={[
+                style={({ pressed }) => [
                   styles.visibilityOption,
                   {
                     backgroundColor:
                       visibility === 'public' ? theme.text : theme.backgroundElement,
                     borderColor: theme.border,
                   },
+                  pressed && { opacity: 0.7 },
                 ]}
+                hitSlop={4}
               >
                 <ThemedText
                   variant="body"
@@ -335,14 +341,16 @@ export default function CreateCommunityScreen() {
 
               <Pressable
                 onPress={() => setVisibility('restricted')}
-                style={[
+                style={({ pressed }) => [
                   styles.visibilityOption,
                   {
                     backgroundColor:
                       visibility === 'restricted' ? theme.text : theme.backgroundElement,
                     borderColor: theme.border,
                   },
+                  pressed && { opacity: 0.7 },
                 ]}
+                hitSlop={4}
               >
                 <ThemedText
                   variant="body"

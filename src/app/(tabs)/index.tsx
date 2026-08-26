@@ -143,7 +143,7 @@ export default function CommunitiesScreen() {
       >
         <Pressable
           onPress={() => router.push('/discover')}
-          style={styles.fabPressable}
+          style={({ pressed }) => [styles.fabPressable, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
           hitSlop={12}
           accessibilityLabel="Discover communities"
           accessibilityRole="button"

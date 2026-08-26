@@ -372,7 +372,7 @@ export function SessionDetailPopup({
                 <Pressable
                   onPress={() => setChatVisible(true)}
                   hitSlop={16}
-                  style={[styles.chatBtn, { backgroundColor: theme.backgroundElement }]}
+                  style={({ pressed }) => [styles.chatBtn, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                 >
                   <MessageCircle size={18} color={theme.text} strokeWidth={2.5} />
                   {sessionChat.unreadCount > 0 && (
@@ -487,24 +487,28 @@ export function SessionDetailPopup({
                                 <ActivityIndicator size="small" color={theme.textSecondary} style={styles.actionLoading} />
                               ) : (
                                 <>
-                                  <Pressable
-                                    onPress={() => handleApprove(c.id)}
-                                    disabled={approvingId === c.id}
-                                    style={[
-                                      styles.actionChip,
-                                      { backgroundColor: `${theme.success}20`, borderColor: `${theme.success}40` },
-                                    ]}
-                                  >
-                                    <Check size={14} color={theme.success} strokeWidth={3} />
-                                  </Pressable>
-                                  <Pressable
-                                    onPress={() => handleReject(c.id)}
-                                    disabled={approvingId === c.id}
-                                    style={[
-                                      styles.actionChip,
-                                      { backgroundColor: `${theme.error}20`, borderColor: `${theme.error}40` },
-                                    ]}
-                                  >
+                                   <Pressable
+                                     onPress={() => handleApprove(c.id)}
+                                     disabled={approvingId === c.id}
+                                     style={({ pressed }) => [
+                                       styles.actionChip,
+                                       { backgroundColor: `${theme.success}20`, borderColor: `${theme.success}40` },
+                                       pressed && { opacity: 0.7 },
+                                     ]}
+                                     hitSlop={8}
+                                   >
+                                     <Check size={14} color={theme.success} strokeWidth={3} />
+                                   </Pressable>
+                                   <Pressable
+                                      onPress={() => handleReject(c.id)}
+                                      disabled={approvingId === c.id}
+                                      style={({ pressed }) => [
+                                        styles.actionChip,
+                                       { backgroundColor: `${theme.error}20`, borderColor: `${theme.error}40` },
+                                       pressed && { opacity: 0.7 },
+                                     ]}
+                                     hitSlop={8}
+                                   >
                                     <X size={14} color={theme.error} strokeWidth={3} />
                                   </Pressable>
                                 </>
@@ -668,7 +672,8 @@ export function SessionDetailPopup({
                       <Pressable
                         onPress={handleDelete}
                         disabled={deleting}
-                        style={styles.deleteAction}
+                        style={({ pressed }) => [styles.deleteAction, pressed && { opacity: 0.7 }]}
+                        hitSlop={8}
                       >
                         <ThemedText
                           style={{ color: theme.error, fontWeight: '600', fontSize: 14 }}

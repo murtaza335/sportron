@@ -149,7 +149,7 @@ export function InviteMemberModal({
           enabled
         >
           <View style={styles.header}>
-            <Pressable onPress={onClose} hitSlop={16} style={styles.headerAction}>
+            <Pressable onPress={onClose} hitSlop={16} style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.6 }]}>
               <X size={24} color={theme.text} strokeWidth={2} />
             </Pressable>
             <ThemedText variant="heading" style={styles.title}>Invite Member</ThemedText>

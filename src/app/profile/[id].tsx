@@ -84,7 +84,7 @@ export default function PublicProfileScreen() {
           headerShown: true,
           title: profile?.username ?? 'Profile',
           headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
               <X size={22} color={theme.text} strokeWidth={2} />
             </Pressable>
           ),

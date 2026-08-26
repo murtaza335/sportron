@@ -134,7 +134,7 @@ export default function AddMatchScreen() {
 return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={16} style={styles.headerAction}>
+        <Pressable onPress={() => router.back()} hitSlop={16} style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.6 }]}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading" style={styles.title}>Record Match</ThemedText>

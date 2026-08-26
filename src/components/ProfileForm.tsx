@@ -170,9 +170,10 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           <Pressable
             onPress={pickImage}
             disabled={loading || uploadingAvatar}
-            style={[
+            style={({ pressed }) => [
               styles.avatarButton,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              (pressed || loading || uploadingAvatar) && { opacity: 0.6 },
             ]}
             hitSlop={12}>
             <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
@@ -183,7 +184,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
             <Pressable
               onPress={removeAvatar}
               disabled={loading || uploadingAvatar}
-              style={[styles.avatarButtonRemove, { backgroundColor: `${theme.error}10`, borderColor: theme.error }]}
+              style={({ pressed }) => [styles.avatarButtonRemove, { backgroundColor: `${theme.error}10`, borderColor: theme.error }, (pressed || loading || uploadingAvatar) && { opacity: 0.6 }]}
               hitSlop={12}>
               <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.error }}>
                 Remove

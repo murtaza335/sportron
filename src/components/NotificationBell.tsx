@@ -12,7 +12,7 @@ export function NotificationBell({ unreadCount, onPress }: NotificationBellProps
   const theme = useTheme();
 
   return (
-    <Pressable onPress={onPress} hitSlop={12} style={styles.container}>
+    <Pressable onPress={onPress} hitSlop={12} style={({ pressed }) => [styles.container, pressed && { opacity: 0.6 }]}>
       <View style={styles.bellWrapper}>
         <Bell size={24} color={theme.text} strokeWidth={2.5} />
         {unreadCount > 0 && (

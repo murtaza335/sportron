@@ -361,7 +361,7 @@ export default function CommunityDetailScreen() {
           headerRight: () =>
             isMember ? (
               <View>
-                <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={styles.headerIcon}>
+                <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={({ pressed }) => [styles.headerIcon, pressed && { opacity: 0.6 }]}>
                   <MoreHorizontal size={22} color={theme.text} strokeWidth={2} />
                 </Pressable>
               </View>
@@ -531,7 +531,8 @@ export default function CommunityDetailScreen() {
               />
               <Pressable
                 onPress={() => setChatVisible(true)}
-                style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
+                hitSlop={8}
               >
                 <MessageCircle size={20} color={theme.text} strokeWidth={2} />
                 {communityChat.unreadCount > 0 && (
@@ -545,7 +546,8 @@ export default function CommunityDetailScreen() {
               {(isAdmin || community.pings_enabled) && (
                 <Pressable
                   onPress={openPingModal}
-                  style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                  style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
+                  hitSlop={8}
                 >
                   <Megaphone size={20} color={theme.text} strokeWidth={2} />
                   <View style={[styles.pingDot, { backgroundColor: theme.error }]} />
@@ -556,11 +558,13 @@ export default function CommunityDetailScreen() {
             {/* Tabs */}
             <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
               <Pressable
-                style={[
+                style={({ pressed }) => [
                   styles.tab,
                   activeTab === 'feed' && { borderBottomColor: theme.text },
+                  pressed && { opacity: 0.7 },
                 ]}
                 onPress={() => setActiveTab('feed')}
+                hitSlop={8}
               >
                 <ThemedText
                   variant="label"
@@ -574,11 +578,13 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable
-                style={[
+                style={({ pressed }) => [
                   styles.tab,
                   activeTab === 'pending' && { borderBottomColor: theme.text },
+                  pressed && { opacity: 0.7 },
                 ]}
                 onPress={() => setActiveTab('pending')}
+                hitSlop={8}
               >
                 <ThemedText
                   variant="label"
@@ -614,8 +620,9 @@ export default function CommunityDetailScreen() {
                 {activeTab === 'feed' && hasMoreMatches && (
                   <Pressable
                     onPress={handleLoadMore}
-                    style={[styles.loadMoreButton, { borderColor: theme.border }]}
+                    style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
                     disabled={loadingMore}
+                    hitSlop={8}
                   >
                     {loadingMore ? (
                       <ActivityIndicator size="small" color={theme.textSecondary} />
@@ -647,7 +654,7 @@ export default function CommunityDetailScreen() {
           <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
               <ThemedText variant="heading">Ping Everyone</ThemedText>
-              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16}>
+              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
             </View>

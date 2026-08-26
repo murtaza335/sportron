@@ -1,5 +1,5 @@
 import { useCallback, useState } from 'react';
-import { Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
 import { CheckCheck } from 'lucide-react-native';
 
 import { ActivityCard } from '@/components/ActivityCard';
@@ -24,6 +24,7 @@ export default function UpdatesScreen() {
   const theme = useTheme();
   const { notifications, fetchNotifications, loading, markAllAsRead, unreadCount } = useNotifications();
   const [activeTab, setActiveTab] = useState<'action' | 'invites' | 'past'>('action');
+  const [markingAll, setMarkingAll] = useState(false);
 
   const actionRequired = notifications.filter((n) => ACTION_REQUIRED_TYPES.includes(n.type));
   const invites = notifications.filter((n) => INVITE_TYPES.includes(n.type));
@@ -43,19 +44,34 @@ export default function UpdatesScreen() {
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       {unreadCount > 0 && (
-        <Pressable onPress={markAllAsRead} style={styles.markAllButton} hitSlop={8}>
-          <CheckCheck size={14} color={theme.info} strokeWidth={2.5} />
+        <Pressable
+          onPress={async () => {
+            if (markingAll) return;
+            setMarkingAll(true);
+            await markAllAsRead();
+            setMarkingAll(false);
+          }}
+          style={({ pressed }) => [styles.markAllButton, pressed && { opacity: 0.6 }]}
+          disabled={markingAll}
+          hitSlop={8}
+        >
+          {markingAll ? (
+            <ActivityIndicator size="small" color={theme.info} />
+          ) : (
+            <CheckCheck size={14} color={theme.info} strokeWidth={2.5} />
+          )}
           <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '700' }}>
-            Mark all as read
+            {markingAll ? 'Marking...' : 'Mark all as read'}
           </ThemedText>
         </Pressable>
       )}
       <View style={[styles.tabRow, { borderBottomColor: theme.border }]}>
         <Pressable
           onPress={() => setActiveTab('action')}
-          style={[
+          style={({ pressed }) => [
             styles.tab,
             activeTab === 'action' && { borderBottomColor: theme.text },
+            pressed && { opacity: 0.7 },
           ]}
           hitSlop={8}
         >
@@ -79,9 +95,10 @@ export default function UpdatesScreen() {
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('invites')}
-          style={[
+          style={({ pressed }) => [
             styles.tab,
             activeTab === 'invites' && { borderBottomColor: theme.text },
+            pressed && { opacity: 0.7 },
           ]}
           hitSlop={8}
         >
@@ -105,9 +122,10 @@ export default function UpdatesScreen() {
         </Pressable>
         <Pressable
           onPress={() => setActiveTab('past')}
-          style={[
+          style={({ pressed }) => [
             styles.tab,
             activeTab === 'past' && { borderBottomColor: theme.text },
+            pressed && { opacity: 0.7 },
           ]}
           hitSlop={8}
         >

@@ -80,13 +80,15 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
   return (
     <Pressable
       onPress={() => markAsRead(notificationId)}
-      style={{
+      style={({ pressed }) => ({
         backgroundColor: actionResult ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,
         borderBottomColor: theme.border,
         paddingHorizontal: Spacing.lg,
         paddingVertical: Spacing.md,
-      }}
+        opacity: pressed ? 0.85 : 1,
+      })}
+      hitSlop={4}
     >
       <View style={{ flexDirection: 'row', gap: Spacing.md }}>
         <View
