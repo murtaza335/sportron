@@ -294,7 +294,7 @@ export function MatchDetailPopup({
       else await disputeCommunityMatch(match.id, currentUserId);
       setVerificationStatus(status);
       onRefreshFeed?.();
-    } catch (_error) {
+    } catch {
       alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);

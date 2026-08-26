@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageSquare, ChevronRight, Users } from 'lucide-react-native';
+import { MessageSquare, Users } from 'lucide-react-native';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { SessionChatPopup } from '@/components/SessionChatPopup';

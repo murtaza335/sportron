@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { Radius, Spacing } from '@/constants/theme';
@@ -22,9 +22,8 @@ export function SegmentedControl<T extends string>({
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
   const selectedIndex = options.findIndex((o) => o.value === value);
-  const slideAnim = useRef(new Animated.Value(0)).current;
+  const [slideAnim] = useState(() => new Animated.Value(0));
   const containerWidth = useRef(0);
-  const segmentWidth = containerWidth.current / options.length || 0;
 
   useEffect(() => {
     if (containerWidth.current === 0) return;
