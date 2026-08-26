@@ -149,7 +149,7 @@ export default function ProfileScreen() {
                     </ThemedText>
                     <Pressable
                       onPress={() => { if (typeof window !== 'undefined') window.location.href = '/android'; }}
-                      style={styles.webPromptLink}
+                      style={({ pressed }) => [styles.webPromptLink, pressed && { opacity: 0.7 }]}
                       hitSlop={8}
                     >
                       <ThemedText variant="caption" style={{ color: theme.background, textDecorationLine: 'underline' }}>
@@ -161,7 +161,7 @@ export default function ProfileScreen() {
               )}
               <Pressable
                 onPress={() => setDismissedWebPrompt(true)}
-                style={styles.webPromptDismiss}
+                style={({ pressed }) => [styles.webPromptDismiss, pressed && { opacity: 0.6 }]}
                 hitSlop={8}
               >
                 <X size={18} color={theme.background} />
@@ -175,7 +175,7 @@ export default function ProfileScreen() {
               <UserAvatar avatarUrl={profile?.avatar_url} size={88} />
               <Pressable
                 onPress={() => setEditing(true)}
-                style={[styles.editAvatarButton, { backgroundColor: theme.text }]}
+                style={({ pressed }) => [styles.editAvatarButton, { backgroundColor: theme.text }, pressed && { opacity: 0.7, transform: [{ scale: 0.9 }] }]}
                 hitSlop={8}
               >
                 <Pencil size={14} color={theme.background} />
@@ -207,7 +207,7 @@ export default function ProfileScreen() {
           </ThemedText>
           <Pressable
             onPress={() => setShowThemeModal(true)}
-            style={[styles.sectionIcon, { backgroundColor: theme.backgroundElement }]}
+            style={({ pressed }) => [styles.sectionIcon, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
             hitSlop={12}
           >
             {colorScheme === 'dark' ? (
@@ -249,7 +249,7 @@ export default function ProfileScreen() {
               >
                 <View style={styles.modalHeader}>
                   <ThemedText variant="label">Choose Theme</ThemedText>
-                  <Pressable onPress={() => setShowThemeModal(false)} hitSlop={12}>
+                   <Pressable onPress={() => setShowThemeModal(false)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                     <X size={20} color={theme.text} />
                   </Pressable>
                 </View>
@@ -272,7 +272,7 @@ export default function ProfileScreen() {
                           {option === 'light' ? 'Light' : 'Dark'}
                         </ThemedText>
                       </View>
-                      {colorScheme === option && <Check size={22} color="#10B981" />}
+                      {colorScheme === option && <Check size={22} color={theme.success} />}
                     </Pressable>
                   ))}
                 </View>
@@ -301,8 +301,8 @@ export default function ProfileScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={handleNotificationsToggle}
-              trackColor={{ false: '#9CA3AF', true: '#3B82F6' }}
-              thumbColor="#F9FAFB"
+              trackColor={{ false: theme.borderMuted, true: theme.accent }}
+              thumbColor={theme.background}
             />
           </View>
         </Card>
@@ -324,8 +324,8 @@ export default function ProfileScreen() {
           loading={signingOut}
           onPress={handleSignOut}
           buttonStyle={{
-            borderColor: '#DC2626',
-            backgroundColor: 'rgba(220, 38, 38, 0.08)',
+            borderColor: theme.error,
+            backgroundColor: `${theme.error}0D`,
           }}
         />
       </ScrollView>

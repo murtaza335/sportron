@@ -18,13 +18,14 @@ const IMAGE_HEIGHT = 140;
 export function CommunityCard({ community, membershipRole }: CommunityCardProps) {
   const theme = useTheme();
   const router = useRouter();
+  const isDark = theme.resolvedColorScheme === 'dark';
 
   return (
     <Pressable
       onPress={() => router.push(`/community/${community.id}?communityName=${encodeURIComponent(community.name)}`)}
       style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
     >
-      <View style={[styles.card, { backgroundColor: theme.background, borderColor: theme.border }]}>
+      <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         <View style={styles.imageContainer}>
           {community.image_url ? (
             <Image
@@ -45,62 +46,112 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
             {community.name}
           </ThemedText>
           {community.description && (
-            <ThemedText variant="caption" muted numberOfLines={2} style={styles.desc}>
+            <ThemedText
+              variant="caption"
+              numberOfLines={2}
+              style={[styles.desc, { color: theme.textSecondary }]}
+            >
               {community.description}
             </ThemedText>
           )}
           <View style={styles.byRow}>
-            <ThemedText variant="caption" muted numberOfLines={1} style={styles.byText}>
+            <ThemedText
+              variant="caption"
+              numberOfLines={1}
+              style={[styles.byText, { color: theme.textSecondary }]}
+            >
               Created by {community.creator?.username ?? 'unknown'}
             </ThemedText>
             {community.organization && (
               <View style={styles.orgItem}>
                 <Building2 size={11} color={theme.textSecondary} strokeWidth={2} />
-                <ThemedText variant="caption" muted numberOfLines={1} style={styles.byText}>
+                <ThemedText
+                  variant="caption"
+                  numberOfLines={1}
+                  style={[styles.byText, { color: theme.textSecondary }]}
+                >
                   {community.organization}
                 </ThemedText>
               </View>
             )}
           </View>
           <View style={styles.metaRow}>
-            <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
-              <ThemedText variant="caption" muted style={styles.badgeText}>
+            {/* Sport pill — capsule, semi-transparent accent */}
+            <View
+              style={[
+                styles.sportPill,
+                {
+                  backgroundColor: isDark
+                    ? 'rgba(0, 168, 181, 0.15)'
+                    : 'rgba(0, 168, 181, 0.1)',
+                },
+              ]}
+            >
+              <ThemedText
+                variant="caption"
+                style={[
+                  styles.sportPillText,
+                  { color: isDark ? '#2DD4BF' : '#00A8B5' },
+                ]}
+              >
                 {SPORT_LABELS[community.sport]}
               </ThemedText>
             </View>
-            <Users size={12} color={theme.textSecondary} strokeWidth={2} />
-            <ThemedText variant="caption" muted>
-              {community.member_count ?? 0}
-            </ThemedText>
-            <View style={[styles.badge, { backgroundColor: theme.backgroundSelected }]}>
-              <ThemedText variant="caption" muted style={styles.badgeText}>
+
+            {/* Member count */}
+            <View style={styles.memberCount}>
+              <Users size={12} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText
+                variant="caption"
+                style={[styles.metaText, { color: theme.textSecondary }]}
+              >
+                {community.member_count ?? 0}
+              </ThemedText>
+            </View>
+
+            {/* Visibility pill — capsule */}
+            <View
+              style={[
+                styles.statusPill,
+                {
+                  backgroundColor: isDark ? '#262A34' : '#E2E8F0',
+                },
+              ]}
+            >
+              <ThemedText
+                variant="caption"
+                style={[
+                  styles.statusPillText,
+                  { color: theme.textSecondary },
+                ]}
+              >
                 {community.visibility === 'public' ? 'Public' : 'Private'}
               </ThemedText>
             </View>
+
+            {/* Member/Admin badge */}
             {membershipRole && (
               <View
                 style={[
-                  styles.badge,
                   styles.memberTag,
                   {
-                    backgroundColor:
-                      membershipRole === 'admin' ? '#F59E0B20' : '#3B82F620',
+                    backgroundColor: isDark
+                      ? 'rgba(16, 185, 129, 0.15)'
+                      : 'rgba(16, 185, 129, 0.1)',
                   },
                 ]}
               >
                 <ShieldCheck
                   size={10}
-                  color={membershipRole === 'admin' ? '#D97706' : '#2563EB'}
+                  color={isDark ? '#34D399' : '#10B981'}
                   strokeWidth={2.5}
                 />
                 <ThemedText
                   variant="caption"
-                  style={{
-                    fontSize: 10,
-                    fontWeight: '700',
-                    textTransform: 'uppercase',
-                    color: membershipRole === 'admin' ? '#D97706' : '#2563EB',
-                  }}
+                  style={[
+                    styles.memberTagText,
+                    { color: isDark ? '#34D399' : '#10B981' },
+                  ]}
                 >
                   {membershipRole === 'admin' ? 'Admin' : 'Member'}
                 </ThemedText>
@@ -115,7 +166,7 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     borderWidth: 1,
     overflow: 'hidden',
   },
@@ -136,10 +187,11 @@ const styles = StyleSheet.create({
     gap: 2,
   },
   name: {
-    fontWeight: '700',
+    fontWeight: '600',
   },
   desc: {
     marginTop: 1,
+    fontWeight: '400',
   },
   byRow: {
     flexDirection: 'row',
@@ -150,6 +202,7 @@ const styles = StyleSheet.create({
   },
   byText: {
     fontSize: 11,
+    fontWeight: '500',
   },
   orgItem: {
     flexDirection: 'row',
@@ -161,20 +214,47 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
-    marginTop: Spacing.xs,
+    marginTop: Spacing.sm,
     flexWrap: 'wrap',
   },
-  badge: {
+  sportPill: {
     paddingHorizontal: Spacing.sm,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  sportPillText: {
+    fontSize: 10,
+    fontWeight: '700',
+    textTransform: 'uppercase',
+  },
+  memberCount: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 3,
+  },
+  metaText: {
+    fontSize: 12,
+    fontWeight: '500',
+  },
+  statusPill: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
+  },
+  statusPillText: {
+    fontSize: 10,
+    fontWeight: '600',
+    textTransform: 'uppercase',
   },
   memberTag: {
     flexDirection: 'row',
     alignItems: 'center',
     gap: 3,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: 3,
+    borderRadius: Radius.full,
   },
-  badgeText: {
+  memberTagText: {
     fontSize: 10,
     fontWeight: '700',
     textTransform: 'uppercase',

@@ -124,6 +124,7 @@ export default function CommunityMembersScreen() {
 
   // Context menu state
   const [contextMember, setContextMember] = useState<CommunityMember | null>(null);
+  const [promotingId, setPromotingId] = useState<string | null>(null);
 
   const handleRemove = (member: CommunityMember) => {
     setContextMember(null);
@@ -149,7 +150,9 @@ export default function CommunityMembersScreen() {
   };
 
   const handleMakeAdmin = async (member: CommunityMember) => {
+    if (promotingId) return;
     setContextMember(null);
+    setPromotingId(member.profile_id);
     try {
       await promoteToAdmin(id!, member.profile_id, userId!);
       setMembers((prev) =>
@@ -160,6 +163,8 @@ export default function CommunityMembersScreen() {
       alert('Done', `${member.profile?.username || 'User'} is now an admin.`);
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to promote member.');
+    } finally {
+      setPromotingId(null);
     }
   };
 
@@ -173,7 +178,14 @@ export default function CommunityMembersScreen() {
           headerTintColor: theme.text,
           headerTitleStyle: { color: theme.text },
           headerLeft: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+            <Pressable
+              onPress={() => router.back()}
+              hitSlop={12}
+              style={({ pressed }) => [
+                { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+                pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+              ]}
+            >
               <ChevronLeft size={24} color={theme.text} />
             </Pressable>
           ),
@@ -198,10 +210,10 @@ export default function CommunityMembersScreen() {
               <>
                 <Pressable
                   onPress={() => setShowInviteModal(true)}
-                  style={styles.inviteButton}
+                  style={({ pressed }) => [styles.inviteButton, pressed && { opacity: 0.7, backgroundColor: theme.backgroundSelected }]}
                   hitSlop={8}
                 >
-                  <ThemedText variant="body" style={{ color: '#3B82F6', fontWeight: '700' }}>
+                  <ThemedText variant="body" style={{ color: theme.info, fontWeight: '700' }}>
                     + Invite Member by Username
                   </ThemedText>
                 </Pressable>
@@ -225,7 +237,7 @@ export default function CommunityMembersScreen() {
                           </ThemedText>
                         </View>
                         <View style={styles.pendingBadge}>
-                          <ThemedText variant="caption" style={{ color: '#3B82F6', fontWeight: '700', fontSize: 11 }}>
+                          <ThemedText variant="caption" style={{ color: theme.info, fontWeight: '700', fontSize: 11 }}>
                             Invited
                           </ThemedText>
                         </View>
@@ -268,8 +280,8 @@ export default function CommunityMembersScreen() {
                   )}
                 </View>
                 {item.role === 'admin' && (
-                  <View style={[styles.roleBadge, { backgroundColor: '#D9770620' }]}>
-                    <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700', fontSize: 11 }}>
+                  <View style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
+                    <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin
                     </ThemedText>
                   </View>
@@ -300,20 +312,29 @@ export default function CommunityMembersScreen() {
             </ThemedText>
 
             <Pressable
-              style={[styles.contextOption, { borderBottomColor: theme.border }]}
+              style={({ pressed }) => [styles.contextOption, { borderBottomColor: theme.border }, pressed && { opacity: 0.7, backgroundColor: theme.backgroundSelected }]}
               onPress={() => contextMember && handleMakeAdmin(contextMember)}
+              disabled={!!promotingId}
+              hitSlop={8}
             >
-              <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                Make admin
-              </ThemedText>
-              <ThemedText variant="caption" muted>Promote this member to admin</ThemedText>
+              {promotingId ? (
+                <ActivityIndicator color={theme.text} style={{ marginVertical: Spacing.xs }} />
+              ) : (
+                <>
+                  <ThemedText variant="body" style={{ fontWeight: '600' }}>
+                    Make admin
+                  </ThemedText>
+                  <ThemedText variant="caption" muted>Promote this member to admin</ThemedText>
+                </>
+              )}
             </Pressable>
 
             <Pressable
-              style={styles.contextOption}
+              style={({ pressed }) => [styles.contextOption, pressed && { opacity: 0.7, backgroundColor: theme.backgroundSelected }]}
               onPress={() => contextMember && handleRemove(contextMember)}
+              hitSlop={8}
             >
-              <ThemedText variant="body" style={{ color: '#EF4444', fontWeight: '600' }}>
+              <ThemedText variant="body" style={{ color: theme.error, fontWeight: '600' }}>
                 Remove from community
               </ThemedText>
               <ThemedText variant="caption" muted>Kick this member out</ThemedText>
@@ -321,7 +342,8 @@ export default function CommunityMembersScreen() {
 
             <Pressable
               onPress={() => setContextMember(null)}
-              style={[styles.contextCancel, { borderTopColor: theme.border }]}
+              style={({ pressed }) => [styles.contextCancel, { borderTopColor: theme.border }, pressed && { opacity: 0.7, backgroundColor: theme.backgroundSelected }]}
+              hitSlop={8}
             >
               <ThemedText variant="body" style={{ color: theme.textSecondary, fontWeight: '600' }}>
                 Cancel

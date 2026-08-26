@@ -84,7 +84,7 @@ export default function PublicProfileScreen() {
           headerShown: true,
           title: profile?.username ?? 'Profile',
           headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12}>
+            <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
               <X size={22} color={theme.text} strokeWidth={2} />
             </Pressable>
           ),
@@ -140,8 +140,8 @@ export default function PublicProfileScreen() {
               </View>
 
               {memberStats.role === 'admin' && (
-                <View style={[styles.adminBadge, { backgroundColor: '#D9770620' }]}>
-                  <ThemedText variant="caption" style={{ color: '#D97706', fontWeight: '700' }}>
+                <View style={[styles.adminBadge, { backgroundColor: `${theme.warning}20` }]}>
+                  <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700' }}>
                     Admin
                   </ThemedText>
                 </View>

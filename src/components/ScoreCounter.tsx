@@ -73,7 +73,7 @@ export function ScoreCounter({ label, score, onIncrement, onDecrement, onScorePr
           <Minus size={28} color={theme.text} strokeWidth={2.5} />
         </Pressable>
 
-        <Pressable onPress={handleScorePress} style={styles.scoreTouchArea} hitSlop={16}>
+        <Pressable onPress={handleScorePress} style={({ pressed }) => [styles.scoreTouchArea, pressed && { opacity: 0.7 }]} hitSlop={16}>
           <ThemedText variant="hero" style={styles.score}>
             {score}
           </ThemedText>

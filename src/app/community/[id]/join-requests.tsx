@@ -26,6 +26,7 @@ export default function CommunityJoinRequestsScreen() {
   const [joinRequests, setJoinRequests] = useState<CommunityJoinRequest[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  const [processingId, setProcessingId] = useState<string | null>(null);
 
   const load = useCallback(async () => {
     if (!id) return;
@@ -79,11 +80,15 @@ export default function CommunityJoinRequestsScreen() {
     request: CommunityJoinRequest,
     status: 'approved' | 'rejected',
   ) => {
+    if (processingId) return;
+    setProcessingId(request.id);
     try {
       await respondToJoinRequest(request.id, status);
       setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to respond.');
+    } finally {
+      setProcessingId(null);
     }
   };
 
@@ -93,7 +98,14 @@ export default function CommunityJoinRequestsScreen() {
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
-      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => [
+          { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+          pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+        ]}
+      >
         <ChevronLeft size={24} color={theme.text} />
       </Pressable>
     ),
@@ -137,18 +149,40 @@ export default function CommunityJoinRequestsScreen() {
                 </View>
               </View>
               <View style={styles.requestActions}>
-                <Pressable
-                  onPress={() => handleRespond(req, 'approved')}
-                  style={[styles.actionChip, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}
-                >
-                  <Check size={14} color="#10B981" strokeWidth={3} />
-                </Pressable>
-                <Pressable
-                  onPress={() => handleRespond(req, 'rejected')}
-                  style={[styles.actionChip, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}
-                >
-                  <X size={14} color="#EF4444" strokeWidth={3} />
-                </Pressable>
+                {processingId === req.id ? (
+                  <View style={[styles.actionChip, { backgroundColor: '#10B98120', borderColor: '#10B98140' }]}>
+                    <ActivityIndicator size="small" color="#10B981" />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => handleRespond(req, 'approved')}
+                    style={({ pressed }) => [
+                      styles.actionChip,
+                      { backgroundColor: '#10B98120', borderColor: '#10B98140' },
+                      pressed && { opacity: 0.6, transform: [{ scale: 0.9 }] },
+                    ]}
+                    hitSlop={8}
+                  >
+                    <Check size={14} color="#10B981" strokeWidth={3} />
+                  </Pressable>
+                )}
+                {processingId === req.id ? (
+                  <View style={[styles.actionChip, { backgroundColor: '#EF444420', borderColor: '#EF444440' }]}>
+                    <ActivityIndicator size="small" color="#EF4444" />
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={() => handleRespond(req, 'rejected')}
+                    style={({ pressed }) => [
+                      styles.actionChip,
+                      { backgroundColor: '#EF444420', borderColor: '#EF444440' },
+                      pressed && { opacity: 0.6, transform: [{ scale: 0.9 }] },
+                    ]}
+                    hitSlop={8}
+                  >
+                    <X size={14} color="#EF4444" strokeWidth={3} />
+                  </Pressable>
+                )}
               </View>
             </Card>
           ))

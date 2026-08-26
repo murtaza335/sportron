@@ -387,8 +387,8 @@ function EditCommunityForm({
           />
 
           <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
-            <Shield size={14} color="#EF4444" strokeWidth={2} />
-            <ThemedText variant="caption" style={{ color: '#EF4444', fontWeight: '600' }}>
+            <Shield size={14} color={theme.error} strokeWidth={2} />
+            <ThemedText variant="caption" style={{ color: theme.error, fontWeight: '600' }}>
               Transfer Admin Rights
             </ThemedText>
           </Pressable>

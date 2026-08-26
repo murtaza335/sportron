@@ -49,10 +49,13 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
     }
   }, [hydrated, userScheme]);
 
-  // Resolve the actual color scheme to use
-  const resolvedColorScheme = userScheme === 'system' || userScheme === null
-    ? (systemScheme === 'dark' ? 'dark' : 'light')
-    : userScheme;
+  // Resolve the actual color scheme to use (default: dark on first launch)
+  const resolvedColorScheme =
+    userScheme === 'light' || userScheme === 'dark'
+      ? userScheme
+      : userScheme === 'system'
+        ? (systemScheme === 'dark' ? 'dark' : 'light')
+        : 'dark';
 
   const theme = Colors[resolvedColorScheme];
 

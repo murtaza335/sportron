@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { MessageSquare, ChevronRight, Users } from 'lucide-react-native';
+import { MessageSquare, Users } from 'lucide-react-native';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { SessionChatPopup } from '@/components/SessionChatPopup';
@@ -61,7 +61,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
       onPress={onPress}
       style={({ pressed }) => [
         styles.tile,
-        pressed && { backgroundColor: theme.backgroundElement },
+        { backgroundColor: pressed ? theme.backgroundElement : 'transparent' },
       ]}
     >
       {isCommunity && row.community.image_url ? (
@@ -73,7 +73,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           style={[
             styles.avatarWrap,
             styles.avatarPlaceholder,
-            { backgroundColor: isSessionActive ? '#10B98120' : theme.backgroundSelected },
+            { backgroundColor: isSessionActive ? `${theme.success}20` : theme.backgroundSelected },
           ]}
         >
           {isCommunity ? (
@@ -81,7 +81,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           ) : (
             <MessageSquare
               size={20}
-              color={isSessionActive ? '#10B981' : theme.textSecondary}
+              color={isSessionActive ? theme.success : theme.textSecondary}
               strokeWidth={2}
             />
           )}
@@ -96,11 +96,10 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
         </ThemedText>
       </View>
       {row.unread > 0 ? (
-        <View style={styles.unreadBadge}>
+        <View style={[styles.unreadBadge, { backgroundColor: theme.success }]}>
           <Text style={styles.unreadBadgeText}>{row.unread > 99 ? '99+' : row.unread}</Text>
         </View>
       ) : null}
-      <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2.5} />
     </Pressable>
   );
 }
@@ -296,7 +295,7 @@ const styles = StyleSheet.create({
     width: '100%',
     alignSelf: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.lg,
+    paddingTop: Spacing.sm,
   },
   loader: {
     marginTop: Spacing.xxl,
@@ -348,7 +347,6 @@ const styles = StyleSheet.create({
     height: 24,
     paddingHorizontal: 8,
     borderRadius: 12,
-    backgroundColor: '#10B981',
     alignItems: 'center',
     justifyContent: 'center',
   },

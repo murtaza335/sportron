@@ -1,6 +1,6 @@
-import { StyleSheet, View, type ViewProps } from 'react-native';
+import { StyleSheet, View, type ViewStyle, type ViewProps } from 'react-native';
 
-import { Radius, Spacing } from '@/constants/theme';
+import { Radius, Spacing, Shadows } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 
 type CardProps = ViewProps & {
@@ -9,16 +9,19 @@ type CardProps = ViewProps & {
 
 export function Card({ style, bordered = true, ...rest }: CardProps) {
   const theme = useTheme();
+  const isDark = theme.resolvedColorScheme === 'dark';
+  const shadow = isDark ? Shadows.dark.card : Shadows.light.card;
 
   return (
     <View
       style={[
         styles.card,
         {
-          backgroundColor: theme.background,
+          backgroundColor: theme.backgroundElement,
           borderColor: theme.border,
         },
         bordered && styles.bordered,
+        shadow as ViewStyle,
         style,
       ]}
       {...rest}
@@ -42,7 +45,7 @@ export function Divider({ spacing = Spacing.md }: { spacing?: number }) {
 
 const styles = StyleSheet.create({
   card: {
-    borderRadius: Radius.md,
+    borderRadius: Radius.lg,
     padding: Spacing.md,
   },
   bordered: {

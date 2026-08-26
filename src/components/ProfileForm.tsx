@@ -150,7 +150,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
                       cx="54"
                       cy="54"
                       r={RING_RADIUS}
-                      stroke="#10B981"
+                      stroke={theme.success}
                       strokeWidth="4"
                       fill="none"
                       strokeDasharray={`${CIRCUMFERENCE} ${CIRCUMFERENCE}`}
@@ -170,9 +170,10 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           <Pressable
             onPress={pickImage}
             disabled={loading || uploadingAvatar}
-            style={[
+            style={({ pressed }) => [
               styles.avatarButton,
               { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+              (pressed || loading || uploadingAvatar) && { opacity: 0.6 },
             ]}
             hitSlop={12}>
             <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
@@ -183,9 +184,9 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
             <Pressable
               onPress={removeAvatar}
               disabled={loading || uploadingAvatar}
-              style={styles.avatarButtonRemove}
+              style={({ pressed }) => [styles.avatarButtonRemove, { backgroundColor: `${theme.error}10`, borderColor: theme.error }, (pressed || loading || uploadingAvatar) && { opacity: 0.6 }]}
               hitSlop={12}>
-              <ThemedText variant="caption" style={{ fontWeight: '700', color: '#DC2626' }}>
+              <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.error }}>
                 Remove
               </ThemedText>
             </Pressable>
@@ -212,11 +213,11 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
             Checking availability…
           </ThemedText>
         ) : taken ? (
-          <ThemedText variant="caption" style={{ color: '#DC2626' }}>
+          <ThemedText variant="caption" style={{ color: theme.error }}>
             That username is taken. Please choose another one.
           </ThemedText>
         ) : available ? (
-          <ThemedText variant="caption" style={{ color: '#10B981' }}>
+          <ThemedText variant="caption" style={{ color: theme.success }}>
             Username is available.
           </ThemedText>
         ) : null}
@@ -304,10 +305,8 @@ const styles = StyleSheet.create({
   avatarButtonRemove: {
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.xs,
-    backgroundColor: 'rgba(220, 38, 38, 0.1)',
     borderRadius: Radius.full,
     borderWidth: 1,
-    borderColor: '#DC2626',
   },
   field: {
     gap: Spacing.sm,

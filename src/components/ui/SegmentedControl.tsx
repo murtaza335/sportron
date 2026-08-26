@@ -1,4 +1,5 @@
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useEffect, useRef, useState } from 'react';
+import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -20,9 +21,43 @@ export function SegmentedControl<T extends string>({
   unread,
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
+  const selectedIndex = options.findIndex((o) => o.value === value);
+  const [slideAnim] = useState(() => new Animated.Value(0));
+  const containerWidth = useRef(0);
+
+  useEffect(() => {
+    if (containerWidth.current === 0) return;
+    const target = (containerWidth.current / options.length) * selectedIndex;
+    Animated.spring(slideAnim, {
+      toValue: target,
+      useNativeDriver: true,
+      speed: 28,
+      bounciness: 0,
+    }).start();
+  }, [selectedIndex, options.length, slideAnim]);
+
+  const onContainerLayout = (e: LayoutChangeEvent) => {
+    containerWidth.current = e.nativeEvent.layout.width;
+    slideAnim.setValue((e.nativeEvent.layout.width / options.length) * selectedIndex);
+  };
 
   return (
-    <View style={[styles.container, { borderColor: theme.border }]}>
+    <View
+      style={[styles.container, { borderColor: theme.border }]}
+      onLayout={onContainerLayout}
+    >
+      {/* Sliding indicator */}
+      <Animated.View
+        style={[
+          styles.indicator,
+          compact && styles.indicatorCompact,
+          {
+            backgroundColor: theme.text,
+            width: `${100 / options.length}%`,
+            transform: [{ translateX: slideAnim }],
+          },
+        ]}
+      />
       {options.map((option) => {
         const selected = option.value === value;
         const hasUnread = !!unread?.[option.value];
@@ -30,10 +65,10 @@ export function SegmentedControl<T extends string>({
           <Pressable
             key={option.value}
             onPress={() => onChange(option.value)}
-            style={[
+            style={({ pressed }) => [
               styles.segment,
               compact && styles.segmentCompact,
-              selected && { backgroundColor: theme.text },
+              pressed && { opacity: 0.6 },
             ]}
             hitSlop={12}
             accessibilityRole="button"
@@ -47,7 +82,7 @@ export function SegmentedControl<T extends string>({
                 ]}>
                 {option.label}
               </Text>
-              {hasUnread && <View style={styles.dot} />}
+              {hasUnread && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
             </View>
           </Pressable>
         );
@@ -62,6 +97,18 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderRadius: Radius.md,
     overflow: 'hidden',
+    position: 'relative',
+  },
+  indicator: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    bottom: 0,
+    borderRadius: Radius.md - 1,
+    zIndex: 0,
+  },
+  indicatorCompact: {
+    borderRadius: Radius.sm,
   },
   segment: {
     flex: 1,
@@ -70,6 +117,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.md,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 1,
   },
   segmentCompact: {
     minHeight: 32,
@@ -85,7 +133,6 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#10B981',
   },
   label: {
     fontSize: 14,

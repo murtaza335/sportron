@@ -334,6 +334,7 @@ export function SessionDetailPopup({
     (maxParticipants != null && commitmentCount >= maxParticipants);
 
   const sessionStatus = session?.status ?? initialSession?.status;
+  const isClosed = sessionStatus === 'closed' || sessionStatus === 'completed' || sessionStatus === 'cancelled';
   const canSendChat =
     canViewChat &&
     (isCreator || myCommitmentStatus === 'accepted') &&
@@ -372,11 +373,11 @@ export function SessionDetailPopup({
                 <Pressable
                   onPress={() => setChatVisible(true)}
                   hitSlop={16}
-                  style={[styles.chatBtn, { backgroundColor: theme.backgroundElement }]}
+                  style={({ pressed }) => [styles.chatBtn, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                 >
                   <MessageCircle size={18} color={theme.text} strokeWidth={2.5} />
                   {sessionChat.unreadCount > 0 && (
-                    <View style={styles.chatUnreadBadge}>
+                    <View style={[styles.chatUnreadBadge, { backgroundColor: theme.error }]}>
                       <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
                         {sessionChat.unreadCount > 99 ? '99+' : sessionChat.unreadCount}
                       </ThemedText>
@@ -387,7 +388,7 @@ export function SessionDetailPopup({
               <Pressable
                 onPress={onClose}
                 hitSlop={16}
-                style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
+                style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.6 }]}
               >
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
@@ -448,8 +449,8 @@ export function SessionDetailPopup({
               <ActivityIndicator color={theme.text} style={styles.dynamicLoader} />
             ) : (
               <>
-                {/* Applicants section — visible to creator */}
-                {isCreator && (
+                {/* Applicants section — visible to creator when session is active */}
+                {isCreator && !isClosed && (
                   <View style={styles.applicantsSection}>
                     <ThemedText variant="label" muted style={styles.sectionTitle}>
                       Applicants
@@ -487,25 +488,29 @@ export function SessionDetailPopup({
                                 <ActivityIndicator size="small" color={theme.textSecondary} style={styles.actionLoading} />
                               ) : (
                                 <>
-                                  <Pressable
-                                    onPress={() => handleApprove(c.id)}
-                                    disabled={approvingId === c.id}
-                                    style={[
-                                      styles.actionChip,
-                                      { backgroundColor: '#10B98120', borderColor: '#10B98140' },
-                                    ]}
-                                  >
-                                    <Check size={14} color="#10B981" strokeWidth={3} />
-                                  </Pressable>
-                                  <Pressable
-                                    onPress={() => handleReject(c.id)}
-                                    disabled={approvingId === c.id}
-                                    style={[
-                                      styles.actionChip,
-                                      { backgroundColor: '#EF444420', borderColor: '#EF444440' },
-                                    ]}
-                                  >
-                                    <X size={14} color="#EF4444" strokeWidth={3} />
+                                   <Pressable
+                                     onPress={() => handleApprove(c.id)}
+                                     disabled={approvingId === c.id}
+                                     style={({ pressed }) => [
+                                       styles.actionChip,
+                                       { backgroundColor: `${theme.success}20`, borderColor: `${theme.success}40` },
+                                       pressed && { opacity: 0.7 },
+                                     ]}
+                                     hitSlop={8}
+                                   >
+                                     <Check size={14} color={theme.success} strokeWidth={3} />
+                                   </Pressable>
+                                   <Pressable
+                                      onPress={() => handleReject(c.id)}
+                                      disabled={approvingId === c.id}
+                                      style={({ pressed }) => [
+                                        styles.actionChip,
+                                       { backgroundColor: `${theme.error}20`, borderColor: `${theme.error}40` },
+                                       pressed && { opacity: 0.7 },
+                                     ]}
+                                     hitSlop={8}
+                                   >
+                                    <X size={14} color={theme.error} strokeWidth={3} />
                                   </Pressable>
                                 </>
                               )}
@@ -534,10 +539,10 @@ export function SessionDetailPopup({
                                 </ThemedText>
                               </View>
                             </View>
-                            <View style={[styles.statusChip, { backgroundColor: '#10B98120' }]}>
+                            <View style={[styles.statusChip, { backgroundColor: `${theme.success}20` }]}>
                               <ThemedText
                                 variant="caption"
-                                style={{ color: '#10B981', fontWeight: '700', fontSize: 10 }}
+                                style={{ color: theme.success, fontWeight: '700', fontSize: 10 }}
                               >
                                 Approved
                               </ThemedText>
@@ -575,11 +580,11 @@ export function SessionDetailPopup({
                                     </ThemedText>
                                   </View>
                                 </View>
-                                <View style={[styles.statusChip, { backgroundColor: '#EF444420' }]}>
+                                <View style={[styles.statusChip, { backgroundColor: `${theme.error}20` }]}>
                                   <ThemedText
                                     variant="caption"
                                     style={{
-                                      color: '#EF4444',
+                                      color: theme.error,
                                       fontWeight: '700',
                                       fontSize: 10,
                                     }}
@@ -625,11 +630,11 @@ export function SessionDetailPopup({
                                     </ThemedText>
                                   </View>
                                 </View>
-                                <View style={[styles.statusChip, { backgroundColor: '#A855F720' }]}>
+                                <View style={[styles.statusChip, { backgroundColor: `${theme.info}20` }]}>
                                   <ThemedText
                                     variant="caption"
                                     style={{
-                                      color: '#A855F7',
+                                      color: theme.info,
                                       fontWeight: '700',
                                       fontSize: 10,
                                     }}
@@ -646,19 +651,19 @@ export function SessionDetailPopup({
                   </View>
                 )}
 
-                {/* Delete — visible to creator */}
-                {isCreator && (
+                {/* Delete — visible to creator when session is active */}
+                {isCreator && !isClosed && (
                   <>
                     {hasAcceptedParticipants ? (
                       <View
                         style={[
                           styles.deleteBlockedBanner,
-                          { backgroundColor: '#DC262610', borderColor: '#DC262625' },
+                          { backgroundColor: `${theme.error}10`, borderColor: `${theme.error}25` },
                         ]}
                       >
                         <ThemedText
                           variant="caption"
-                          style={{ color: '#DC2626', textAlign: 'center', fontWeight: '500' }}
+                          style={{ color: theme.error, textAlign: 'center', fontWeight: '500' }}
                         >
                           Cannot delete — {acceptedCommitments.length} participant
                           {acceptedCommitments.length > 1 ? 's have' : ' has'} already been accepted
@@ -668,10 +673,11 @@ export function SessionDetailPopup({
                       <Pressable
                         onPress={handleDelete}
                         disabled={deleting}
-                        style={styles.deleteAction}
+                        style={({ pressed }) => [styles.deleteAction, pressed && { opacity: 0.7 }]}
+                        hitSlop={8}
                       >
                         <ThemedText
-                          style={{ color: '#DC2626', fontWeight: '600', fontSize: 14 }}
+                          style={{ color: theme.error, fontWeight: '600', fontSize: 14 }}
                         >
                           {deleting ? 'Deleting...' : 'Delete Session'}
                         </ThemedText>
@@ -680,8 +686,8 @@ export function SessionDetailPopup({
                   </>
                 )}
 
-                {/* Action section — visible to non-creators */}
-                {!isCreator && currentUserId && (
+                {/* Action section — visible to non-creators when session is active */}
+                {!isCreator && currentUserId && !isClosed && (
                   <>
                     {myCommitmentStatus === 'accepted' && (
                       <Button
@@ -702,10 +708,10 @@ export function SessionDetailPopup({
                       </ThemedText>
                     )}
                     {myCommitmentStatus === 'left' && (
-                      <View style={[styles.leftBanner, { backgroundColor: '#A855F715', borderColor: '#A855F730' }]}>
+                      <View style={[styles.leftBanner, { backgroundColor: `${theme.info}15`, borderColor: `${theme.info}30` }]}>
                         <ThemedText
                           variant="body"
-                          style={{ color: '#A855F7', fontWeight: '600', textAlign: 'center' }}
+                          style={{ color: theme.info, fontWeight: '600', textAlign: 'center' }}
                         >
                           You left this session
                         </ThemedText>
@@ -723,10 +729,10 @@ export function SessionDetailPopup({
                     {!myCommitmentStatus && (
                       <>
                         {isSessionFull ? (
-                          <View style={[styles.fullBanner, { backgroundColor: '#DC262610', borderColor: '#DC262625' }]}>
-                            <ThemedText
-                              variant="body"
-                              style={{ color: '#DC2626', fontWeight: '600', textAlign: 'center' }}
+                        <View style={[styles.fullBanner, { backgroundColor: `${theme.error}10`, borderColor: `${theme.error}25` }]}>
+                          <ThemedText
+                            variant="body"
+                            style={{ color: theme.error, fontWeight: '600', textAlign: 'center' }}
                             >
                               Session is full
                             </ThemedText>
@@ -823,8 +829,6 @@ const styles = StyleSheet.create({
     minWidth: 16,
     height: 16,
     borderRadius: Radius.full,
-    backgroundColor: '#EF4444',
-    paddingHorizontal: 3,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,

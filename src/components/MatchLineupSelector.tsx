@@ -97,7 +97,7 @@ function SlotCard({
         <Pressable
           onPress={onDelete}
           hitSlop={12}
-          style={styles.deleteButton}
+          style={({ pressed }) => [styles.deleteButton, pressed && { opacity: 0.6 }]}
         >
           <Trash2 size={16} color="#DC2626" />
         </Pressable>
@@ -362,7 +362,7 @@ export function MatchLineupSelector({
                 </ThemedText>
               </View>
 
-              <Pressable onPress={closePicker} hitSlop={12} style={styles.closeButton}>
+              <Pressable onPress={closePicker} hitSlop={12} style={({ pressed }) => [styles.closeButton, pressed && { opacity: 0.6 }]}>
                 <X size={20} color={theme.text} />
               </Pressable>
             </View>

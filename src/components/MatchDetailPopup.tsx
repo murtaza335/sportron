@@ -81,6 +81,7 @@ export function MatchDetailPopup({
   const [submittingComment, setSubmittingComment] = useState(false);
   const [liked, setLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
+  const [liking, setLiking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
 
@@ -252,7 +253,8 @@ export function MatchDetailPopup({
   const creatorName = recordedByName ?? match.recorder?.username ?? match.player?.username ?? 'Unknown';
 
   const handleLike = async () => {
-    if (!currentUserId) return;
+    if (!currentUserId || liking) return;
+    setLiking(true);
     const nextLiked = !liked;
     setLiked(nextLiked);
     setLikesCount((prev) => (nextLiked ? prev + 1 : Math.max(0, prev - 1)));
@@ -264,6 +266,8 @@ export function MatchDetailPopup({
       console.error('Failed to toggle like:', error);
       setLiked(!nextLiked);
       setLikesCount((prev) => (!nextLiked ? prev + 1 : Math.max(0, prev - 1)));
+    } finally {
+      setLiking(false);
     }
   };
 
@@ -290,7 +294,7 @@ export function MatchDetailPopup({
       else await disputeCommunityMatch(match.id, currentUserId);
       setVerificationStatus(status);
       onRefreshFeed?.();
-    } catch (_error) {
+    } catch {
       alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);
@@ -298,9 +302,9 @@ export function MatchDetailPopup({
   };
 
   const statusStyle = {
-    verified: { bg: '#10B9811F', color: '#10B981', label: 'Verified', Icon: Check },
-    pending: { bg: '#D977061F', color: '#D97706', label: 'Pending', Icon: Clock },
-    disputed: { bg: '#DC26261F', color: '#EF4444', label: 'Disputed', Icon: AlertTriangle },
+    verified: { bg: `${theme.success}1F`, color: theme.success, label: 'Verified', Icon: Check },
+    pending: { bg: `${theme.warning}1F`, color: theme.warning, label: 'Pending', Icon: Clock },
+    disputed: { bg: `${theme.error}1F`, color: theme.error, label: 'Disputed', Icon: AlertTriangle },
   }[verificationStatus];
 
   const StatusIcon = statusStyle.Icon;
@@ -376,11 +380,11 @@ export function MatchDetailPopup({
                   {userResult && (
                     <View style={[
                       styles.resultBadge,
-                      { backgroundColor: userResult === 'win' ? '#10B9811F' : userResult === 'loss' ? '#EF44441F' : '#6B72801F' }
+                      { backgroundColor: userResult === 'win' ? `${theme.success}1F` : userResult === 'loss' ? `${theme.error}1F` : `${theme.textSecondary}1F` }
                     ]}>
                       <ThemedText style={[
                         styles.resultText,
-                        { color: userResult === 'win' ? '#10B981' : userResult === 'loss' ? '#EF4444' : '#6B7280' }
+                        { color: userResult === 'win' ? theme.success : userResult === 'loss' ? theme.error : theme.textSecondary }
                       ]}>
                         {userResult}
                       </ThemedText>
@@ -423,9 +427,9 @@ export function MatchDetailPopup({
                     <Pressable
                       onPress={() => handleVerifyStatus('disputed')}
                       disabled={updatingStatus}
-                      style={[styles.verifyBtn, styles.disputeBtn]}
+                      style={[styles.verifyBtn, { backgroundColor: 'transparent', borderWidth: 1, borderColor: theme.error }]}
                     >
-                      <ThemedText style={[styles.verifyBtnText, styles.disputeText]}>Dispute</ThemedText>
+                      <ThemedText style={[styles.verifyBtnText, { color: theme.error }]}>Dispute</ThemedText>
                     </Pressable>
                   </View>
                 </View>
@@ -474,9 +478,14 @@ export function MatchDetailPopup({
                 <ThemedText variant="body" style={styles.sectionTitle}>
                   Comments ({comments.length})
                 </ThemedText>
-                <Pressable onPress={handleLike} style={styles.likeActionBtn} hitSlop={8}>
-                  <Heart size={15} color={liked ? '#EF4444' : theme.textSecondary} fill={liked ? '#EF4444' : 'none'} />
-                  <ThemedText variant="caption" style={[styles.likeText, { color: liked ? '#EF4444' : theme.textSecondary }]}>
+                <Pressable
+                  onPress={handleLike}
+                  disabled={liking}
+                  style={({ pressed }) => [styles.likeActionBtn, pressed && { opacity: 0.6 }]}
+                  hitSlop={8}
+                >
+                  <Heart size={15} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
+                  <ThemedText variant="caption" style={[styles.likeText, { color: liked ? theme.error : theme.textSecondary }]}>
                     {likesCount} {likesCount === 1 ? 'like' : 'likes'}
                   </ThemedText>
                 </Pressable>

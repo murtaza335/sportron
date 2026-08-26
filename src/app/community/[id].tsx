@@ -298,7 +298,14 @@ export default function CommunityDetailScreen() {
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
-      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+      <Pressable
+        onPress={() => router.back()}
+        hitSlop={12}
+        style={({ pressed }) => [
+          { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+          pressed && { backgroundColor: theme.backgroundSelected, transform: [{ scale: 0.92 }] },
+        ]}
+      >
         <ChevronLeft size={24} color={theme.text} />
       </Pressable>
     ),
@@ -354,7 +361,7 @@ export default function CommunityDetailScreen() {
           headerRight: () =>
             isMember ? (
               <View>
-                <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={styles.headerIcon}>
+                <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={({ pressed }) => [styles.headerIcon, pressed && { opacity: 0.6 }]}>
                   <MoreHorizontal size={22} color={theme.text} strokeWidth={2} />
                 </Pressable>
               </View>
@@ -385,19 +392,19 @@ export default function CommunityDetailScreen() {
                   style={[
                     styles.visibilityBadgeSmall,
                     {
-                      backgroundColor: community.visibility === 'public' ? '#10B98120' : '#D9770620',
+                      backgroundColor: community.visibility === 'public' ? `${theme.success}20` : `${theme.warning}20`,
                     },
                   ]}
                 >
                   {community.visibility === 'public' ? (
-                    <Globe size={12} color="#10B981" strokeWidth={2.5} />
+                    <Globe size={12} color={theme.success} strokeWidth={2.5} />
                   ) : (
-                    <Lock size={12} color="#D97706" strokeWidth={2.5} />
+                    <Lock size={12} color={theme.warning} strokeWidth={2.5} />
                   )}
                   <ThemedText
                     variant="caption"
                     style={{
-                      color: community.visibility === 'public' ? '#10B981' : '#D97706',
+                      color: community.visibility === 'public' ? theme.success : theme.warning,
                       fontWeight: '700',
                       fontSize: 11,
                     }}
@@ -500,7 +507,7 @@ export default function CommunityDetailScreen() {
             </View>
             <View style={styles.joinRequestsLinkRight}>
               {joinRequests.length > 0 && (
-                <View style={[styles.requestCountBadge, { backgroundColor: '#DC2626' }]}>
+                <View style={[styles.requestCountBadge, { backgroundColor: theme.error }]}>
                   <ThemedText style={styles.requestCountText}>
                     {joinRequests.length > 99 ? '99+' : joinRequests.length}
                   </ThemedText>
@@ -524,11 +531,12 @@ export default function CommunityDetailScreen() {
               />
               <Pressable
                 onPress={() => setChatVisible(true)}
-                style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
+                hitSlop={8}
               >
                 <MessageCircle size={20} color={theme.text} strokeWidth={2} />
                 {communityChat.unreadCount > 0 && (
-                  <View style={styles.chatUnreadBadge}>
+                  <View style={[styles.chatUnreadBadge, { backgroundColor: theme.error }]}>
                     <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
                       {communityChat.unreadCount > 99 ? '99+' : communityChat.unreadCount}
                     </ThemedText>
@@ -538,10 +546,11 @@ export default function CommunityDetailScreen() {
               {(isAdmin || community.pings_enabled) && (
                 <Pressable
                   onPress={openPingModal}
-                  style={[styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}
+                  style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
+                  hitSlop={8}
                 >
                   <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                  <View style={styles.pingDot} />
+                  <View style={[styles.pingDot, { backgroundColor: theme.error }]} />
                 </Pressable>
               )}
             </View>
@@ -549,11 +558,13 @@ export default function CommunityDetailScreen() {
             {/* Tabs */}
             <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
               <Pressable
-                style={[
+                style={({ pressed }) => [
                   styles.tab,
                   activeTab === 'feed' && { borderBottomColor: theme.text },
+                  pressed && { opacity: 0.7 },
                 ]}
                 onPress={() => setActiveTab('feed')}
+                hitSlop={8}
               >
                 <ThemedText
                   variant="label"
@@ -567,11 +578,13 @@ export default function CommunityDetailScreen() {
                 </ThemedText>
               </Pressable>
               <Pressable
-                style={[
+                style={({ pressed }) => [
                   styles.tab,
                   activeTab === 'pending' && { borderBottomColor: theme.text },
+                  pressed && { opacity: 0.7 },
                 ]}
                 onPress={() => setActiveTab('pending')}
+                hitSlop={8}
               >
                 <ThemedText
                   variant="label"
@@ -607,8 +620,9 @@ export default function CommunityDetailScreen() {
                 {activeTab === 'feed' && hasMoreMatches && (
                   <Pressable
                     onPress={handleLoadMore}
-                    style={[styles.loadMoreButton, { borderColor: theme.border }]}
+                    style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
                     disabled={loadingMore}
+                    hitSlop={8}
                   >
                     {loadingMore ? (
                       <ActivityIndicator size="small" color={theme.textSecondary} />
@@ -640,7 +654,7 @@ export default function CommunityDetailScreen() {
           <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
             <View style={styles.modalHeader}>
               <ThemedText variant="heading">Ping Everyone</ThemedText>
-              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16}>
+              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
             </View>

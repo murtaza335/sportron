@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
@@ -117,8 +117,8 @@ export default function SettingsScreen() {
             <Switch
               value={notificationsEnabled}
               onValueChange={handleMasterToggle}
-              trackColor={{ false: '#9CA3AF', true: '#3B82F6' }}
-              thumbColor="#F9FAFB"
+              trackColor={{ false: theme.borderMuted, true: theme.accent }}
+              thumbColor={theme.background}
             />
           </View>
         </Card>
@@ -151,24 +151,27 @@ export default function SettingsScreen() {
 
         <Card style={styles.settingCard}>
           <View style={styles.settingRow}>
-            <View style={[styles.settingIcon, { backgroundColor: '#FEE2E2' }]}>
-              <AlertTriangle size={22} color="#DC2626" />
+            <View style={[styles.settingIcon, { backgroundColor: `${theme.error}15` }]}>
+              <AlertTriangle size={22} color={theme.error} />
             </View>
             <View style={styles.settingContent}>
-              <ThemedText variant="body" style={{ color: '#DC2626' }}>Delete Account</ThemedText>
+              <ThemedText variant="body" style={{ color: theme.error }}>Delete Account</ThemedText>
               <ThemedText variant="caption" muted>
                 Permanently delete your data
               </ThemedText>
             </View>
           </View>
           <View style={styles.deleteButtonContainer}>
-            <ThemedText
-              variant="body"
-              style={styles.deleteButton}
+            <Pressable
               onPress={handleDeleteAccount}
+              style={({ pressed }) => [styles.deleteButton, { color: theme.error, borderColor: theme.error, backgroundColor: `${theme.error}08` }, pressed && { opacity: 0.7 }]}
+              hitSlop={12}
+              accessibilityRole="button"
             >
-              Delete My Account
-            </ThemedText>
+              <ThemedText variant="body" style={{ color: theme.error, fontWeight: '600' }}>
+                Delete My Account
+              </ThemedText>
+            </Pressable>
           </View>
         </Card>
       </ScrollView>
@@ -221,13 +224,10 @@ const styles = StyleSheet.create({
     paddingBottom: Spacing.sm,
   },
   deleteButton: {
-    color: '#DC2626',
     textAlign: 'center',
     paddingVertical: Spacing.sm,
     borderRadius: Radius.md,
     borderWidth: 1,
-    borderColor: '#DC2626',
-    backgroundColor: '#FEF2F2',
     overflow: 'hidden',
   },
 });

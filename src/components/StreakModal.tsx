@@ -94,14 +94,13 @@ export function StreakModal({
 
   if (!visible) return null;
 
-  const isDark = theme.resolvedColorScheme === 'dark';
   const hasStreak = streakCount > 0;
-  const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
+  const streakColor = hasStreak ? theme.error : theme.textSecondary;
 
-  const cardBackgroundColor = isDark ? '#1C1C1E' : theme.background;
-  const cardBorderColor = isDark ? '#2C2C2E' : theme.border;
-  const buttonBgColor = isDark ? '#FFFFFF' : '#000000';
-  const buttonTextColor = isDark ? '#000000' : '#FFFFFF';
+  const cardBackgroundColor = theme.backgroundElement;
+  const cardBorderColor = theme.border;
+  const buttonBgColor = theme.text;
+  const buttonTextColor = theme.background;
 
   return (
     <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
@@ -129,7 +128,7 @@ export function StreakModal({
             <Pressable
               onPress={onClose}
               hitSlop={12}
-              style={styles.closeIconButton}
+              style={({ pressed }) => [styles.closeIconButton, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
               accessibilityLabel="Close"
             >
@@ -159,7 +158,7 @@ export function StreakModal({
             {/* Best Streak */}
             <View style={styles.statBox}>
               <View style={[styles.flameCircle, { backgroundColor: 'rgba(245, 158, 11, 0.1)' }]}>
-                <Trophy size={22} color="#F59E0B" strokeWidth={2.2} />
+                <Trophy size={22} color={theme.warning} strokeWidth={2.2} />
               </View>
               <View style={styles.streakCountRow}>
                 <Text style={[styles.streakNumber, { color: theme.text }]}>{longestStreak}</Text>
@@ -180,7 +179,7 @@ export function StreakModal({
 
           {/* Rule Notice */}
           <View style={styles.ruleCard}>
-            <Sparkles size={15} color="#3B82F6" strokeWidth={2.2} style={styles.ruleIcon} />
+            <Sparkles size={15} color={theme.accent} strokeWidth={2.2} style={styles.ruleIcon} />
             <ThemedText variant="caption" style={[styles.ruleText, { color: theme.textSecondary }]}>
               Maintain your streak by playing a match or participating/creating a session daily.
             </ThemedText>

@@ -38,7 +38,7 @@ function SessionsHeaderRight() {
   return (
     <Pressable
       onPress={() => setSessionsView(isHistory ? 'new' : 'history')}
-      style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }}
+      style={({ pressed }) => [{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }, pressed && { opacity: 0.6 }]}
       hitSlop={12}
       accessibilityLabel={isHistory ? 'Show open sessions' : 'Show session history'}
       accessibilityRole="button"
@@ -108,7 +108,7 @@ function CommunitiesHeaderStreak() {
   const { streakCount, longestStreak, lastActivityDate } = useStreak();
   const [modalVisible, setModalVisible] = useState(false);
   const hasStreak = streakCount > 0;
-  const streakColor = hasStreak ? '#FF5722' : theme.textSecondary;
+  const streakColor = hasStreak ? theme.error : theme.textSecondary;
 
   return (
     <>
@@ -215,7 +215,7 @@ export default function TabLayout() {
           headerLeft: () => (
             <Pressable
               onPress={() => router.navigate('/create-session')}
-              style={{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
+              style={({ pressed }) => [{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }, pressed && { opacity: 0.6 }]}
               hitSlop={16}
               accessibilityLabel="Create session"
               accessibilityRole="button"
@@ -246,7 +246,7 @@ export default function TabLayout() {
                   paddingHorizontal: 4,
                   alignItems: 'center',
                   justifyContent: 'center',
-                  backgroundColor: '#10B981',
+                   backgroundColor: theme.success,
                 }}>
                   <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>
                     {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
@@ -274,7 +274,7 @@ export default function TabLayout() {
                   width: 10,
                   height: 10,
                   borderRadius: 5,
-                  backgroundColor: '#DC2626',
+                   backgroundColor: theme.error,
                 }} />
               )}
             </View>
