@@ -139,23 +139,33 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
     <Card bordered={false} style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border, borderWidth: 1 }]}>
       {/* Post Header */}
       <View style={styles.header}>
-<Pressable
-              style={styles.authorRow}
+        <View style={styles.authorRow}>
+          <Pressable
+            disabled={!recorderProfile?.id}
+            onPress={() => {
+              if (recorderProfile?.id) router.push(`/profile/${recorderProfile.id}${communityId ? `?community=${communityId}` : ''}`);
+            }}
+            style={({ pressed }) => pressed && styles.pressedContent}
+          >
+            <UserAvatar avatarUrl={recorderAvatar} size={36} />
+          </Pressable>
+          <View style={styles.authorTextCol}>
+            <Pressable
               disabled={!recorderProfile?.id}
               onPress={() => {
                 if (recorderProfile?.id) router.push(`/profile/${recorderProfile.id}${communityId ? `?community=${communityId}` : ''}`);
               }}
+              style={({ pressed }) => pressed && styles.pressedContent}
             >
-              <UserAvatar avatarUrl={recorderAvatar} size={36} />
-              <View style={styles.authorTextCol}>
-                <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
-                  {recorderName}
-                </ThemedText>
-                <ThemedText variant="caption" muted style={styles.timeAgo}>
-                  {formatRelativeTime(match.created_at)}
-                </ThemedText>
-              </View>
+              <ThemedText variant="body" style={styles.authorName} numberOfLines={1}>
+                {recorderName}
+              </ThemedText>
             </Pressable>
+            <ThemedText variant="caption" muted style={styles.timeAgo}>
+              {formatRelativeTime(match.created_at)}
+            </ThemedText>
+          </View>
+        </View>
 
            <View style={styles.badges}>
              
@@ -303,11 +313,11 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
          {/* Social Row Footer */}
          <View style={styles.socialRow}>
-           <Pressable
-             onPress={handleLike}
-             hitSlop={8}
-             style={styles.socialAction}
-           >
+            <Pressable
+              onPress={handleLike}
+              hitSlop={8}
+              style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}
+            >
               <Heart
                 size={16}
                 color={liked ? theme.error : theme.textSecondary}
@@ -318,12 +328,17 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
              </ThemedText>
            </Pressable>
 
-           <View style={styles.socialAction}>
-             <MessageSquare size={16} color={theme.textSecondary} />
-             <ThemedText variant="caption" muted style={styles.socialText}>
-               {match.comments_count || 0} {match.comments_count === 1 ? 'comment' : 'comments'}
-             </ThemedText>
-           </View>
+            <Pressable
+              onPress={onPress}
+              hitSlop={8}
+              style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}
+              disabled={!onPress}
+            >
+              <MessageSquare size={16} color={theme.textSecondary} />
+              <ThemedText variant="caption" muted style={styles.socialText}>
+                {match.comments_count || 0} {match.comments_count === 1 ? 'comment' : 'comments'}
+              </ThemedText>
+            </Pressable>
          </View>
        </Card>
     );
@@ -442,6 +457,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
+    paddingVertical: 4,
+    paddingHorizontal: 6,
+    borderRadius: Radius.sm,
+  },
+  pressedSocial: {
+    opacity: 0.5,
   },
   socialText: {
     fontSize: 12,
