@@ -129,6 +129,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   const [draft, setDraft] = useState('');
   const draftRef = useRef('');
   const inputRef = useRef<TextInput>(null);
+  const [inputHeight, setInputHeight] = useState(40);
   const [replyTo, setReplyTo] = useState<T | null>(null);
   const [editingMessage, setEditingMessage] = useState<T | null>(null);
   const [contextMenu, setContextMenu] = useState<{ message: T; x: number; y: number } | null>(null);
@@ -873,6 +874,10 @@ const contextLayout = useMemo(() => {
                     draftRef.current = text;
                     setDraft(text);
                   }}
+                  onLayout={(e) => {
+                    const h = e.nativeEvent.layout.height;
+                    setInputHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
+                  }}
                   placeholder={placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
@@ -884,6 +889,15 @@ const contextLayout = useMemo(() => {
                       color: theme.text,
                       backgroundColor: theme.backgroundElement,
                       borderColor: theme.border,
+                      borderRadius:
+                        inputHeight <= 44
+                          ? Radius.full
+                          : inputHeight >= 100
+                            ? Radius.md
+                            : Math.round(
+                                9999 -
+                                  ((inputHeight - 44) / (100 - 44)) * (9999 - Radius.md),
+                              ),
                     },
                   ]}
                 />
