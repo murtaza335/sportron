@@ -387,7 +387,7 @@ export function SessionDetailPopup({
               <Pressable
                 onPress={onClose}
                 hitSlop={16}
-                style={[styles.closeBtn, { backgroundColor: theme.backgroundElement }]}
+                style={({ pressed }) => [styles.closeBtn, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.6 }]}
               >
                 <X size={18} color={theme.text} strokeWidth={2.5} />
               </Pressable>
