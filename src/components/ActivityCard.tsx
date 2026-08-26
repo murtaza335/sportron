@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Alert, Pressable, View } from 'react-native';
+import { ActivityIndicator, Pressable, View } from 'react-native';
 import { Bell, Check, CheckCircle, Swords, UserPlus, X, XCircle } from 'lucide-react-native';
 
+import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -226,7 +227,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       await doAction('accepted');
     } catch (err) {
       console.error('Accept action failed:', err);
-      Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
+      alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
       return;
     }
@@ -247,7 +248,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
       await doAction('declined');
     } catch (err) {
       console.error('Decline action failed:', err);
-      Alert.alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
+      alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
       return;
     }

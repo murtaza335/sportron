@@ -1,6 +1,7 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Building2,
+  ChevronLeft,
   ChevronRight,
   Clock,
   Globe,
@@ -18,7 +19,6 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Modal,
   Pressable,
   RefreshControl,
@@ -28,6 +28,7 @@ import {
   View,
 } from 'react-native';
 
+import { alert } from '@/lib/alert';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
@@ -246,7 +247,7 @@ export default function CommunityDetailScreen() {
     try {
       if (community?.visibility === 'restricted') {
         await requestToJoinCommunity(id, user.id);
-        Alert.alert('Request Sent', 'The admin will review your request.');
+        alert('Request Sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
         setMembership({
@@ -263,7 +264,7 @@ export default function CommunityDetailScreen() {
       }
       refresh();
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to join.');
+      alert('Error', e?.message ?? 'Failed to join.');
     }
   };
 
@@ -274,9 +275,9 @@ export default function CommunityDetailScreen() {
       await sendPing(id, user.id, pingMessage.trim());
       setPingMessage('');
       setPingModalVisible(false);
-      Alert.alert('Ping Sent', 'Notification sent to all members.');
+      alert('Ping Sent', 'Notification sent to all members.');
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to send ping.');
+      alert('Error', e?.message ?? 'Failed to send ping.');
     } finally {
       setSendingPing(false);
     }
@@ -295,6 +296,12 @@ export default function CommunityDetailScreen() {
     headerStyle: { backgroundColor: theme.background },
     headerShadowVisible: false,
     headerTintColor: theme.text,
+    headerTitleStyle: { color: theme.text },
+    headerLeft: () => (
+      <Pressable onPress={() => router.back()} hitSlop={12} style={{ marginRight: 8 }}>
+        <ChevronLeft size={24} color={theme.text} />
+      </Pressable>
+    ),
   };
 
   if (loading) {

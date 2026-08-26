@@ -1,4 +1,5 @@
-import { Alert, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { alert } from '@/lib/alert';
 import { Check, ClipboardCheck, X, Clock, MapPin } from 'lucide-react-native';
 import { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -81,7 +82,7 @@ export function SessionFeedbackPopup({
       }
     } catch (e) {
       console.error('Failed to submit session feedback:', e);
-      Alert.alert('Failed to save', 'Could not save feedback. Please try again.');
+      alert('Failed to save', 'Could not save feedback. Please try again.');
     } finally {
       setSubmitting(false);
     }

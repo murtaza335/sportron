@@ -16,6 +16,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -81,7 +82,7 @@ function EditCommunityForm({
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos.');
+      alert('Permission required', 'Please grant permission to access your photos.');
       return;
     }
     const result = await ImagePicker.launchImageLibraryAsync({
@@ -107,7 +108,7 @@ function EditCommunityForm({
           setUploadingImage(true);
           const uploaded = await uploadImageFromUri(imageUri);
           if (!uploaded) {
-            Alert.alert('Error', 'Failed to upload image.');
+            alert('Error', 'Failed to upload image.');
             setSaving(false);
             setUploadingImage(false);
             return;
@@ -129,7 +130,7 @@ function EditCommunityForm({
       refresh();
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to update.');
+      alert('Error', e?.message ?? 'Failed to update.');
     } finally {
       setSaving(false);
       setUploadingImage(false);
@@ -145,15 +146,15 @@ function EditCommunityForm({
           if (!text.trim() || !userId) return;
           try {
             await transferAdmin(community.id, userId, text.trim());
-            Alert.alert('Done', 'Admin rights transferred.');
+            alert('Done', 'Admin rights transferred.');
             router.back();
           } catch (e: any) {
-            Alert.alert('Error', e?.message ?? 'Failed to transfer.');
+            alert('Error', e?.message ?? 'Failed to transfer.');
           }
         },
       );
     } else {
-      Alert.alert(
+      alert(
         'Transfer Admin',
         'Transfer admin by username: feature available on iOS.',
       );

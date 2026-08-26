@@ -1,8 +1,9 @@
 import { FontAwesome } from '@expo/vector-icons';
 import { useState } from 'react';
-import { ActivityIndicator, Alert, Image, ImageBackground, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ActivityIndicator, Image, ImageBackground, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { signInWithGoogle } from '@/services/auth';
@@ -12,7 +13,7 @@ export default function LoginScreen() {
 
   const handleGoogleSignIn = async () => {
     if (!isSupabaseConfigured) {
-      Alert.alert(
+      alert(
         'Setup required',
         'Add your Supabase URL and Anon Key to a .env file. See .env.example for details.'
       );
@@ -24,7 +25,7 @@ export default function LoginScreen() {
       await signInWithGoogle();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Sign in failed';
-      Alert.alert('Sign in failed', message);
+      alert('Sign in failed', message);
     } finally {
       setLoading(false);
     }

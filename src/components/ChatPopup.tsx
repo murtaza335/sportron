@@ -289,6 +289,21 @@ export function ChatPopup<T extends ChatMessageBase>({
     return 'Unknown';
   };
 
+  // WhatsApp-style stable per-sender name colors. Each username is hashed to a
+  // fixed color so the same person always reads the same way. Palettes are
+  // tuned for the bubble background in both light and dark mode.
+  const senderNamePalette =
+    theme.resolvedColorScheme === 'dark'
+      ? ['#F472B6', '#60A5FA', '#A78BFA', '#FBBF24', '#FB923C', '#34D399', '#22D3EE', '#F87171']
+      : ['#C2185B', '#1565C0', '#6A1B9A', '#B45309', '#C2410C', '#15803D', '#0E7490', '#D32F2F'];
+  const senderNameColor = (name: string): string => {
+    let hash = 0;
+    for (let i = 0; i < name.length; i++) {
+      hash = (hash * 31 + name.charCodeAt(i)) | 0;
+    }
+    return senderNamePalette[Math.abs(hash) % senderNamePalette.length];
+  };
+
   // Goes to the very bottom (button tap / after sending) and re-enables
   // auto-scroll pinning. In inverted lists offset 0 IS the bottom.
   const scrollToBottom = useCallback((animated: boolean) => {
@@ -571,7 +586,7 @@ const contextLayout = useMemo(() => {
               {!mine && isGroupStart && (
                 <ThemedText
                   variant="caption"
-                  style={[styles.bubbleSenderName, { color: theme.textSecondary }]}
+                  style={[styles.bubbleSenderName, { color: senderNameColor(item.sender?.username ?? 'Unknown') }]}
                 >
                   {item.sender?.username ?? 'Unknown'}
                 </ThemedText>
@@ -1218,8 +1233,8 @@ const styles = StyleSheet.create({
   },
   bubble: {
     borderRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.md,
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.sm,
     borderWidth: 1,
   },
   bubbleText: {

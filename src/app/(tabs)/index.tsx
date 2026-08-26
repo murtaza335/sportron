@@ -11,8 +11,6 @@ import { useMyCommunities } from '@/hooks/useCommunities';
 import { router, useFocusEffect } from 'expo-router';
 import { Plus, Users } from 'lucide-react-native';
 
-const AnimatedPlus = Animated.createAnimatedComponent(Plus);
-
 export default function CommunitiesScreen() {
   const theme = useTheme();
   const { user } = useAuth();
@@ -152,15 +150,7 @@ export default function CommunitiesScreen() {
         >
           {/* eslint-disable-next-line react-hooks/refs */}
           <Animated.View style={{ transform: [{ scale: iconScaleAnim.current }] }}>
-            <AnimatedPlus
-              size={34}
-              // eslint-disable-next-line react-hooks/refs
-              color={colorAnim.current.interpolate({
-                inputRange: [0, 1, 2, 3, 4],
-                outputRange: [theme.background, '#FFFFFF', '#FFFFFF', '#FFFFFF', theme.background],
-              })}
-              strokeWidth={3}
-            />
+            <Plus size={34} color={theme.background} strokeWidth={3} />
           </Animated.View>
         </Pressable>
       </Animated.View>

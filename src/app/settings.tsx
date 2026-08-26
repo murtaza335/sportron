@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { Alert, Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
+import { alert } from '@/lib/alert';
 import { Card, Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -40,7 +41,7 @@ export default function SettingsScreen() {
         await updateNotificationPreferences(profile.id, newPrefs);
       } catch {
         setNotificationsEnabled(!value);
-        Alert.alert('Failed to update', 'Could not save notification preferences');
+        alert('Failed to update', 'Could not save notification preferences');
       }
     }
 
@@ -59,7 +60,7 @@ export default function SettingsScreen() {
   };
 
   const handleDeleteAccount = () => {
-    Alert.alert(
+    alert(
       'Delete Account',
       'This will permanently erase all your data except your name on existing matches. You can sign in again to re-activate your account.',
       [
@@ -83,7 +84,7 @@ export default function SettingsScreen() {
               await softDeleteAccount(profile.id);
               await signOut();
             } catch {
-              Alert.alert('Error', 'Failed to delete account. Please try again.');
+              alert('Error', 'Failed to delete account. Please try again.');
             }
           },
         },
