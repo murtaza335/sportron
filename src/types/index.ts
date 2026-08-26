@@ -155,7 +155,7 @@ export type MatchWithProfiles = Match & {
 export type CreateProfileInput = {
   username: string;
   bio?: string;
-  avatarUrl?: string;
+  avatarUrl?: string | null;
 };
 
 export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {

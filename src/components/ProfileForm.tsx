@@ -61,7 +61,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         return;
       }
       try {
-        const isAvailable = await isUsernameAvailable(currentValue, excludeUsername);
+        const isAvailable = await isUsernameAvailable(currentValue);
         setChecked({ value: currentValue, status: isAvailable ? 'available' : 'taken' });
       } catch (error) {
         console.error('Username availability check failed:', error);

@@ -97,7 +97,7 @@ export default function ProfileScreen() {
       await updateProfile(profile.id, {
         username: data.username,
         bio: data.bio,
-        avatarUrl: data.avatarUrl ?? undefined,
+        avatarUrl: data.avatarUrl,
       });
       await refreshProfile();
     } catch (error) {
