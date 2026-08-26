@@ -1,8 +1,9 @@
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Alert, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { ProfileForm } from '@/components/ProfileForm';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -32,7 +33,7 @@ export default function OnboardingScreen() {
       router.replace('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not save profile';
-      Alert.alert('Setup failed', message);
+      alert('Setup failed', message);
     } finally {
       setLoading(false);
     }

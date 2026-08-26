@@ -2,7 +2,6 @@ import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-nati
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   Modal,
@@ -13,6 +12,7 @@ import {
   View,
 } from 'react-native';
 
+import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -209,7 +209,7 @@ export function SessionDetailPopup({
       const conflicts = await checkTimeConflicts(currentUserId, session!.date_time);
       const otherConflicts = conflicts.filter((c) => c.id !== sessionId);
       if (otherConflicts.length > 0) {
-        Alert.alert(
+        alert(
           'Time Conflict',
           `You have a conflicting session within ±30 minutes:\n\n${otherConflicts
             .map((c) => `• ${c.purpose} at ${new Date(c.date_time).toLocaleString()}`)
@@ -221,7 +221,7 @@ export function SessionDetailPopup({
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();
     } catch (e: any) {
-      Alert.alert('Cannot Join', e?.message ?? 'Failed to join session.');
+      alert('Cannot Join', e?.message ?? 'Failed to join session.');
       console.error('Commit error:', e);
     } finally {
       setJoining(false);
@@ -236,7 +236,7 @@ export function SessionDetailPopup({
       setMyCommitmentStatus('left');
       onRefreshFeed?.();
     } catch (e) {
-      Alert.alert('Error', 'Failed to leave session.');
+      alert('Error', 'Failed to leave session.');
       console.error('Uncommit error:', e);
     } finally {
       setJoining(false);
@@ -256,7 +256,7 @@ export function SessionDetailPopup({
       setMyCommitmentStatus(sessionData?.my_commitment?.status ?? null);
       onRefreshFeed?.();
     } catch (e: any) {
-      Alert.alert('Cannot Approve', e?.message ?? 'Failed to approve applicant.');
+      alert('Cannot Approve', e?.message ?? 'Failed to approve applicant.');
       console.error('Approve error:', e);
     } finally {
       setApprovingId(null);
@@ -272,7 +272,7 @@ export function SessionDetailPopup({
       setReloadKey((k) => k + 1);
       onRefreshFeed?.();
     } catch (e) {
-      Alert.alert('Error', 'Failed to reject applicant.');
+      alert('Error', 'Failed to reject applicant.');
       console.error('Reject error:', e);
     } finally {
       setApprovingId(null);
@@ -281,7 +281,7 @@ export function SessionDetailPopup({
 
   const handleDelete = () => {
     if (!sessionId || !currentUserId) return;
-    Alert.alert(
+    alert(
       'Delete Session',
       'Are you sure you want to delete this session? This cannot be undone.',
       [
@@ -296,7 +296,7 @@ export function SessionDetailPopup({
               onRefreshFeed?.();
               onClose();
             } catch (e: any) {
-              Alert.alert('Cannot Delete', e?.message ?? 'An error occurred.');
+              alert('Cannot Delete', e?.message ?? 'An error occurred.');
             } finally {
               setDeleting(false);
             }

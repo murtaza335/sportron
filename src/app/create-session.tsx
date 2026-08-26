@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -14,6 +13,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -90,11 +90,11 @@ export default function CreateSessionScreen() {
     if (!user?.id || !canSave) return;
 
     if (!purpose) {
-      Alert.alert('Select a purpose', 'Please choose what this session is for.');
+      alert('Select a purpose', 'Please choose what this session is for.');
       return;
     }
     if (!title.trim()) {
-      Alert.alert('Missing title', 'Please add a short title for this session.');
+      alert('Missing title', 'Please add a short title for this session.');
       return;
     }
 
@@ -109,12 +109,12 @@ export default function CreateSessionScreen() {
     const maxDate = new Date();
     maxDate.setDate(maxDate.getDate() + 7);
     if (new Date(dateTime) > maxDate) {
-      Alert.alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
+      alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
       return;
     }
 
     if (!participantsValid) {
-      Alert.alert(
+      alert(
         'Invalid Participants',
         `Please enter a number between ${MIN_SESSION_PARTICIPANTS} and ${MAX_SESSION_PARTICIPANTS}.`,
       );
@@ -149,7 +149,7 @@ export default function CreateSessionScreen() {
       await createSession(user.id, input);
       router.back();
     } catch (e) {
-      Alert.alert('Error', 'Failed to create session. Please try again.');
+      alert('Error', 'Failed to create session. Please try again.');
       console.error('Create session error:', e);
     } finally {
       setSaving(false);

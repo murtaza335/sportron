@@ -2,7 +2,6 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  Alert,
   KeyboardAvoidingView,
   Platform,
   Pressable,
@@ -13,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { MatchLineupSelector } from '@/components/MatchLineupSelector';
 import { ScoreCounter } from '@/components/ScoreCounter';
 import { Button } from '@/components/ui/Button';
@@ -99,14 +99,14 @@ export default function AddMatchScreen() {
   const handleSave = async () => {
     if (!user?.id || !canSave) return;
     if (!communityId) {
-      Alert.alert('Error', 'Matches can only be recorded within a community.');
+      alert('Error', 'Matches can only be recorded within a community.');
       return;
     }
     setSaving(true);
     try {
       const opponent = selection.opponent;
       if (!opponent) {
-        Alert.alert('Invalid Opponent', 'Please select a community member as opponent.');
+        alert('Invalid Opponent', 'Please select a community member as opponent.');
         setSaving(false);
         return;
       }
@@ -122,10 +122,10 @@ export default function AddMatchScreen() {
         player_score: playerScore,
         opponent_score: opponentScore,
       });
-      Alert.alert('Match Recorded', 'Waiting for opponent approval.');
+      alert('Match Recorded', 'Waiting for opponent approval.');
       router.back();
     } catch (error) {
-      Alert.alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
+      alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
     } finally {
       setSaving(false);
     }

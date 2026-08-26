@@ -1,8 +1,9 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useEffect, useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
+import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -74,7 +75,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos.');
+      alert('Permission required', 'Please grant permission to access your photos.');
       return;
     }
 
@@ -103,12 +104,12 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           setAvatarUrl(uploadedUrl); // Replace local URI with the remote Cloudinary URL
         } else {
           setAvatarUrl(previousAvatarUrl); // Revert on failure
-          Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
+          alert('Upload failed', 'Could not upload profile picture. Please try again.');
         }
       } catch (error) {
         console.error('Avatar upload failed:', error);
         setAvatarUrl(previousAvatarUrl); // Revert on failure
-        Alert.alert('Upload failed', 'Could not upload profile picture. Please try again.');
+        alert('Upload failed', 'Could not upload profile picture. Please try again.');
       } finally {
         setUploadingAvatar(false);
         setUploadProgress(null);

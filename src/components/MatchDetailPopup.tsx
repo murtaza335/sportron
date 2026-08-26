@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Animated,
   Dimensions,
   KeyboardAvoidingView,
@@ -17,6 +16,7 @@ import {
   View,
 } from 'react-native';
 
+import { alert } from '@/lib/alert';
 import { Divider } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -291,7 +291,7 @@ export function MatchDetailPopup({
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch (_error) {
-      Alert.alert('Error', 'Failed to update verification status.');
+      alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);
     }

@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
-  Alert,
   Image,
   KeyboardAvoidingView,
   Platform,
@@ -15,6 +14,7 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -46,7 +46,7 @@ export default function CreateCommunityScreen() {
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission required', 'Please grant permission to access your photos.');
+      alert('Permission required', 'Please grant permission to access your photos.');
       return;
     }
 
@@ -76,13 +76,13 @@ export default function CreateCommunityScreen() {
       try {
         uploadedUrl = await uploadImageFromUri(imageUri);
         if (!uploadedUrl) {
-          Alert.alert('Upload failed', 'Could not upload community image. Please try again.');
+          alert('Upload failed', 'Could not upload community image. Please try again.');
           setUploadingImage(false);
           return;
         }
       } catch (e) {
         console.error('Community image upload failed:', e);
-        Alert.alert('Upload failed', 'Could not upload community image. Please try again.');
+        alert('Upload failed', 'Could not upload community image. Please try again.');
         setUploadingImage(false);
         return;
       }
@@ -102,7 +102,7 @@ export default function CreateCommunityScreen() {
       });
       router.back();
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to create community. Please try again.');
+      alert('Error', e?.message ?? 'Failed to create community. Please try again.');
       console.error('Create community error:', e);
     } finally {
       setSaving(false);

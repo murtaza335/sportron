@@ -1,7 +1,8 @@
 import { useState } from 'react';
-import { Alert, Pressable, View } from 'react-native';
+import { Pressable, View } from 'react-native';
 import { CheckCircle, UserPlus, XCircle } from 'lucide-react-native';
 
+import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -51,7 +52,7 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
       onComplete();
     } catch (err) {
       console.error('Accept invite failed:', err);
-      Alert.alert('Failed', err instanceof Error ? err.message : 'Could not accept invite');
+      alert('Failed', err instanceof Error ? err.message : 'Could not accept invite');
     } finally {
       setActionLoading(false);
     }
@@ -67,7 +68,7 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
       onComplete();
     } catch (err) {
       console.error('Decline invite failed:', err);
-      Alert.alert('Failed', err instanceof Error ? err.message : 'Could not decline invite');
+      alert('Failed', err instanceof Error ? err.message : 'Could not decline invite');
     } finally {
       setActionLoading(false);
     }

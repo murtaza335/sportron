@@ -17,7 +17,6 @@ import {
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Image,
   Pressable,
   RefreshControl,
@@ -34,6 +33,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import { alert } from '@/lib/alert';
 import { useCommunity } from '@/hooks/useCommunity';
 import {
   deleteCommunity,
@@ -78,7 +78,7 @@ export default function CommunityInfoScreen() {
       await setPingsEnabled(id, value);
     } catch (e: any) {
       setPingsEnabledOverride(previous);
-      Alert.alert('Error', e?.message ?? 'Failed to update ping settings.');
+      alert('Error', e?.message ?? 'Failed to update ping settings.');
     }
   };
 
@@ -134,7 +134,7 @@ export default function CommunityInfoScreen() {
     try {
       if (isRestricted) {
         await requestToJoinCommunity(id, user.id);
-        Alert.alert('Request Sent', 'The admin will review your request.');
+        alert('Request Sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
         setMembership({
@@ -151,13 +151,13 @@ export default function CommunityInfoScreen() {
       }
       refresh();
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to join.');
+      alert('Error', e?.message ?? 'Failed to join.');
     }
   };
 
   const handleLeave = () => {
     if (!id || !user) return;
-    Alert.alert(
+    alert(
       'Leave Community',
       'Are you sure you want to leave this community?',
       [
@@ -172,7 +172,7 @@ export default function CommunityInfoScreen() {
               refresh();
               router.back();
             } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to leave.');
+              alert('Error', e?.message ?? 'Failed to leave.');
             }
           },
         },
@@ -182,7 +182,7 @@ export default function CommunityInfoScreen() {
 
   const handleDelete = () => {
     if (!id) return;
-    Alert.alert(
+    alert(
       'Delete Community',
       'This action cannot be undone. All matches, members, and data will be permanently removed.',
       [
@@ -195,7 +195,7 @@ export default function CommunityInfoScreen() {
               await deleteCommunity(id);
               router.back();
             } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to delete community.');
+              alert('Error', e?.message ?? 'Failed to delete community.');
             }
           },
         },
@@ -212,12 +212,12 @@ export default function CommunityInfoScreen() {
         ),
       );
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to promote member.');
+      alert('Error', e?.message ?? 'Failed to promote member.');
     }
   };
 
   const handleRemove = (member: CommunityMember) => {
-    Alert.alert(
+    alert(
       'Remove Member',
       `Remove ${member.profile?.username || 'this member'} from the community?`,
       [
@@ -230,7 +230,7 @@ export default function CommunityInfoScreen() {
               await removeMember(id!, member.profile_id);
               setMembers((prev) => prev.filter((m) => m.profile_id !== member.profile_id));
             } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to remove member.');
+              alert('Error', e?.message ?? 'Failed to remove member.');
             }
           },
         },
@@ -402,7 +402,7 @@ export default function CommunityInfoScreen() {
                 }
                 onLongPress={() => {
                   if (isAdmin && member.profile_id !== user?.id) {
-                    Alert.alert(
+                    alert(
                       member.profile?.username || 'Member',
                       undefined,
                       [

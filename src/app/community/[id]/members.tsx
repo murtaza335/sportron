@@ -2,7 +2,6 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   FlatList,
   Modal,
   Platform,
@@ -12,6 +11,7 @@ import {
   View,
 } from 'react-native';
 
+import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
 import { InviteMemberModal } from '@/components/InviteMemberModal';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -126,7 +126,7 @@ export default function CommunityMembersScreen() {
 
   const handleRemove = (member: CommunityMember) => {
     setContextMember(null);
-    Alert.alert(
+    alert(
       'Remove Member',
       `Remove ${member.profile?.username || 'this member'} from the community?`,
       [
@@ -139,7 +139,7 @@ export default function CommunityMembersScreen() {
               await removeMember(id!, member.profile_id);
               setMembers((prev) => prev.filter((m) => m.profile_id !== member.profile_id));
             } catch (e: any) {
-              Alert.alert('Error', e?.message ?? 'Failed to remove member.');
+              alert('Error', e?.message ?? 'Failed to remove member.');
             }
           },
         },
@@ -156,9 +156,9 @@ export default function CommunityMembersScreen() {
           m.profile_id === member.profile_id ? { ...m, role: 'admin' } : m,
         ),
       );
-      Alert.alert('Done', `${member.profile?.username || 'User'} is now an admin.`);
+      alert('Done', `${member.profile?.username || 'User'} is now an admin.`);
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to promote member.');
+      alert('Error', e?.message ?? 'Failed to promote member.');
     }
   };
 

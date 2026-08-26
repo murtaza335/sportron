@@ -1,8 +1,9 @@
 import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Alert, Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { alert } from '@/lib/alert';
 import { ProfileForm } from '@/components/ProfileForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
@@ -102,7 +103,7 @@ export default function ProfileScreen() {
     } catch (error) {
       setEditing(true);
       const message = error instanceof Error ? error.message : 'Could not update profile';
-      Alert.alert('Update failed', message);
+      alert('Update failed', message);
     }
   };
 
@@ -112,7 +113,7 @@ export default function ProfileScreen() {
       await signOut();
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not sign out';
-      Alert.alert('Sign out failed', message);
+      alert('Sign out failed', message);
     } finally {
       setSigningOut(false);
     }

@@ -2,7 +2,6 @@ import { Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import {
   ActivityIndicator,
-  Alert,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -11,6 +10,7 @@ import {
 } from 'react-native';
 import { Check, UserPlus, X } from 'lucide-react-native';
 
+import { alert } from '@/lib/alert';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -83,7 +83,7 @@ export default function CommunityJoinRequestsScreen() {
       await respondToJoinRequest(request.id, status);
       setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
     } catch (e: any) {
-      Alert.alert('Error', e?.message ?? 'Failed to respond.');
+      alert('Error', e?.message ?? 'Failed to respond.');
     }
   };
 
