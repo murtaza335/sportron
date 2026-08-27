@@ -299,8 +299,8 @@ const styles = StyleSheet.create({
   },
   participantRow: {
     flexDirection: 'row',
+    flexWrap: 'wrap',
     alignItems: 'center',
-    justifyContent: 'space-between',
     gap: Spacing.sm,
     borderRadius: Radius.md,
     borderWidth: 1,
@@ -312,6 +312,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
+    minWidth: 120,
   },
   participantName: {
     flexShrink: 1,
