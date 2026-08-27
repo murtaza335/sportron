@@ -94,10 +94,8 @@ export function useChat<T extends ChatMessageBase>(
       setHasMore(more);
 
       if (userId) {
-        const [cursor, count] = await Promise.all([
-          fetchChatReadCursor(idColumn, sourceId, userId),
-          fetchChatUnreadCount(table, idColumn, sourceId, userId),
-        ]);
+        const cursor = await fetchChatReadCursor(idColumn, sourceId, userId);
+        const count = await fetchChatUnreadCount(table, idColumn, sourceId, userId, cursor);
         setUnreadCount(count);
         // Authoritative from the DB — publish into the shared store so the
         // Chats tab badge reflects it (no refetch). A 0 here is a real "all

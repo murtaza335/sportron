@@ -16,7 +16,7 @@ import {
   Users,
   X,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -29,6 +29,7 @@ import {
 } from 'react-native';
 
 import { alert } from '@/lib/alert';
+import { supabase } from '@/lib/supabase';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
@@ -43,12 +44,14 @@ import { useCommunityChat } from '@/hooks/useCommunityChat';
 import {
   fetchCommunityMatchById,
   fetchCommunityMatches,
+  fetchJoinRequests,
   getNextPingTime,
   joinCommunity,
   requestToJoinCommunity,
   sendPing,
 } from '@/services/communities';
 import type {
+  CommunityJoinRequest,
   CommunityMatch,
   MatchWithProfiles,
 } from '@/types';
@@ -66,10 +69,8 @@ export default function CommunityDetailScreen() {
   const {
     community,
     membership,
-    joinRequests,
     myPendingInvite,
     myJoinRequest,
-    pendingMatches,
     loading,
     refresh,
     setMembership,
@@ -77,6 +78,12 @@ export default function CommunityDetailScreen() {
 
   const isAdmin = membership?.role === 'admin';
   const isMember = !!membership;
+
+  // Join requests — admin only
+  const [joinRequests, setJoinRequests] = useState<CommunityJoinRequest[]>([]);
+
+  // Pending matches — realtime
+  const [pendingMatches, setPendingMatches] = useState<CommunityMatch[]>([]);
 
   const communityChat = useCommunityChat(
     isMember ? (id ?? null) : null,
@@ -131,6 +138,74 @@ export default function CommunityDetailScreen() {
       loadMatches(1);
     }, [loadMatches]),
   );
+
+  // Join requests — admin only
+  useFocusEffect(
+    useCallback(() => {
+      if (!id || !isAdmin) return;
+      let cancelled = false;
+      (async () => {
+        try {
+          const requests = await fetchJoinRequests(id);
+          if (!cancelled) setJoinRequests(requests);
+        } catch (e) {
+          console.error('Failed to load join requests:', e);
+        }
+      })();
+      return () => { cancelled = true; };
+    }, [id, isAdmin]),
+  );
+
+  // Pending matches — realtime
+  const pendingMatchesChannelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
+  const mountedRef = useRef(true);
+
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => { mountedRef.current = false; };
+  }, []);
+
+  useEffect(() => {
+    if (!id || !user) return;
+
+    const channel = supabase
+      .channel(`community-pending-${id}-${user.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'community_matches',
+          filter: `community_id=eq.${id}`,
+        },
+        (payload) => {
+          if (!mountedRef.current) return;
+          const match = payload.new as CommunityMatch;
+          if (match.approval_status === 'pending' && (match.opponent_id === user.id || match.recorded_by === user.id)) {
+            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
+              setPendingMatches((prev) => {
+                if (prev.some((m) => m.id === match.id)) {
+                  return prev.map((m) => (m.id === match.id ? match : m));
+                }
+                return [match, ...prev];
+              });
+            } else if (payload.eventType === 'DELETE') {
+              setPendingMatches((prev) => prev.filter((m) => m.id !== (payload.old as { id: string }).id));
+            }
+          }
+        },
+      )
+      .subscribe();
+
+    pendingMatchesChannelRef.current = channel;
+
+    return () => {
+      if (pendingMatchesChannelRef.current) {
+        supabase.removeChannel(pendingMatchesChannelRef.current);
+        pendingMatchesChannelRef.current = null;
+      }
+    };
+  }, [id, user]);
 
   const handleLoadMore = async () => {
     if (loadingMore || !hasMoreMatches) return;
