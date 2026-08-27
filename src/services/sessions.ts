@@ -47,6 +47,7 @@ type CommitmentRpcRow = {
   feedback_status: string | null; feedback_provided_by: string | null;
   created_at: string; updated_at: string;
   username: string | null; avatar_url: string | null;
+  completed_sessions: number | null; total_committed_sessions: number | null;
 };
 
 function rowToCommitment(r: CommitmentRpcRow): Commitment {
@@ -56,7 +57,11 @@ function rowToCommitment(r: CommitmentRpcRow): Commitment {
     feedback_provided_by: r.feedback_provided_by,
     created_at: r.created_at, updated_at: r.updated_at,
     profile: r.username
-      ? { id: r.user_id, username: r.username, avatar_url: r.avatar_url }
+      ? {
+          id: r.user_id, username: r.username, avatar_url: r.avatar_url,
+          completed_sessions: r.completed_sessions ?? 0,
+          total_committed_sessions: r.total_committed_sessions ?? 0,
+        }
       : null,
   } as Commitment;
 }
