@@ -37,16 +37,24 @@ export function useCommunity(id: string, userId?: string) {
     if (!id) return;
     try {
       const uid = userIdRef.current;
-      const [communityData, memberData, invites, ownRequest] = await Promise.all([
+      const [communityData, memberData] = await Promise.all([
         fetchCommunityById(id),
         uid ? fetchCommunityMember(id, uid) : Promise.resolve(null),
-        uid ? fetchUserPendingInvites(uid) : Promise.resolve([]),
-        uid ? fetchMyJoinRequest(id, uid) : Promise.resolve(null),
       ]);
       setCommunity(communityData);
       setMembership(memberData);
-      setMyPendingInvite(invites.find((i) => i.community_id === id) ?? null);
-      setMyJoinRequest(ownRequest);
+
+      if (memberData) {
+        setMyPendingInvite(null);
+        setMyJoinRequest(null);
+      } else {
+        const [invites, ownRequest] = await Promise.all([
+          uid ? fetchUserPendingInvites(uid) : Promise.resolve([]),
+          uid ? fetchMyJoinRequest(id, uid) : Promise.resolve(null),
+        ]);
+        setMyPendingInvite(invites.find((i) => i.community_id === id) ?? null);
+        setMyJoinRequest(ownRequest);
+      }
     } catch (e) {
       console.error('Failed to load community:', e);
     } finally {
