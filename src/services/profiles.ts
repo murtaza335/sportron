@@ -2,6 +2,11 @@ import { supabase } from '@/lib/supabase';
 import type { CreateProfileInput, NotificationPreferences, Profile } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
 export async function fetchProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
@@ -27,7 +32,7 @@ export async function isUsernameAvailable(username: string, excludeUserId?: stri
     .select('id')
     .ilike('username', normalized);
 
-  if (excludeUserId) {
+  if (excludeUserId && isValidUUID(excludeUserId)) {
     query = query.neq('id', excludeUserId);
   }
 
@@ -47,7 +52,7 @@ export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[
     .is('deleted_at', null)
     .order('username', { ascending: true });
 
-  if (excludeUserId) {
+  if (excludeUserId && isValidUUID(excludeUserId)) {
     query = query.neq('id', excludeUserId);
   }
 
