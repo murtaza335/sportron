@@ -1264,16 +1264,19 @@ export async function fetchCommunityInvites(
 
   if (error) throw error;
 
+  if (!data || data.length === 0) return [];
+
   // Batch-resolve profiles from public_profiles view
-  const profileIds = (data ?? []).flatMap((r: any) => [r.invited_by, r.invitee_id]);
+  const profileIds = data.flatMap((r: any) => [r.invited_by, r.invitee_id]);
   const uniqueIds = [...new Set(profileIds)];
+  if (uniqueIds.length === 0) return data as any[];
   const { data: profiles } = await supabase
     .from('public_profiles')
     .select('id, username, avatar_url')
     .in('id', uniqueIds);
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 
-  return (data ?? []).map((row: any) => ({
+  return data.map((row: any) => ({
     ...row,
     inviter: profileMap.get(row.invited_by)
       ? { id: row.invited_by, username: profileMap.get(row.invited_by)!.username, avatar_url: profileMap.get(row.invited_by)!.avatar_url }
@@ -1293,16 +1296,18 @@ export async function fetchUserPendingInvites(userId: string): Promise<Community
     .order('created_at', { ascending: false });
 
   if (error) throw error;
+  if (!data || data.length === 0) return [];
 
-  const profileIds = (data ?? []).flatMap((r: any) => [r.invited_by, r.invitee_id]);
+  const profileIds = data.flatMap((r: any) => [r.invited_by, r.invitee_id]);
   const uniqueIds = [...new Set(profileIds)];
+  if (uniqueIds.length === 0) return data as any[];
   const { data: profiles } = await supabase
     .from('public_profiles')
     .select('id, username, avatar_url')
     .in('id', uniqueIds);
   const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
 
-  return (data ?? []).map((row: any) => ({
+  return data.map((row: any) => ({
     ...row,
     inviter: profileMap.get(row.invited_by)
       ? { id: row.invited_by, username: profileMap.get(row.invited_by)!.username, avatar_url: profileMap.get(row.invited_by)!.avatar_url }

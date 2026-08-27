@@ -49,10 +49,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       setSession(currentSession);
       setLoading(false);
-
-      if (currentSession?.user.id) {
-        loadProfile(currentSession.user.id);
-      }
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {

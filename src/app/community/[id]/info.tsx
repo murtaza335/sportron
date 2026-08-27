@@ -34,8 +34,8 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
-import { alert } from '@/lib/alert';
 import { useCommunity } from '@/hooks/useCommunity';
+import { alert } from '@/lib/alert';
 import {
   deleteCommunity,
   fetchCommunityMembers,

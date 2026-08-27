@@ -13,7 +13,8 @@ import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
-import { fetchMaintenanceMode, fetchMinAppVersion, isVersionSatisfied } from '@/services/config';
+import { isVersionSatisfied } from '@/services/config';
+import { supabase } from '@/lib/supabase';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -210,23 +211,36 @@ export default function RootLayout() {
     let active = true;
 
     (async () => {
-      const maintenance = await fetchMaintenanceMode();
+      // Single query for both config rows
+      const { data } = await supabase
+        .from('site_config')
+        .select('key, value')
+        .in('key', ['maintenance', 'min_app_version']);
+
       if (!active) return;
 
-      if (maintenance.enabled) {
+      const rows = data ?? [];
+      const maintenanceRow = rows.find((r) => r.key === 'maintenance');
+      const maintenanceValue = (maintenanceRow?.value ?? {}) as Record<string, unknown>;
+      const maintenanceEnabled = Boolean(maintenanceValue.enabled);
+
+      if (maintenanceEnabled) {
         setMaintenanceActive(true);
         return;
       }
 
       // Maintenance off — check version
       const currentVersion = Constants.expoConfig?.version ?? '0.0.0';
-      const minConfig = await fetchMinAppVersion();
-      if (!active) return;
+      const versionRow = rows.find((r) => r.key === 'min_app_version');
+      const versionValue = (versionRow?.value ?? {}) as Record<string, unknown>;
+      const minVersion = typeof versionValue.min_version === 'string' ? versionValue.min_version : '0.0.0';
+      const storeUrl = typeof versionValue.store_url === 'string' ? versionValue.store_url : '';
+      const updateMessage = typeof versionValue.message === 'string' ? versionValue.message : '';
 
-      if (!isVersionSatisfied(currentVersion, minConfig.minVersion)) {
+      if (!isVersionSatisfied(currentVersion, minVersion)) {
         setVersionOk(false);
-        setStoreUrl(minConfig.storeUrl);
-        setUpdateMessage(minConfig.message);
+        setStoreUrl(storeUrl);
+        setUpdateMessage(updateMessage);
       }
 
       setMaintenanceActive(false);

@@ -3,13 +3,22 @@ import { useFocusEffect } from 'expo-router';
 import { useAuth } from '@/contexts/AuthContext';
 import { updateStreak, getStreakStatus } from '@/services/streak';
 
+function computeIsAtRisk(streakCount: number, lastActivityDate: string | null): boolean {
+  if (!lastActivityDate || streakCount <= 0) return false;
+  const lastActiveDate = new Date(`${lastActivityDate}T00:00:00Z`);
+  const hoursSince = Math.floor((Date.now() - lastActiveDate.getTime()) / (1000 * 60 * 60));
+  return hoursSince >= 22;
+}
+
 export function useStreak() {
   const { profile, refreshProfile } = useAuth();
   const profileId = profile?.id ?? null;
   const [streakCount, setStreakCount] = useState(profile?.streak_count ?? 0);
   const [longestStreak, setLongestStreak] = useState(profile?.longest_streak ?? 0);
   const [lastActivityDate, setLastActivityDate] = useState<string | null>(profile?.last_activity_date ?? null);
-  const [isAtRisk, setIsAtRisk] = useState(false);
+  const [isAtRisk, setIsAtRisk] = useState(() =>
+    computeIsAtRisk(profile?.streak_count ?? 0, profile?.last_activity_date ?? null),
+  );
   const [loading, setLoading] = useState(false);
 
   const load = useCallback(async () => {
