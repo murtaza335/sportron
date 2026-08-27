@@ -5,13 +5,15 @@ import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import Constants from 'expo-constants';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
-import { MaintenanceProvider, useMaintenance } from '@/contexts/MaintenanceContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { FCMInitializer } from '@/components/FCMInitializer';
+import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { fetchMaintenanceMode, fetchMinAppVersion, isVersionSatisfied } from '@/services/config';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -20,7 +22,6 @@ function RootNavigator() {
   const router = useRouter();
   const segments = useSegments();
   const { session, profile, loading, profileLoading } = useAuth();
-  const { isMaintenanceMode, loading: maintenanceLoading } = useMaintenance();
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
@@ -67,14 +68,6 @@ function RootNavigator() {
     return (
       <View style={[styles.loader, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.text} />
-      </View>
-    );
-  }
-
-  if (!maintenanceLoading && isMaintenanceMode) {
-    return (
-      <View style={[styles.container, { backgroundColor: theme.background }]}>
-        <MaintenanceScreen />
       </View>
     );
   }
@@ -208,14 +201,70 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  const [maintenanceActive, setMaintenanceActive] = useState<boolean | null>(null);
+  const [versionOk, setVersionOk] = useState(true);
+  const [storeUrl, setStoreUrl] = useState('');
+  const [updateMessage, setUpdateMessage] = useState('');
+
+  useEffect(() => {
+    let active = true;
+
+    (async () => {
+      const maintenance = await fetchMaintenanceMode();
+      if (!active) return;
+
+      if (maintenance.enabled) {
+        setMaintenanceActive(true);
+        return;
+      }
+
+      // Maintenance off — check version
+      const currentVersion = Constants.expoConfig?.version ?? '0.0.0';
+      const minConfig = await fetchMinAppVersion();
+      if (!active) return;
+
+      if (!isVersionSatisfied(currentVersion, minConfig.minVersion)) {
+        setVersionOk(false);
+        setStoreUrl(minConfig.storeUrl);
+        setUpdateMessage(minConfig.message);
+      }
+
+      setMaintenanceActive(false);
+    })();
+
+    return () => { active = false; };
+  }, []);
+
+  // While checking — render nothing (no flash of any screen)
+  if (maintenanceActive === null) {
+    return <View style={styles.container} />;
+  }
+
+  // Maintenance on — show the screen directly, no providers needed
+  if (maintenanceActive) {
+    return (
+      <GestureHandlerRootView style={styles.container}>
+        <MaintenanceScreen />
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Version too old — forced update screen, no providers needed
+  if (!versionOk) {
+    return (
+      <GestureHandlerRootView style={styles.container}>
+        <ForcedUpdateScreen message={updateMessage} storeUrl={storeUrl} />
+      </GestureHandlerRootView>
+    );
+  }
+
+  // Normal — full provider tree
   return (
     <GestureHandlerRootView style={styles.container}>
       <ThemeProvider>
         <AuthProvider>
           <NotificationsProvider>
-            <MaintenanceProvider>
-              <RootNavigator />
-            </MaintenanceProvider>
+            <RootNavigator />
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>

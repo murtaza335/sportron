@@ -324,7 +324,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -337,7 +337,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (
@@ -366,7 +366,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -379,7 +379,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (
@@ -411,7 +411,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -424,7 +424,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   INNER JOIN public.commitments my_c
     ON my_c.session_id = s.id
@@ -459,7 +459,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -472,7 +472,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (
@@ -510,7 +510,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -523,7 +523,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (
@@ -585,7 +585,7 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -598,7 +598,7 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (

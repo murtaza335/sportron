@@ -210,7 +210,9 @@ RETURNS TABLE (
   updated_at timestamptz,
   creator_username text,
   creator_avatar_url text,
-  accepted_count bigint
+  commitment_count bigint,
+  my_commitment_id uuid,
+  my_commitment_status text
 )
 LANGUAGE sql
 SECURITY DEFINER
@@ -223,7 +225,9 @@ AS $$
     s.status, s.created_at, s.updated_at,
     p.username AS creator_username,
     p.avatar_url AS creator_avatar_url,
-    COALESCE(cc.cnt, 0) AS accepted_count
+    COALESCE(cc.cnt, 0) AS commitment_count,
+    mc.id AS my_commitment_id,
+    mc.status AS my_commitment_status
   FROM public.sessions s
   LEFT JOIN public.profiles p ON p.id = s.created_by
   LEFT JOIN LATERAL (
@@ -231,6 +235,8 @@ AS $$
     FROM public.commitments c
     WHERE c.session_id = s.id AND c.status = 'accepted'
   ) cc ON true
+  LEFT JOIN public.commitments mc
+    ON mc.session_id = s.id AND mc.user_id = auth.uid()
   WHERE s.id = p_session_id
     AND (
       -- Open/full sessions: any authenticated user can view (to decide to join)
@@ -238,10 +244,10 @@ AS $$
       -- Ended sessions: only the creator or a participant can view
       OR s.created_by = auth.uid()
       OR EXISTS (
-        SELECT 1 FROM public.commitments mc
-        WHERE mc.session_id = p_session_id
-          AND mc.user_id = auth.uid()
-          AND mc.status IN ('accepted', 'left')
+        SELECT 1 FROM public.commitments mc2
+        WHERE mc2.session_id = p_session_id
+          AND mc2.user_id = auth.uid()
+          AND mc2.status IN ('accepted', 'left')
       )
     );
 $$;

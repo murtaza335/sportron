@@ -215,13 +215,14 @@ export default function SessionsScreen() {
   const [scope, setScope] = useState<SessionScope>('all');
   const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
   const [showPurposeModal, setShowPurposeModal] = useState(false);
+  const { sessions, loading, refreshing, refresh, silentRefresh } = useSessionFeed(user?.id, scope);
 
-  const { sessions, loading, refreshing, refresh } = useSessionFeed(user?.id, scope);
   const {
     sessions: historySessions,
     loading: historyLoading,
     refreshing: historyRefreshing,
     refresh: refreshHistory,
+    silentRefresh: silentRefreshHistory,
   } = useSessionHistory(user?.id);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -238,6 +239,8 @@ export default function SessionsScreen() {
     setSelectedSessionId(null);
     setSelectedSessionData(null);
     if (sessionIdParam) router.setParams({ sessionId: undefined });
+    if (!isHistory) silentRefresh();
+    else silentRefreshHistory();
   };
 
   // Post-session feedback loop — when the creator opens the Sessions tab, a

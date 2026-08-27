@@ -130,7 +130,11 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
     setRefreshing(false);
   }, [load]);
 
-  return { sessions, loading, refreshing, refresh };
+  const silentRefresh = useCallback(() => {
+    load({ silent: true });
+  }, [load]);
+
+  return { sessions, loading, refreshing, refresh, silentRefresh };
 }
 
 export function useSessionHistory(userId?: string) {
@@ -189,5 +193,9 @@ export function useSessionHistory(userId?: string) {
     setRefreshing(false);
   }, [load]);
 
-  return { sessions, loading, refreshing, refresh };
+  const silentRefresh = useCallback(() => {
+    load({ silent: true });
+  }, [load]);
+
+  return { sessions, loading, refreshing, refresh, silentRefresh };
 }
