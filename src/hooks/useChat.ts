@@ -85,8 +85,11 @@ export function useChat<T extends ChatMessageBase>(
     new Map(),
   );
 
+  const loadingRef = useRef(false);
+
   const load = useCallback(async () => {
-    if (!sourceId) return;
+    if (!sourceId || loadingRef.current) return;
+    loadingRef.current = true;
     setLoading(true);
     try {
       const { messages: page, hasMore: more } = await fetchMessages(sourceId);
@@ -97,12 +100,7 @@ export function useChat<T extends ChatMessageBase>(
         const cursor = await fetchChatReadCursor(idColumn, sourceId, userId);
         const count = await fetchChatUnreadCount(table, idColumn, sourceId, userId, cursor);
         setUnreadCount(count);
-        // Authoritative from the DB — publish into the shared store so the
-        // Chats tab badge reflects it (no refetch). A 0 here is a real "all
-        // read" marker, not an uninitialized value (that only happens pre-load).
         setChatUnreadCountFor(chatKind, sourceId, count);
-        // Index (in the ascending messages list) of the oldest unread message.
-        // null means the user is fully caught up (scroll to bottom on open).
         if (cursor) {
           const cursorTime = new Date(cursor).getTime();
           const idx = page.findIndex((m) => new Date(m.created_at).getTime() > cursorTime);
@@ -115,6 +113,7 @@ export function useChat<T extends ChatMessageBase>(
       console.error('Failed to load chat:', e);
     } finally {
       setLoading(false);
+      loadingRef.current = false;
     }
   }, [sourceId, fetchMessages, idColumn, table, userId, chatKind]);
 
