@@ -254,7 +254,7 @@ export async function searchCommunityMembers(
 
   // Step 1: find profile ids whose username matches the query.
   const { data: profileRows, error: profileError } = await supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id')
     .ilike('username', `%${normalized}%`)
     .limit(20);
@@ -1137,7 +1137,7 @@ export async function inviteMemberByUsername(
   username: string,
 ): Promise<CommunityInvite> {
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username')
     .eq('username', username.toLowerCase())
     .single();

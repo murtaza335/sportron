@@ -561,7 +561,7 @@ async function resolveSessionApplicationNotification(
 ): Promise<void> {
   try {
     const [applicantResult, sessionResult] = await Promise.all([
-      supabase.from('profiles').select('username').eq('id', applicantId).single(),
+      supabase.from('public_profiles').select('username').eq('id', applicantId).single(),
       supabase.from('sessions').select('title, purpose, date_time').eq('id', sessionId).maybeSingle(),
     ]);
 
