@@ -348,21 +348,23 @@ export default function SessionsScreen() {
               <RefreshControl refreshing={listRefreshing} onRefresh={onRefresh} tintColor={theme.text} />
             }
             ListHeaderComponent={
-              <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
-                <View style={styles.statItem}>
-                  <ThemedText variant="heading" style={{ fontWeight: '700' }}>
-                    {profile?.total_committed_sessions ?? 0}
-                  </ThemedText>
-                  <ThemedText variant="caption" muted>Committed</ThemedText>
+              (isHistory || scope === 'all') ? (
+                <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <View style={styles.statItem}>
+                    <ThemedText variant="heading" style={{ fontWeight: '700' }}>
+                      {profile?.total_committed_sessions ?? 0}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>Committed</ThemedText>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                  <View style={styles.statItem}>
+                    <ThemedText variant="heading" style={{ fontWeight: '700' }}>
+                      {profile?.completed_sessions ?? 0}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>Completed</ThemedText>
+                  </View>
                 </View>
-                <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
-                <View style={styles.statItem}>
-                  <ThemedText variant="heading" style={{ fontWeight: '700' }}>
-                    {profile?.completed_sessions ?? 0}
-                  </ThemedText>
-                  <ThemedText variant="caption" muted>Completed</ThemedText>
-                </View>
-              </View>
+              ) : null
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
