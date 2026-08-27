@@ -458,3 +458,18 @@ export type SessionChatMessage = ChatMessageBase & {
 export type CommunityChatMessage = ChatMessageBase & {
   community_id: string;
 };
+
+export type AuditLog = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  table_name: string;
+  record_id: string;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  // Joined from profiles
+  actor_username?: string | null;
+  actor_avatar_url?: string | null;
+};
