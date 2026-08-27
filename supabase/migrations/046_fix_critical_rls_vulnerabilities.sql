@@ -21,10 +21,12 @@
 -- ============================================================
 
 -- 1a. Create a view that strips sensitive columns
-CREATE OR REPLACE VIEW public.public_profiles AS
+DROP VIEW IF EXISTS public.public_profiles;
+CREATE VIEW public.public_profiles AS
 SELECT
   id,
   username,
+  display_name,
   bio,
   avatar_url,
   sport_interests,
@@ -33,6 +35,7 @@ SELECT
   streak_count,
   longest_streak,
   last_activity_date,
+  streak_updated_at,
   created_at,
   updated_at,
   deleted_at
@@ -43,10 +46,21 @@ DROP POLICY IF EXISTS "Profiles are viewable by authenticated users" ON public.p
 
 -- 1c. Restrict profiles table SELECT to own-row only
 --     (own profile: full access including fcm_tokens, notification_preferences)
-CREATE POLICY "Users can view own profile (full)"
-  ON public.profiles FOR select
-  TO authenticated
-  USING (auth.uid() = id);
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_policies
+    WHERE policyname = 'Users can view own profile (full)'
+      AND tablename = 'profiles'
+      AND schemaname = 'public'
+  ) THEN
+    CREATE POLICY "Users can view own profile (full)"
+      ON public.profiles FOR select
+      TO authenticated
+      USING (auth.uid() = id);
+  END IF;
+END
+$$;
 
 -- ============================================================
 -- FIX 2: Add admin auth check to create_community_invite()
