@@ -7,9 +7,11 @@ import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
+import { MaintenanceProvider, useMaintenance } from '@/contexts/MaintenanceContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { FCMInitializer } from '@/components/FCMInitializer';
+import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -18,6 +20,7 @@ function RootNavigator() {
   const router = useRouter();
   const segments = useSegments();
   const { session, profile, loading, profileLoading } = useAuth();
+  const { isMaintenanceMode, loading: maintenanceLoading } = useMaintenance();
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
   useEffect(() => {
@@ -64,6 +67,14 @@ function RootNavigator() {
     return (
       <View style={[styles.loader, { backgroundColor: theme.background }]}>
         <ActivityIndicator size="large" color={theme.text} />
+      </View>
+    );
+  }
+
+  if (!maintenanceLoading && isMaintenanceMode) {
+    return (
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        <MaintenanceScreen />
       </View>
     );
   }
@@ -202,7 +213,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <NotificationsProvider>
-            <RootNavigator />
+            <MaintenanceProvider>
+              <RootNavigator />
+            </MaintenanceProvider>
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
