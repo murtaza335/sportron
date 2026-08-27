@@ -166,10 +166,28 @@ export async function createCommunity(
   return { ...data, member_count: 1 };
 }
 
+async function requireCommunityAdmin(communityId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: member } = await supabase
+    .from('community_members')
+    .select('role')
+    .eq('community_id', communityId)
+    .eq('profile_id', user.id)
+    .single();
+
+  if (!member || member.role !== 'admin') {
+    throw new Error('Only community admins can perform this action.');
+  }
+}
+
 export async function updateCommunity(
   communityId: string,
   input: UpdateCommunityInput,
 ): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
@@ -193,6 +211,8 @@ export async function updateCommunity(
 }
 
 export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const { error } = await supabase
     .from('communities')
     .update({ pings_enabled: enabled })
@@ -202,6 +222,8 @@ export async function setPingsEnabled(communityId: string, enabled: boolean): Pr
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const { error } = await supabase
     .from('communities')
     .delete()

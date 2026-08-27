@@ -1,7 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, Shield, X } from 'lucide-react-native';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
   Alert,
@@ -29,11 +29,18 @@ import type { Community, CommunityVisibility } from '@/types';
 
 export default function EditCommunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
+  const router = useRouter();
   const theme = useTheme();
   const { user } = useAuth();
-  const { community, loading, refresh } = useCommunity(id ?? '', user?.id);
+  const { community, membership, loading, refresh } = useCommunity(id ?? '', user?.id);
 
-  if (loading || !community) {
+  useEffect(() => {
+    if (!loading && membership && membership.role !== 'admin') {
+      router.replace(`/community/${id}`);
+    }
+  }, [loading, membership, id, router]);
+
+  if (loading || !community || membership?.role !== 'admin') {
     return (
       <View style={[styles.flex, styles.centered, { backgroundColor: theme.background }]}>
         {loading ? (
