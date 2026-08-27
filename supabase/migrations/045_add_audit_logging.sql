@@ -95,13 +95,13 @@ set search_path = public
 as $$
 begin
   if tg_op = 'INSERT' then
-    perform public.log_audit_event('INSERT', 'community_members', NEW.id, null, to_jsonb(NEW));
+    perform public.log_audit_event('INSERT', 'community_members', NEW.community_id, null, to_jsonb(NEW));
     return NEW;
   elsif tg_op = 'UPDATE' then
-    perform public.log_audit_event('UPDATE', 'community_members', NEW.id, to_jsonb(OLD), to_jsonb(NEW));
+    perform public.log_audit_event('UPDATE', 'community_members', NEW.community_id, to_jsonb(OLD), to_jsonb(NEW));
     return NEW;
   elsif tg_op = 'DELETE' then
-    perform public.log_audit_event('DELETE', 'community_members', OLD.id, to_jsonb(OLD), null);
+    perform public.log_audit_event('DELETE', 'community_members', OLD.community_id, to_jsonb(OLD), null);
     return OLD;
   end if;
 end;
