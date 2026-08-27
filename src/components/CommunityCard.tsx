@@ -13,7 +13,7 @@ type CommunityCardProps = {
   membershipRole?: CommunityMemberRole | null;
 };
 
-const IMAGE_HEIGHT = 140;
+const CARD_IMAGE_ASPECT_RATIO = 16 / 9;
 
 export function CommunityCard({ community, membershipRole }: CommunityCardProps) {
   const theme = useTheme();
@@ -171,12 +171,12 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   imageContainer: {
-    height: IMAGE_HEIGHT,
+    aspectRatio: CARD_IMAGE_ASPECT_RATIO,
     overflow: 'hidden',
   },
   image: {
     width: '100%',
-    height: IMAGE_HEIGHT,
+    height: '100%',
   },
   placeholder: {
     alignItems: 'center',

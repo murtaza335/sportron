@@ -94,8 +94,7 @@ function EditCommunityForm({
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
+      allowsEditing: false,
       quality: 0.8,
     });
     if (!result.canceled && result.assets[0]) {
@@ -113,7 +112,7 @@ function EditCommunityForm({
       if (imageUri !== (community.image_url ?? null)) {
         if (imageUri) {
           setUploadingImage(true);
-          const uploaded = await uploadImageFromUri(imageUri);
+          const uploaded = await uploadImageFromUri(imageUri, undefined, undefined, 'cover');
           if (!uploaded) {
             alert('Error', 'Failed to upload image.');
             setSaving(false);
@@ -455,7 +454,7 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     width: '100%',
-    height: 180,
+    aspectRatio: 16 / 9,
     borderRadius: Radius.md,
   },
   imageRemoveButton: {

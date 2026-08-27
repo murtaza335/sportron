@@ -19,17 +19,16 @@ interface CompressOptions {
 
 const DEFAULT_COMPRESS_OPTIONS: CompressOptions = {
   maxWidth: 1280,
-  maxHeight: 1280,
   quality: 0.7,
   format: ImageManipulator.SaveFormat.JPEG,
 };
 
 async function compressImage(uri: string, options: CompressOptions = DEFAULT_COMPRESS_OPTIONS): Promise<string> {
-  const { maxWidth, maxHeight, quality, format } = { ...DEFAULT_COMPRESS_OPTIONS, ...options };
+  const { maxWidth, quality, format } = { ...DEFAULT_COMPRESS_OPTIONS, ...options };
   
   const result = await ImageManipulator.manipulateAsync(
     uri,
-    [{ resize: { width: maxWidth, height: maxHeight } }],
+    [{ resize: { width: maxWidth } }],
     { compress: quality, format, base64: false }
   );
   
@@ -39,7 +38,8 @@ async function compressImage(uri: string, options: CompressOptions = DEFAULT_COM
 export async function uploadImageFromUri(
   uri: string,
   onProgress?: (progress: UploadProgress) => void,
-  compressOptions?: CompressOptions
+  compressOptions?: CompressOptions,
+  filePrefix = 'avatar',
 ): Promise<string | null> {
   if (!CLOUDINARY_CLOUD_NAME || !CLOUDINARY_UPLOAD_PRESET) {
     console.error('Cloudinary environment variables are missing.');
@@ -55,11 +55,11 @@ export async function uploadImageFromUri(
     if (Platform.OS === 'web') {
       const response = await fetch(compressedUri);
       const fileBlob = await response.blob();
-      formData.append('file', fileBlob, `avatar_${Date.now()}.jpg`);
+      formData.append('file', fileBlob, `${filePrefix}_${Date.now()}.jpg`);
     } else {
       const fileObject = {
         uri: compressedUri,
-        name: `avatar_${Date.now()}.jpg`,
+        name: `${filePrefix}_${Date.now()}.jpg`,
         type: 'image/jpeg',
       };
       formData.append('file', fileObject as any);
