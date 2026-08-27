@@ -86,6 +86,8 @@ export type Profile = {
   longest_streak: number;
   last_activity_date: string | null;
   streak_updated_at: string | null;
+  completed_sessions: number;
+  total_committed_sessions: number;
 };
 
 export type NotificationPreferences = {

@@ -277,6 +277,8 @@ export function MatchLineupSelector({
                 longest_streak: 0,
                 last_activity_date: null,
                 streak_updated_at: null,
+                completed_sessions: 0,
+                total_committed_sessions: 0,
               }}
               helperText=""
               locked
