@@ -656,7 +656,7 @@ const contextLayout = useMemo(() => {
     <>
       <Modal
         visible={visible}
-        animationType="slide"
+        animationType="none"
         presentationStyle="fullScreen"
         onRequestClose={onClose}
       >

@@ -298,28 +298,30 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.xs,
   },
   participantRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.sm,
+    flexDirection: 'column',
+    alignItems: 'stretch',
+    gap: Spacing.xs,
     borderRadius: Radius.md,
     borderWidth: 1,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
   },
   participantInfo: {
-    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.sm,
   },
+  nameButtonsWrap: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
   participantName: {
-    flexShrink: 1,
     fontWeight: '600',
   },
   markGroup: {
     flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'flex-end',
     gap: Spacing.xs,
   },
   markChip: {

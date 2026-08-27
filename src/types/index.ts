@@ -86,6 +86,8 @@ export type Profile = {
   longest_streak: number;
   last_activity_date: string | null;
   streak_updated_at: string | null;
+  completed_sessions: number;
+  total_committed_sessions: number;
 };
 
 export type NotificationPreferences = {
@@ -457,4 +459,19 @@ export type SessionChatMessage = ChatMessageBase & {
 
 export type CommunityChatMessage = ChatMessageBase & {
   community_id: string;
+};
+
+export type AuditLog = {
+  id: string;
+  actor_id: string | null;
+  action: string;
+  table_name: string;
+  record_id: string;
+  old_data: Record<string, unknown> | null;
+  new_data: Record<string, unknown> | null;
+  metadata: Record<string, unknown> | null;
+  created_at: string;
+  // Joined from profiles
+  actor_username?: string | null;
+  actor_avatar_url?: string | null;
 };

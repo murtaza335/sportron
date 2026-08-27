@@ -575,12 +575,12 @@ const styles = StyleSheet.create({
 
   // Cover
   coverContainer: {
-    height: 160,
+    aspectRatio: 16 / 9,
     position: 'relative',
   },
   coverImage: {
     width: '100%',
-    height: 160,
+    height: '100%',
   },
   coverOverlay: {
     position: 'absolute',

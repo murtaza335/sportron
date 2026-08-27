@@ -2,7 +2,34 @@ import { supabase } from '@/lib/supabase';
 import type { CreateProfileInput, NotificationPreferences, Profile } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+function isValidUUID(value: string): boolean {
+  return UUID_RE.test(value);
+}
+
+/**
+ * Fetch any user's public profile (no fcm_tokens / notification_preferences).
+ * Uses the `public_profiles` view which strips sensitive columns.
+ */
 export async function fetchProfile(userId: string): Promise<Profile | null> {
+  const { data, error } = await supabase
+    .from('public_profiles')
+    .select('*')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw error;
+  }
+
+  return data as Profile | null;
+}
+
+/**
+ * Fetch the current user's FULL profile (including fcm_tokens, notification_preferences).
+ * Only use this for the logged-in user — other users' sensitive data is hidden by RLS.
+ */
+export async function fetchOwnProfile(userId: string): Promise<Profile | null> {
   const { data, error } = await supabase
     .from('profiles')
     .select('*')
@@ -23,11 +50,11 @@ export async function isUsernameAvailable(username: string, excludeUserId?: stri
   }
 
   let query = supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id')
     .ilike('username', normalized);
 
-  if (excludeUserId) {
+  if (excludeUserId && isValidUUID(excludeUserId)) {
     query = query.neq('id', excludeUserId);
   }
 
@@ -42,12 +69,12 @@ export async function isUsernameAvailable(username: string, excludeUserId?: stri
 
 export async function fetchAllProfiles(excludeUserId?: string): Promise<Profile[]> {
   let query = supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('*')
     .is('deleted_at', null)
     .order('username', { ascending: true });
 
-  if (excludeUserId) {
+  if (excludeUserId && isValidUUID(excludeUserId)) {
     query = query.neq('id', excludeUserId);
   }
 

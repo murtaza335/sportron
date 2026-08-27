@@ -2,7 +2,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
-import { fetchProfile, reEnableAccount } from '@/services/profiles';
+import { fetchOwnProfile, reEnableAccount } from '@/services/profiles';
 import type { Profile } from '@/types';
 
 type AuthContextValue = {
@@ -25,7 +25,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const loadProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
     try {
-      const data = await fetchProfile(userId);
+      const data = await fetchOwnProfile(userId);
       if (data?.deleted_at) {
         await reEnableAccount(userId);
         data.deleted_at = null;

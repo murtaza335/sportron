@@ -139,8 +139,18 @@ export default function CommunityDetailScreen() {
   };
 
   const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
-
-  const displayMatches = activeTab === 'pending' ? pendingMatches : feedMatches;
+  const pendingFromFeed = matches.filter(
+    (m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id),
+  );
+  const allPendingMatches = [
+    ...pendingFromFeed,
+    ...pendingMatches.filter(
+      (pm) => pm.approval_status === 'pending'
+        && (pm.recorded_by === user?.id || pm.opponent_id === user?.id)
+        && !pendingFromFeed.some((m) => m.id === pm.id),
+    ),
+  ];
+  const displayMatches = activeTab === 'pending' ? allPendingMatches : feedMatches;
 
   const toMatchWithProfiles = useCallback(
     (cm: CommunityMatch): MatchWithProfiles => {
@@ -594,7 +604,7 @@ export default function CommunityDetailScreen() {
                     activeTab !== 'pending' && { color: theme.textSecondary },
                   ]}
                 >
-                  Pending ({pendingMatches.length})
+                  Pending ({allPendingMatches.length})
                 </ThemedText>
               </Pressable>
             </View>
@@ -922,35 +932,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-  },
-  editImagePicker: {
-    width: '100%',
-    height: 120,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-    overflow: 'hidden',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editImagePreview: {
-    width: '100%',
-    height: 120,
-  },
-  editImageRemove: {
-    position: 'absolute',
-    top: 6,
-    right: 6,
-    width: 24,
-    height: 24,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  editImagePlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
   },
   pingInput: {
     borderRadius: Radius.md,

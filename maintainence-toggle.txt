@@ -1,0 +1,5 @@
+-- Enable
+UPDATE site_config SET value = '{"enabled": true, "message": "Back in ~30 min."}' WHERE key = 'maintenance';
+
+-- Disable
+UPDATE site_config SET value = '{"enabled": false, "message": ""}' WHERE key = 'maintenance';

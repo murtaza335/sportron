@@ -3,7 +3,6 @@ import type {
   Community,
   CommunityInvite,
   CommunityMemberStats,
-  Profile,
   CommunityJoinRequest,
   CommunityMatch,
   CommunityMatchComment,
@@ -33,66 +32,140 @@ import {
 } from './notifications';
 import { updateStreak } from './streak';
 
-type CommunityRow = Community & {
-  member_count: { count: number }[] | null;
-  creator?: { id: string; username: string } | null;
+// ---------------------------------------------------------------------------
+// RPC row types — matches the column aliases returned by the SECURITY DEFINER
+// functions in migration 047. These are internal; the public API remains the
+// existing Community / CommunityMember / etc. types from @/types.
+// ---------------------------------------------------------------------------
+
+type CommunityRpcRow = {
+  id: string; name: string; description: string | null; organization: string | null;
+  location: string | null; image_url: string | null; visibility: string; sport: string;
+  created_by: string; created_at: string; updated_at: string; pings_enabled: boolean;
+  member_count: number; creator_username: string | null; creator_avatar_url: string | null;
 };
 
-function normalizeCommunity(row: CommunityRow): Community {
+function rowToCommunity(r: CommunityRpcRow): Community {
   return {
-    id: row.id,
-    name: row.name,
-    description: row.description,
-    organization: row.organization,
-    location: row.location,
-    image_url: row.image_url,
-    visibility: row.visibility,
-    sport: row.sport,
-    created_by: row.created_by,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    pings_enabled: row.pings_enabled,
-    member_count: row.member_count?.[0]?.count ?? 0,
-    creator: Array.isArray(row.creator) ? row.creator[0] ?? null : row.creator ?? null,
+    id: r.id, name: r.name, description: r.description, organization: r.organization,
+    location: r.location, image_url: r.image_url, visibility: r.visibility as any,
+    sport: r.sport as any, created_by: r.created_by, created_at: r.created_at,
+    updated_at: r.updated_at, pings_enabled: r.pings_enabled,
+    member_count: Number(r.member_count) ?? 0,
+    creator: r.creator_username
+      ? { id: r.created_by, username: r.creator_username }
+      : null,
+  };
+}
+
+type MemberRpcRow = {
+  community_id: string; profile_id: string; role: string; approval_status: string;
+  matches_played: number; wins: number; losses: number; win_ratio: number;
+  joined_at: string; username: string | null; display_name: string | null; avatar_url: string | null;
+};
+
+function rowToMember(r: MemberRpcRow): CommunityMember {
+  return {
+    community_id: r.community_id, profile_id: r.profile_id,
+    role: r.role as CommunityMemberRole, approval_status: r.approval_status as any,
+    matches_played: r.matches_played, wins: r.wins, losses: r.losses,
+    win_ratio: r.win_ratio, joined_at: r.joined_at,
+    profile: r.username
+      ? { id: r.profile_id, username: r.username, display_name: r.display_name, avatar_url: r.avatar_url }
+      : null,
+  } as CommunityMember;
+}
+
+type InviteRpcRow = {
+  id: string; community_id: string; invited_by: string; invitee_id: string;
+  status: string; created_at: string; updated_at: string;
+  community_name: string | null; community_image_url: string | null;
+  inviter_username: string | null; inviter_avatar_url: string | null;
+  invitee_username: string | null; invitee_avatar_url: string | null;
+};
+
+function rowToInvite(r: InviteRpcRow): CommunityInvite {
+  return {
+    id: r.id, community_id: r.community_id, invited_by: r.invited_by,
+    invitee_id: r.invitee_id, status: r.status as any,
+    created_at: r.created_at, updated_at: r.updated_at,
+    community: r.community_name
+      ? { id: r.community_id, name: r.community_name, image_url: r.community_image_url }
+      : null,
+    inviter: r.inviter_username
+      ? { id: r.invited_by, username: r.inviter_username, avatar_url: r.inviter_avatar_url }
+      : null,
+    invitee: r.invitee_username
+      ? { id: r.invitee_id, username: r.invitee_username, avatar_url: r.invitee_avatar_url }
+      : null,
+  } as CommunityInvite;
+}
+
+type CommentRpcRow = {
+  id: string; community_match_id: string; profile_id: string;
+  content: string; created_at: string;
+  username: string | null; avatar_url: string | null;
+};
+
+function rowToComment(r: CommentRpcRow): CommunityMatchComment {
+  return {
+    id: r.id, community_match_id: r.community_match_id, profile_id: r.profile_id,
+    content: r.content, created_at: r.created_at,
+    profile: r.username
+      ? { id: r.profile_id, username: r.username, avatar_url: r.avatar_url }
+      : null,
+  } as CommunityMatchComment;
+}
+
+type MatchRpcRow = {
+  id: string; community_id: string; recorded_by: string;
+  player_id: string; player_partner_id: string | null;
+  opponent_id: string; opponent_partner_id: string | null;
+  sport: string; custom_sport_name: string | null;
+  team_a_name: string | null; team_b_name: string | null;
+  player_score: number; opponent_score: number;
+  approval_status: string; created_at: string; updated_at: string;
+  recorder_username: string | null; recorder_avatar_url: string | null;
+  player_username: string | null; player_avatar_url: string | null;
+  player_partner_username: string | null; player_partner_avatar_url: string | null;
+  opponent_username: string | null; opponent_avatar_url: string | null;
+  opponent_partner_username: string | null; opponent_partner_avatar_url: string | null;
+  likes_count: number; comments_count: number; is_liked_by_user: boolean;
+};
+
+function rowToMatch(r: MatchRpcRow): CommunityMatch {
+  const profile = (username: string | null, avatar: string | null, id: string) =>
+    username ? { id, username, avatar_url: avatar } : null;
+  return {
+    id: r.id, community_id: r.community_id, recorded_by: r.recorded_by,
+    player_id: r.player_id, player_partner_id: r.player_partner_id,
+    opponent_id: r.opponent_id, opponent_partner_id: r.opponent_partner_id,
+    sport: r.sport as any, custom_sport_name: r.custom_sport_name,
+    team_a_name: r.team_a_name, team_b_name: r.team_b_name,
+    player_score: r.player_score, opponent_score: r.opponent_score,
+    approval_status: r.approval_status as any,
+    created_at: r.created_at, updated_at: r.updated_at,
+    recorder: profile(r.recorder_username, r.recorder_avatar_url, r.recorded_by),
+    player: profile(r.player_username, r.player_avatar_url, r.player_id),
+    playerPartner: profile(r.player_partner_username, r.player_partner_avatar_url, r.player_partner_id!),
+    opponent: profile(r.opponent_username, r.opponent_avatar_url, r.opponent_id),
+    opponentPartner: profile(r.opponent_partner_username, r.opponent_partner_avatar_url, r.opponent_partner_id!),
+    likes_count: Number(r.likes_count) ?? 0,
+    comments_count: Number(r.comments_count) ?? 0,
+    is_liked_by_user: r.is_liked_by_user,
   };
 }
 
 export async function fetchPublicCommunities(): Promise<Community[]> {
-  const { data, error } = await supabase
-    .from('communities')
-    .select(`
-      *,
-      member_count:community_members(count),
-      creator:created_by(id, username)
-    `)
-    .order('created_at', { ascending: false });
-
+  const { data, error } = await supabase.rpc('get_public_communities');
   if (error) throw error;
-  return (data ?? []).map((row) => normalizeCommunity(row as CommunityRow));
+  return (data ?? []).map(rowToCommunity);
 }
 
 export async function fetchMyCommunities(userId: string): Promise<Community[]> {
-  const { data, error } = await supabase
-    .from('community_members')
-    .select(`
-      community:community_id(
-        *,
-        member_count:community_members(count),
-        creator:created_by(id, username)
-      )
-    `)
-    .eq('profile_id', userId)
-    .eq('approval_status', 'approved');
-
+  const { data, error } = await supabase.rpc('get_my_communities');
   if (error) throw error;
-
-  const communities: Community[] = [];
-  for (const row of data ?? []) {
-    const c = (row as Record<string, unknown>).community as CommunityRow | undefined;
-    if (c) communities.push(normalizeCommunity(c));
-  }
-
-  return communities;
+  return (data ?? []).map(rowToCommunity);
 }
 
 export async function fetchMyCommunityMemberships(
@@ -109,21 +182,10 @@ export async function fetchMyCommunityMemberships(
 }
 
 export async function fetchCommunityById(id: string): Promise<Community | null> {
-  const { data, error } = await supabase
-    .from('communities')
-    .select(`
-      *,
-      member_count:community_members(count),
-      creator:created_by(id, username)
-    `)
-    .eq('id', id)
-    .single();
-
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
-  }
-  return data ? normalizeCommunity(data as CommunityRow) : null;
+  const { data, error } = await supabase.rpc('get_community_by_id', { p_community_id: id });
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? rowToCommunity(row) : null;
 }
 
 export async function createCommunity(
@@ -166,10 +228,28 @@ export async function createCommunity(
   return { ...data, member_count: 1 };
 }
 
+async function requireCommunityAdmin(communityId: string): Promise<void> {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('Not authenticated');
+
+  const { data: member } = await supabase
+    .from('community_members')
+    .select('role')
+    .eq('community_id', communityId)
+    .eq('profile_id', user.id)
+    .single();
+
+  if (!member || member.role !== 'admin') {
+    throw new Error('Only community admins can perform this action.');
+  }
+}
+
 export async function updateCommunity(
   communityId: string,
   input: UpdateCommunityInput,
 ): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const updates: Record<string, unknown> = {};
   if (input.name !== undefined) updates.name = input.name.trim();
   if (input.description !== undefined) updates.description = input.description?.trim() || null;
@@ -193,6 +273,8 @@ export async function updateCommunity(
 }
 
 export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const { error } = await supabase
     .from('communities')
     .update({ pings_enabled: enabled })
@@ -202,6 +284,8 @@ export async function setPingsEnabled(communityId: string, enabled: boolean): Pr
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
+  await requireCommunityAdmin(communityId);
+
   const { error } = await supabase
     .from('communities')
     .delete()
@@ -211,16 +295,9 @@ export async function deleteCommunity(communityId: string): Promise<void> {
 }
 
 export async function fetchCommunityMembers(communityId: string): Promise<CommunityMember[]> {
-  const { data, error } = await supabase
-    .from('community_members')
-    .select(`
-      *,
-      profile:profile_id(id, username, display_name, avatar_url)
-    `)
-    .eq('community_id', communityId);
-
+  const { data, error } = await supabase.rpc('get_community_members', { p_community_id: communityId });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(rowToMember);
 }
 
 export async function searchCommunityMembers(
@@ -230,32 +307,13 @@ export async function searchCommunityMembers(
   const normalized = query.trim();
   if (normalized.length < 1) return [];
 
-  // Step 1: find profile ids whose username matches the query.
-  const { data: profileRows, error: profileError } = await supabase
-    .from('profiles')
-    .select('id')
-    .ilike('username', `%${normalized}%`)
-    .limit(20);
-  if (profileError) throw profileError;
-
-  const ids = (profileRows ?? []).map((p) => p.id);
-  if (ids.length === 0) return [];
-
-  // Step 2: fetch the matching members with their joined profile. Unlike filtering
-  // on the embedded `profile.username` directly, this keeps the embed fully populated.
-  const { data, error } = await supabase
-    .from('community_members')
-    .select(`
-      *,
-      profile:profile_id(id, username, display_name, avatar_url)
-    `)
-    .eq('community_id', communityId)
-    .eq('approval_status', 'approved')
-    .in('profile_id', ids)
-    .limit(20);
+  const { data, error } = await supabase.rpc('search_community_members', {
+    p_community_id: communityId,
+    p_query: normalized,
+  });
 
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(rowToMember);
 }
 
 export async function fetchCommunityMember(
@@ -479,18 +537,15 @@ export async function transferAdmin(
 export async function fetchJoinRequests(
   communityId: string,
 ): Promise<CommunityJoinRequest[]> {
-  const { data, error } = await supabase
-    .from('community_join_requests')
-    .select(`
-      *,
-      profile:user_id(id, username, avatar_url)
-    `)
-    .eq('community_id', communityId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: true });
-
+  const { data, error } = await supabase.rpc('get_join_requests', { p_community_id: communityId });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map((r: any) => ({
+    id: r.id, community_id: r.community_id, user_id: r.user_id,
+    status: r.status, created_at: r.created_at, updated_at: r.updated_at,
+    profile: r.username
+      ? { id: r.user_id, username: r.username, avatar_url: r.avatar_url }
+      : null,
+  }));
 }
 
 export async function fetchMyJoinRequest(
@@ -754,94 +809,33 @@ export async function fetchCommunityMatches(
   page?: number,
   pageSize?: number,
 ): Promise<{ data: CommunityMatch[]; hasMore: boolean }> {
-  let query = supabase
-    .from('community_matches')
-    .select(`
-      *,
-      recorder:recorded_by(id, username, avatar_url),
-      player:player_id(id, username, avatar_url),
-      playerPartner:player_partner_id(id, username, avatar_url),
-      opponent:opponent_id(id, username, avatar_url),
-      opponentPartner:opponent_partner_id(id, username, avatar_url),
-      likes:community_match_likes(profile_id),
-      comments:community_match_comments(id)
-    `)
-    .eq('community_id', communityId)
-    .order('created_at', { ascending: false });
-
-  // Filter out pending matches that don't involve the current user
-  if (userId) {
-    query = query.or(`approval_status.neq.pending,recorded_by.eq.${userId},opponent_id.eq.${userId}`);
-  }
-
-  if (page && pageSize) {
-    const from = (page - 1) * pageSize;
-    const to = from + pageSize - 1;
-    query = query.range(from, to);
-  }
-
-  const { data, error } = await query;
+  const { data, error } = await supabase.rpc('get_community_matches', {
+    p_community_id: communityId,
+    p_page: page ?? 1,
+    p_page_size: pageSize ?? 20,
+    p_user_id: userId ?? null,
+  });
 
   if (error) throw error;
 
   const rows = data ?? [];
   const hasMore = page && pageSize ? rows.length === pageSize : false;
 
-  const matches = rows.map((row: any) => {
-    const likes = row.likes ?? [];
-    const comments = row.comments ?? [];
-    return {
-      ...row,
-      player: Array.isArray(row.player) ? row.player[0] ?? null : row.player,
-      playerPartner: Array.isArray(row.playerPartner) ? row.playerPartner[0] ?? null : row.playerPartner,
-      opponent: Array.isArray(row.opponent) ? row.opponent[0] ?? null : row.opponent,
-      opponentPartner: Array.isArray(row.opponentPartner) ? row.opponentPartner[0] ?? null : row.opponentPartner,
-      recorder: Array.isArray(row.recorder) ? row.recorder[0] ?? null : row.recorder,
-      likes_count: likes.length,
-      comments_count: comments.length,
-      is_liked_by_user: userId ? likes.some((like: { profile_id: string }) => like.profile_id === userId) : false,
-    } as CommunityMatch;
-  });
-
-  return { data: matches, hasMore };
+  return { data: rows.map(rowToMatch), hasMore };
 }
 
 export async function fetchCommunityMatchById(
   matchId: string,
   userId?: string,
 ): Promise<CommunityMatch | null> {
-  const { data, error } = await supabase
-    .from('community_matches')
-    .select(`
-      *,
-      recorder:recorded_by(id, username, avatar_url),
-      player:player_id(id, username, avatar_url),
-      playerPartner:player_partner_id(id, username, avatar_url),
-      opponent:opponent_id(id, username, avatar_url),
-      opponentPartner:opponent_partner_id(id, username, avatar_url),
-      likes:community_match_likes(profile_id),
-      comments:community_match_comments(id)
-    `)
-    .eq('id', matchId)
-    .maybeSingle();
+  const { data, error } = await supabase.rpc('get_community_match_by_id', {
+    p_match_id: matchId,
+    p_user_id: userId ?? null,
+  });
 
   if (error) throw error;
-  if (!data) return null;
-
-  const row = data as any;
-  const likes = row.likes ?? [];
-  const comments = row.comments ?? [];
-  return {
-    ...row,
-    player: Array.isArray(row.player) ? row.player[0] ?? null : row.player,
-    playerPartner: Array.isArray(row.playerPartner) ? row.playerPartner[0] ?? null : row.playerPartner,
-    opponent: Array.isArray(row.opponent) ? row.opponent[0] ?? null : row.opponent,
-    opponentPartner: Array.isArray(row.opponentPartner) ? row.opponentPartner[0] ?? null : row.opponentPartner,
-    recorder: Array.isArray(row.recorder) ? row.recorder[0] ?? null : row.recorder,
-    likes_count: likes.length,
-    comments_count: comments.length,
-    is_liked_by_user: userId ? likes.some((like: { profile_id: string }) => like.profile_id === userId) : false,
-  } as CommunityMatch;
+  const row = data?.[0];
+  return row ? rowToMatch(row) : null;
 }
 
 export async function toggleCommunityMatchLike(
@@ -882,21 +876,9 @@ export async function toggleCommunityMatchLike(
 export async function fetchCommunityMatchComments(
   communityMatchId: string,
 ): Promise<CommunityMatchComment[]> {
-  const { data, error } = await supabase
-    .from('community_match_comments')
-    .select(`
-      *,
-      profile:profiles(id, username, avatar_url)
-    `)
-    .eq('community_match_id', communityMatchId)
-    .order('created_at', { ascending: true });
-
+  const { data, error } = await supabase.rpc('get_match_comments', { p_match_id: communityMatchId });
   if (error) throw error;
-
-  return (data ?? []).map((row: any) => ({
-    ...row,
-    profile: Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile,
-  }));
+  return (data ?? []).map(rowToComment);
 }
 
 export async function addCommunityMatchComment(
@@ -911,18 +893,21 @@ export async function addCommunityMatchComment(
       profile_id: userId,
       content: content.trim(),
     })
-    .select(`
-      *,
-      profile:profiles(id, username, avatar_url)
-    `)
+    .select('*')
     .single();
 
   if (error) throw error;
 
-  const row = data as any;
+  // Fetch the profile for the new comment
+  const { data: profile } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .eq('id', userId)
+    .single();
+
   const comment = {
-    ...row,
-    profile: Array.isArray(row.profile) ? row.profile[0] ?? null : row.profile,
+    ...data,
+    profile: profile ?? null,
   };
 
   try {
@@ -1088,34 +1073,13 @@ export async function promoteToAdmin(
   }
 }
 
-type InviteRow = CommunityInvite & {
-  community: Pick<Community, 'id' | 'name' | 'image_url'> | null;
-  inviter: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
-  invitee: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
-};
-
-function normalizeInvite(row: InviteRow): CommunityInvite {
-  return {
-    id: row.id,
-    community_id: row.community_id,
-    invited_by: row.invited_by,
-    invitee_id: row.invitee_id,
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
-    community: row.community,
-    inviter: row.inviter,
-    invitee: row.invitee,
-  };
-}
-
 export async function inviteMemberByUsername(
   communityId: string,
   adminId: string,
   username: string,
 ): Promise<CommunityInvite> {
   const { data: profile, error: profileError } = await supabase
-    .from('profiles')
+    .from('public_profiles')
     .select('id, username')
     .eq('username', username.toLowerCase())
     .single();
@@ -1175,37 +1139,15 @@ export async function inviteMemberByUsername(
 export async function fetchPendingInvites(
   communityId: string,
 ): Promise<CommunityInvite[]> {
-  const { data, error } = await supabase
-    .from('community_invites')
-    .select(`
-      *,
-      community:community_id(id, name, image_url),
-      inviter:invited_by(id, username, avatar_url),
-      invitee:invitee_id(id, username, avatar_url)
-    `)
-    .eq('community_id', communityId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
-
+  const { data, error } = await supabase.rpc('get_community_invites', { p_community_id: communityId });
   if (error) throw error;
-  return (data ?? []).map(normalizeInvite);
+  return (data ?? []).map(rowToInvite);
 }
 
 export async function fetchMyPendingInvites(userId: string): Promise<CommunityInvite[]> {
-  const { data, error } = await supabase
-    .from('community_invites')
-    .select(`
-      *,
-      community:community_id(id, name, image_url),
-      inviter:invited_by(id, username, avatar_url),
-      invitee:invitee_id(id, username, avatar_url)
-    `)
-    .eq('invitee_id', userId)
-    .eq('status', 'pending')
-    .order('created_at', { ascending: false });
-
+  const { data, error } = await supabase.rpc('get_my_pending_invites');
   if (error) throw error;
-  return (data ?? []).map(normalizeInvite);
+  return (data ?? []).map(rowToInvite);
 }
 
 export async function respondToInvite(
@@ -1316,34 +1258,59 @@ export async function fetchCommunityInvites(
 ): Promise<CommunityInvite[]> {
   const { data, error } = await supabase
     .from('community_invites')
-    .select(`
-      *,
-      community:communities(id, name, image_url),
-      inviter:profiles!community_invites_invited_by_fkey(id, username, avatar_url),
-      invitee:profiles!community_invites_invitee_id_fkey(id, username, avatar_url)
-    `)
+    .select('*')
     .eq('community_id', communityId)
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  // Batch-resolve profiles from public_profiles view
+  const profileIds = (data ?? []).flatMap((r: any) => [r.invited_by, r.invitee_id]);
+  const uniqueIds = [...new Set(profileIds)];
+  const { data: profiles } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .in('id', uniqueIds);
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    inviter: profileMap.get(row.invited_by)
+      ? { id: row.invited_by, username: profileMap.get(row.invited_by)!.username, avatar_url: profileMap.get(row.invited_by)!.avatar_url }
+      : null,
+    invitee: profileMap.get(row.invitee_id)
+      ? { id: row.invitee_id, username: profileMap.get(row.invitee_id)!.username, avatar_url: profileMap.get(row.invitee_id)!.avatar_url }
+      : null,
+  }));
 }
 
 export async function fetchUserPendingInvites(userId: string): Promise<CommunityInvite[]> {
   const { data, error } = await supabase
     .from('community_invites')
-    .select(`
-      *,
-      community:communities(id, name, image_url),
-      inviter:profiles!community_invites_invited_by_fkey(id, username, avatar_url),
-      invitee:profiles!community_invites_invitee_id_fkey(id, username, avatar_url)
-    `)
+    .select('*')
     .eq('invitee_id', userId)
     .eq('status', 'pending')
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return data ?? [];
+
+  const profileIds = (data ?? []).flatMap((r: any) => [r.invited_by, r.invitee_id]);
+  const uniqueIds = [...new Set(profileIds)];
+  const { data: profiles } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .in('id', uniqueIds);
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+
+  return (data ?? []).map((row: any) => ({
+    ...row,
+    inviter: profileMap.get(row.invited_by)
+      ? { id: row.invited_by, username: profileMap.get(row.invited_by)!.username, avatar_url: profileMap.get(row.invited_by)!.avatar_url }
+      : null,
+    invitee: profileMap.get(row.invitee_id)
+      ? { id: row.invitee_id, username: profileMap.get(row.invitee_id)!.username, avatar_url: profileMap.get(row.invitee_id)!.avatar_url }
+      : null,
+  }));
 }
 
 export async function respondToCommunityInvite(

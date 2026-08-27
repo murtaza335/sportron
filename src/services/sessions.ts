@@ -11,16 +11,64 @@ import {
 } from './notifications';
 import { updateStreak } from './streak';
 
-type SessionRow = Session & {
-  creator: { id: string; username: string; avatar_url: string | null } | null;
-  commitments: { id: string; user_id: string; status: string }[] | null;
+// ---------------------------------------------------------------------------
+// RPC row types — matches the column aliases returned by the SECURITY DEFINER
+// functions in migration 047.
+// ---------------------------------------------------------------------------
+
+type SessionRpcRow = {
+  id: string; created_by: string; purpose: string; title: string | null;
+  location: string | null; date_time: string; expires_at: string | null;
+  max_participants: number | null; description: string | null;
+  status: string; created_at: string; updated_at: string;
+  creator_username: string | null; creator_avatar_url: string | null;
+  commitment_count: number;
+  my_commitment_id: string | null; my_commitment_status: string | null;
 };
 
-// Coalesces the close_expired_sessions RPC + notification cleanup across the
-// screens that call it on every focus (session feed scopes, pending feedback,
-// sessions/popups). Multiple calls inside a window collapse into one.
-let lastCloseExpiredAt = 0;
-const CLOSE_EXPIRED_MIN_INTERVAL_MS = 15_000;
+function rowToSession(r: SessionRpcRow, currentUserId?: string): Session {
+  return {
+    id: r.id, created_by: r.created_by, purpose: r.purpose, title: r.title,
+    location: r.location ?? '', date_time: r.date_time, expires_at: r.expires_at,
+    max_participants: r.max_participants ?? 0, description: r.description,
+    status: r.status as any, created_at: r.created_at, updated_at: r.updated_at,
+    creator: r.creator_username
+      ? { id: r.created_by, username: r.creator_username, avatar_url: r.creator_avatar_url }
+      : null,
+    commitment_count: Number(r.commitment_count ?? 0),
+    my_commitment: currentUserId && r.my_commitment_id
+      ? { id: r.my_commitment_id, status: r.my_commitment_status as any }
+      : null,
+  };
+}
+
+type CommitmentRpcRow = {
+  id: string; session_id: string; user_id: string; status: string;
+  feedback_status: string | null; feedback_provided_by: string | null;
+  created_at: string; updated_at: string;
+  username: string | null; avatar_url: string | null;
+  completed_sessions: number | null; total_committed_sessions: number | null;
+};
+
+function rowToCommitment(r: CommitmentRpcRow): Commitment {
+  return {
+    id: r.id, session_id: r.session_id, user_id: r.user_id,
+    status: r.status as any, feedback_status: r.feedback_status as FeedbackStatus | null,
+    feedback_provided_by: r.feedback_provided_by,
+    created_at: r.created_at, updated_at: r.updated_at,
+    profile: r.username
+      ? {
+          id: r.user_id, username: r.username, avatar_url: r.avatar_url,
+          completed_sessions: r.completed_sessions ?? 0,
+          total_committed_sessions: r.total_committed_sessions ?? 0,
+        }
+      : null,
+  } as Commitment;
+}
+
+// ---------------------------------------------------------------------------
+// Internal helpers used by mutation functions (commitToSession, approveCommitment, etc.)
+// ---------------------------------------------------------------------------
 
 function normalizeSession(
   row: SessionRow,
@@ -28,18 +76,10 @@ function normalizeSession(
   acceptedCount?: number,
 ): Session {
   return {
-    id: row.id,
-    created_by: row.created_by,
-    purpose: row.purpose,
-    title: row.title,
-    location: row.location,
-    date_time: row.date_time,
-    expires_at: row.expires_at,
-    max_participants: row.max_participants,
-    description: row.description,
-    status: row.status,
-    created_at: row.created_at,
-    updated_at: row.updated_at,
+    id: row.id, created_by: row.created_by, purpose: row.purpose, title: row.title,
+    location: row.location, date_time: row.date_time, expires_at: row.expires_at,
+    max_participants: row.max_participants, description: row.description,
+    status: row.status as any, created_at: row.created_at, updated_at: row.updated_at,
     creator: row.creator,
     commitment_count: acceptedCount ?? 0,
     my_commitment: currentUserId
@@ -62,30 +102,38 @@ async function fetchAcceptedCounts(sessionIds: string[]): Promise<Record<string,
   return map;
 }
 
+async function resolveCreatorProfiles(
+  rows: { created_by: string }[],
+): Promise<Map<string, { id: string; username: string; avatar_url: string | null }>> {
+  const ids = [...new Set(rows.map((r) => r.created_by).filter(Boolean))];
+  if (ids.length === 0) return new Map();
+  const { data } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .in('id', ids);
+  const map = new Map<string, { id: string; username: string; avatar_url: string | null }>();
+  for (const p of data ?? []) {
+    map.set(p.id, { id: p.id, username: p.username ?? '', avatar_url: p.avatar_url ?? null });
+  }
+  return map;
+}
+
+type SessionRow = Session & {
+  creator: { id: string; username: string; avatar_url: string | null } | null;
+  commitments: { id: string; user_id: string; status: string }[] | null;
+};
+
+// Coalesces the close_expired_sessions RPC + notification cleanup across the
+// screens that call it on every focus (session feed scopes, pending feedback,
+// sessions/popups). Multiple calls inside a window collapse into one.
+let lastCloseExpiredAt = 0;
+const CLOSE_EXPIRED_MIN_INTERVAL_MS = 15_000;
+
 export async function fetchOpenSessions(currentUserId?: string): Promise<Session[]> {
   await closeExpiredSessions(currentUserId);
-
-  const { data, error } = await supabase
-    .from('sessions')
-    .select(
-      `
-      *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
-      commitments:commitments (id, user_id, status)
-    `,
-    )
-    .in('status', ['open', 'full'])
-    .order('date_time', { ascending: true });
-
+  const { data, error } = await supabase.rpc('get_open_sessions');
   if (error) throw error;
-
-  const sessions = data ?? [];
-  const sessionIds = sessions.map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
-
-  return sessions.map((row) =>
-    normalizeSession(row as SessionRow, currentUserId, countMap[row.id] ?? 0),
-  );
+  return (data ?? []).map((r: SessionRpcRow) => rowToSession(r, currentUserId));
 }
 
 export async function fetchSessionById(
@@ -93,31 +141,37 @@ export async function fetchSessionById(
   currentUserId?: string,
 ): Promise<Session | null> {
   await closeExpiredSessions(currentUserId);
+  const { data, error } = await supabase.rpc('get_session_by_id', { p_session_id: id });
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? rowToSession(row, currentUserId) : null;
+}
 
-  const { data, error } = await supabase
-    .from('sessions')
-    .select(
-      `
-      *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
-      commitments:commitments (id, user_id, status)
-    `,
-    )
-    .eq('id', id)
-    .single();
+// Sessions created by the user — active (open/full) first, then ended ones.
+export async function fetchMySessions(userId: string): Promise<Session[]> {
+  await closeExpiredSessions(userId);
+  const { data, error } = await supabase.rpc('get_my_sessions');
+  if (error) throw error;
+  return sortActiveFirst(
+    (data ?? []).map((r: SessionRpcRow) => rowToSession(r, userId)),
+  );
+}
 
-  if (error) {
-    if (error.code === 'PGRST116') return null;
-    throw error;
-  }
+// Sessions the user has an accepted commitment on — active first, then ended.
+export async function fetchJoinedSessions(userId: string): Promise<Session[]> {
+  await closeExpiredSessions(userId);
+  const { data, error } = await supabase.rpc('get_joined_sessions');
+  if (error) throw error;
+  return sortActiveFirst(
+    (data ?? []).map((r: SessionRpcRow) => rowToSession(r, userId)),
+  );
+}
 
-  let acceptedCount = 0;
-  if (data) {
-    const countMap = await fetchAcceptedCounts([data.id]);
-    acceptedCount = countMap[data.id] ?? 0;
-  }
-
-  return data ? normalizeSession(data as SessionRow, currentUserId, acceptedCount) : null;
+// Lean session rows for the Chats hub.
+export async function fetchChatSessions(userId: string): Promise<Session[]> {
+  const { data, error } = await supabase.rpc('get_my_accessible_sessions');
+  if (error) throw error;
+  return (data ?? []).map((r: SessionRpcRow) => rowToSession(r, userId));
 }
 
 // Sorts sessions so active ones (open/full) appear first (soonest first),
@@ -132,150 +186,12 @@ function sortActiveFirst(sessions: Session[]): Session[] {
   return [...active, ...past];
 }
 
-// Sessions created by the user — active (open/full) first, then ended ones.
-export async function fetchMySessions(userId: string): Promise<Session[]> {
-  await closeExpiredSessions(userId);
-
-  const { data, error } = await supabase
-    .from('sessions')
-    .select(
-      `
-      *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
-      commitments:commitments (id, user_id, status)
-    `,
-    )
-    .eq('created_by', userId);
-
-  if (error) throw error;
-
-  const sessions = data ?? [];
-  const sessionIds = sessions.map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
-
-  return sortActiveFirst(
-    sessions.map((row) =>
-      normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
-    ),
-  );
-}
-
-// Sessions the user has an accepted commitment on — active first, then ended.
-export async function fetchJoinedSessions(userId: string): Promise<Session[]> {
-  await closeExpiredSessions(userId);
-
-  const { data: committedRows, error: committedError } = await supabase
-    .from('commitments')
-    .select('session_id')
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
-
-  if (committedError) throw committedError;
-
-  const committedIds = (committedRows ?? []).map((c) => c.session_id);
-  if (committedIds.length === 0) return [];
-
-  const { data, error } = await supabase
-    .from('sessions')
-    .select(
-      `
-      *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
-      commitments:commitments (id, user_id, status)
-    `,
-    )
-    .in('id', committedIds);
-
-  if (error) throw error;
-
-  const sessions = data ?? [];
-  const sessionIds = sessions.map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
-
-  return sortActiveFirst(
-    sessions.map((row) =>
-      normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
-    ),
-  );
-}
-
-// Lean session rows for the Chats hub. The hub only renders title / status /
-// date, so this skips the commitment embeds, the per-session count RPC, and the
-// expiry RPC entirely — just the union of "created by me" + "accepted on".
-export async function fetchChatSessions(userId: string): Promise<Session[]> {
-  const { data: committedRows, error: committedError } = await supabase
-    .from('commitments')
-    .select('session_id')
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
-
-  if (committedError) throw committedError;
-
-  const committedIds = (committedRows ?? []).map((c) => c.session_id);
-
-  let query = supabase
-    .from('sessions')
-    .select(
-      `
-      id, created_by, purpose, title, location, date_time, expires_at,
-      max_participants, description, status, created_at, updated_at,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url)
-    `,
-    );
-
-  if (committedIds.length > 0) {
-    query = query.or(`created_by.eq.${userId},id.in.(${committedIds.join(',')})`);
-  } else {
-    query = query.eq('created_by', userId);
-  }
-
-  const { data, error } = await query;
-  if (error) throw error;
-
-  return (data ?? []).map((row) => normalizeSession(row as unknown as SessionRow, userId));
-}
-
 // Sessions the user was once part of (as creator or an accepted/left
 // participant) that have since ended.
 export async function fetchSessionHistory(userId: string): Promise<Session[]> {
-  const { data: committedRows, error: committedError } = await supabase
-    .from('commitments')
-    .select('session_id')
-    .eq('user_id', userId)
-    .in('status', ['accepted', 'left']);
-
-  if (committedError) throw committedError;
-
-  const committedIds = (committedRows ?? []).map((c) => c.session_id);
-
-  let query = supabase
-    .from('sessions')
-    .select(
-      `
-      *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
-      commitments:commitments (id, user_id, status)
-    `,
-    )
-    .in('status', ['closed', 'completed', 'cancelled']);
-
-  if (committedIds.length > 0) {
-    query = query.or(`created_by.eq.${userId},id.in.(${committedIds.join(',')})`);
-  } else {
-    query = query.eq('created_by', userId);
-  }
-
-  const { data, error } = await query.order('date_time', { ascending: false });
-
+  const { data, error } = await supabase.rpc('get_session_history');
   if (error) throw error;
-
-  const sessions = data ?? [];
-  const sessionIds = sessions.map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
-
-  return sessions.map((row) =>
-    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
-  );
+  return (data ?? []).map((r: SessionRpcRow) => rowToSession(r, userId));
 }
 
 // Maximum session duration: 1 week in minutes
@@ -350,22 +266,11 @@ export async function createSession(
 export async function fetchSessionCommitments(
   sessionId: string,
 ): Promise<Commitment[]> {
-  const { data, error } = await supabase
-    .from('commitments')
-    .select(
-      `
-      *,
-      profile:profiles!commitments_user_id_fkey (
-        id, username, avatar_url,
-        completed_sessions, total_committed_sessions
-      )
-    `,
-    )
-    .eq('session_id', sessionId)
-    .order('created_at', { ascending: true });
-
+  const { data, error } = await supabase.rpc('get_session_commitments', {
+    p_session_id: sessionId,
+  });
   if (error) throw error;
-  return data ?? [];
+  return (data ?? []).map(rowToCommitment);
 }
 
 export async function commitToSession(
@@ -561,7 +466,7 @@ async function resolveSessionApplicationNotification(
 ): Promise<void> {
   try {
     const [applicantResult, sessionResult] = await Promise.all([
-      supabase.from('profiles').select('username').eq('id', applicantId).single(),
+      supabase.from('public_profiles').select('username').eq('id', applicantId).single(),
       supabase.from('sessions').select('title, purpose, date_time').eq('id', sessionId).maybeSingle(),
     ]);
 
@@ -648,13 +553,10 @@ export async function fetchUserSessions(
 
   let query = supabase
     .from('sessions')
-    .select(
-      `
+    .select(`
       *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
       commitments:commitments (id, user_id, status)
-    `,
-    );
+    `);
 
   if (committedIds.length > 0) {
     query = query.or(
@@ -669,12 +571,15 @@ export async function fetchUserSessions(
   if (error) throw error;
 
   const sessions = data ?? [];
-  const sessionIds = sessions.map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
+  const [countMap, creatorMap] = await Promise.all([
+    fetchAcceptedCounts(sessions.map((s) => s.id)),
+    resolveCreatorProfiles(sessions),
+  ]);
 
-  return sessions.map((row) =>
-    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
-  );
+  return sessions.map((row) => {
+    const enriched = { ...row, creator: creatorMap.get(row.created_by) ?? null };
+    return normalizeSession(enriched as SessionRow, userId, countMap[row.id] ?? 0);
+  });
 }
 
 export async function deleteSession(sessionId: string, userId: string): Promise<void> {
@@ -748,25 +653,25 @@ export async function checkTimeConflicts(
 
   const { data: conflicts, error: err3 } = await supabase
     .from('sessions')
-    .select(
-      `
+    .select(`
       *,
-      creator:profiles!sessions_created_by_fkey (id, username, avatar_url),
       commitments:commitments (id, user_id, status)
-    `,
-    )
+    `)
     .in('id', allIds)
     .gte('date_time', startWindow)
     .lte('date_time', endWindow);
 
   if (err3) throw err3;
 
-  const sessionIds = (conflicts ?? []).map((s) => s.id);
-  const countMap = await fetchAcceptedCounts(sessionIds);
+  const [countMap, creatorMap] = await Promise.all([
+    fetchAcceptedCounts((conflicts ?? []).map((s) => s.id)),
+    resolveCreatorProfiles(conflicts ?? []),
+  ]);
 
-  return (conflicts ?? []).map((row) =>
-    normalizeSession(row as SessionRow, userId, countMap[row.id] ?? 0),
-  );
+  return (conflicts ?? []).map((row) => {
+    const enriched = { ...row, creator: creatorMap.get(row.created_by) ?? null };
+    return normalizeSession(enriched as SessionRow, userId, countMap[row.id] ?? 0);
+  });
 }
 
 export async function closeExpiredSessions(currentUserId?: string): Promise<void> {
@@ -856,24 +761,30 @@ export async function fetchPendingFeedbackSessions(
 
   const { data: commitmentRows, error: commError } = await supabase
     .from('commitments')
-    .select(
-      `
+    .select(`
       id, session_id, user_id, status, feedback_status, feedback_provided_by,
-      created_at, updated_at,
-      profile:profiles!commitments_user_id_fkey (id, username, avatar_url)
-    `,
-    )
+      created_at, updated_at
+    `)
     .in('session_id', sessionIds)
     .eq('status', 'accepted')
     .is('feedback_status', null);
 
   if (commError) throw commError;
 
+  const userIds = [...new Set((commitmentRows ?? []).map((r) => r.user_id))];
+  const { data: profiles } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .in('id', userIds);
+  const profileMap = new Map((profiles ?? []).map((p: any) => [p.id, p]));
+
   const bySession = new Map<string, Commitment[]>();
   for (const row of commitmentRows ?? []) {
     const list = bySession.get(row.session_id) ?? [];
-    const profile = Array.isArray(row.profile) ? row.profile[0] : row.profile;
-    list.push({ ...row, profile: profile ?? null });
+    list.push({
+      ...row,
+      profile: profileMap.get(row.user_id) ?? null,
+    } as any);
     bySession.set(row.session_id, list);
   }
 

@@ -210,18 +210,19 @@ function FilterChip({
 
 export default function SessionsScreen() {
   const theme = useTheme();
-  const { user } = useAuth();
+  const { user, profile } = useAuth();
   const insets = useSafeAreaInsets();
   const [scope, setScope] = useState<SessionScope>('all');
   const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
   const [showPurposeModal, setShowPurposeModal] = useState(false);
+  const { sessions, loading, refreshing, refresh, silentRefresh } = useSessionFeed(user?.id, scope);
 
-  const { sessions, loading, refreshing, refresh } = useSessionFeed(user?.id, scope);
   const {
     sessions: historySessions,
     loading: historyLoading,
     refreshing: historyRefreshing,
     refresh: refreshHistory,
+    silentRefresh: silentRefreshHistory,
   } = useSessionHistory(user?.id);
 
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
@@ -238,6 +239,8 @@ export default function SessionsScreen() {
     setSelectedSessionId(null);
     setSelectedSessionData(null);
     if (sessionIdParam) router.setParams({ sessionId: undefined });
+    if (!isHistory) silentRefresh();
+    else silentRefreshHistory();
   };
 
   // Post-session feedback loop — when the creator opens the Sessions tab, a
@@ -343,6 +346,25 @@ export default function SessionsScreen() {
             showsVerticalScrollIndicator={false}
             refreshControl={
               <RefreshControl refreshing={listRefreshing} onRefresh={onRefresh} tintColor={theme.text} />
+            }
+            ListHeaderComponent={
+              (isHistory || scope === 'all') ? (
+                <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+                  <View style={styles.statItem}>
+                    <ThemedText variant="heading" style={{ fontWeight: '700' }}>
+                      {profile?.total_committed_sessions ?? 0}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>Committed</ThemedText>
+                  </View>
+                  <View style={[styles.statDivider, { backgroundColor: theme.border }]} />
+                  <View style={styles.statItem}>
+                    <ThemedText variant="heading" style={{ fontWeight: '700' }}>
+                      {profile?.completed_sessions ?? 0}
+                    </ThemedText>
+                    <ThemedText variant="caption" muted>Completed</ThemedText>
+                  </View>
+                </View>
+              ) : null
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
@@ -674,5 +696,27 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: Spacing.xs,
+  },
+  statsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+    paddingVertical: Spacing.md,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  statItem: {
+    flex: 1,
+    alignItems: 'center',
+    gap: 2,
+  },
+  statDivider: {
+    width: 1,
+    height: 32,
   },
 });

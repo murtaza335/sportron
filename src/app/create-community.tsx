@@ -52,8 +52,7 @@ export default function CreateCommunityScreen() {
 
     const result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [16, 9],
+      allowsEditing: false,
       quality: 0.8,
     });
 
@@ -74,7 +73,7 @@ export default function CreateCommunityScreen() {
     if (imageUri) {
       setUploadingImage(true);
       try {
-        uploadedUrl = await uploadImageFromUri(imageUri);
+        uploadedUrl = await uploadImageFromUri(imageUri, undefined, undefined, 'cover');
         if (!uploadedUrl) {
           alert('Upload failed', 'Could not upload community image. Please try again.');
           setUploadingImage(false);
@@ -447,7 +446,7 @@ const styles = StyleSheet.create({
   },
   imagePreview: {
     width: '100%',
-    height: 180,
+    aspectRatio: 16 / 9,
     borderRadius: Radius.md,
   },
   imageRemoveButton: {
