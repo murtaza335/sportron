@@ -1,14 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput, FeedbackStatus } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH } from '@/types';
-import { fetchProfile } from './profiles';
-import { formatSessionDisplayName } from '@/lib/date';
-import {
-  notifySessionApplication,
-  notifySessionAccepted,
-  notifySessionRejected,
-  notifySessionLeft,
-} from './notifications';
 import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
@@ -312,20 +304,6 @@ export async function commitToSession(
 
   if (error) throw error;
 
-  try {
-    if (sessionRow.created_by !== userId) {
-      const applicant = await fetchProfile(userId);
-      await notifySessionApplication(
-        sessionRow.created_by,
-        sessionId,
-        applicant?.username ?? 'Someone',
-        userId,
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send session application notification:', e);
-  }
-
   return data;
 }
 
@@ -380,33 +358,6 @@ export async function approveCommitment(
   } catch (e) {
     console.error('Failed to update streak for session join:', e);
   }
-
-  await resolveSessionApplicationNotification(
-    commitment.session_id,
-    commitment.user_id,
-    actorId,
-    'accepted',
-  );
-
-  try {
-    const actor = await fetchProfile(actorId);
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('title, purpose, date_time')
-      .eq('id', commitment.session_id)
-      .maybeSingle();
-    const sessionName = session
-      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
-      : 'this session';
-    await notifySessionAccepted(
-      commitment.user_id,
-      commitment.session_id,
-      actor?.username ?? 'Session host',
-      sessionName,
-    );
-  } catch (e) {
-    console.error('Failed to send session accepted notification:', e);
-  }
 }
 
 export async function rejectCommitment(
@@ -427,70 +378,6 @@ export async function rejectCommitment(
     .eq('id', commitmentId);
 
   if (error) throw error;
-
-  await resolveSessionApplicationNotification(
-    commitment.session_id,
-    commitment.user_id,
-    actorId,
-    'rejected',
-  );
-
-  try {
-    const actor = await fetchProfile(actorId);
-    const { data: session } = await supabase
-      .from('sessions')
-      .select('title, purpose, date_time')
-      .eq('id', commitment.session_id)
-      .maybeSingle();
-    const sessionName = session
-      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
-      : 'this session';
-    await notifySessionRejected(
-      commitment.user_id,
-      commitment.session_id,
-      actor?.username ?? 'Session host',
-      sessionName,
-    );
-  } catch (e) {
-    console.error('Failed to send session rejected notification:', e);
-  }
-}
-
-// Resolves the session creator's pending `session_application` notification so it
-// leaves the "Action Required" inbox regardless of where the action was taken.
-async function resolveSessionApplicationNotification(
-  sessionId: string,
-  applicantId: string,
-  creatorId: string,
-  action: 'accepted' | 'rejected',
-): Promise<void> {
-  try {
-    const [applicantResult, sessionResult] = await Promise.all([
-      supabase.from('public_profiles').select('username').eq('id', applicantId).single(),
-      supabase.from('sessions').select('title, purpose, date_time').eq('id', sessionId).maybeSingle(),
-    ]);
-
-    const name = applicantResult.data?.username ?? 'Someone';
-    const session = sessionResult.data;
-    const sessionName = session
-      ? formatSessionDisplayName(session.purpose, session.date_time, session.title)
-      : 'your session';
-    await supabase
-      .from('in_app_notifications')
-      .update({
-        type: action === 'accepted' ? 'session_accepted' : 'session_rejected',
-        read: true,
-        body: action === 'accepted'
-          ? `You accepted ${name} into the ${sessionName}`
-          : `You declined ${name} from the ${sessionName}`,
-      })
-      .eq('user_id', creatorId)
-      .eq('type', 'session_application')
-      .eq('data->>sessionId', sessionId)
-      .eq('data->>applicantId', applicantId);
-  } catch (e) {
-    console.error('Failed to resolve session application notification:', e);
-  }
 }
 
 export async function uncommitFromSession(sessionId: string, userId: string): Promise<void> {
@@ -520,19 +407,6 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
         .eq('id', sessionId);
       if (statusError) console.error('Failed to reopen session:', statusError);
     }
-  }
-
-  try {
-    if (session.created_by !== userId) {
-      const leaver = await fetchProfile(userId);
-      await notifySessionLeft(
-        session.created_by,
-        sessionId,
-        leaver?.username ?? 'Someone',
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send session left notification:', e);
   }
 }
 
