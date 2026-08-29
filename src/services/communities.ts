@@ -423,13 +423,11 @@ export async function requestToJoinCommunity(
       .single();
 
     if (community) {
-      const { data: admins } = await supabase
-        .from('community_members')
-        .select('profile_id')
-        .eq('community_id', communityId)
-        .eq('role', 'admin');
+      const { data: admins } = await supabase.rpc('get_community_admin_ids', {
+        p_community_id: communityId,
+      });
 
-      const adminIds = (admins ?? []).map((a) => a.profile_id);
+      const adminIds = (admins ?? []).map((a: { profile_id: string }) => a.profile_id);
       if (adminIds.length > 0) {
         await notifyJoinRequest(
           adminIds,
