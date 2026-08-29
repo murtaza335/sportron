@@ -572,6 +572,17 @@ begin
 
   -- ─── DELETE: member removed ───
   if TG_OP = 'DELETE' then
+    -- Skip notifications when:
+    -- 1. Community was deleted (cascade) — community row no longer exists
+    -- 2. User left voluntarily — profile_id matches the authenticated user
+    if v_community_name is null then
+      return OLD;
+    end if;
+
+    if OLD.profile_id = auth.uid() then
+      return OLD;
+    end if;
+
     if not public._notification_already_exists(
       OLD.profile_id,
       'member_removed',
