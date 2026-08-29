@@ -1,6 +1,6 @@
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
-import { Image as ImageIcon, Shield, X } from 'lucide-react-native';
+import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   ActivityIndicator,
@@ -24,7 +24,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { uploadImageFromUri } from '@/lib/cloudinary';
-import { transferAdmin, updateCommunity } from '@/services/communities';
+import { updateCommunity } from '@/services/communities';
 import type { Community, CommunityVisibility } from '@/types';
 
 export default function EditCommunityScreen() {
@@ -140,30 +140,6 @@ function EditCommunityForm({
     } finally {
       setSaving(false);
       setUploadingImage(false);
-    }
-  };
-
-  const handleTransferAdmin = () => {
-    if (Alert.prompt) {
-      Alert.prompt(
-        'Transfer Admin',
-        'Enter the username of the new admin:',
-        async (text) => {
-          if (!text.trim() || !userId) return;
-          try {
-            await transferAdmin(community.id, userId, text.trim());
-            alert('Done', 'Admin rights transferred.');
-            router.back();
-          } catch (e: any) {
-            alert('Error', e?.message ?? 'Failed to transfer.');
-          }
-        },
-      );
-    } else {
-      alert(
-        'Transfer Admin',
-        'Transfer admin by username: feature available on iOS.',
-      );
     }
   };
 
@@ -392,12 +368,6 @@ function EditCommunityForm({
             buttonStyle={styles.submit}
           />
 
-          <Pressable onPress={handleTransferAdmin} style={styles.transferAdminLink}>
-            <Shield size={14} color={theme.error} strokeWidth={2} />
-            <ThemedText variant="caption" style={{ color: theme.error, fontWeight: '600' }}>
-              Transfer Admin Rights
-            </ThemedText>
-          </Pressable>
         </ScrollView>
       </KeyboardAvoidingView>
     </View>
@@ -499,12 +469,5 @@ const styles = StyleSheet.create({
   },
   submit: {
     marginTop: Spacing.sm,
-  },
-  transferAdminLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: Spacing.xs,
-    paddingVertical: Spacing.sm,
   },
 });
