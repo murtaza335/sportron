@@ -1,6 +1,5 @@
 import { supabase } from '@/lib/supabase';
 import type { Profile } from '@/types';
-import { notifyStreakMilestone } from './notifications';
 
 export type StreakResult = {
   streakCount: number;
@@ -104,14 +103,6 @@ export async function updateStreak(
 
   if (updateError) {
     return { error: updateError.message };
-  }
-
-  // Trigger milestone notification if this is a new record and hits a milestone
-  const MILESTONES = [3, 7, 14, 30, 60, 100];
-  if (result.isNewRecord && MILESTONES.includes(result.streakCount)) {
-    notifyStreakMilestone(userId, result.streakCount).catch((e) =>
-      console.error('[streak] Failed to send milestone notification:', e)
-    );
   }
 
   return result;

@@ -42,3 +42,10 @@ example
 /ios
 /android
 .env
+
+
+# Android Build Artifacts
+*.apk
+*.aab
+build-*.apk
+build-*.aab

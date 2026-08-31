@@ -103,7 +103,10 @@ export function useChat<T extends ChatMessageBase>(
         setChatUnreadCountFor(chatKind, sourceId, count);
         if (cursor) {
           const cursorTime = new Date(cursor).getTime();
-          const idx = page.findIndex((m) => new Date(m.created_at).getTime() > cursorTime);
+          // Skip own messages — they are never unread
+          const idx = page.findIndex(
+            (m) => new Date(m.created_at).getTime() > cursorTime && m.sender_id !== userId,
+          );
           setFirstUnreadIndex(idx >= 0 ? idx : null);
         } else {
           setFirstUnreadIndex(null);

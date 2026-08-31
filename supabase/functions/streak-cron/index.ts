@@ -48,13 +48,18 @@ async function createNotification(
   body: string,
   data?: Record<string, unknown>
 ): Promise<void> {
-  await supabase.rpc('insert_notification', {
-    p_user_id: userId,
-    p_type: type,
-    p_title: title,
-    p_body: body,
-    p_data: data ?? null,
-  });
+  const { error } = await supabase
+    .from('in_app_notifications')
+    .insert({
+      user_id: userId,
+      type,
+      title,
+      body,
+      data: data ?? null,
+      read: false,
+    });
+
+  if (error) throw error;
 }
 
 async function sendDailyNudge() {

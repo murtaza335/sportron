@@ -14,22 +14,6 @@ import type {
   UpdateCommunityInput,
 } from '@/types';
 import { fetchProfile } from './profiles';
-import {
-  notifyJoinRequest,
-  notifyJoinApproved,
-  notifyJoinRejected,
-  notifyPing,
-  notifyMemberRemoved,
-  notifyPromotedToAdmin,
-  notifyAdminTransferred,
-  notifyCommunityMatchPending,
-  notifyCommunityMatchApproved,
-  notifyCommunityMatchDisputed,
-  notifyCommunityMatchLiked,
-  notifyCommunityMatchCommented,
-  notifyCommunityInvite,
-  notifyCommunityInviteResponse,
-} from './notifications';
 import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
@@ -413,36 +397,6 @@ export async function requestToJoinCommunity(
     });
 
   if (error) throw error;
-
-  try {
-    const requester = await fetchProfile(userId);
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      const { data: admins } = await supabase
-        .from('community_members')
-        .select('profile_id')
-        .eq('community_id', communityId)
-        .eq('role', 'admin');
-
-      const adminIds = (admins ?? []).map((a) => a.profile_id);
-      if (adminIds.length > 0) {
-        await notifyJoinRequest(
-          adminIds,
-          communityId,
-          community.name,
-          requester?.username ?? 'Someone',
-          userId,
-        );
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send join request notification:', e);
-  }
 }
 
 export async function cancelJoinRequest(communityId: string, userId: string): Promise<void> {
@@ -476,20 +430,6 @@ export async function removeMember(
     .eq('profile_id', profileId);
 
   if (error) throw error;
-
-  try {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      await notifyMemberRemoved(profileId, communityId, community.name);
-    }
-  } catch (e) {
-    console.error('Failed to send removal notification:', e);
-  }
 }
 
 export async function transferAdmin(
@@ -512,26 +452,6 @@ export async function transferAdmin(
     .eq('profile_id', newAdminId);
 
   if (promoteError) throw promoteError;
-
-  try {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      const currentUser = await fetchProfile(currentUserId);
-      await notifyAdminTransferred(
-        newAdminId,
-        communityId,
-        community.name,
-        currentUser?.username ?? 'Previous admin',
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send admin transfer notification:', e);
-  }
 }
 
 export async function fetchJoinRequests(
@@ -594,38 +514,6 @@ export async function respondToJoinRequest(
       });
 
     if (memberError) throw memberError;
-  }
-
-  try {
-    await supabase
-      .from('in_app_notifications')
-      .update({
-        type: status === 'approved' ? 'join_approved' : 'join_rejected',
-        read: true,
-      })
-      .eq('type', 'join_request')
-      .eq('data->>communityId', request.community_id)
-      .eq('data->>requesterId', request.user_id);
-  } catch (e) {
-    console.error('Failed to resolve join request notification:', e);
-  }
-
-  try {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', request.community_id)
-      .single();
-
-    if (community) {
-      if (status === 'approved') {
-        await notifyJoinApproved(request.user_id, request.community_id, community.name);
-      } else {
-        await notifyJoinRejected(request.user_id, request.community_id, community.name);
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send join response notification:', e);
   }
 }
 
@@ -690,37 +578,6 @@ export async function sendPing(
     throw error;
   }
 
-  try {
-    const sender = await fetchProfile(senderId);
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      const { data: members } = await supabase
-        .from('community_members')
-        .select('profile_id')
-        .eq('community_id', communityId)
-        .eq('approval_status', 'approved')
-        .neq('profile_id', senderId);
-
-      const memberIds = (members ?? []).map((m) => m.profile_id);
-      if (memberIds.length > 0) {
-        await notifyPing(
-          memberIds,
-          communityId,
-          community.name,
-          sender?.username ?? 'Someone',
-          message.trim(),
-        );
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send ping notifications:', e);
-  }
-
   return ping.id;
 }
 
@@ -769,29 +626,6 @@ export async function recordCommunityMatch(input: {
     .single();
 
   if (error) throw error;
-
-  try {
-    if (input.opponent_id !== input.recorded_by) {
-      const recorder = await fetchProfile(input.recorded_by);
-      const { data: community } = await supabase
-        .from('communities')
-        .select('name')
-        .eq('id', input.community_id)
-        .single();
-
-      if (community) {
-        await notifyCommunityMatchPending(
-          input.opponent_id,
-          data.id,
-          input.community_id,
-          recorder?.username ?? 'Someone',
-          community.name,
-        );
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send community match notification:', e);
-  }
 
   // Update streak for the person recording the match
   try {
@@ -848,21 +682,6 @@ export async function toggleCommunityMatchLike(
       .from('community_match_likes')
       .insert({ community_match_id: communityMatchId, profile_id: userId });
     if (error) throw error;
-
-    try {
-      const { data: match } = await supabase
-        .from('community_matches')
-        .select('recorded_by, community_id')
-        .eq('id', communityMatchId)
-        .single();
-
-      if (match && match.recorded_by !== userId) {
-        const liker = await fetchProfile(userId);
-        await notifyCommunityMatchLiked(match.recorded_by, communityMatchId, match.community_id, liker?.username ?? 'Someone');
-      }
-    } catch (e) {
-      console.error('Failed to send community match like notification:', e);
-    }
   } else {
     const { error } = await supabase
       .from('community_match_likes')
@@ -910,26 +729,6 @@ export async function addCommunityMatchComment(
     profile: profile ?? null,
   };
 
-  try {
-    const { data: match } = await supabase
-      .from('community_matches')
-      .select('recorded_by, community_id')
-      .eq('id', communityMatchId)
-      .single();
-
-    if (match && match.recorded_by !== userId) {
-      await notifyCommunityMatchCommented(
-        match.recorded_by,
-        communityMatchId,
-        match.community_id,
-        comment.profile?.username ?? 'Someone',
-        comment.id,
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send community match comment notification:', e);
-  }
-
   return comment;
 }
 
@@ -951,39 +750,6 @@ export async function approveCommunityMatch(
     .eq('id', matchId);
 
   if (error) throw error;
-
-  try {
-    await supabase
-      .from('in_app_notifications')
-      .update({ type: 'community_match_approved', read: true })
-      .eq('type', 'community_match_pending')
-      .eq('data->>matchId', matchId);
-  } catch (e) {
-    console.error('Failed to resolve community match notification:', e);
-  }
-
-  try {
-    if (match.recorded_by !== actorId) {
-      const actor = await fetchProfile(actorId);
-      const { data: community } = await supabase
-        .from('communities')
-        .select('name')
-        .eq('id', match.community_id)
-        .single();
-
-      if (community) {
-        await notifyCommunityMatchApproved(
-          match.recorded_by,
-          matchId,
-          match.community_id,
-          actor?.username ?? 'Someone',
-          community.name,
-        );
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send match approval notification:', e);
-  }
 }
 
 export async function disputeCommunityMatch(
@@ -1004,39 +770,6 @@ export async function disputeCommunityMatch(
     .eq('id', matchId);
 
   if (error) throw error;
-
-  try {
-    await supabase
-      .from('in_app_notifications')
-      .update({ type: 'community_match_disputed', read: true })
-      .eq('type', 'community_match_pending')
-      .eq('data->>matchId', matchId);
-  } catch (e) {
-    console.error('Failed to resolve community match notification:', e);
-  }
-
-  try {
-    if (match.recorded_by !== actorId) {
-      const actor = await fetchProfile(actorId);
-      const { data: community } = await supabase
-        .from('communities')
-        .select('name')
-        .eq('id', match.community_id)
-        .single();
-
-      if (community) {
-        await notifyCommunityMatchDisputed(
-          match.recorded_by,
-          matchId,
-          match.community_id,
-          actor?.username ?? 'Someone',
-          community.name,
-        );
-      }
-    }
-  } catch (e) {
-    console.error('Failed to send match dispute notification:', e);
-  }
 }
 
 export async function promoteToAdmin(
@@ -1051,26 +784,6 @@ export async function promoteToAdmin(
     .eq('profile_id', targetUserId);
 
   if (error) throw error;
-
-  try {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      const actor = await fetchProfile(actorId);
-      await notifyPromotedToAdmin(
-        targetUserId,
-        communityId,
-        community.name,
-        actor?.username ?? 'An admin',
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send promotion notification:', e);
-  }
 }
 
 export async function inviteMemberByUsername(
@@ -1123,10 +836,6 @@ export async function inviteMemberByUsername(
     .single();
 
   const admin = await fetchProfile(adminId);
-
-  if (community && admin) {
-    await notifyCommunityInvite(inviteeId, communityId, community.name, admin.username, data.id);
-  }
 
   return {
     ...data,
@@ -1183,24 +892,6 @@ export async function respondToInvite(
 
     if (memberError) throw memberError;
   }
-
-  const { data: community } = await supabase
-    .from('communities')
-    .select('name')
-    .eq('id', invite.community_id)
-    .single();
-
-  const invitee = await fetchProfile(invite.invitee_id);
-
-  if (community && invitee) {
-    await notifyCommunityInviteResponse(
-      invite.invited_by,
-      invite.community_id,
-      community.name,
-      invitee.username,
-      status === 'accepted',
-    );
-  }
 }
 
 export async function cancelInvite(inviteId: string, adminId: string): Promise<void> {
@@ -1228,27 +919,6 @@ export async function inviteToCommunity(
   if (error) throw error;
 
   const invite = data[0];
-
-  try {
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', communityId)
-      .single();
-
-    if (community) {
-      const inviter = await fetchProfile(invitedBy);
-      await notifyCommunityInvite(
-        inviteeId,
-        communityId,
-        community.name,
-        inviter?.username ?? 'Someone',
-        invite.id,
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send community invite notification:', e);
-  }
 
   return invite;
 }
@@ -1330,28 +1000,6 @@ export async function respondToCommunityInvite(
   });
 
   if (error) throw error;
-
-  try {
-    const invite = data as { community_id: string; invited_by: string; invitee_id: string };
-    const { data: community } = await supabase
-      .from('communities')
-      .select('name')
-      .eq('id', invite.community_id)
-      .single();
-
-    if (community) {
-      const invitee = await fetchProfile(userId);
-      await notifyCommunityInviteResponse(
-        invite.invited_by,
-        invite.community_id,
-        community.name,
-        invitee?.username ?? 'Someone',
-        accept,
-      );
-    }
-  } catch (e) {
-    console.error('Failed to send invite response notification:', e);
-  }
 
   return data as { community_id: string; invited_by: string; invitee_id: string };
 }
