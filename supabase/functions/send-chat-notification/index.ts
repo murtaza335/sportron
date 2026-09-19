@@ -101,7 +101,7 @@ Deno.serve(async (req: Request) => {
   }
 
   const data = rpcData as unknown as ChatPushData;
-  const chatName = data.chat_name ?? (chat_type === 'session' ? 'Session' : 'Community');
+  const chatName = data.chat_name?.trim() ? data.chat_name : (chat_type === 'session' ? 'Session' : 'Community');
   const recentMessages = data.messages ?? [];
 
   // Exclude the reply target from the main recipients list to avoid a

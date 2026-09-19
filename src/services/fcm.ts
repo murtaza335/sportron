@@ -223,8 +223,8 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
   const notification = remoteMessage.notification;
   const data = remoteMessage.data as Record<string, string> | undefined;
 
-  const title = notification?.title ?? data?.title ?? 'Notification';
-  const body = notification?.body ?? data?.body ?? '';
+  const title = notification?.title ?? data?.title;
+  const body = notification?.body ?? data?.body;
 
   if (!title && !body) return null;
 
@@ -239,7 +239,7 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     message: data?.message,
   };
 
-  return { title, body, data: parsedData };
+  return { title: title ?? 'Notification', body: body ?? '', data: parsedData };
 }
 
 export function setupForegroundMessageHandler(
