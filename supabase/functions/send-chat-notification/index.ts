@@ -60,6 +60,7 @@ interface ChatPushData {
 }
 
 const MAX_UNREAD_BODY_CHARS = 2000;
+const MAX_UNREAD_MESSAGES = 7;
 
 Deno.serve(async (req: Request) => {
   if (req.method !== 'POST') {
@@ -128,21 +129,25 @@ Deno.serve(async (req: Request) => {
     for (const r of recipients) {
       const readAt = r.last_read_at ? new Date(r.last_read_at).getTime() : -Infinity;
 
-      // Accumulate ALL unread messages (oldest first) into a single body.
-      // Drop oldest lines first to stay under the FCM data limit.
-      const lines: string[] = [];
-      for (let i = 0; i < msgTexts.length; i++) {
-        if (msgTimestamps[i] > readAt) lines.push(msgTexts[i]);
+      // Collect unread messages from NEWEST to oldest, cap at MAX_UNREAD_MESSAGES.
+      // recentMessages is already sorted ASC (oldest first) from the RPC.
+      const unreadLines: string[] = [];
+      for (let i = msgTexts.length - 1; i >= 0 && unreadLines.length < MAX_UNREAD_MESSAGES; i--) {
+        if (msgTimestamps[i] > readAt) {
+          unreadLines.push(msgTexts[i]);
+        }
       }
+      // Reverse to show oldest→newest in the banner.
+      unreadLines.reverse();
 
       let body: string;
-      if (lines.length === 0) {
+      if (unreadLines.length === 0) {
         body = `${senderName}: ${content}`;
       } else {
-        body = lines.join('\n');
-        while (body.length > MAX_UNREAD_BODY_CHARS && lines.length > 1) {
-          lines.shift();
-          body = lines.join('\n');
+        body = unreadLines.join('\n');
+        while (body.length > MAX_UNREAD_BODY_CHARS && unreadLines.length > 1) {
+          unreadLines.shift();
+          body = unreadLines.join('\n');
         }
         if (body.length > MAX_UNREAD_BODY_CHARS) {
           body = `${body.slice(0, MAX_UNREAD_BODY_CHARS)}…`;
