@@ -41,6 +41,24 @@ function getYesterdayUTC(): string {
   return yesterday.toISOString().split('T')[0];
 }
 
+// Reset streak_count to 0 for users whose streak is broken (last activity before yesterday)
+async function resetBrokenStreaks(): Promise<number> {
+  const yesterday = getYesterdayUTC();
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ streak_count: 0, streak_updated_at: new Date().toISOString() })
+    .gt('streak_count', 0)
+    .lt('last_activity_date', yesterday)
+    .is('deleted_at', null)
+    .select('id');
+
+  if (error) {
+    console.error('[streak-cron] Failed to reset broken streaks:', error);
+    return 0;
+  }
+  return data?.length ?? 0;
+}
+
 async function createNotification(
   userId: string,
   type: string,
@@ -161,6 +179,12 @@ Deno.serve(async (req: Request) => {
     return new Response(err instanceof Error ? err.message : String(err), { status: 401 });
   }
 
+  // Reset broken streaks before sending notifications
+  const resetCount = await resetBrokenStreaks();
+  if (resetCount > 0) {
+    console.log(`[streak-cron] Reset ${resetCount} broken streaks to 0`);
+  }
+
   const body = await req.json().catch(() => ({}));
   const { mode } = body as { mode?: 'daily' | 'at-risk' | 'both' };
 
@@ -174,7 +198,7 @@ Deno.serve(async (req: Request) => {
     results.at_risk = await sendAtRiskAlerts();
   }
 
-  return new Response(JSON.stringify(results), {
+  return new Response(JSON.stringify({ ...results, resetBrokenStreaks: resetCount }), {
     headers: { 'Content-Type': 'application/json' },
   });
 });
