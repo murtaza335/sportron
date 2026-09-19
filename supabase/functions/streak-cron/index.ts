@@ -83,9 +83,6 @@ async function sendDailyNudge() {
   let failed = 0;
 
   for (const user of users ?? []) {
-    const prefs = user.notification_preferences as Record<string, boolean> | null;
-    if (!prefs?.streak_reminder) continue;
-
     try {
       await createNotification(
         user.id,
@@ -125,9 +122,6 @@ async function sendAtRiskAlerts() {
   let failed = 0;
 
   for (const user of users ?? []) {
-    const prefs = user.notification_preferences as Record<string, boolean> | null;
-    if (!prefs?.streak_at_risk) continue;
-
     // Calculate hours since last activity
     const lastActive = new Date(`${user.last_activity_date}T00:00:00Z`);
     const now = new Date();
