@@ -129,17 +129,11 @@ async function sendStreakReminders() {
 
 async function sendRetentionNudges() {
   const today = getTodayUTC();
-  const threeDaysAgo = new Date();
-  threeDaysAgo.setUTCDate(threeDaysAgo.getUTCDate() - 3);
-  const threeDaysAgoStr = threeDaysAgo.toISOString().split('T')[0];
   
-  // Get inactive users (no activity in 3+ days) who have FCM tokens
-  // Exclude users who were active today
+  // Get ALL users who have FCM tokens (not deleted)
   const { data: users, error } = await supabase
     .from('profiles')
     .select('id, username, last_activity_date, fcm_tokens')
-    .lt('last_activity_date', threeDaysAgoStr)
-    .neq('last_activity_date', today)
     .is('deleted_at', null)
     .not('fcm_tokens', 'is', null);
 
