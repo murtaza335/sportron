@@ -28,11 +28,11 @@ const STREAK_AT_RISK_LINES = [
 ];
 
 const RETENTION_NUDGE_LINES = [
-  "Plan a game for tomorrow, Now! 🏓",
+  "Plan a game for today, now! 🏓",
   "Missing the court? Book a session in seconds! 🎾",
   "Your next match is waiting. Create a session! 🏸",
-  "Don't let the week slip by — plan a game! ⚡",
-  "Quick game tomorrow? Set it up now! ✨",
+  "Don't let the day slip by — plan a game! ⚡",
+  "Quick game today? Set it up now! ✨",
   "Find players near you. Start a session! 🔥",
 ];
 
