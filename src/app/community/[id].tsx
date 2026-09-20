@@ -1,22 +1,24 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Building2,
+  Camera,
   ChevronLeft,
   ChevronRight,
   Clock,
+  Edit,
   Globe,
   Lock,
   MapPin,
   Megaphone,
-  MessageCircle,
   MoreHorizontal,
   Plus,
   Swords,
+  Trophy,
   User,
   Users,
   X,
 } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Modal,
@@ -31,8 +33,11 @@ import {
 import { alert } from '@/lib/alert';
 import { supabase } from '@/lib/supabase';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
+import { CreatePostModal } from '@/components/CreatePostModal';
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
+import { PostCard } from '@/components/PostCard';
+import { PostDetailPopup } from '@/components/PostDetailPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -41,6 +46,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
+import { useCommunityPosts } from '@/hooks/useCommunityPosts';
 import {
   fetchCommunityMatchById,
   fetchCommunityMatches,
@@ -53,17 +59,20 @@ import {
 import type {
   CommunityJoinRequest,
   CommunityMatch,
+  CommunityPost,
   MatchWithProfiles,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id, communityName, matchId: matchIdParam } = useLocalSearchParams<{
+  const { id, communityName, matchId: matchIdParam, postId: postIdParam } = useLocalSearchParams<{
     id: string;
     communityName?: string;
     matchId?: string | string[];
+    postId?: string | string[];
   }>();
   const matchId = typeof matchIdParam === 'string' ? matchIdParam : undefined;
+  const postId = typeof postIdParam === 'string' ? postIdParam : undefined;
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -92,6 +101,39 @@ export default function CommunityDetailScreen() {
     null,
   );
 
+  // Posts feed
+  const {
+    posts,
+    loading: postsLoading,
+    refresh: refreshPosts,
+    loadMore: loadMorePosts,
+    loadingMore: loadingMorePosts,
+    hasMore: hasMorePosts,
+  } = useCommunityPosts(id ?? null, user?.id ?? null);
+
+  // Matches
+  const [matches, setMatches] = useState<CommunityMatch[]>([]);
+  const [matchesLoading, setMatchesLoading] = useState(true);
+  const [matchesPage, setMatchesPage] = useState(1);
+  const [hasMoreMatches, setHasMoreMatches] = useState(false);
+  const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
+  const [matchPopupVisible, setMatchPopupVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
+  const [postPopupVisible, setPostPopupVisible] = useState(false);
+  const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
+
+  // FAB menu state
+  const [fabMenuOpen, setFabMenuOpen] = useState(false);
+  const [showPingModal, setShowPingModal] = useState(false);
+  const [createPostInitialTab, setCreatePostInitialTab] = useState<'write' | 'photo'>('write');
+
+  // Ping state (moved from modal to inline)
+  const [pingMessage, setPingMessage] = useState('');
+  const [sendingPing, setSendingPing] = useState(false);
+  const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+
   const optimisticTitle = community?.name || communityName || '';
 
   const joinAction = (() => {
@@ -100,16 +142,6 @@ export default function CommunityDetailScreen() {
     if (community?.visibility === 'restricted') return { label: 'Request to Join', disabled: false } as const;
     return { label: 'Join Community', disabled: false } as const;
   })();
-
-  // Matches
-  const [matches, setMatches] = useState<CommunityMatch[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(true);
-  const [matchesPage, setMatchesPage] = useState(1);
-  const [hasMoreMatches, setHasMoreMatches] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
-  const [popupVisible, setPopupVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'feed' | 'pending'>('feed');
 
   const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
@@ -126,7 +158,7 @@ export default function CommunityDetailScreen() {
       console.error('Failed to load matches:', e);
     } finally {
       setMatchesLoading(false);
-      setLoadingMore(false);
+      setLoadingMoreMatches(false);
     }
   }, [id, user]);
 
@@ -207,12 +239,6 @@ export default function CommunityDetailScreen() {
     };
   }, [id, user]);
 
-  const handleLoadMore = async () => {
-    if (loadingMore || !hasMoreMatches) return;
-    setLoadingMore(true);
-    await loadMatches(matchesPage + 1, true);
-  };
-
   const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
   const pendingFromFeed = matches.filter(
     (m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id),
@@ -225,8 +251,8 @@ export default function CommunityDetailScreen() {
         && !pendingFromFeed.some((m) => m.id === pm.id),
     ),
   ];
-  const displayMatches = activeTab === 'pending' ? allPendingMatches : feedMatches;
 
+  // Combine posts and approved matches into unified feed
   const toMatchWithProfiles = useCallback(
     (cm: CommunityMatch): MatchWithProfiles => {
       return {
@@ -264,6 +290,29 @@ export default function CommunityDetailScreen() {
     []
   );
 
+  const combinedFeed = useMemo(() => {
+    const feedItems: Array<{ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles }> = [];
+
+    // Add posts
+    (posts ?? []).forEach((post) => {
+      feedItems.push({ type: 'post', data: post });
+    });
+
+    // Add approved matches
+    (feedMatches ?? []).forEach((match) => {
+      feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
+    });
+
+    // Sort by created_at descending
+    feedItems.sort((a, b) => {
+      const dateA = new Date(a.type === 'post' ? a.data.created_at : a.data.created_at).getTime();
+      const dateB = new Date(b.type === 'post' ? b.data.created_at : b.data.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    return feedItems;
+  }, [posts, feedMatches, toMatchWithProfiles]);
+
   // Auto-open match detail when navigating from a notification tap
   useEffect(() => {
     if (!matchId) return;
@@ -273,7 +322,7 @@ export default function CommunityDetailScreen() {
         const m = await fetchCommunityMatchById(matchId, user?.id);
         if (!cancelled && m) {
           setSelectedMatch(toMatchWithProfiles(m));
-          setPopupVisible(true);
+          setMatchPopupVisible(true);
         }
       } catch (e) {
         console.error('Failed to open deep-linked match:', e);
@@ -286,16 +335,34 @@ export default function CommunityDetailScreen() {
     };
   }, [matchId, user?.id, toMatchWithProfiles]);
 
-  // Ping modal
-  const [pingModalVisible, setPingModalVisible] = useState(false);
-  const [pingMessage, setPingMessage] = useState('');
-  const [sendingPing, setSendingPing] = useState(false);
-  const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
-  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+  // Auto-open post detail when navigating from a notification tap
+  useEffect(() => {
+    if (!postId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fetchCommunityPostById } = await import('@/services/communities');
+        const p = await fetchCommunityPostById(postId, user?.id);
+        if (!cancelled && p) {
+          setSelectedPost(p);
+          setPostPopupVisible(true);
+        }
+      } catch (e) {
+        console.error('Failed to open deep-linked post:', e);
+      } finally {
+        if (!cancelled) router.setParams({ postId: undefined });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, user?.id]);
 
-  const openPingModal = useCallback(async () => {
+  // Ping functionality (inline from FAB menu)
+  const openPing = useCallback(async () => {
     if (!id || !user) return;
-    setPingModalVisible(true);
+    setFabMenuOpen(false);
+    setShowPingModal(true);
     setNowTs(Date.now());
     try {
       const until = await getNextPingTime(id, user.id);
@@ -303,13 +370,13 @@ export default function CommunityDetailScreen() {
     } catch {
       setPingCooldownUntil(null);
     }
-  }, [id, user, setPingModalVisible, setNowTs, setPingCooldownUntil]);
+  }, [id, user, setNowTs, setPingCooldownUntil]);
 
   useEffect(() => {
-    if (!pingModalVisible) return;
+    if (!fabMenuOpen || !pingCooldownUntil) return;
     const interval = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [pingModalVisible]);
+  }, [fabMenuOpen, pingCooldownUntil, nowTs]);
 
   const cooldownRemainingMs = pingCooldownUntil
     ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
@@ -322,6 +389,21 @@ export default function CommunityDetailScreen() {
     const seconds = totalSeconds % 60;
     if (minutes === 0) return `${seconds}s`;
     return `${minutes}m ${seconds}s`;
+  };
+
+  const handleSendPing = async () => {
+    if (!id || !user || !pingMessage.trim()) return;
+    setSendingPing(true);
+    try {
+      await sendPing(id, user.id, pingMessage.trim());
+      setPingMessage('');
+      setShowPingModal(false);
+      alert('Ping Sent', 'Notification sent to all members.');
+    } catch (e: any) {
+      alert('Error', e?.message ?? 'Failed to send ping.');
+    } finally {
+      setSendingPing(false);
+    }
   };
 
   // Community chat
@@ -353,19 +435,18 @@ export default function CommunityDetailScreen() {
     }
   };
 
-  const handleSendPing = async () => {
-    if (!id || !user || !pingMessage.trim()) return;
-    setSendingPing(true);
-    try {
-      await sendPing(id, user.id, pingMessage.trim());
-      setPingMessage('');
-      setPingModalVisible(false);
-      alert('Ping Sent', 'Notification sent to all members.');
-    } catch (e: any) {
-      alert('Error', e?.message ?? 'Failed to send ping.');
-    } finally {
-      setSendingPing(false);
-    }
+  const handleCreatePostClose = () => {
+    setCreatePostModalVisible(false);
+  };
+
+  const handlePostPress = (post: CommunityPost) => {
+    setSelectedPost(post);
+    setPostPopupVisible(true);
+  };
+
+  const handleMatchPress = (match: MatchWithProfiles) => {
+    setSelectedMatch(match);
+    setMatchPopupVisible(true);
   };
 
   const headerRight = () => null;
@@ -603,193 +684,327 @@ export default function CommunityDetailScreen() {
           </Pressable>
         )}
 
-        {/* 4. Matches Section */}
+        {/* Pending Matches Banner - sleek banner at top, only when there are pending matches */}
+        {isMember && allPendingMatches.length > 0 && (
+          <Pressable
+            onPress={() => router.navigate(`/community/${id}?pending=true`)}
+            style={{
+              marginTop: Spacing.md,
+              marginBottom: Spacing.xs,
+              paddingHorizontal: Spacing.md,
+              paddingVertical: Spacing.md,
+              borderRadius: Radius.md,
+              backgroundColor: `${theme.warning}15`,
+              borderWidth: 1,
+              borderColor: `${theme.warning}40`,
+            }}
+            hitSlop={8}
+          >
+            <View style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'space-between',
+              gap: Spacing.md,
+            }}>
+              <View style={{
+                width: 28,
+                height: 28,
+                borderRadius: Radius.full,
+                backgroundColor: `${theme.warning}25`,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Clock size={16} color={theme.warning} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText variant="label" style={{ fontWeight: '600' }}>
+                  {allPendingMatches.length} pending match{allPendingMatches.length !== 1 ? 'es' : ''}
+                </ThemedText>
+                <ThemedText variant="caption" muted>
+                  Tap to review
+                </ThemedText>
+              </View>
+              <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
+            </View>
+          </Pressable>
+        )}
+
+        {/* 4. Feed Section (Members only) */}
         {isMember && (
           <View style={styles.section}>
-            {/* Record Match + Ping Bar */}
-            <View style={styles.recordMatchBar}>
-              <Button
-                label="Record Match"
-                icon={<Swords size={18} color={theme.background} strokeWidth={2} />}
-                onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
-                buttonStyle={styles.recordMatchButton}
-              />
-              <Pressable
-                onPress={() => setChatVisible(true)}
-                style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
-                hitSlop={8}
-              >
-                <MessageCircle size={20} color={theme.text} strokeWidth={2} />
-                {communityChat.unreadCount > 0 && (
-                  <View style={[styles.chatUnreadBadge, { backgroundColor: theme.error }]}>
-                    <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
-                      {communityChat.unreadCount > 99 ? '99+' : communityChat.unreadCount}
-                    </ThemedText>
-                  </View>
-                )}
-              </Pressable>
-              {(isAdmin || community.pings_enabled) && (
-                <Pressable
-                  onPress={openPingModal}
-                  style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
-                  hitSlop={8}
-                >
-                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                  <View style={[styles.pingDot, { backgroundColor: theme.error }]} />
-                </Pressable>
-              )}
+            {/* Feed Header */}
+            <View style={styles.feedHeader}>
+              <View style={styles.feedHeaderLeft} />
+              <View style={styles.feedHeaderRight} />
             </View>
 
-            {/* Tabs */}
-            <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tab,
-                  activeTab === 'feed' && { borderBottomColor: theme.text },
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={() => setActiveTab('feed')}
-                hitSlop={8}
-              >
-                <ThemedText
-                  variant="label"
-                  style={[
-                    styles.tabText,
-                    activeTab === 'feed' && { color: theme.text },
-                    activeTab !== 'feed' && { color: theme.textSecondary },
-                  ]}
-                >
-                  Feed ({feedMatches.length})
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tab,
-                  activeTab === 'pending' && { borderBottomColor: theme.text },
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={() => setActiveTab('pending')}
-                hitSlop={8}
-              >
-                <ThemedText
-                  variant="label"
-                  style={[
-                    styles.tabText,
-                    activeTab === 'pending' && { color: theme.text },
-                    activeTab !== 'pending' && { color: theme.textSecondary },
-                  ]}
-                >
-                  Pending ({allPendingMatches.length})
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            {/* Match List */}
-            {matchesLoading ? (
+            {/* Feed Content */}
+            {postsLoading && combinedFeed.length === 0 ? (
               <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
-            ) : displayMatches.length > 0 ? (
+            ) : combinedFeed.length > 0 ? (
               <>
-                {displayMatches.map((cm) => (
-                  <MatchCard
-                    key={cm.id}
-                    match={toMatchWithProfiles(cm)}
-                    currentUserId={user?.id}
-                    onPress={() => {
-                      setSelectedMatch(toMatchWithProfiles(cm));
-                      setPopupVisible(true);
-                    }}
-                    showYoursBadge={false}
-                    communityId={id}
-                  />
-                ))}
-                {activeTab === 'feed' && hasMoreMatches && (
+                {combinedFeed.map((item, index) => (
                   <Pressable
-                    onPress={handleLoadMore}
-                    style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-                    disabled={loadingMore}
+                    key={`${item.type}-${item.data.id}`}
+                    onPress={() => {
+                      if (item.type === 'post') {
+                        handlePostPress(item.data);
+                      } else {
+                        handleMatchPress(item.data);
+                      }
+                    }}
+                    style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
                     hitSlop={8}
                   >
-                    {loadingMore ? (
-                      <ActivityIndicator size="small" color={theme.textSecondary} />
-                    ) : (
-                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
-                        Load More
-                      </ThemedText>
+                    {item.type === 'post' ? (
+                      <PostCard
+                            post={item.data}
+                            currentUserId={user?.id}
+                            communityId={id}
+                            showYoursBadge={false}
+                            onPress={() => handlePostPress(item.data)}
+                          />
+                        ) : (
+                          <MatchCard
+                            match={item.data}
+                            currentUserId={user?.id}
+                            communityId={id}
+                            showYoursBadge={false}
+                          />
+                        )}
+                      </Pressable>
+                    ))}
+                    {(postsLoading || loadingMorePosts) && (
+                      <View style={styles.loadMoreContainer}>
+                        <ActivityIndicator size="small" color={theme.textSecondary} />
+                      </View>
                     )}
-                  </Pressable>
+                    {hasMorePosts && !postsLoading && !loadingMorePosts && (
+                      <Pressable
+                        onPress={loadMorePosts}
+                        style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
+                        disabled={loadingMorePosts}
+                        hitSlop={8}
+                      >
+                        <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
+                          Load More
+                        </ThemedText>
+                      </Pressable>
+                    )}
+                  </>
+                ) : (
+                  <ThemedText muted style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
+                    No posts or matches yet
+                  </ThemedText>
                 )}
-              </>
-            ) : (
-              <Card>
-                <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                  {activeTab === 'pending'
-                    ? 'No pending approvals for you.'
-                    : 'No matches recorded yet. Be the first to record one!'}
-                </ThemedText>
-              </Card>
+              </View>
             )}
-          </View>
-        )}
 
       </ScrollView>
 
-      {/* Ping Modal */}
-      <Modal transparent visible={pingModalVisible} animationType="fade" onRequestClose={() => setPingModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setPingModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Ping Everyone</ThemedText>
-              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
-              </Pressable>
-            </View>
-            <TextInput
-              placeholder="What's up? (e.g. Playing tennis now!)"
-              placeholderTextColor={theme.textSecondary}
-              value={pingMessage}
-              onChangeText={setPingMessage}
-              editable={!inCooldown}
-              style={[
-                styles.pingInput,
-                {
-                  color: inCooldown ? theme.textSecondary : theme.text,
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                },
-              ]}
-              multiline
-              maxLength={200}
-            />
-            {inCooldown ? (
-              <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
-                <ThemedText variant="caption" muted style={{ flex: 1 }}>
-                  You can ping again in{' '}
-                  <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
-                    {formatCooldown(cooldownRemainingMs)}
-                  </ThemedText>
-                  .
-                </ThemedText>
-              </View>
-            ) : (
-              <Button
-                label="Send Ping"
-                onPress={handleSendPing}
-                loading={sendingPing}
-                disabled={!pingMessage.trim()}
+      {/* Floating Action Button Menu */}
+      {isMember && (
+        <View style={styles.fabContainer}>
+          {/* FAB Menu Items (expand upward) */}
+          {fabMenuOpen && (
+            <>
+              {/* Backdrop to close on outside press */}
+              <Pressable
+                onPress={() => setFabMenuOpen(false)}
+                style={styles.fabBackdrop}
+                hitSlop={{ top: 100 }}
               />
-            )}
+              {/* Ping Option */}
+              <Pressable
+                onPress={openPing}
+                style={[
+                  styles.fabMenuItem,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  inCooldown && styles.fabMenuItemDisabled,
+                ]}
+                disabled={inCooldown}
+                hitSlop={8}
+              >
+                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
+                  <Megaphone size={22} color={inCooldown ? theme.textSecondary : theme.text} strokeWidth={2} />
+                </View>
+                <View style={styles.fabMenuItemContent}>
+                  <ThemedText variant="label" style={{ fontWeight: '600', color: inCooldown ? theme.textSecondary : theme.text }}>
+                    Ping
+                  </ThemedText>
+                  {inCooldown && (
+                    <ThemedText variant="caption" muted>
+                      Available in {formatCooldown(cooldownRemainingMs)}
+                    </ThemedText>
+                  )}
+                </View>
+              </Pressable>
+              {/* Write Post Option */}
+              <Pressable
+                onPress={() => { setCreatePostInitialTab('write'); setFabMenuOpen(false); setCreatePostModalVisible(true); }}
+                style={[
+                  styles.fabMenuItem,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                hitSlop={8}
+              >
+                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
+                  <Edit size={22} color={theme.text} strokeWidth={2} />
+                </View>
+                <View style={styles.fabMenuItemContent}>
+                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
+                    Write
+                  </ThemedText>
+                </View>
+              </Pressable>
+              {/* Photo Post Option */}
+              <Pressable
+                onPress={() => { setCreatePostInitialTab('photo'); setFabMenuOpen(false); setCreatePostModalVisible(true); }}
+                style={[
+                  styles.fabMenuItem,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                hitSlop={8}
+              >
+                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
+                  <Camera size={22} color={theme.text} strokeWidth={2} />
+                </View>
+                <View style={styles.fabMenuItemContent}>
+                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
+                    Photo
+                  </ThemedText>
+                </View>
+              </Pressable>
+              {/* Record Match Option */}
+              <Pressable
+                onPress={() => { setFabMenuOpen(false); router.navigate(`/add-match?communityId=${id}&sport=${community?.sport}`); }}
+                style={[
+                  styles.fabMenuItem,
+                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                hitSlop={8}
+              >
+                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
+                  <Trophy size={22} color={theme.text} strokeWidth={2} />
+                </View>
+                <View style={styles.fabMenuItemContent}>
+                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
+                    Match
+                  </ThemedText>
+                </View>
+              </Pressable>
+            </>
+          )}
+          {/* Main FAB Button */}
+          <Pressable
+            onPress={() => setFabMenuOpen(!fabMenuOpen)}
+            onLongPress={() => setFabMenuOpen(!fabMenuOpen)}
+            style={({ pressed }) => [
+              styles.fabMain,
+              { backgroundColor: theme.accent },
+              pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
+              fabMenuOpen && styles.fabMainOpen,
+            ]}
+            hitSlop={8}
+          >
+            <Plus size={28} color={theme.background} strokeWidth={2.5} />
+            {fabMenuOpen && <X size={28} color={theme.background} strokeWidth={2.5} />}
           </Pressable>
-        </Pressable>
-      </Modal>
+        </View>
+      )}
+
+      {/* Ping Input Modal (shown when Ping selected from FAB) */}
+      {showPingModal && (
+        <Modal
+          transparent
+          visible={true}
+          animationType="fade"
+          onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
+        >
+          <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
+            <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+              <View style={styles.pingModalHeader}>
+                <ThemedText variant="heading">Ping Everyone</ThemedText>
+                <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                  <X size={18} color={theme.text} strokeWidth={2.5} />
+                </Pressable>
+              </View>
+              <TextInput
+                placeholder="What's up? (e.g. Playing tennis now!)"
+                placeholderTextColor={theme.textSecondary}
+                value={pingMessage}
+                onChangeText={setPingMessage}
+                style={[
+                  styles.pingModalInput,
+                  {
+                    color: theme.text,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+                multiline
+                maxLength={200}
+                autoFocus
+              />
+              {inCooldown ? (
+                <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                  <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
+                  <ThemedText variant="caption" muted style={{ flex: 1 }}>
+                    You can ping again in{' '}
+                    <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
+                      {formatCooldown(cooldownRemainingMs)}
+                    </ThemedText>
+                    .
+                  </ThemedText>
+                </View>
+              ) : (
+                <View style={styles.pingModalActions}>
+                  <Button
+                    label="Cancel"
+                    variant="secondary"
+                    onPress={() => { setShowPingModal(false); setPingMessage(''); }}
+                    buttonStyle={{ flex: 1 }}
+                  />
+                  <Button
+                    label="Send Ping"
+                    onPress={handleSendPing}
+                    loading={sendingPing}
+                    disabled={!pingMessage.trim()}
+                    buttonStyle={{ flex: 1 }}
+                  />
+                </View>
+              )}
+            </Pressable>
+          </Pressable>
+        </Modal>
+      )}
 
       <MatchDetailPopup
         match={selectedMatch}
-        visible={popupVisible}
-        onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
+        visible={matchPopupVisible}
+        onClose={() => { setMatchPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
         communityId={id}
+      />
+
+      <PostDetailPopup
+        post={selectedPost}
+        visible={postPopupVisible}
+        onClose={() => { setPostPopupVisible(false); setSelectedPost(null); }}
+        currentUserId={user?.id}
+        communityId={id}
+        onRefreshFeed={refreshPosts}
+      />
+
+      <CreatePostModal
+        communityId={id ?? ''}
+        communitySport={community?.sport ?? ''}
+        authorId={user?.id ?? ''}
+        visible={createPostModalVisible}
+        onClose={handleCreatePostClose}
+        onRefreshFeed={refreshPosts}
+        initialTab={createPostInitialTab}
       />
 
       <CommunityChatPopup
@@ -907,7 +1122,23 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  // Matches Section
+  // Feed Section
+  feedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xs,
+  },
+  feedHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  feedHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -924,13 +1155,23 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  recordMatchBar: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
+  fabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.full,
     alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
-  recordMatchButton: {
-    flex: 1,
+  pendingBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
   },
   pingButton: {
     width: 48,
@@ -968,6 +1209,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     lineHeight: 10,
+  },
+  feedItem: {
+    marginBottom: Spacing.xs,
+  },
+  pressedFeedItem: {
+    opacity: 0.95,
+  },
+  loadMoreContainer: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
   },
   loadMoreButton: {
     alignItems: 'center',
@@ -1052,5 +1303,101 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
-  }
+  },
+
+  // FAB Menu Styles
+  fabContainer: {
+    position: 'absolute',
+    bottom: Spacing.xl,
+    right: Spacing.lg,
+    alignItems: 'flex-end',
+    zIndex: 100,
+  },
+  fabBackdrop: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    zIndex: -1,
+  },
+  fabMain: {
+    width: 56,
+    height: 56,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  fabMainOpen: {
+    transform: [{ rotate: '45deg' }],
+  },
+  fabMenuItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.md,
+    paddingVertical: Spacing.sm,
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    marginBottom: Spacing.sm,
+    minWidth: 160,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 4,
+  },
+  fabMenuItemDisabled: {
+    opacity: 0.5,
+  },
+  fabMenuItemIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.full,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: Spacing.md,
+  },
+  fabMenuItemContent: {
+    flex: 1,
+    gap: 2,
+  },
+
+  // Ping Modal Styles (inline from FAB)
+  pingModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  pingModalContent: {
+    width: '100%',
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  pingModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pingModalInput: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  pingModalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
 });

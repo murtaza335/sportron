@@ -118,6 +118,9 @@ export type NotificationPreferences = {
   community_invite: boolean;
   community_invite_accepted: boolean;
   community_invite_rejected: boolean;
+  community_post_created: boolean;
+  community_post_liked: boolean;
+  community_post_commented: boolean;
   streak_reminder: boolean;
   streak_at_risk: boolean;
   streak_milestone: boolean;
@@ -188,6 +191,9 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   community_invite: true,
   community_invite_accepted: true,
   community_invite_rejected: true,
+  community_post_created: true,
+  community_post_liked: true,
+  community_post_commented: true,
   streak_reminder: true,
   streak_at_risk: true,
   streak_milestone: true,
@@ -227,6 +233,9 @@ export type NotificationType =
   | 'community_invite'
   | 'community_invite_accepted'
   | 'community_invite_rejected'
+  | 'community_post_created'
+  | 'community_post_liked'
+  | 'community_post_commented'
   | 'session_chat_message'
   | 'session_chat_reply'
   | 'community_chat_message'
@@ -461,6 +470,32 @@ export type CommunityChatMessage = ChatMessageBase & {
   community_id: string;
 };
 
+export type CommunityPostType = 'text' | 'photo' | 'match';
+
+export type CommunityPost = {
+  id: string;
+  community_id: string;
+  author_id: string;
+  content: string | null;
+  image_url: string | null;
+  post_type: CommunityPostType;
+  created_at: string;
+  updated_at: string;
+  author?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+  likes_count?: number;
+  comments_count?: number;
+  is_liked_by_user?: boolean;
+};
+
+export type CommunityPostComment = {
+  id: string;
+  post_id: string;
+  profile_id: string;
+  content: string;
+  created_at: string;
+  profile?: Pick<Profile, 'id' | 'username' | 'avatar_url'> | null;
+};
+
 export type AuditLog = {
   id: string;
   actor_id: string | null;
@@ -471,7 +506,6 @@ export type AuditLog = {
   new_data: Record<string, unknown> | null;
   metadata: Record<string, unknown> | null;
   created_at: string;
-  // Joined from profiles
   actor_username?: string | null;
   actor_avatar_url?: string | null;
 };
