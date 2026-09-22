@@ -30,8 +30,6 @@ import {
   View,
 } from 'react-native';
 
-import { alert } from '@/lib/alert';
-import { supabase } from '@/lib/supabase';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { CreatePostModal } from '@/components/CreatePostModal';
 import { MatchCard } from '@/components/MatchCard';
@@ -47,6 +45,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
 import { useCommunityPosts } from '@/hooks/useCommunityPosts';
+import { alert } from '@/lib/alert';
+import { supabase } from '@/lib/supabase';
 import {
   fetchCommunityMatchById,
   fetchCommunityMatches,
@@ -794,7 +794,7 @@ export default function CommunityDetailScreen() {
                   </>
                 ) : (
                   <ThemedText muted style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
-                    No posts or matches yet
+                    Be the first to Post! Click on the Plus icon below
                   </ThemedText>
                 )}
               </View>
