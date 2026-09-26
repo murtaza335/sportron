@@ -9,7 +9,6 @@ import {
   Globe,
   Lock,
   MapPin,
-  Megaphone,
   MoreHorizontal,
   Plus,
   Swords,
@@ -18,10 +17,13 @@ import {
   Users,
   X,
 } from 'lucide-react-native';
+import { FABMenu } from '@/components/FABMenu';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -122,17 +124,14 @@ export default function CommunityDetailScreen() {
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
   const [postPopupVisible, setPostPopupVisible] = useState(false);
   const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
-
-  // FAB menu state
-  const [fabMenuOpen, setFabMenuOpen] = useState(false);
-  const [showPingModal, setShowPingModal] = useState(false);
   const [createPostInitialTab, setCreatePostInitialTab] = useState<'write' | 'photo'>('write');
 
-  // Ping state (moved from modal to inline)
+  // Ping state
   const [pingMessage, setPingMessage] = useState('');
   const [sendingPing, setSendingPing] = useState(false);
   const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
   const [nowTs, setNowTs] = useState<number>(() => Date.now());
+  const [showPingModal, setShowPingModal] = useState(false);
 
   const optimisticTitle = community?.name || communityName || '';
 
@@ -361,7 +360,6 @@ export default function CommunityDetailScreen() {
   // Ping functionality (inline from FAB menu)
   const openPing = useCallback(async () => {
     if (!id || !user) return;
-    setFabMenuOpen(false);
     setShowPingModal(true);
     setNowTs(Date.now());
     try {
@@ -373,10 +371,10 @@ export default function CommunityDetailScreen() {
   }, [id, user, setNowTs, setPingCooldownUntil]);
 
   useEffect(() => {
-    if (!fabMenuOpen || !pingCooldownUntil) return;
+    if (!pingCooldownUntil) return;
     const interval = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [fabMenuOpen, pingCooldownUntil, nowTs]);
+  }, [pingCooldownUntil, nowTs]);
 
   const cooldownRemainingMs = pingCooldownUntil
     ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
@@ -687,7 +685,7 @@ export default function CommunityDetailScreen() {
         {/* Pending Matches Banner - sleek banner at top, only when there are pending matches */}
         {isMember && allPendingMatches.length > 0 && (
           <Pressable
-            onPress={() => router.navigate(`/community/${id}?pending=true`)}
+            onPress={() => router.navigate(`/community/${id}/pending-matches`)}
             style={{
               marginTop: Spacing.md,
               marginBottom: Spacing.xs,
@@ -802,116 +800,20 @@ export default function CommunityDetailScreen() {
 
       </ScrollView>
 
-      {/* Floating Action Button Menu */}
-      {isMember && (
-        <View style={styles.fabContainer}>
-          {/* FAB Menu Items (expand upward) */}
-          {fabMenuOpen && (
-            <>
-              {/* Backdrop to close on outside press */}
-              <Pressable
-                onPress={() => setFabMenuOpen(false)}
-                style={styles.fabBackdrop}
-                hitSlop={{ top: 100 }}
-              />
-              {/* Ping Option */}
-              <Pressable
-                onPress={openPing}
-                style={[
-                  styles.fabMenuItem,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                  inCooldown && styles.fabMenuItemDisabled,
-                ]}
-                disabled={inCooldown}
-                hitSlop={8}
-              >
-                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
-                  <Megaphone size={22} color={inCooldown ? theme.textSecondary : theme.text} strokeWidth={2} />
-                </View>
-                <View style={styles.fabMenuItemContent}>
-                  <ThemedText variant="label" style={{ fontWeight: '600', color: inCooldown ? theme.textSecondary : theme.text }}>
-                    Ping
-                  </ThemedText>
-                  {inCooldown && (
-                    <ThemedText variant="caption" muted>
-                      Available in {formatCooldown(cooldownRemainingMs)}
-                    </ThemedText>
-                  )}
-                </View>
-              </Pressable>
-              {/* Write Post Option */}
-              <Pressable
-                onPress={() => { setCreatePostInitialTab('write'); setFabMenuOpen(false); setCreatePostModalVisible(true); }}
-                style={[
-                  styles.fabMenuItem,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-                hitSlop={8}
-              >
-                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
-                  <Edit size={22} color={theme.text} strokeWidth={2} />
-                </View>
-                <View style={styles.fabMenuItemContent}>
-                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
-                    Write
-                  </ThemedText>
-                </View>
-              </Pressable>
-              {/* Photo Post Option */}
-              <Pressable
-                onPress={() => { setCreatePostInitialTab('photo'); setFabMenuOpen(false); setCreatePostModalVisible(true); }}
-                style={[
-                  styles.fabMenuItem,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-                hitSlop={8}
-              >
-                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
-                  <Camera size={22} color={theme.text} strokeWidth={2} />
-                </View>
-                <View style={styles.fabMenuItemContent}>
-                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
-                    Photo
-                  </ThemedText>
-                </View>
-              </Pressable>
-              {/* Record Match Option */}
-              <Pressable
-                onPress={() => { setFabMenuOpen(false); router.navigate(`/add-match?communityId=${id}&sport=${community?.sport}`); }}
-                style={[
-                  styles.fabMenuItem,
-                  { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                ]}
-                hitSlop={8}
-              >
-                <View style={[styles.fabMenuItemIcon, { backgroundColor: theme.accent }]}>
-                  <Trophy size={22} color={theme.text} strokeWidth={2} />
-                </View>
-                <View style={styles.fabMenuItemContent}>
-                  <ThemedText variant="label" style={{ fontWeight: '600', color: theme.text }}>
-                    Match
-                  </ThemedText>
-                </View>
-              </Pressable>
-            </>
-          )}
-          {/* Main FAB Button */}
-          <Pressable
-            onPress={() => setFabMenuOpen(!fabMenuOpen)}
-            onLongPress={() => setFabMenuOpen(!fabMenuOpen)}
-            style={({ pressed }) => [
-              styles.fabMain,
-              { backgroundColor: theme.accent },
-              pressed && { opacity: 0.8, transform: [{ scale: 0.95 }] },
-              fabMenuOpen && styles.fabMainOpen,
-            ]}
-            hitSlop={8}
-          >
-            <Plus size={28} color={theme.background} strokeWidth={2.5} />
-            {fabMenuOpen && <X size={28} color={theme.background} strokeWidth={2.5} />}
-          </Pressable>
-        </View>
-      )}
+      <FABMenu
+        isMember={isMember}
+        communityId={id}
+        userId={user?.id}
+        communitySport={community?.sport}
+        inCooldown={inCooldown}
+        cooldownRemainingMs={cooldownRemainingMs}
+        formatCooldown={formatCooldown}
+        openPing={openPing}
+        setCreatePostInitialTab={setCreatePostInitialTab}
+        setCreatePostModalVisible={setCreatePostModalVisible}
+        router={router}
+        onFabMenuClose={() => {}}
+      />
 
       {/* Ping Input Modal (shown when Ping selected from FAB) */}
       {showPingModal && (
@@ -921,61 +823,67 @@ export default function CommunityDetailScreen() {
           animationType="fade"
           onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
         >
-          <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
-            <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-              <View style={styles.pingModalHeader}>
-                <ThemedText variant="heading">Ping Everyone</ThemedText>
-                <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                  <X size={18} color={theme.text} strokeWidth={2.5} />
-                </Pressable>
-              </View>
-              <TextInput
-                placeholder="What's up? (e.g. Playing tennis now!)"
-                placeholderTextColor={theme.textSecondary}
-                value={pingMessage}
-                onChangeText={setPingMessage}
-                style={[
-                  styles.pingModalInput,
-                  {
-                    color: theme.text,
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-                multiline
-                maxLength={200}
-                autoFocus
-              />
-              {inCooldown ? (
-                <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                  <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
-                  <ThemedText variant="caption" muted style={{ flex: 1 }}>
-                    You can ping again in{' '}
-                    <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
-                      {formatCooldown(cooldownRemainingMs)}
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+            style={styles.pingModalKeyboardAvoiding}
+          >
+            <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
+              <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={styles.pingModalHeader}>
+                  <ThemedText variant="heading">Ping Everyone</ThemedText>
+                  <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                    <X size={18} color={theme.text} strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+                <TextInput
+                  placeholder="What's up? (e.g. Playing tennis now!)"
+                  placeholderTextColor={theme.textSecondary}
+                  value={pingMessage}
+                  onChangeText={setPingMessage}
+                  style={[
+                    styles.pingModalInput,
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  multiline
+                  maxLength={200}
+                  autoFocus
+                />
+                {inCooldown ? (
+                  <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                    <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
+                    <ThemedText variant="caption" muted style={{ flex: 1 }}>
+                      You can ping again in{' '}
+                      <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
+                        {formatCooldown(cooldownRemainingMs)}
+                      </ThemedText>
+                      .
                     </ThemedText>
-                    .
-                  </ThemedText>
-                </View>
-              ) : (
-                <View style={styles.pingModalActions}>
-                  <Button
-                    label="Cancel"
-                    variant="secondary"
-                    onPress={() => { setShowPingModal(false); setPingMessage(''); }}
-                    buttonStyle={{ flex: 1 }}
-                  />
-                  <Button
-                    label="Send Ping"
-                    onPress={handleSendPing}
-                    loading={sendingPing}
-                    disabled={!pingMessage.trim()}
-                    buttonStyle={{ flex: 1 }}
-                  />
-                </View>
-              )}
+                  </View>
+                ) : (
+                  <View style={styles.pingModalActions}>
+                    <Button
+                      label="Cancel"
+                      variant="secondary"
+                      onPress={() => { setShowPingModal(false); setPingMessage(''); }}
+                      buttonStyle={{ flex: 1 }}
+                    />
+                    <Button
+                      label="Send Ping"
+                      onPress={handleSendPing}
+                      loading={sendingPing}
+                      disabled={!pingMessage.trim()}
+                      buttonStyle={{ flex: 1 }}
+                    />
+                  </View>
+                )}
+              </Pressable>
             </Pressable>
-          </Pressable>
+          </KeyboardAvoidingView>
         </Modal>
       )}
 
@@ -1305,74 +1213,14 @@ const styles = StyleSheet.create({
     paddingVertical: Spacing.sm,
   },
 
-  // FAB Menu Styles
-  fabContainer: {
-    position: 'absolute',
-    bottom: Spacing.xl,
-    right: Spacing.lg,
-    alignItems: 'flex-end',
-    zIndex: 100,
-  },
-  fabBackdrop: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    zIndex: -1,
-  },
-  fabMain: {
-    width: 56,
-    height: 56,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  fabMainOpen: {
-    transform: [{ rotate: '45deg' }],
-  },
-  fabMenuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: Spacing.md,
-    paddingVertical: Spacing.sm,
-    borderRadius: Radius.md,
-    borderWidth: 1,
-    marginBottom: Spacing.sm,
-    minWidth: 160,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  fabMenuItemDisabled: {
-    opacity: 0.5,
-  },
-  fabMenuItemIcon: {
-    width: 40,
-    height: 40,
-    borderRadius: Radius.full,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: Spacing.md,
-  },
-  fabMenuItemContent: {
-    flex: 1,
-    gap: 2,
-  },
-
   // Ping Modal Styles (inline from FAB)
   pingModalBackdrop: {
     flex: 1,
     backgroundColor: 'rgba(0,0,0,0.5)',
     justifyContent: 'flex-end',
+  },
+  pingModalKeyboardAvoiding: {
+    flex: 1,
   },
   pingModalContent: {
     width: '100%',

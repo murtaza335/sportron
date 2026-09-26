@@ -62,29 +62,36 @@ export function CreatePostModal({
   // Reset form fields when modal visibility changes
   useEffect(() => {
     if (visible) {
-      setTextContent('');
-      setSelectedImage(null);
-      setUploading(false);
-      setUploadProgress(0);
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setTextContent('');
+        setSelectedImage(null);
+        setUploading(false);
+        setUploadProgress(0);
+      }, 0);
     }
   }, [visible]);
 
   // Handle slide/fade animation
   useEffect(() => {
     if (visible) {
-      setIsAnimating(true);
       Animated.timing(animation, {
         toValue: 1,
         duration: 250,
         useNativeDriver: true,
-      }).start(() => setIsAnimating(false));
+      }).start(() => {
+        setIsAnimating(false);
+      });
     } else {
-      setIsAnimating(true);
-      Animated.timing(animation, {
-        toValue: 0,
-        duration: 200,
-        useNativeDriver: true,
-      }).start(() => setIsAnimating(false));
+      // Use setTimeout to avoid synchronous setState in effect
+      setTimeout(() => {
+        setIsAnimating(true);
+        Animated.timing(animation, {
+          toValue: 0,
+          duration: 200,
+          useNativeDriver: true,
+        }).start(() => setIsAnimating(false));
+      }, 0);
     }
   }, [visible, animation]);
 
@@ -189,14 +196,14 @@ export function CreatePostModal({
     }
   };
 
-  if (!visible && !isAnimating) return null;
+  if (!visible) return null;
 
   return (
     <Modal
       ref={modalRef}
       transparent
-      visible={visible || isAnimating}
-      animationType="fade"
+      visible={visible}
+      animationType="slide"
       onRequestClose={onClose}
       supportedOrientations={['portrait']}
     >
@@ -222,7 +229,8 @@ export function CreatePostModal({
 
           {/* Form Content */}
           <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
             style={styles.contentWrapper}
           >
             <ScrollView

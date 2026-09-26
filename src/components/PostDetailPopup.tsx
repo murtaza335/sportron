@@ -1,9 +1,8 @@
+import { X, Edit, Camera, Trophy, Megaphone, Plus, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Heart, MessageSquare, MoreHorizontal, Send, Trash2, X } from 'lucide-react-native';
+import { Alert } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  Alert,
-  Image,
   Keyboard,
   KeyboardAvoidingView,
   Modal,
@@ -13,9 +12,18 @@ import {
   StyleSheet,
   TextInput,
   View,
+  Image,
 } from 'react-native';
 import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, { runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, {
+  useSharedValue,
+  useAnimatedStyle,
+  withSpring,
+  withTiming,
+  interpolate,
+  runOnJS,
+  Extrapolate,
+} from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -23,10 +31,10 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { formatRelativeTime } from '@/lib/date';
 import {
-  addCommunityPostComment,
-  deleteCommunityPost,
   fetchCommunityPostComments,
+  addCommunityPostComment,
   toggleCommunityPostLike,
+  deleteCommunityPost,
 } from '@/services/communities';
 import type { CommunityPost, CommunityPostComment } from '@/types';
 
@@ -120,10 +128,9 @@ export function PostDetailPopup({
         }
       });
     }
-    // Focus the input after a short delay to let scroll happen
     setTimeout(() => {
       if (inputWrapperRef.current) {
-        // The input will focus via the keyboard avoiding view
+        // Input will focus via keyboard avoiding view
       }
     }, 150);
   };
@@ -248,7 +255,7 @@ export function PostDetailPopup({
       return (
         <View style={styles.matchIndicator}>
           <ThemedText variant="body" style={{ color: theme.accent, fontWeight: '600' }}>
-            Match recorded
+            📊 Match recorded
           </ThemedText>
         </View>
       );
@@ -345,24 +352,14 @@ export function PostDetailPopup({
               </View>
 
               <ScrollView
-              ref={scrollViewRef}
-              style={styles.scrollView}
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              <View style={styles.postCard}>
-                <View style={styles.postHeader}>
-                  <Pressable
-                    disabled={!post.author?.id}
-                    onPress={() => {
-                      if (post.author?.id) router.push(`/profile/${post.author.id}${communityId ? `?community=${communityId}` : ''}`);
-                    }}
-                    style={({ pressed }) => pressed && styles.pressedContent}
-                  >
-                    <UserAvatar avatarUrl={post.author?.avatar_url} size={40} />
-                  </Pressable>
-                  <View style={styles.postAuthorTextCol}>
+                ref={scrollViewRef}
+                style={styles.scrollView}
+                contentContainerStyle={styles.scrollContent}
+                keyboardShouldPersistTaps="handled"
+                showsVerticalScrollIndicator={false}
+              >
+                <View style={styles.postCard}>
+                  <View style={styles.postHeader}>
                     <Pressable
                       disabled={!post.author?.id}
                       onPress={() => {
@@ -370,106 +367,115 @@ export function PostDetailPopup({
                       }}
                       style={({ pressed }) => pressed && styles.pressedContent}
                     >
-                      <ThemedText variant="body" style={styles.postAuthorName} numberOfLines={1}>
-                        {post.author?.username ?? 'Unknown'}
+                      <UserAvatar avatarUrl={post.author?.avatar_url} size={40} />
+                    </Pressable>
+                    <View style={styles.postAuthorTextCol}>
+                      <Pressable
+                        disabled={!post.author?.id}
+                        onPress={() => {
+                          if (post.author?.id) router.push(`/profile/${post.author.id}${communityId ? `?community=${communityId}` : ''}`);
+                        }}
+                        style={({ pressed }) => pressed && styles.pressedContent}
+                      >
+                        <ThemedText variant="body" style={styles.postAuthorName} numberOfLines={1}>
+                          {post.author?.username ?? 'Unknown'}
+                        </ThemedText>
+                      </Pressable>
+                      <ThemedText variant="caption" muted style={styles.postTimeAgo}>
+                        {formatRelativeTime(post.created_at)}
+                      </ThemedText>
+                    </View>
+                  </View>
+
+                  {renderPostContent()}
+
+                  <View style={styles.postSocialRow}>
+                    <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
+                      <Heart size={20} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
+                      <ThemedText variant="label" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
+                        {likesCount} {likesCount === 1 ? 'like' : 'likes'}
                       </ThemedText>
                     </Pressable>
-                    <ThemedText variant="caption" muted style={styles.postTimeAgo}>
-                      {formatRelativeTime(post.created_at)}
-                    </ThemedText>
+
+                    <Pressable onPress={scrollToComments} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
+                      <MessageSquare size={20} color={theme.textSecondary} />
+                      <ThemedText variant="label" muted style={styles.socialText}>
+                        {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
+                      </ThemedText>
+                    </Pressable>
                   </View>
                 </View>
 
-                {renderPostContent()}
+                <View ref={commentsSectionRef} style={styles.commentsSection}>
+                  <ThemedText variant="heading" style={styles.commentsTitle}>
+                    Comments ({comments.length})
+                  </ThemedText>
 
-                <View style={styles.postSocialRow}>
-                  <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-                    <Heart size={20} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-                    <ThemedText variant="label" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-                      {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                    </ThemedText>
-                  </Pressable>
+                  {renderCommentsSection()}
+                </View>
+              </ScrollView>
 
-                  <Pressable onPress={scrollToComments} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-                    <MessageSquare size={20} color={theme.textSecondary} />
-                    <ThemedText variant="label" muted style={styles.socialText}>
-                      {comments.length} {comments.length === 1 ? 'comment' : 'comments'}
-                    </ThemedText>
+              <KeyboardAvoidingView
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+                keyboardVerticalOffset={0}
+                style={[styles.inputContainer, { borderTopColor: theme.border }]}
+              >
+                <View ref={inputWrapperRef} style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                  <TextInput
+                    placeholder="Write a comment..."
+                    placeholderTextColor={theme.textSecondary}
+                    value={commentText}
+                    onChangeText={setCommentText}
+                    style={[
+                      styles.textInput,
+                      { color: theme.text },
+                    ]}
+                    multiline
+                    maxLength={1000}
+                    onSubmitEditing={handleSendComment}
+                    returnKeyType="send"
+                    blurOnSubmit={false}
+                  />
+                  <Pressable
+                    onPress={handleSendComment}
+                    disabled={!commentText.trim() || sendingComment}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.sendButton,
+                      (!commentText.trim() || sendingComment) && styles.sendButtonDisabled,
+                      pressed && !(!commentText.trim() || sendingComment) && { opacity: 0.7 },
+                    ]}
+                  >
+                    <Send size={20} color={commentText.trim() && !sendingComment ? theme.accent : theme.textSecondary} strokeWidth={2} />
                   </Pressable>
                 </View>
-              </View>
+              </KeyboardAvoidingView>
 
-              <View ref={commentsSectionRef} style={styles.commentsSection}>
-                <ThemedText variant="heading" style={styles.commentsTitle}>
-                  Comments ({comments.length})
-                </ThemedText>
-
-                {renderCommentsSection()}
-              </View>
-            </ScrollView>
-
-            <KeyboardAvoidingView
-              behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-              keyboardVerticalOffset={0}
-              style={[styles.inputContainer, { borderTopColor: theme.border }]}
-            >
-              <View ref={inputWrapperRef} style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                <TextInput
-                  placeholder="Write a comment..."
-                  placeholderTextColor={theme.textSecondary}
-                  value={commentText}
-                  onChangeText={setCommentText}
-                  style={[
-                    styles.textInput,
-                    { color: theme.text },
-                  ]}
-                  multiline
-                  maxLength={1000}
-                  onSubmitEditing={handleSendComment}
-                  returnKeyType="send"
-                  blurOnSubmit={false}
-                />
-                <Pressable
-                  onPress={handleSendComment}
-                  disabled={!commentText.trim() || sendingComment}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.sendButton,
-                    (!commentText.trim() || sendingComment) && styles.sendButtonDisabled,
-                    pressed && !(!commentText.trim() || sendingComment) && { opacity: 0.7 },
-                  ]}
-                >
-                  <Send size={20} color={commentText.trim() && !sendingComment ? theme.accent : theme.textSecondary} strokeWidth={2} />
-                </Pressable>
-              </View>
-            </KeyboardAvoidingView>
-
-            {showMenu && (
-              <View style={styles.menuOverlay}>
-                <Pressable onPress={() => setShowMenu(false)} style={styles.menuOverlayBackdrop} />
-                <View style={[styles.menuContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                  <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
-                    <Trash2 size={18} color={theme.error} strokeWidth={2} />
-                    <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
-                      Delete
-                    </ThemedText>
-                  </Pressable>
-                  <Pressable onPress={() => setShowMenu(false)} style={styles.menuItem} hitSlop={8}>
-                    <ThemedText variant="body" style={{ color: theme.text }}>
-                      Cancel
-                    </ThemedText>
-                  </Pressable>
+              {showMenu && (
+                <View style={styles.menuOverlay}>
+                  <Pressable onPress={() => setShowMenu(false)} style={styles.menuOverlayBackdrop} />
+                  <View style={[styles.menuContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                    <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
+                      <Trash2 size={18} color={theme.error} strokeWidth={2} />
+                      <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
+                        Delete
+                      </ThemedText>
+                    </Pressable>
+                    <Pressable onPress={() => setShowMenu(false)} style={styles.menuItem} hitSlop={8}>
+                      <ThemedText variant="body" style={{ color: theme.text }}>
+                        Cancel
+                      </ThemedText>
+                    </Pressable>
+                  </View>
                 </View>
-              </View>
-            )}
-</View>
-            </GestureDetector>
-          </View>
-        </Animated.View>
+              )}
+            </View>
+          </GestureDetector>
+        </View>
+      </Animated.View>
     </Modal>
   );
 }
-
 const styles = StyleSheet.create({
   modalContainer: {
     flex: 1,
@@ -664,6 +670,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     paddingHorizontal: Spacing.md,
     paddingVertical: Spacing.sm,
+    backgroundColor: '#fff',
   },
   textInput: {
     flex: 1,
