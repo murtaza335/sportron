@@ -115,7 +115,6 @@ export default function CommunityDetailScreen() {
 
   // Matches
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(true);
   const [matchesPage, setMatchesPage] = useState(1);
   const [hasMoreMatches, setHasMoreMatches] = useState(false);
   const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
@@ -125,6 +124,7 @@ export default function CommunityDetailScreen() {
   const [postPopupVisible, setPostPopupVisible] = useState(false);
   const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
   const [createPostInitialTab, setCreatePostInitialTab] = useState<'write' | 'photo'>('write');
+  const initialMatchesLoadRef = useRef(true);
 
   // Ping state
   const [pingMessage, setPingMessage] = useState('');
@@ -160,19 +160,18 @@ export default function CommunityDetailScreen() {
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
-      setMatchesLoading(false);
       setLoadingMoreMatches(false);
     }
   }, [id, user]);
 
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    if (initialMatchesLoadRef.current) {
+      initialMatchesLoadRef.current = false;
       setMatchesPage(1);
       setHasMoreMatches(false);
-      setMatchesLoading(true);
       loadMatches(1);
-    }, [loadMatches]),
-  );
+    }
+  }, [loadMatches]);
 
   // Join requests — admin only
   useFocusEffect(
@@ -388,9 +387,15 @@ export default function CommunityDetailScreen() {
               )}
             </Pressable>
           ))}
-          {(postsLoading || loadingMorePosts || loadingMoreMatches) && (
-            <View style={styles.loadMoreContainer}>
-              <ActivityIndicator size="small" color={theme.textSecondary} />
+          {(loadingMorePosts || loadingMoreMatches) && (
+            <View style={skeletonContainerStyle}>
+              {[...Array(3)].map((_, i) => (
+                <View key={i} style={skeletonCardStyle}>
+                  <View style={skeletonLineStyle} />
+                  <View style={skeletonLineShortStyle} />
+                  <View style={skeletonLineStyle} />
+                </View>
+              ))}
             </View>
           )}
           {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
@@ -460,7 +465,7 @@ export default function CommunityDetailScreen() {
                   marginTop: Spacing.xs,
                 }}
               >
-                You're all caught up!
+                You&apos;re all caught up!
               </ThemedText>
 
               <ThemedText
@@ -847,7 +852,7 @@ export default function CommunityDetailScreen() {
         refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={() => { refresh(); setMatchesLoading(true); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
+            onRefresh={() => { refresh(); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
             tintColor={theme.text}
           />
         }
