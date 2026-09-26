@@ -2,6 +2,7 @@ import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router
 import {
   Building2,
   Camera,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -9,6 +10,7 @@ import {
   Globe,
   Lock,
   MapPin,
+  Megaphone,
   MoreHorizontal,
   Plus,
   Swords,
@@ -147,7 +149,11 @@ export default function CommunityDetailScreen() {
     try {
       const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
       if (append) {
-        setMatches((prev) => [...prev, ...data]);
+        setMatches((prev) => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newMatches = data.filter(m => !existingIds.has(m.id));
+          return [...prev, ...newMatches];
+        });
       } else {
         setMatches(data);
       }
@@ -297,9 +303,13 @@ export default function CommunityDetailScreen() {
       feedItems.push({ type: 'post', data: post });
     });
 
-    // Add approved matches
-    (feedMatches ?? []).forEach((match) => {
-      feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
+    // Add approved matches (deduplicated by id)
+    const seenMatchIds = new Set<string>();
+    (matches ?? []).forEach((match) => {
+      if (!seenMatchIds.has(match.id)) {
+        seenMatchIds.add(match.id);
+        feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
+      }
     });
 
     // Sort by created_at descending
@@ -310,7 +320,104 @@ export default function CommunityDetailScreen() {
     });
 
     return feedItems;
-  }, [posts, feedMatches, toMatchWithProfiles]);
+  }, [posts, matches, toMatchWithProfiles]);
+
+const feedContent = useMemo(() => {
+    // Inline styles for skeleton loader
+    const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
+    const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
+    const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
+    const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
+    
+    // Caught up card styles
+    const caughtUpCardStyle = {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: Spacing.sm,
+      padding: Spacing.lg,
+      marginTop: Spacing.md,
+      borderRadius: Radius.lg,
+      backgroundColor: theme.success + '15',
+      borderWidth: 1,
+      borderColor: theme.success,
+    };
+
+    if (postsLoading && combinedFeed.length === 0) {
+      return (
+        <View style={skeletonContainerStyle}>
+          {[...Array(3)].map((_, i) => (
+            <View key={i} style={skeletonCardStyle}>
+              <View style={skeletonLineStyle} />
+              <View style={skeletonLineShortStyle} />
+              <View style={skeletonLineStyle} />
+            </View>
+          ))}
+        </View>
+      );
+    }
+    if (combinedFeed.length > 0) {
+      return (
+        <>
+          {combinedFeed.map((item, index) => (
+            <Pressable
+              key={`${item.type}-${item.data.id}`}
+              onPress={() => {
+                if (item.type === 'post') {
+                  handlePostPress(item.data);
+                } else {
+                  handleMatchPress(item.data);
+                }
+              }}
+              style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
+              hitSlop={8}
+            >
+              {item.type === 'post' ? (
+                <PostCard
+                      post={item.data}
+                      currentUserId={user?.id}
+                      communityId={id}
+                      showYoursBadge={false}
+                      onPress={() => handlePostPress(item.data)}
+                    />
+                  ) : (
+                    <MatchCard
+                      match={item.data}
+                      currentUserId={user?.id}
+                      communityId={id}
+                      showYoursBadge={false}
+                    />
+                  )}
+                  </Pressable>
+              ))}
+              {(postsLoading || loadingMorePosts || loadingMoreMatches) && (
+                <View style={styles.loadMoreContainer}>
+                  <ActivityIndicator size="small" color={theme.textSecondary} />
+                </View>
+              )}
+              {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
+                <View style={caughtUpCardStyle}>
+                  <CheckCircle size={24} color={theme.success} />
+                  <ThemedText variant="body" style={{ marginTop: Spacing.sm, color: theme.success }}>
+                    You are all caught up!
+                  </ThemedText>
+                  <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
+                    No more posts or matches to show
+                  </ThemedText>
+                </View>
+              )}
+            </>
+          );
+    }
+    if (combinedFeed.length === 0 && !postsLoading) {
+      return (
+        <ThemedText muted style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
+          Be the first to Post! Click on the Plus icon below
+        </ThemedText>
+      );
+    }
+    return null;
+  }, [combinedFeed, postsLoading, loadingMorePosts, loadingMoreMatches, hasMorePosts, hasMoreMatches]);
 
   // Auto-open match detail when navigating from a notification tap
   useEffect(() => {
@@ -536,6 +643,14 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const threshold = contentSize.height - layoutMeasurement.height * 1.3;
+          if (contentOffset.y >= threshold) {
+            if (!loadingMorePosts && hasMorePosts) loadMorePosts();
+            if (!loadingMoreMatches && hasMoreMatches) loadMatches(matchesPage + 1, true);
+          }
+        }}
           refreshControl={
           <RefreshControl
             refreshing={loading}
@@ -737,64 +852,7 @@ export default function CommunityDetailScreen() {
             </View>
 
             {/* Feed Content */}
-            {postsLoading && combinedFeed.length === 0 ? (
-              <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
-            ) : combinedFeed.length > 0 ? (
-              <>
-                {combinedFeed.map((item, index) => (
-                  <Pressable
-                    key={`${item.type}-${item.data.id}`}
-                    onPress={() => {
-                      if (item.type === 'post') {
-                        handlePostPress(item.data);
-                      } else {
-                        handleMatchPress(item.data);
-                      }
-                    }}
-                    style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
-                    hitSlop={8}
-                  >
-                    {item.type === 'post' ? (
-                      <PostCard
-                            post={item.data}
-                            currentUserId={user?.id}
-                            communityId={id}
-                            showYoursBadge={false}
-                            onPress={() => handlePostPress(item.data)}
-                          />
-                        ) : (
-                          <MatchCard
-                            match={item.data}
-                            currentUserId={user?.id}
-                            communityId={id}
-                            showYoursBadge={false}
-                          />
-                        )}
-                      </Pressable>
-                    ))}
-                    {(postsLoading || loadingMorePosts) && (
-                      <View style={styles.loadMoreContainer}>
-                        <ActivityIndicator size="small" color={theme.textSecondary} />
-                      </View>
-                    )}
-                    {hasMorePosts && !postsLoading && !loadingMorePosts && (
-                      <Pressable
-                        onPress={loadMorePosts}
-                        style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-                        disabled={loadingMorePosts}
-                        hitSlop={8}
-                      >
-                        <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
-                          Load More
-                        </ThemedText>
-                      </Pressable>
-                    )}
-                  </>
-                ) : (
-                  <ThemedText muted style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
-                    Be the first to Post! Click on the Plus icon below
-                  </ThemedText>
-                )}
+            {feedContent}
               </View>
             )}
 
