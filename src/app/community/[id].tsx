@@ -1,3 +1,4 @@
+import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Building2,
@@ -6,20 +7,17 @@ import {
   ChevronLeft,
   ChevronRight,
   Clock,
-  Edit,
   Globe,
   Lock,
   MapPin,
-  Megaphone,
   MoreHorizontal,
   Plus,
+  Sparkles,
   Swords,
-  Trophy,
   User,
   Users,
-  X,
+  X
 } from 'lucide-react-native';
-import { FABMenu } from '@/components/FABMenu';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
@@ -322,13 +320,13 @@ export default function CommunityDetailScreen() {
     return feedItems;
   }, [posts, matches, toMatchWithProfiles]);
 
-const feedContent = useMemo(() => {
+  const feedContent = useMemo(() => {
     // Inline styles for skeleton loader
     const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
     const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
     const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
     const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
-    
+
     // Caught up card styles
     const caughtUpCardStyle = {
       flexDirection: 'row' as const,
@@ -374,46 +372,241 @@ const feedContent = useMemo(() => {
             >
               {item.type === 'post' ? (
                 <PostCard
-                      post={item.data}
-                      currentUserId={user?.id}
-                      communityId={id}
-                      showYoursBadge={false}
-                      onPress={() => handlePostPress(item.data)}
-                    />
-                  ) : (
-                    <MatchCard
-                      match={item.data}
-                      currentUserId={user?.id}
-                      communityId={id}
-                      showYoursBadge={false}
-                    />
-                  )}
-                  </Pressable>
-              ))}
-              {(postsLoading || loadingMorePosts || loadingMoreMatches) && (
-                <View style={styles.loadMoreContainer}>
-                  <ActivityIndicator size="small" color={theme.textSecondary} />
-                </View>
+                  post={item.data}
+                  currentUserId={user?.id}
+                  communityId={id}
+                  showYoursBadge={false}
+                  onPress={() => handlePostPress(item.data)}
+                />
+              ) : (
+                <MatchCard
+                  match={item.data}
+                  currentUserId={user?.id}
+                  communityId={id}
+                  showYoursBadge={false}
+                />
               )}
-              {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
-                <View style={caughtUpCardStyle}>
-                  <CheckCircle size={24} color={theme.success} />
-                  <ThemedText variant="body" style={{ marginTop: Spacing.sm, color: theme.success }}>
-                    You are all caught up!
-                  </ThemedText>
-                  <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
-                    No more posts or matches to show
-                  </ThemedText>
-                </View>
-              )}
-            </>
-          );
+            </Pressable>
+          ))}
+          {(postsLoading || loadingMorePosts || loadingMoreMatches) && (
+            <View style={styles.loadMoreContainer}>
+              <ActivityIndicator size="small" color={theme.textSecondary} />
+            </View>
+          )}
+          {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
+            <View
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: 260,
+                borderRadius: Radius.lg,
+                backgroundColor: theme.backgroundElement,
+                paddingVertical: Spacing.xl,
+                paddingHorizontal: Spacing.lg,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginVertical: Spacing.md,
+              }}
+            >
+              {/* Background Graphic Accents */}
+              <View
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: -40,
+                  right: -40,
+                  width: 180,
+                  height: 180,
+                  borderRadius: 90,
+                  backgroundColor: theme.borderMuted,
+                  opacity: 0.1,
+                }}
+              />
+              <View
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  bottom: -50,
+                  left: -30,
+                  width: 200,
+                  height: 200,
+                  borderRadius: 100,
+                  backgroundColor: theme.borderMuted,
+                  opacity: 0.12,
+                }}
+              />
+
+              {/* Content */}
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: Radius.full,
+                  backgroundColor: theme.backgroundSelected,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: Spacing.md,
+                }}
+              >
+                <CheckCircle size={32} color={theme.text} strokeWidth={2} />
+              </View>
+
+              <ThemedText
+                variant="body"
+                style={{
+                  fontWeight: '700',
+                  fontSize: 18,
+                  color: theme.text,
+                  marginTop: Spacing.xs,
+                }}
+              >
+                You're all caught up!
+              </ThemedText>
+
+              <ThemedText
+                variant="caption"
+                style={{
+                  color: theme.textSecondary,
+                  marginTop: Spacing.xs,
+                  textAlign: 'center',
+                  fontSize: 13,
+                }}
+              >
+                No more posts or matches to show right now
+              </ThemedText>
+            </View>
+          )}
+        </>
+      );
     }
     if (combinedFeed.length === 0 && !postsLoading) {
       return (
-        <ThemedText muted style={{ textAlign: 'center', paddingVertical: Spacing.xl }}>
-          Be the first to Post! Click on the Plus icon below
-        </ThemedText>
+        <View
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            minHeight: 280,
+            borderRadius: Radius.lg,
+            backgroundColor: theme.backgroundElement,
+            borderWidth: 1,
+            borderColor: theme.border,
+            paddingVertical: Spacing.lg,
+            paddingHorizontal: Spacing.lg,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginVertical: Spacing.md,
+          }}
+        >
+          {/* Background Decorative Rings */}
+          <View
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: -40,
+              right: -40,
+              width: 180,
+              height: 180,
+              borderRadius: 90,
+              borderWidth: 16,
+              borderColor: '#E1306C',
+              opacity: 0.1,
+            }}
+          />
+          <View
+            aria-hidden
+            style={{
+              position: 'absolute',
+              bottom: -50,
+              left: -50,
+              width: 200,
+              height: 200,
+              borderRadius: 100,
+              borderWidth: 20,
+              borderColor: '#F56040',
+              opacity: 0.08,
+            }}
+          />
+
+          {/* Main Large Graphic Badge */}
+          <View style={{ position: 'relative', marginBottom: Spacing.lg }}>
+            {/* Outer Glowing Ring */}
+            <View
+              style={{
+                width: 104,
+                height: 104,
+                borderRadius: Radius.full,
+                padding: 4,
+                backgroundColor: '#E1306C',
+                // Soft shadow behind icon badge
+                shadowColor: '#E1306C',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 12,
+                elevation: 6,
+              }}
+            >
+              {/* Inner Circle Container */}
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: Radius.full,
+                  backgroundColor: theme.backgroundElement,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Camera size={48} color="#E1306C" strokeWidth={1.8} />
+              </View>
+            </View>
+
+            {/* Floating Large Sparkle Badge */}
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                width: 36,
+                height: 36,
+                borderRadius: Radius.full,
+                backgroundColor: '#F77737',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 3,
+                borderColor: theme.backgroundElement,
+              }}
+            >
+              <Sparkles size={18} color="#FFF" strokeWidth={2.2} />
+            </View>
+          </View>
+
+          {/* Main Title */}
+          <ThemedText
+            variant="body"
+            style={{
+              fontWeight: '800',
+              fontSize: 20,
+              color: theme.text,
+              textAlign: 'center',
+            }}
+          >
+            Share Your First Moment
+          </ThemedText>
+
+          {/* Subtext */}
+          <ThemedText
+            variant="caption"
+            style={{
+              color: theme.textSecondary,
+              marginTop: Spacing.xs,
+              textAlign: 'center',
+              maxWidth: 270,
+              lineHeight: 20,
+              fontSize: 13,
+            }}
+          >
+            Your feed is empty right now. Tap the plus icon below to post a photo or record a match!
+          </ThemedText>
+        </View>
       );
     }
     return null;
@@ -557,10 +750,10 @@ const feedContent = useMemo(() => {
   const headerRight = () => null;
   const headerTitle = optimisticTitle
     ? () => (
-        <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
-          {optimisticTitle}
-        </ThemedText>
-      )
+      <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
+        {optimisticTitle}
+      </ThemedText>
+    )
     : undefined;
 
   const themedHeader = {
@@ -651,7 +844,7 @@ const feedContent = useMemo(() => {
             if (!loadingMoreMatches && hasMoreMatches) loadMatches(matchesPage + 1, true);
           }
         }}
-          refreshControl={
+        refreshControl={
           <RefreshControl
             refreshing={loading}
             onRefresh={() => { refresh(); setMatchesLoading(true); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
@@ -853,8 +1046,8 @@ const feedContent = useMemo(() => {
 
             {/* Feed Content */}
             {feedContent}
-              </View>
-            )}
+          </View>
+        )}
 
       </ScrollView>
 
@@ -870,7 +1063,7 @@ const feedContent = useMemo(() => {
         setCreatePostInitialTab={setCreatePostInitialTab}
         setCreatePostModalVisible={setCreatePostModalVisible}
         router={router}
-        onFabMenuClose={() => {}}
+        onFabMenuClose={() => { }}
       />
 
       {/* Ping Input Modal (shown when Ping selected from FAB) */}
@@ -994,7 +1187,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingBottom: Spacing.xxxl,
   },
-  
+
   headerIcon: {
     padding: Spacing.xs,
   },
