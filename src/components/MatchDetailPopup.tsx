@@ -334,7 +334,7 @@ export function MatchDetailPopup({
             <View style={styles.header}>
               <View style={styles.headerInfo}>
                 <ThemedText variant="body" style={styles.headerTitle}>
-                  {SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport} · {match.match_format === 'doubles' ? 'Doubles' : 'Singles'}
+                  {SPORT_LABELS[match.sport as Sport] || match.custom_sport_name || match.sport} · {match.player_partner_id || match.opponent_partner_id ? 'Doubles' : 'Singles'}
                 </ThemedText>
                 <View style={styles.visibilityRow}>
                   {match.is_public ? <Globe size={12} color={theme.textSecondary} /> : <Lock size={12} color={theme.textSecondary} />}

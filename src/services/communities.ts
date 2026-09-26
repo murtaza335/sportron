@@ -603,7 +603,9 @@ export async function recordCommunityMatch(input: {
   community_id: string;
   recorded_by: string;
   player_id: string;
+  player_partner_id?: string | null;
   opponent_id: string;
+  opponent_partner_id?: string | null;
   sport: Sport;
   custom_sport_name?: string | null;
   team_a_name?: string | null;
@@ -617,7 +619,9 @@ export async function recordCommunityMatch(input: {
       community_id: input.community_id,
       recorded_by: input.recorded_by,
       player_id: input.player_id,
+      player_partner_id: input.player_partner_id ?? null,
       opponent_id: input.opponent_id,
+      opponent_partner_id: input.opponent_partner_id ?? null,
       sport: input.sport,
       custom_sport_name: input.custom_sport_name?.trim() || null,
       team_a_name: input.team_a_name?.trim() || null,

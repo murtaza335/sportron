@@ -105,27 +105,29 @@ export default function AddMatchScreen() {
       return;
     }
     setSaving(true);
-    try {
-      const opponent = selection.opponent;
-      if (!opponent) {
-        alert('Invalid Opponent', 'Please select a community member as opponent.');
-        setSaving(false);
-        return;
-      }
-      await recordCommunityMatch({
-        community_id: communityId,
-        recorded_by: user.id,
-        player_id: user.id,
-        opponent_id: opponent.id,
-        sport,
-        custom_sport_name: sport === 'other' ? customSportName.trim() : null,
-        team_a_name: isTeam ? teamAName.trim() : null,
-        team_b_name: isTeam ? teamBName.trim() : null,
-        player_score: playerScore,
-        opponent_score: opponentScore,
-      });
-      alert('Match Recorded', 'Waiting for opponent approval.');
-      router.back();
+try {
+        const opponent = selection.opponent;
+        if (!opponent) {
+          alert('Invalid Opponent', 'Please select a community member as opponent.');
+          setSaving(false);
+          return;
+        }
+        await recordCommunityMatch({
+          community_id: communityId,
+          recorded_by: user.id,
+          player_id: user.id,
+          player_partner_id: selection.playerPartner?.id ?? null,
+          opponent_id: opponent.id,
+          opponent_partner_id: selection.opponentPartner?.id ?? null,
+          sport,
+          custom_sport_name: sport === 'other' ? customSportName.trim() : null,
+          team_a_name: isTeam ? teamAName.trim() : null,
+          team_b_name: isTeam ? teamBName.trim() : null,
+          player_score: playerScore,
+          opponent_score: opponentScore,
+        });
+        alert('Match Recorded', 'Waiting for opponent approval.');
+        router.back();
     } catch (error) {
       alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
     } finally {
