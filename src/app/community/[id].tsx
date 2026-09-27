@@ -609,7 +609,7 @@ export default function CommunityDetailScreen() {
               fontSize: 13,
             }}
           >
-            Your feed is empty right now. Tap the plus icon below to post a photo or record a match!
+            Be the first to Post! Click Plus icon below!
           </ThemedText>
         </View>
       );
@@ -857,6 +857,30 @@ export default function CommunityDetailScreen() {
           />
         }
       >
+        {/* Pending Matches Banner - solid, full-width, at top of feed */}
+        {isMember && allPendingMatches.length > 0 && (
+          <Pressable
+            onPress={() => router.navigate(`/community/${id}/pending-matches`)}
+            style={[styles.pendingMatchesBanner, { backgroundColor: theme.warning }]}
+            hitSlop={8}
+          >
+            <View style={styles.pendingBannerContent}>
+              <View style={styles.pendingBannerIcon}>
+                <Clock size={16} color={theme.background} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText variant="label" style={{ fontWeight: '600', color: theme.background }}>
+                  {allPendingMatches.length} pending match{allPendingMatches.length !== 1 ? 'es' : ''}
+                </ThemedText>
+                <ThemedText variant="caption" style={{ color: theme.background, opacity: 0.9 }}>
+                  Tap to review
+                </ThemedText>
+              </View>
+              <ChevronRight size={18} color={theme.background} strokeWidth={2} />
+            </View>
+          </Pressable>
+        )}
+
         {/* 1. Info Card + Join Action (Non-members only) */}
         {!isMember && (
           <>
@@ -990,51 +1014,6 @@ export default function CommunityDetailScreen() {
                   </ThemedText>
                 </View>
               )}
-              <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
-            </View>
-          </Pressable>
-        )}
-
-        {/* Pending Matches Banner - sleek banner at top, only when there are pending matches */}
-        {isMember && allPendingMatches.length > 0 && (
-          <Pressable
-            onPress={() => router.navigate(`/community/${id}/pending-matches`)}
-            style={{
-              marginTop: Spacing.md,
-              marginBottom: Spacing.xs,
-              paddingHorizontal: Spacing.md,
-              paddingVertical: Spacing.md,
-              borderRadius: Radius.md,
-              backgroundColor: `${theme.warning}15`,
-              borderWidth: 1,
-              borderColor: `${theme.warning}40`,
-            }}
-            hitSlop={8}
-          >
-            <View style={{
-              flexDirection: 'row',
-              alignItems: 'center',
-              justifyContent: 'space-between',
-              gap: Spacing.md,
-            }}>
-              <View style={{
-                width: 28,
-                height: 28,
-                borderRadius: Radius.full,
-                backgroundColor: `${theme.warning}25`,
-                alignItems: 'center',
-                justifyContent: 'center',
-              }}>
-                <Clock size={16} color={theme.warning} strokeWidth={2} />
-              </View>
-              <View style={{ flex: 1, gap: 2 }}>
-                <ThemedText variant="label" style={{ fontWeight: '600' }}>
-                  {allPendingMatches.length} pending match{allPendingMatches.length !== 1 ? 'es' : ''}
-                </ThemedText>
-                <ThemedText variant="caption" muted>
-                  Tap to review
-                </ThemedText>
-              </View>
               <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
             </View>
           </Pressable>
@@ -1286,6 +1265,31 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
+  // Pending Matches Banner
+  pendingMatchesBanner: {
+    marginTop: -Spacing.lg,
+    marginHorizontal: -Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomLeftRadius: Radius.md,
+    borderBottomRightRadius: Radius.md,
+  },
+  pendingBannerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+
   // Feed Section
   feedHeader: {
     flexDirection: 'row',
@@ -1330,12 +1334,6 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 4,
-  },
-  pendingBannerContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
   },
   pingButton: {
     width: 48,
