@@ -11,13 +11,13 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
+import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
-import { Radius, Spacing } from '@/constants/theme';
+import { Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchCommunityMatches } from '@/services/communities';
 import type { CommunityMatch, MatchWithProfiles } from '@/types';
-import { SPORT_LABELS } from '@/types';
 
 export default function PendingMatchesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -76,7 +76,15 @@ export default function PendingMatchesScreen() {
     try {
       const { data } = await fetchCommunityMatches(id, user?.id, 1, 50);
       const pendingData = data.filter((m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id));
-      setMatches(pendingData);
+      // Sort: matches where current user is opponent (needs to approve) first, then matches recorded by user
+      const sorted = [...pendingData].sort((a, b) => {
+        const aIsOpponent = a.opponent_id === user?.id;
+        const bIsOpponent = b.opponent_id === user?.id;
+        if (aIsOpponent && !bIsOpponent) return -1;
+        if (!aIsOpponent && bIsOpponent) return 1;
+        return 0;
+      });
+      setMatches(sorted);
     } catch (e) {
       console.error('Failed to load pending matches:', e);
     } finally {
@@ -162,69 +170,14 @@ export default function PendingMatchesScreen() {
         ) : (
           <View style={styles.list}>
             {matches.map((match) => (
-              <Pressable
+              <MatchCard
                 key={match.id}
-                onPress={() => {
-                  handleMatchPress(match);
-                }}
-                style={({ pressed }) => [
-                  styles.matchCard,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                  pressed && { opacity: 0.85, backgroundColor: theme.backgroundSelected },
-                ]}
-                hitSlop={8}
-              >
-                <View style={styles.matchHeader}>
-                  <View style={styles.matchTypeRow}>
-                    <View style={[styles.sportBadge, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11, color: theme.text }}>
-                        {SPORT_LABELS[match.sport as keyof typeof SPORT_LABELS] || match.sport}
-                      </ThemedText>
-                    </View>
-                    <View style={[styles.pendingBadge, { backgroundColor: `${theme.warning}20` }]}>
-                      <Clock size={12} color={theme.warning} strokeWidth={2} />
-                      <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 10, marginLeft: 2 }}>
-                        {'PENDING'}
-                      </ThemedText>
-                    </View>
-                  </View>
-                  <ThemedText variant="caption" muted style={{ fontSize: 11, color: theme.textSecondary }}>
-                    {new Date(match.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                  </ThemedText>
-                </View>
-
-                <View style={styles.matchPlayers}>
-                  <View style={styles.playerSide}>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'You / Partner'}</ThemedText>
-                    <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
-                      {match.player?.username ?? 'You'}
-                      {match.player_partner_id && ` & ${match.playerPartner?.username ?? 'Partner'}`}
-                    </ThemedText>
-                  </View>
-                  <View style={styles.vsDivider}>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'VS'}</ThemedText>
-                  </View>
-                  <View style={styles.playerSide}>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'Opponent'}</ThemedText>
-                    <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
-                      {match.opponent?.username ?? 'Unknown'}
-                      {match.opponent_partner_id && ` & ${match.opponentPartner?.username ?? 'Partner'}`}
-                    </ThemedText>
-                  </View>
-                </View>
-
-                <View style={styles.matchScore}>
-                  <ThemedText variant="heading" style={{ color: theme.text }}>
-                    {match.player_score} - {match.opponent_score}
-                  </ThemedText>
-                  <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>
-                    {match.recorded_by === user?.id ? 'Recorded by you' : 'Recorded by opponent'}
-                  </ThemedText>
-                </View>
-              </Pressable>
+                match={toMatchWithProfiles(match)}
+                currentUserId={user?.id}
+                showYoursBadge={false}
+                communityId={id}
+                onPress={() => handleMatchPress(match)}
+              />
             ))}
           </View>
         )}
@@ -257,52 +210,5 @@ const styles = StyleSheet.create({
   },
   list: {
     gap: Spacing.md,
-  },
-  matchCard: {
-    borderWidth: 1,
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    gap: Spacing.md,
-  },
-  matchHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  matchTypeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: Spacing.sm,
-  },
-  sportBadge: {
-    paddingHorizontal: Spacing.sm,
-    paddingVertical: 4,
-    borderRadius: Radius.sm,
-    borderWidth: 1,
-  },
-  pendingBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.xs,
-    paddingVertical: 2,
-    borderRadius: Radius.sm,
-    gap: 2,
-  },
-  matchPlayers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  playerSide: {
-    flex: 1,
-    gap: 2,
-  },
-  vsDivider: {
-    paddingHorizontal: Spacing.sm,
-  },
-  matchScore: {
-    alignItems: 'center',
-    gap: 2,
   },
 });
