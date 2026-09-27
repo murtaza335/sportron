@@ -302,7 +302,7 @@ export default function CommunityDetailScreen() {
 
     // Add approved matches (deduplicated by id)
     const seenMatchIds = new Set<string>();
-    (matches ?? []).forEach((match) => {
+    (feedMatches ?? []).forEach((match) => {
       if (!seenMatchIds.has(match.id)) {
         seenMatchIds.add(match.id);
         feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });

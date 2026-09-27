@@ -1,9 +1,8 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft, Clock, X } from 'lucide-react-native';
+import { ChevronLeft, Clock } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
   ActivityIndicator,
-  Modal,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -12,6 +11,7 @@ import {
 } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
+import { MatchDetailPopup } from '@/components/MatchDetailPopup';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -230,76 +230,13 @@ export default function PendingMatchesScreen() {
         )}
       </ScrollView>
 
-      {/* Match Detail Popup */}
-      <Modal transparent visible={matchPopupVisible} animationType="fade" onRequestClose={() => { setMatchPopupVisible(false); setSelectedMatch(null); }}>
-        <Pressable style={styles.modalBackdrop} onPress={() => { setMatchPopupVisible(false); setSelectedMatch(null); }}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]} onPress={() => {}}>
-            <View style={styles.modalInner}>
-              <View style={styles.modalHeader}>
-                <ThemedText variant="heading" style={{ color: theme.text }}>{'Match Detail'}</ThemedText>
-                <Pressable onPress={() => { setMatchPopupVisible(false); setSelectedMatch(null); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                  <X size={24} color={theme.text} strokeWidth={2.5} />
-                </Pressable>
-              </View>
-              {selectedMatch && (
-                <View style={styles.modalBody}>
-                  <View style={styles.detailHeader}>
-                    <View style={[styles.sportBadge, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                      <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11, color: theme.text }}>
-                        {SPORT_LABELS[selectedMatch.sport as keyof typeof SPORT_LABELS] || selectedMatch.sport}
-                      </ThemedText>
-                    </View>
-                    <View style={[styles.pendingBadge, { backgroundColor: `${theme.warning}20` }]}>
-                      <Clock size={12} color={theme.warning} strokeWidth={2} />
-                      <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 10, marginLeft: 2 }}>
-                        {'PENDING'}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailPlayers}>
-                    <View style={styles.detailSide}>
-                      <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'You / Partner'}</ThemedText>
-                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
-                        {selectedMatch.player?.username ?? 'You'}
-                        {selectedMatch.player_partner_id && ` & ${selectedMatch.playerPartner?.username ?? 'Partner'}`}
-                      </ThemedText>
-                    </View>
-                    <View style={styles.vsDivider}>
-                      <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'VS'}</ThemedText>
-                    </View>
-                    <View style={styles.detailSide}>
-                      <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>{'Opponent'}</ThemedText>
-                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.text }}>
-                        {selectedMatch.opponent?.username ?? 'Unknown'}
-                        {selectedMatch.opponent_partner_id && ` & ${selectedMatch.opponentPartner?.username ?? 'Partner'}`}
-                      </ThemedText>
-                    </View>
-                  </View>
-
-                  <View style={styles.detailScore}>
-                    <ThemedText variant="heading" style={{ color: theme.text, fontSize: 32 }}>
-                      {selectedMatch.player_score} - {selectedMatch.opponent_score}
-                    </ThemedText>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>
-                      {selectedMatch.created_by === user?.id ? 'Recorded by you' : 'Recorded by opponent'}
-                    </ThemedText>
-                  </View>
-
-                  <View style={styles.detailMeta}>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>
-                      {new Date(selectedMatch.created_at).toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit' })}
-                    </ThemedText>
-                    <ThemedText variant="caption" muted style={{ color: theme.textSecondary }}>
-                      Format: {selectedMatch.match_format === 'doubles' ? 'Doubles' : 'Singles'}
-                    </ThemedText>
-                  </View>
-                </View>
-              )}
-            </View>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      <MatchDetailPopup
+        match={selectedMatch}
+        visible={matchPopupVisible}
+        onClose={() => { setMatchPopupVisible(false); setSelectedMatch(null); }}
+        currentUserId={user?.id}
+        communityId={id}
+      />
     </View>
   );
 }
@@ -367,55 +304,5 @@ const styles = StyleSheet.create({
   matchScore: {
     alignItems: 'center',
     gap: 2,
-  },
-
-  // Modal styles
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    padding: Spacing.lg,
-  },
-  modalContent: {
-    width: '100%',
-    maxWidth: 400,
-    borderRadius: Radius.lg,
-    borderWidth: 1,
-    padding: Spacing.lg,
-  },
-  modalInner: {
-    gap: Spacing.md,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  modalBody: {
-    gap: Spacing.md,
-  },
-  detailHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  detailPlayers: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: Spacing.md,
-  },
-  detailSide: {
-    flex: 1,
-    gap: 2,
-  },
-  detailScore: {
-    alignItems: 'center',
-    gap: 4,
-  },
-  detailMeta: {
-    gap: 4,
-    alignItems: 'center',
   },
 });
