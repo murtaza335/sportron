@@ -1,9 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, Trophy, X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
   Alert,
-  Animated,
   Image,
   KeyboardAvoidingView,
   Modal,
@@ -14,6 +13,7 @@ import {
   TextInput,
   View,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -47,22 +47,18 @@ export function CreatePostModal({
 }: CreatePostModalProps) {
   const theme = useTheme();
   const router = useRouter();
+  const insets = useSafeAreaInsets();
 
   const [textContent, setTextContent] = useState('');
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [uploadProgress, setUploadProgress] = useState(0);
   const [submitting, setSubmitting] = useState(false);
-  const [animation] = useState(new Animated.Value(0));
-  const [isAnimating, setIsAnimating] = useState(false);
-  const modalRef = useRef<Modal>(null);
 
   const maxTextLength = 2000;
 
-  // Reset form fields when modal visibility changes
   useEffect(() => {
     if (visible) {
-      // Use setTimeout to avoid synchronous setState in effect
       setTimeout(() => {
         setTextContent('');
         setSelectedImage(null);
@@ -71,29 +67,6 @@ export function CreatePostModal({
       }, 0);
     }
   }, [visible]);
-
-  // Handle slide/fade animation
-  useEffect(() => {
-    if (visible) {
-      Animated.timing(animation, {
-        toValue: 1,
-        duration: 250,
-        useNativeDriver: true,
-      }).start(() => {
-        setIsAnimating(false);
-      });
-    } else {
-      // Use setTimeout to avoid synchronous setState in effect
-      setTimeout(() => {
-        setIsAnimating(true);
-        Animated.timing(animation, {
-          toValue: 0,
-          duration: 200,
-          useNativeDriver: true,
-        }).start(() => setIsAnimating(false));
-      }, 0);
-    }
-  }, [visible, animation]);
 
   const handleSubmit = async () => {
     if (submitting || uploading) return;
@@ -183,7 +156,6 @@ export function CreatePostModal({
     setSelectedImage(null);
   };
 
-  // Dynamic header title based on initialTab prop
   const getHeaderTitle = () => {
     switch (initialTab) {
       case 'photo':
@@ -196,29 +168,26 @@ export function CreatePostModal({
     }
   };
 
-  if (!visible) return null;
-
   return (
     <Modal
-      ref={modalRef}
-      transparent
       visible={visible}
       animationType="slide"
+      transparent={false}
       onRequestClose={onClose}
-      supportedOrientations={['portrait']}
     >
-      <Animated.View style={[styles.backdrop, { opacity: animation }]}>
-        <Pressable onPress={onClose} style={styles.backdropPress} />
-
-        <Animated.View
-          style={[
-            styles.modalContainer,
-            { backgroundColor: theme.background, borderColor: theme.border },
-            { transform: [{ translateY: animation.interpolate({ inputRange: [0, 1], outputRange: [300, 0] }) }] },
-          ]}
+      <View
+        style={[
+          styles.container,
+          {
+            backgroundColor: theme.background,
+            paddingTop: insets.top,
+          },
+        ]}
+      >
+        <KeyboardAvoidingView
+          behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+          style={styles.contentWrapper}
         >
-          <View style={[styles.modalHandle, { backgroundColor: theme.border }]} />
-
           {/* Header */}
           <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
             <ThemedText variant="heading">{getHeaderTitle()}</ThemedText>
@@ -227,172 +196,148 @@ export function CreatePostModal({
             </Pressable>
           </View>
 
-          {/* Form Content */}
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-            style={styles.contentWrapper}
-          >
-            <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
-            >
-              {/* Conditional Rendering Based on initialTab Prop */}
-              {initialTab === 'write' && (
-                <View style={styles.tabContent}>
-                  <TextInput
-                    placeholder="What's on your mind?"
-                    placeholderTextColor={theme.textSecondary}
-                    value={textContent}
-                    onChangeText={setTextContent}
-                    style={[
-                      styles.textInput,
-                      { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    ]}
-                    multiline
-                    maxLength={maxTextLength}
-                    textAlignVertical="top"
-                  />
-                  <ThemedText variant="caption" muted style={styles.charCount}>
-                    {textContent.length}/{maxTextLength}
-                  </ThemedText>
-                </View>
-              )}
-
-              {initialTab === 'photo' && (
-                <View style={styles.tabContent}>
-                  {selectedImage ? (
-                    <View style={styles.imagePreviewContainer}>
-                      <Image source={{ uri: selectedImage }} style={styles.imagePreview} resizeMode="cover" />
-                      <Pressable onPress={removeImage} style={styles.removeImageButton} hitSlop={8}>
-                        <X size={20} color="#fff" strokeWidth={3} />
-                      </Pressable>
-                    </View>
-                  ) : (
-                    <Pressable
-                      onPress={pickImage}
-                      style={[styles.imagePickerButton, { borderColor: theme.border }]}
-                      hitSlop={8}
-                    >
-                      <View style={styles.imagePickerIcon}>
-                        <ImageIcon size={32} color={theme.textSecondary} strokeWidth={2} />
-                      </View>
-                      <ThemedText variant="body" muted style={styles.imagePickerText}>
-                        Tap to select a photo
-                      </ThemedText>
-                    </Pressable>
-                  )}
-
-                  <TextInput
-                    placeholder="Add a caption (optional)..."
-                    placeholderTextColor={theme.textSecondary}
-                    value={textContent}
-                    onChangeText={setTextContent}
-                    style={[
-                      styles.captionInput,
-                      { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    ]}
-                    multiline
-                    maxLength={maxTextLength}
-                    textAlignVertical="top"
-                  />
-                  <ThemedText variant="caption" muted style={styles.charCount}>
-                    {textContent.length}/{maxTextLength}
-                  </ThemedText>
-
-                  {uploading && (
-                    <View style={styles.uploadProgress}>
-                      <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
-                        <View
-                          style={[
-                            styles.progressFill,
-                            { backgroundColor: theme.accent, width: `${uploadProgress}%` },
-                          ]}
-                        />
-                      </View>
-                      <ThemedText variant="caption" muted>
-                        Uploading... {uploadProgress}%
-                      </ThemedText>
-                    </View>
-                  )}
-                </View>
-              )}
-
-              {initialTab === 'match' && (
-                <View style={styles.tabContent}>
-                  <Card style={[styles.matchCard, { borderColor: theme.border }]}>
-                    <View style={styles.matchCardContent}>
-                      <Trophy size={32} color={theme.accent} strokeWidth={2} />
-                      <View style={styles.matchCardText}>
-                        <ThemedText variant="heading" style={{ marginBottom: Spacing.xs }}>
-                          Record a Match
-                        </ThemedText>
-                        <ThemedText variant="body" muted>
-                          Record a match result with scores, opponents, and format.
-                        </ThemedText>
-                      </View>
-                    </View>
-                  </Card>
-                  <ThemedText variant="caption" muted style={styles.matchHint}>
-                    Opens the match recording screen
-                  </ThemedText>
-                </View>
-              )}
-            </ScrollView>
-          </KeyboardAvoidingView>
-
-          {/* Action Button */}
-          <Pressable
-            onPress={handleSubmit}
-            disabled={submitting || uploading}
-            style={[
-              styles.submitButton,
-              { backgroundColor: theme.accent },
-              (submitting || uploading) && styles.submitButtonDisabled,
+          <ScrollView
+            contentContainerStyle={[
+              styles.scrollContent,
+              { paddingBottom: Spacing.xl * 3 + insets.bottom },
             ]}
-            hitSlop={8}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            keyboardDismissMode="interactive"
           >
-            <ThemedText variant="label" style={{ color: theme.background, fontWeight: '700' }}>
-              {submitting
-                ? 'Posting...'
-                : uploading
-                ? `Uploading ${uploadProgress}%`
-                : initialTab === 'match'
-                ? 'Continue to Match'
-                : 'Post'}
-            </ThemedText>
-          </Pressable>
-        </Animated.View>
-      </Animated.View>
+            {initialTab === 'write' && (
+              <View style={styles.tabContent}>
+                <TextInput
+                  placeholder="What's on your mind?"
+                  placeholderTextColor={theme.textSecondary}
+                  value={textContent}
+                  onChangeText={setTextContent}
+                  style={[
+                    styles.textInput,
+                    { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                  multiline
+                  maxLength={maxTextLength}
+                  textAlignVertical="top"
+                />
+                <ThemedText variant="caption" muted style={styles.charCount}>
+                  {textContent.length}/{maxTextLength}
+                </ThemedText>
+              </View>
+            )}
+
+            {initialTab === 'photo' && (
+              <View style={styles.tabContent}>
+                {selectedImage ? (
+                  <View style={styles.imagePreviewContainer}>
+                    <Image source={{ uri: selectedImage }} style={styles.imagePreview} resizeMode="cover" />
+                    <Pressable onPress={removeImage} style={styles.removeImageButton} hitSlop={8}>
+                      <X size={20} color="#fff" strokeWidth={3} />
+                    </Pressable>
+                  </View>
+                ) : (
+                  <Pressable
+                    onPress={pickImage}
+                    style={[styles.imagePickerButton, { borderColor: theme.border }]}
+                    hitSlop={8}
+                  >
+                    <View style={styles.imagePickerIcon}>
+                      <ImageIcon size={32} color={theme.textSecondary} strokeWidth={2} />
+                    </View>
+                    <ThemedText variant="body" muted style={styles.imagePickerText}>
+                      Tap to select a photo
+                    </ThemedText>
+                  </Pressable>
+                )}
+
+                <TextInput
+                  placeholder="Add a caption (optional)..."
+                  placeholderTextColor={theme.textSecondary}
+                  value={textContent}
+                  onChangeText={setTextContent}
+                  style={[
+                    styles.captionInput,
+                    { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                  ]}
+                  multiline
+                  maxLength={maxTextLength}
+                  textAlignVertical="top"
+                />
+                <ThemedText variant="caption" muted style={styles.charCount}>
+                  {textContent.length}/{maxTextLength}
+                </ThemedText>
+
+                {uploading && (
+                  <View style={styles.uploadProgress}>
+                    <View style={[styles.progressBar, { backgroundColor: theme.border }]}>
+                      <View
+                        style={[
+                          styles.progressFill,
+                          { backgroundColor: theme.accent, width: `${uploadProgress}%` },
+                        ]}
+                      />
+                    </View>
+                    <ThemedText variant="caption" muted>
+                      Uploading... {uploadProgress}%
+                    </ThemedText>
+                  </View>
+                )}
+              </View>
+            )}
+
+            {initialTab === 'match' && (
+              <View style={styles.tabContent}>
+                <Card style={[styles.matchCard, { borderColor: theme.border }]}>
+                  <View style={styles.matchCardContent}>
+                    <Trophy size={32} color={theme.accent} strokeWidth={2} />
+                    <View style={styles.matchCardText}>
+                      <ThemedText variant="heading" style={{ marginBottom: Spacing.xs }}>
+                        Record a Match
+                      </ThemedText>
+                      <ThemedText variant="body" muted>
+                        Record a match result with scores, opponents, and format.
+                      </ThemedText>
+                    </View>
+                  </View>
+                </Card>
+                <ThemedText variant="caption" muted style={styles.matchHint}>
+                  Opens the match recording screen
+                </ThemedText>
+              </View>
+            )}
+
+            <Pressable
+              onPress={handleSubmit}
+              disabled={submitting || uploading}
+              style={[
+                styles.submitButton,
+                { backgroundColor: theme.accent },
+                (submitting || uploading) && styles.submitButtonDisabled,
+              ]}
+              hitSlop={8}
+            >
+              <ThemedText variant="label" style={{ color: theme.background, fontWeight: '700' }}>
+                {submitting
+                  ? 'Posting...'
+                  : uploading
+                  ? `Uploading ${uploadProgress}%`
+                  : initialTab === 'match'
+                  ? 'Continue to Match'
+                  : 'Post'}
+              </ThemedText>
+            </Pressable>
+          </ScrollView>
+        </KeyboardAvoidingView>
+      </View>
     </Modal>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
+  container: {
     flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  backdropPress: {
-    flex: 1,
-  },
-  modalContainer: {
     width: '100%',
-    maxHeight: '90%',
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-  },
-  modalHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-    alignSelf: 'center',
-    marginTop: Spacing.md,
-    marginBottom: Spacing.xs,
+    height: '100%',
   },
   modalHeader: {
     flexDirection: 'row',
@@ -403,11 +348,12 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
   },
   contentWrapper: {
-    flexShrink: 1,
+    flex: 1,
   },
   scrollContent: {
     padding: Spacing.lg,
     gap: Spacing.lg,
+    flexGrow: 1,
   },
   tabContent: {
     gap: Spacing.md,
@@ -502,11 +448,11 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
   submitButton: {
-    margin: Spacing.lg,
     paddingVertical: Spacing.md,
     borderRadius: Radius.md,
     alignItems: 'center',
     justifyContent: 'center',
+    marginTop: Spacing.md,
   },
   submitButtonDisabled: {
     opacity: 0.7,
