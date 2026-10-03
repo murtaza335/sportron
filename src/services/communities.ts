@@ -8,6 +8,9 @@ import type {
   CommunityMatchComment,
   CommunityMember,
   CommunityMemberRole,
+  CommunityPost,
+  CommunityPostComment,
+  CommunityPostType,
   CreateCommunityInput,
   Ping,
   Sport,
@@ -600,7 +603,9 @@ export async function recordCommunityMatch(input: {
   community_id: string;
   recorded_by: string;
   player_id: string;
+  player_partner_id?: string | null;
   opponent_id: string;
+  opponent_partner_id?: string | null;
   sport: Sport;
   custom_sport_name?: string | null;
   team_a_name?: string | null;
@@ -614,7 +619,9 @@ export async function recordCommunityMatch(input: {
       community_id: input.community_id,
       recorded_by: input.recorded_by,
       player_id: input.player_id,
+      player_partner_id: input.player_partner_id ?? null,
       opponent_id: input.opponent_id,
+      opponent_partner_id: input.opponent_partner_id ?? null,
       sport: input.sport,
       custom_sport_name: input.custom_sport_name?.trim() || null,
       team_a_name: input.team_a_name?.trim() || null,
@@ -1015,4 +1022,227 @@ export async function cancelCommunityInvite(
     .eq('invited_by', adminId);
 
   if (error) throw error;
+}
+
+type PostRpcRow = {
+  id: string;
+  community_id: string;
+  author_id: string;
+  content: string | null;
+  image_url: string | null;
+  post_type: string;
+  created_at: string;
+  updated_at: string;
+  author_username: string | null;
+  author_avatar_url: string | null;
+  likes_count: number;
+  comments_count: number;
+  is_liked_by_user: boolean;
+};
+
+function rowToPost(r: PostRpcRow): CommunityPost {
+  return {
+    id: r.id,
+    community_id: r.community_id,
+    author_id: r.author_id,
+    content: r.content,
+    image_url: r.image_url,
+    post_type: r.post_type as CommunityPostType,
+    created_at: r.created_at,
+    updated_at: r.updated_at,
+    author: r.author_username
+      ? { id: r.author_id, username: r.author_username, avatar_url: r.author_avatar_url }
+      : null,
+    likes_count: Number(r.likes_count) ?? 0,
+    comments_count: Number(r.comments_count) ?? 0,
+    is_liked_by_user: r.is_liked_by_user,
+  };
+}
+
+type PostCommentRpcRow = {
+  id: string;
+  post_id: string;
+  profile_id: string;
+  content: string;
+  created_at: string;
+  username: string | null;
+  avatar_url: string | null;
+};
+
+function rowToPostComment(r: PostCommentRpcRow): CommunityPostComment {
+  return {
+    id: r.id,
+    post_id: r.post_id,
+    profile_id: r.profile_id,
+    content: r.content,
+    created_at: r.created_at,
+    profile: r.username
+      ? { id: r.profile_id, username: r.username, avatar_url: r.avatar_url }
+      : null,
+  };
+}
+
+export async function fetchCommunityPosts(
+  communityId: string,
+  userId?: string,
+  page?: number,
+  pageSize?: number,
+): Promise<{ data: CommunityPost[]; hasMore: boolean }> {
+  const { data, error } = await supabase.rpc('get_community_posts', {
+    p_community_id: communityId,
+    p_user_id: userId ?? null,
+    p_page: page ?? 1,
+    p_page_size: pageSize ?? 20,
+  });
+
+  if (error) throw error;
+
+  const rows = data ?? [];
+  const hasMore = page && pageSize ? rows.length === pageSize : false;
+
+  return { data: rows.map(rowToPost), hasMore };
+}
+
+export async function fetchCommunityPostById(
+  postId: string,
+  userId?: string,
+): Promise<CommunityPost | null> {
+  const { data, error } = await supabase.rpc('get_community_post_by_id', {
+    p_post_id: postId,
+    p_user_id: userId ?? null,
+  });
+
+  if (error) throw error;
+  const row = data?.[0];
+  return row ? rowToPost(row) : null;
+}
+
+export async function createCommunityPost(input: {
+  community_id: string;
+  author_id: string;
+  content?: string | null;
+  image_url?: string | null;
+  post_type: CommunityPostType;
+}): Promise<CommunityPost> {
+  const { data, error } = await supabase
+    .from('community_posts')
+    .insert({
+      community_id: input.community_id,
+      author_id: input.author_id,
+      content: input.content?.trim() || null,
+      image_url: input.image_url || null,
+      post_type: input.post_type,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+
+  const { data: profile } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .eq('id', input.author_id)
+    .single();
+
+  return {
+    ...data,
+    author: profile ?? null,
+    likes_count: 0,
+    comments_count: 0,
+    is_liked_by_user: false,
+  };
+}
+
+export async function deleteCommunityPost(
+  postId: string,
+  userId: string,
+): Promise<void> {
+  const { data: post, error: fetchError } = await supabase
+    .from('community_posts')
+    .select('author_id, community_id')
+    .eq('id', postId)
+    .single();
+
+  if (fetchError) throw fetchError;
+  if (!post) throw new Error('Post not found');
+
+  const { data: member } = await supabase
+    .from('community_members')
+    .select('role')
+    .eq('community_id', post.community_id)
+    .eq('profile_id', userId)
+    .single();
+
+  const isAdmin = member?.role === 'admin';
+  const isAuthor = post.author_id === userId;
+
+  if (!isAuthor && !isAdmin) {
+    throw new Error('Only the author or an admin can delete this post');
+  }
+
+  const { error } = await supabase
+    .from('community_posts')
+    .delete()
+    .eq('id', postId);
+
+  if (error) throw error;
+}
+
+export async function toggleCommunityPostLike(
+  postId: string,
+  userId: string,
+  like: boolean,
+): Promise<void> {
+  if (like) {
+    const { error } = await supabase
+      .from('community_post_likes')
+      .insert({ post_id: postId, profile_id: userId });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from('community_post_likes')
+      .delete()
+      .eq('post_id', postId)
+      .eq('profile_id', userId);
+    if (error) throw error;
+  }
+}
+
+export async function fetchCommunityPostComments(
+  postId: string,
+): Promise<CommunityPostComment[]> {
+  const { data, error } = await supabase.rpc('get_community_post_comments', {
+    p_post_id: postId,
+  });
+  if (error) throw error;
+  return (data ?? []).map(rowToPostComment);
+}
+
+export async function addCommunityPostComment(
+  postId: string,
+  userId: string,
+  content: string,
+): Promise<CommunityPostComment> {
+  const { data, error } = await supabase
+    .from('community_post_comments')
+    .insert({
+      post_id: postId,
+      profile_id: userId,
+      content: content.trim(),
+    })
+    .select('*')
+    .single();
+
+  if (error) throw error;
+
+  const { data: profile } = await supabase
+    .from('public_profiles')
+    .select('id, username, avatar_url')
+    .eq('id', userId)
+    .single();
+
+  return {
+    ...data,
+    profile: profile ?? null,
+  };
 }

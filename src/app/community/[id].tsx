@@ -1,25 +1,29 @@
+import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
   Building2,
+  Camera,
+  CheckCircle,
   ChevronLeft,
   ChevronRight,
   Clock,
   Globe,
   Lock,
   MapPin,
-  Megaphone,
-  MessageCircle,
   MoreHorizontal,
   Plus,
+  Sparkles,
   Swords,
   User,
   Users,
-  X,
+  X
 } from 'lucide-react-native';
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  KeyboardAvoidingView,
   Modal,
+  Platform,
   Pressable,
   RefreshControl,
   ScrollView,
@@ -28,11 +32,12 @@ import {
   View,
 } from 'react-native';
 
-import { alert } from '@/lib/alert';
-import { supabase } from '@/lib/supabase';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
+import { CreatePostModal } from '@/components/CreatePostModal';
 import { MatchCard } from '@/components/MatchCard';
 import { MatchDetailPopup } from '@/components/MatchDetailPopup';
+import { PostCard } from '@/components/PostCard';
+import { PostDetailPopup } from '@/components/PostDetailPopup';
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -41,6 +46,9 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
+import { useCommunityPosts } from '@/hooks/useCommunityPosts';
+import { alert } from '@/lib/alert';
+import { supabase } from '@/lib/supabase';
 import {
   fetchCommunityMatchById,
   fetchCommunityMatches,
@@ -53,17 +61,20 @@ import {
 import type {
   CommunityJoinRequest,
   CommunityMatch,
+  CommunityPost,
   MatchWithProfiles,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
 export default function CommunityDetailScreen() {
-  const { id, communityName, matchId: matchIdParam } = useLocalSearchParams<{
+  const { id, communityName, matchId: matchIdParam, postId: postIdParam } = useLocalSearchParams<{
     id: string;
     communityName?: string;
     matchId?: string | string[];
+    postId?: string | string[];
   }>();
   const matchId = typeof matchIdParam === 'string' ? matchIdParam : undefined;
+  const postId = typeof postIdParam === 'string' ? postIdParam : undefined;
   const theme = useTheme();
   const { user } = useAuth();
   const {
@@ -92,6 +103,36 @@ export default function CommunityDetailScreen() {
     null,
   );
 
+  // Posts feed
+  const {
+    posts,
+    loading: postsLoading,
+    refresh: refreshPosts,
+    loadMore: loadMorePosts,
+    loadingMore: loadingMorePosts,
+    hasMore: hasMorePosts,
+  } = useCommunityPosts(id ?? null, user?.id ?? null);
+
+  // Matches
+  const [matches, setMatches] = useState<CommunityMatch[]>([]);
+  const [matchesPage, setMatchesPage] = useState(1);
+  const [hasMoreMatches, setHasMoreMatches] = useState(false);
+  const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
+  const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
+  const [matchPopupVisible, setMatchPopupVisible] = useState(false);
+  const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
+  const [postPopupVisible, setPostPopupVisible] = useState(false);
+  const [createPostModalVisible, setCreatePostModalVisible] = useState(false);
+  const [createPostInitialTab, setCreatePostInitialTab] = useState<'write' | 'photo'>('write');
+  const initialMatchesLoadRef = useRef(true);
+
+  // Ping state
+  const [pingMessage, setPingMessage] = useState('');
+  const [sendingPing, setSendingPing] = useState(false);
+  const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
+  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+  const [showPingModal, setShowPingModal] = useState(false);
+
   const optimisticTitle = community?.name || communityName || '';
 
   const joinAction = (() => {
@@ -101,22 +142,16 @@ export default function CommunityDetailScreen() {
     return { label: 'Join Community', disabled: false } as const;
   })();
 
-  // Matches
-  const [matches, setMatches] = useState<CommunityMatch[]>([]);
-  const [matchesLoading, setMatchesLoading] = useState(true);
-  const [matchesPage, setMatchesPage] = useState(1);
-  const [hasMoreMatches, setHasMoreMatches] = useState(false);
-  const [loadingMore, setLoadingMore] = useState(false);
-  const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
-  const [popupVisible, setPopupVisible] = useState(false);
-  const [activeTab, setActiveTab] = useState<'feed' | 'pending'>('feed');
-
   const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
     try {
       const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
       if (append) {
-        setMatches((prev) => [...prev, ...data]);
+        setMatches((prev) => {
+          const existingIds = new Set(prev.map(m => m.id));
+          const newMatches = data.filter(m => !existingIds.has(m.id));
+          return [...prev, ...newMatches];
+        });
       } else {
         setMatches(data);
       }
@@ -125,19 +160,18 @@ export default function CommunityDetailScreen() {
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
-      setMatchesLoading(false);
-      setLoadingMore(false);
+      setLoadingMoreMatches(false);
     }
   }, [id, user]);
 
-  useFocusEffect(
-    useCallback(() => {
+  useEffect(() => {
+    if (initialMatchesLoadRef.current) {
+      initialMatchesLoadRef.current = false;
       setMatchesPage(1);
       setHasMoreMatches(false);
-      setMatchesLoading(true);
       loadMatches(1);
-    }, [loadMatches]),
-  );
+    }
+  }, [loadMatches]);
 
   // Join requests — admin only
   useFocusEffect(
@@ -207,12 +241,6 @@ export default function CommunityDetailScreen() {
     };
   }, [id, user]);
 
-  const handleLoadMore = async () => {
-    if (loadingMore || !hasMoreMatches) return;
-    setLoadingMore(true);
-    await loadMatches(matchesPage + 1, true);
-  };
-
   const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
   const pendingFromFeed = matches.filter(
     (m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id),
@@ -225,8 +253,8 @@ export default function CommunityDetailScreen() {
         && !pendingFromFeed.some((m) => m.id === pm.id),
     ),
   ];
-  const displayMatches = activeTab === 'pending' ? allPendingMatches : feedMatches;
 
+  // Combine posts and approved matches into unified feed
   const toMatchWithProfiles = useCallback(
     (cm: CommunityMatch): MatchWithProfiles => {
       return {
@@ -264,6 +292,331 @@ export default function CommunityDetailScreen() {
     []
   );
 
+  const combinedFeed = useMemo(() => {
+    const feedItems: Array<{ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles }> = [];
+
+    // Add posts
+    (posts ?? []).forEach((post) => {
+      feedItems.push({ type: 'post', data: post });
+    });
+
+    // Add approved matches (deduplicated by id)
+    const seenMatchIds = new Set<string>();
+    (feedMatches ?? []).forEach((match) => {
+      if (!seenMatchIds.has(match.id)) {
+        seenMatchIds.add(match.id);
+        feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
+      }
+    });
+
+    // Sort by created_at descending
+    feedItems.sort((a, b) => {
+      const dateA = new Date(a.type === 'post' ? a.data.created_at : a.data.created_at).getTime();
+      const dateB = new Date(b.type === 'post' ? b.data.created_at : b.data.created_at).getTime();
+      return dateB - dateA;
+    });
+
+    return feedItems;
+  }, [posts, matches, toMatchWithProfiles]);
+
+  const feedContent = useMemo(() => {
+    // Inline styles for skeleton loader
+    const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
+    const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
+    const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
+    const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
+
+    // Caught up card styles
+    const caughtUpCardStyle = {
+      flexDirection: 'row' as const,
+      alignItems: 'center' as const,
+      justifyContent: 'center' as const,
+      gap: Spacing.sm,
+      padding: Spacing.lg,
+      marginTop: Spacing.md,
+      borderRadius: Radius.lg,
+      backgroundColor: theme.success + '15',
+      borderWidth: 1,
+      borderColor: theme.success,
+    };
+
+    if (postsLoading && combinedFeed.length === 0) {
+      return (
+        <View style={skeletonContainerStyle}>
+          {[...Array(3)].map((_, i) => (
+            <View key={i} style={skeletonCardStyle}>
+              <View style={skeletonLineStyle} />
+              <View style={skeletonLineShortStyle} />
+              <View style={skeletonLineStyle} />
+            </View>
+          ))}
+        </View>
+      );
+    }
+    if (combinedFeed.length > 0) {
+      return (
+        <>
+          {combinedFeed.map((item, index) => (
+            <Pressable
+              key={`${item.type}-${item.data.id}`}
+              onPress={() => {
+                if (item.type === 'post') {
+                  handlePostPress(item.data);
+                } else {
+                  handleMatchPress(item.data);
+                }
+              }}
+              style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
+              hitSlop={8}
+            >
+              {item.type === 'post' ? (
+                <PostCard
+                  post={item.data}
+                  currentUserId={user?.id}
+                  communityId={id}
+                  showYoursBadge={false}
+                  onPress={() => handlePostPress(item.data)}
+                />
+              ) : (
+                <MatchCard
+                  match={item.data}
+                  currentUserId={user?.id}
+                  communityId={id}
+                  showYoursBadge={false}
+                />
+              )}
+            </Pressable>
+          ))}
+          {(loadingMorePosts || loadingMoreMatches) && (
+            <View style={skeletonContainerStyle}>
+              {[...Array(3)].map((_, i) => (
+                <View key={i} style={skeletonCardStyle}>
+                  <View style={skeletonLineStyle} />
+                  <View style={skeletonLineShortStyle} />
+                  <View style={skeletonLineStyle} />
+                </View>
+              ))}
+            </View>
+          )}
+          {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
+            <View
+              style={{
+                position: 'relative',
+                overflow: 'hidden',
+                minHeight: 260,
+                borderRadius: Radius.lg,
+                backgroundColor: theme.backgroundElement,
+                paddingVertical: Spacing.xl,
+                paddingHorizontal: Spacing.lg,
+                alignItems: 'center',
+                justifyContent: 'center',
+                marginVertical: Spacing.md,
+              }}
+            >
+              {/* Background Graphic Accents */}
+              <View
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  top: -40,
+                  right: -40,
+                  width: 180,
+                  height: 180,
+                  borderRadius: 90,
+                  backgroundColor: theme.borderMuted,
+                  opacity: 0.1,
+                }}
+              />
+              <View
+                aria-hidden
+                style={{
+                  position: 'absolute',
+                  bottom: -50,
+                  left: -30,
+                  width: 200,
+                  height: 200,
+                  borderRadius: 100,
+                  backgroundColor: theme.borderMuted,
+                  opacity: 0.12,
+                }}
+              />
+
+              {/* Content */}
+              <View
+                style={{
+                  width: 64,
+                  height: 64,
+                  borderRadius: Radius.full,
+                  backgroundColor: theme.backgroundSelected,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginBottom: Spacing.md,
+                }}
+              >
+                <CheckCircle size={32} color={theme.text} strokeWidth={2} />
+              </View>
+
+              <ThemedText
+                variant="body"
+                style={{
+                  fontWeight: '700',
+                  fontSize: 18,
+                  color: theme.text,
+                  marginTop: Spacing.xs,
+                }}
+              >
+                You&apos;re all caught up!
+              </ThemedText>
+
+              <ThemedText
+                variant="caption"
+                style={{
+                  color: theme.textSecondary,
+                  marginTop: Spacing.xs,
+                  textAlign: 'center',
+                  fontSize: 13,
+                }}
+              >
+                No more posts or matches to show right now
+              </ThemedText>
+            </View>
+          )}
+        </>
+      );
+    }
+    if (combinedFeed.length === 0 && !postsLoading) {
+      return (
+        <View
+          style={{
+            position: 'relative',
+            overflow: 'hidden',
+            minHeight: 280,
+            borderRadius: Radius.lg,
+            backgroundColor: theme.backgroundElement,
+            borderWidth: 1,
+            borderColor: theme.border,
+            paddingVertical: Spacing.lg,
+            paddingHorizontal: Spacing.lg,
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginVertical: Spacing.md,
+          }}
+        >
+          {/* Background Decorative Rings */}
+          <View
+            aria-hidden
+            style={{
+              position: 'absolute',
+              top: -40,
+              right: -40,
+              width: 180,
+              height: 180,
+              borderRadius: 90,
+              borderWidth: 16,
+              borderColor: '#E1306C',
+              opacity: 0.1,
+            }}
+          />
+          <View
+            aria-hidden
+            style={{
+              position: 'absolute',
+              bottom: -50,
+              left: -50,
+              width: 200,
+              height: 200,
+              borderRadius: 100,
+              borderWidth: 20,
+              borderColor: '#F56040',
+              opacity: 0.08,
+            }}
+          />
+
+          {/* Main Large Graphic Badge */}
+          <View style={{ position: 'relative', marginBottom: Spacing.lg }}>
+            {/* Outer Glowing Ring */}
+            <View
+              style={{
+                width: 104,
+                height: 104,
+                borderRadius: Radius.full,
+                padding: 4,
+                backgroundColor: '#E1306C',
+                // Soft shadow behind icon badge
+                shadowColor: '#E1306C',
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.35,
+                shadowRadius: 12,
+                elevation: 6,
+              }}
+            >
+              {/* Inner Circle Container */}
+              <View
+                style={{
+                  flex: 1,
+                  borderRadius: Radius.full,
+                  backgroundColor: theme.backgroundElement,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
+              >
+                <Camera size={48} color="#E1306C" strokeWidth={1.8} />
+              </View>
+            </View>
+
+            {/* Floating Large Sparkle Badge */}
+            <View
+              style={{
+                position: 'absolute',
+                top: -4,
+                right: -4,
+                width: 36,
+                height: 36,
+                borderRadius: Radius.full,
+                backgroundColor: '#F77737',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderWidth: 3,
+                borderColor: theme.backgroundElement,
+              }}
+            >
+              <Sparkles size={18} color="#FFF" strokeWidth={2.2} />
+            </View>
+          </View>
+
+          {/* Main Title */}
+          <ThemedText
+            variant="body"
+            style={{
+              fontWeight: '800',
+              fontSize: 20,
+              color: theme.text,
+              textAlign: 'center',
+            }}
+          >
+            Share Your First Moment
+          </ThemedText>
+
+          {/* Subtext */}
+          <ThemedText
+            variant="caption"
+            style={{
+              color: theme.textSecondary,
+              marginTop: Spacing.xs,
+              textAlign: 'center',
+              maxWidth: 270,
+              lineHeight: 20,
+              fontSize: 13,
+            }}
+          >
+            Be the first to Post! Click Plus icon below!
+          </ThemedText>
+        </View>
+      );
+    }
+    return null;
+  }, [combinedFeed, postsLoading, loadingMorePosts, loadingMoreMatches, hasMorePosts, hasMoreMatches]);
+
   // Auto-open match detail when navigating from a notification tap
   useEffect(() => {
     if (!matchId) return;
@@ -273,7 +626,7 @@ export default function CommunityDetailScreen() {
         const m = await fetchCommunityMatchById(matchId, user?.id);
         if (!cancelled && m) {
           setSelectedMatch(toMatchWithProfiles(m));
-          setPopupVisible(true);
+          setMatchPopupVisible(true);
         }
       } catch (e) {
         console.error('Failed to open deep-linked match:', e);
@@ -286,16 +639,33 @@ export default function CommunityDetailScreen() {
     };
   }, [matchId, user?.id, toMatchWithProfiles]);
 
-  // Ping modal
-  const [pingModalVisible, setPingModalVisible] = useState(false);
-  const [pingMessage, setPingMessage] = useState('');
-  const [sendingPing, setSendingPing] = useState(false);
-  const [pingCooldownUntil, setPingCooldownUntil] = useState<Date | null>(null);
-  const [nowTs, setNowTs] = useState<number>(() => Date.now());
+  // Auto-open post detail when navigating from a notification tap
+  useEffect(() => {
+    if (!postId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const { fetchCommunityPostById } = await import('@/services/communities');
+        const p = await fetchCommunityPostById(postId, user?.id);
+        if (!cancelled && p) {
+          setSelectedPost(p);
+          setPostPopupVisible(true);
+        }
+      } catch (e) {
+        console.error('Failed to open deep-linked post:', e);
+      } finally {
+        if (!cancelled) router.setParams({ postId: undefined });
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [postId, user?.id]);
 
-  const openPingModal = useCallback(async () => {
+  // Ping functionality (inline from FAB menu)
+  const openPing = useCallback(async () => {
     if (!id || !user) return;
-    setPingModalVisible(true);
+    setShowPingModal(true);
     setNowTs(Date.now());
     try {
       const until = await getNextPingTime(id, user.id);
@@ -303,13 +673,13 @@ export default function CommunityDetailScreen() {
     } catch {
       setPingCooldownUntil(null);
     }
-  }, [id, user, setPingModalVisible, setNowTs, setPingCooldownUntil]);
+  }, [id, user, setNowTs, setPingCooldownUntil]);
 
   useEffect(() => {
-    if (!pingModalVisible) return;
+    if (!pingCooldownUntil) return;
     const interval = setInterval(() => setNowTs(Date.now()), 1000);
     return () => clearInterval(interval);
-  }, [pingModalVisible]);
+  }, [pingCooldownUntil, nowTs]);
 
   const cooldownRemainingMs = pingCooldownUntil
     ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
@@ -322,6 +692,21 @@ export default function CommunityDetailScreen() {
     const seconds = totalSeconds % 60;
     if (minutes === 0) return `${seconds}s`;
     return `${minutes}m ${seconds}s`;
+  };
+
+  const handleSendPing = async () => {
+    if (!id || !user || !pingMessage.trim()) return;
+    setSendingPing(true);
+    try {
+      await sendPing(id, user.id, pingMessage.trim());
+      setPingMessage('');
+      setShowPingModal(false);
+      alert('Ping Sent', 'Notification sent to all members.');
+    } catch (e: any) {
+      alert('Error', e?.message ?? 'Failed to send ping.');
+    } finally {
+      setSendingPing(false);
+    }
   };
 
   // Community chat
@@ -353,28 +738,27 @@ export default function CommunityDetailScreen() {
     }
   };
 
-  const handleSendPing = async () => {
-    if (!id || !user || !pingMessage.trim()) return;
-    setSendingPing(true);
-    try {
-      await sendPing(id, user.id, pingMessage.trim());
-      setPingMessage('');
-      setPingModalVisible(false);
-      alert('Ping Sent', 'Notification sent to all members.');
-    } catch (e: any) {
-      alert('Error', e?.message ?? 'Failed to send ping.');
-    } finally {
-      setSendingPing(false);
-    }
+  const handleCreatePostClose = () => {
+    setCreatePostModalVisible(false);
+  };
+
+  const handlePostPress = (post: CommunityPost) => {
+    setSelectedPost(post);
+    setPostPopupVisible(true);
+  };
+
+  const handleMatchPress = (match: MatchWithProfiles) => {
+    setSelectedMatch(match);
+    setMatchPopupVisible(true);
   };
 
   const headerRight = () => null;
   const headerTitle = optimisticTitle
     ? () => (
-        <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
-          {optimisticTitle}
-        </ThemedText>
-      )
+      <ThemedText style={{ fontSize: 18, fontWeight: '700', maxWidth: 260 }} numberOfLines={1}>
+        {optimisticTitle}
+      </ThemedText>
+    )
     : undefined;
 
   const themedHeader = {
@@ -457,14 +841,46 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
-          refreshControl={
+        onScroll={({ nativeEvent }) => {
+          const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const threshold = contentSize.height - layoutMeasurement.height * 1.3;
+          if (contentOffset.y >= threshold) {
+            if (!loadingMorePosts && hasMorePosts) loadMorePosts();
+            if (!loadingMoreMatches && hasMoreMatches) loadMatches(matchesPage + 1, true);
+          }
+        }}
+        refreshControl={
           <RefreshControl
             refreshing={loading}
-            onRefresh={() => { refresh(); setMatchesLoading(true); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
+            onRefresh={() => { refresh(); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
             tintColor={theme.text}
           />
         }
       >
+        {/* Pending Matches Banner - solid, full-width, at top of feed */}
+        {isMember && allPendingMatches.length > 0 && (
+          <Pressable
+            onPress={() => router.navigate(`/community/${id}/pending-matches`)}
+            style={[styles.pendingMatchesBanner, { backgroundColor: theme.warning }]}
+            hitSlop={8}
+          >
+            <View style={styles.pendingBannerContent}>
+              <View style={styles.pendingBannerIcon}>
+                <Clock size={16} color={theme.background} strokeWidth={2} />
+              </View>
+              <View style={{ flex: 1, gap: 2 }}>
+                <ThemedText variant="label" style={{ fontWeight: '600', color: theme.background }}>
+                  {allPendingMatches.length} pending match{allPendingMatches.length !== 1 ? 'es' : ''}
+                </ThemedText>
+                <ThemedText variant="caption" style={{ color: theme.background, opacity: 0.9 }}>
+                  Tap to review
+                </ThemedText>
+              </View>
+              <ChevronRight size={18} color={theme.background} strokeWidth={2} />
+            </View>
+          </Pressable>
+        )}
+
         {/* 1. Info Card + Join Action (Non-members only) */}
         {!isMember && (
           <>
@@ -603,193 +1019,135 @@ export default function CommunityDetailScreen() {
           </Pressable>
         )}
 
-        {/* 4. Matches Section */}
+        {/* 4. Feed Section (Members only) */}
         {isMember && (
           <View style={styles.section}>
-            {/* Record Match + Ping Bar */}
-            <View style={styles.recordMatchBar}>
-              <Button
-                label="Record Match"
-                icon={<Swords size={18} color={theme.background} strokeWidth={2} />}
-                onPress={() => router.navigate(`/add-match?communityId=${id}&sport=${community.sport}`)}
-                buttonStyle={styles.recordMatchButton}
-              />
-              <Pressable
-                onPress={() => setChatVisible(true)}
-                style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
-                hitSlop={8}
-              >
-                <MessageCircle size={20} color={theme.text} strokeWidth={2} />
-                {communityChat.unreadCount > 0 && (
-                  <View style={[styles.chatUnreadBadge, { backgroundColor: theme.error }]}>
-                    <ThemedText style={styles.chatUnreadCount} numberOfLines={1}>
-                      {communityChat.unreadCount > 99 ? '99+' : communityChat.unreadCount}
-                    </ThemedText>
-                  </View>
-                )}
-              </Pressable>
-              {(isAdmin || community.pings_enabled) && (
-                <Pressable
-                  onPress={openPingModal}
-                  style={({ pressed }) => [styles.pingButton, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7, transform: [{ scale: 0.95 }] }]}
-                  hitSlop={8}
-                >
-                  <Megaphone size={20} color={theme.text} strokeWidth={2} />
-                  <View style={[styles.pingDot, { backgroundColor: theme.error }]} />
-                </Pressable>
-              )}
+            {/* Feed Header */}
+            <View style={styles.feedHeader}>
+              <View style={styles.feedHeaderLeft} />
+              <View style={styles.feedHeaderRight} />
             </View>
 
-            {/* Tabs */}
-            <View style={[styles.tabsContainer, { borderBottomColor: theme.border }]}>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tab,
-                  activeTab === 'feed' && { borderBottomColor: theme.text },
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={() => setActiveTab('feed')}
-                hitSlop={8}
-              >
-                <ThemedText
-                  variant="label"
-                  style={[
-                    styles.tabText,
-                    activeTab === 'feed' && { color: theme.text },
-                    activeTab !== 'feed' && { color: theme.textSecondary },
-                  ]}
-                >
-                  Feed ({feedMatches.length})
-                </ThemedText>
-              </Pressable>
-              <Pressable
-                style={({ pressed }) => [
-                  styles.tab,
-                  activeTab === 'pending' && { borderBottomColor: theme.text },
-                  pressed && { opacity: 0.7 },
-                ]}
-                onPress={() => setActiveTab('pending')}
-                hitSlop={8}
-              >
-                <ThemedText
-                  variant="label"
-                  style={[
-                    styles.tabText,
-                    activeTab === 'pending' && { color: theme.text },
-                    activeTab !== 'pending' && { color: theme.textSecondary },
-                  ]}
-                >
-                  Pending ({allPendingMatches.length})
-                </ThemedText>
-              </Pressable>
-            </View>
-
-            {/* Match List */}
-            {matchesLoading ? (
-              <ActivityIndicator color={theme.textSecondary} style={{ paddingVertical: Spacing.lg }} />
-            ) : displayMatches.length > 0 ? (
-              <>
-                {displayMatches.map((cm) => (
-                  <MatchCard
-                    key={cm.id}
-                    match={toMatchWithProfiles(cm)}
-                    currentUserId={user?.id}
-                    onPress={() => {
-                      setSelectedMatch(toMatchWithProfiles(cm));
-                      setPopupVisible(true);
-                    }}
-                    showYoursBadge={false}
-                    communityId={id}
-                  />
-                ))}
-                {activeTab === 'feed' && hasMoreMatches && (
-                  <Pressable
-                    onPress={handleLoadMore}
-                    style={({ pressed }) => [styles.loadMoreButton, { borderColor: theme.border }, pressed && { opacity: 0.7 }]}
-                    disabled={loadingMore}
-                    hitSlop={8}
-                  >
-                    {loadingMore ? (
-                      <ActivityIndicator size="small" color={theme.textSecondary} />
-                    ) : (
-                      <ThemedText variant="body" style={{ fontWeight: '600', color: theme.textSecondary }}>
-                        Load More
-                      </ThemedText>
-                    )}
-                  </Pressable>
-                )}
-              </>
-            ) : (
-              <Card>
-                <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
-                  {activeTab === 'pending'
-                    ? 'No pending approvals for you.'
-                    : 'No matches recorded yet. Be the first to record one!'}
-                </ThemedText>
-              </Card>
-            )}
+            {/* Feed Content */}
+            {feedContent}
           </View>
         )}
 
       </ScrollView>
 
-      {/* Ping Modal */}
-      <Modal transparent visible={pingModalVisible} animationType="fade" onRequestClose={() => setPingModalVisible(false)}>
-        <Pressable style={styles.modalBackdrop} onPress={() => setPingModalVisible(false)}>
-          <Pressable style={[styles.modalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.modalHeader}>
-              <ThemedText variant="heading">Ping Everyone</ThemedText>
-              <Pressable onPress={() => setPingModalVisible(false)} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-                <X size={18} color={theme.text} strokeWidth={2.5} />
+      <FABMenu
+        isMember={isMember}
+        communityId={id}
+        userId={user?.id}
+        communitySport={community?.sport}
+        inCooldown={inCooldown}
+        cooldownRemainingMs={cooldownRemainingMs}
+        formatCooldown={formatCooldown}
+        openPing={openPing}
+        setCreatePostInitialTab={setCreatePostInitialTab}
+        setCreatePostModalVisible={setCreatePostModalVisible}
+        router={router}
+        onFabMenuClose={() => { }}
+      />
+
+      {/* Ping Input Modal (shown when Ping selected from FAB) */}
+      {showPingModal && (
+        <Modal
+          transparent
+          visible={true}
+          animationType="fade"
+          onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
+        >
+          <KeyboardAvoidingView
+            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+            keyboardVerticalOffset={0}
+            style={styles.pingModalKeyboardAvoiding}
+          >
+            <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
+              <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+                <View style={styles.pingModalHeader}>
+                  <ThemedText variant="heading">Ping Everyone</ThemedText>
+                  <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                    <X size={18} color={theme.text} strokeWidth={2.5} />
+                  </Pressable>
+                </View>
+                <TextInput
+                  placeholder="What's up? (e.g. Playing tennis now!)"
+                  placeholderTextColor={theme.textSecondary}
+                  value={pingMessage}
+                  onChangeText={setPingMessage}
+                  style={[
+                    styles.pingModalInput,
+                    {
+                      color: theme.text,
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                  multiline
+                  maxLength={200}
+                  autoFocus
+                />
+                {inCooldown ? (
+                  <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
+                    <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
+                    <ThemedText variant="caption" muted style={{ flex: 1 }}>
+                      You can ping again in{' '}
+                      <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
+                        {formatCooldown(cooldownRemainingMs)}
+                      </ThemedText>
+                      .
+                    </ThemedText>
+                  </View>
+                ) : (
+                  <View style={styles.pingModalActions}>
+                    <Button
+                      label="Cancel"
+                      variant="secondary"
+                      onPress={() => { setShowPingModal(false); setPingMessage(''); }}
+                      buttonStyle={{ flex: 1 }}
+                    />
+                    <Button
+                      label="Send Ping"
+                      onPress={handleSendPing}
+                      loading={sendingPing}
+                      disabled={!pingMessage.trim()}
+                      buttonStyle={{ flex: 1 }}
+                    />
+                  </View>
+                )}
               </Pressable>
-            </View>
-            <TextInput
-              placeholder="What's up? (e.g. Playing tennis now!)"
-              placeholderTextColor={theme.textSecondary}
-              value={pingMessage}
-              onChangeText={setPingMessage}
-              editable={!inCooldown}
-              style={[
-                styles.pingInput,
-                {
-                  color: inCooldown ? theme.textSecondary : theme.text,
-                  backgroundColor: theme.backgroundElement,
-                  borderColor: theme.border,
-                },
-              ]}
-              multiline
-              maxLength={200}
-            />
-            {inCooldown ? (
-              <View style={[styles.pingCooldownBox, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
-                <Clock size={16} color={theme.textSecondary} strokeWidth={2} />
-                <ThemedText variant="caption" muted style={{ flex: 1 }}>
-                  You can ping again in{' '}
-                  <ThemedText variant="caption" style={{ fontWeight: '700', color: theme.text }}>
-                    {formatCooldown(cooldownRemainingMs)}
-                  </ThemedText>
-                  .
-                </ThemedText>
-              </View>
-            ) : (
-              <Button
-                label="Send Ping"
-                onPress={handleSendPing}
-                loading={sendingPing}
-                disabled={!pingMessage.trim()}
-              />
-            )}
-          </Pressable>
-        </Pressable>
-      </Modal>
+            </Pressable>
+          </KeyboardAvoidingView>
+        </Modal>
+      )}
 
       <MatchDetailPopup
         match={selectedMatch}
-        visible={popupVisible}
-        onClose={() => { setPopupVisible(false); setSelectedMatch(null); }}
+        visible={matchPopupVisible}
+        onClose={() => { setMatchPopupVisible(false); setSelectedMatch(null); }}
         currentUserId={user?.id}
         onRefreshFeed={loadMatches}
         communityId={id}
+      />
+
+      <PostDetailPopup
+        post={selectedPost}
+        visible={postPopupVisible}
+        onClose={() => { setPostPopupVisible(false); setSelectedPost(null); }}
+        currentUserId={user?.id}
+        communityId={id}
+        onRefreshFeed={refreshPosts}
+      />
+
+      <CreatePostModal
+        communityId={id ?? ''}
+        communitySport={community?.sport ?? ''}
+        authorId={user?.id ?? ''}
+        visible={createPostModalVisible}
+        onClose={handleCreatePostClose}
+        onRefreshFeed={refreshPosts}
+        initialTab={createPostInitialTab}
       />
 
       <CommunityChatPopup
@@ -813,7 +1171,7 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
     paddingBottom: Spacing.xxxl,
   },
-  
+
   headerIcon: {
     padding: Spacing.xs,
   },
@@ -907,7 +1265,48 @@ const styles = StyleSheet.create({
     lineHeight: 14,
   },
 
-  // Matches Section
+  // Pending Matches Banner
+  pendingMatchesBanner: {
+    marginTop: -Spacing.lg,
+    marginHorizontal: -Spacing.lg,
+    marginBottom: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    paddingVertical: Spacing.md,
+    borderBottomLeftRadius: Radius.md,
+    borderBottomRightRadius: Radius.md,
+  },
+  pendingBannerIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: Radius.full,
+    backgroundColor: 'rgba(255,255,255,0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  pendingBannerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    gap: Spacing.md,
+  },
+
+  // Feed Section
+  feedHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.xs,
+  },
+  feedHeaderLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  feedHeaderRight: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
   tabsContainer: {
     flexDirection: 'row',
     borderBottomWidth: 1,
@@ -924,13 +1323,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '700',
   },
-  recordMatchBar: {
-    flexDirection: 'row',
-    gap: Spacing.sm,
+  fabButton: {
+    width: 48,
+    height: 48,
+    borderRadius: Radius.full,
     alignItems: 'center',
-  },
-  recordMatchButton: {
-    flex: 1,
+    justifyContent: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   pingButton: {
     width: 48,
@@ -968,6 +1371,16 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontWeight: '700',
     lineHeight: 10,
+  },
+  feedItem: {
+    marginBottom: Spacing.xs,
+  },
+  pressedFeedItem: {
+    opacity: 0.95,
+  },
+  loadMoreContainer: {
+    paddingVertical: Spacing.md,
+    alignItems: 'center',
   },
   loadMoreButton: {
     alignItems: 'center',
@@ -1052,5 +1465,41 @@ const styles = StyleSheet.create({
     gap: Spacing.xs,
     marginTop: Spacing.md,
     paddingVertical: Spacing.sm,
-  }
+  },
+
+  // Ping Modal Styles (inline from FAB)
+  pingModalBackdrop: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'flex-end',
+  },
+  pingModalKeyboardAvoiding: {
+    flex: 1,
+  },
+  pingModalContent: {
+    width: '100%',
+    borderTopLeftRadius: Radius.lg,
+    borderTopRightRadius: Radius.lg,
+    borderWidth: 1,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+  },
+  pingModalHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  pingModalInput: {
+    borderRadius: Radius.md,
+    borderWidth: 1,
+    padding: Spacing.md,
+    fontSize: 15,
+    minHeight: 100,
+    textAlignVertical: 'top',
+  },
+  pingModalActions: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    marginTop: Spacing.sm,
+  },
 });

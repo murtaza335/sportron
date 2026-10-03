@@ -27,6 +27,15 @@ const STREAK_AT_RISK_LINES = [
   "⏰ Streak emergency: {streak} days on the line. Play now!",
 ];
 
+const RETENTION_NUDGE_LINES = [
+  "Plan a game for today, now! 🏓",
+  "Missing the court? Book a session in seconds! 🎾",
+  "Your next match is waiting. Create a session! 🏸",
+  "Don't let the day slip by — plan a game! ⚡",
+  "Quick game today? Set it up now! ✨",
+  "Find players near you. Start a session! 🔥",
+];
+
 function getRandomLine(lines: string[]): string {
   return lines[Math.floor(Math.random() * lines.length)];
 }
@@ -39,6 +48,24 @@ function getYesterdayUTC(): string {
   const yesterday = new Date();
   yesterday.setUTCDate(yesterday.getUTCDate() - 1);
   return yesterday.toISOString().split('T')[0];
+}
+
+// Reset streak_count to 0 for users whose streak is broken (last activity before yesterday)
+async function resetBrokenStreaks(): Promise<number> {
+  const yesterday = getYesterdayUTC();
+  const { data, error } = await supabase
+    .from('profiles')
+    .update({ streak_count: 0, streak_updated_at: new Date().toISOString() })
+    .gt('streak_count', 0)
+    .lt('last_activity_date', yesterday)
+    .is('deleted_at', null)
+    .select('id');
+
+  if (error) {
+    console.error('[streak-cron] Failed to reset broken streaks:', error);
+    return 0;
+  }
+  return data?.length ?? 0;
 }
 
 async function createNotification(
@@ -62,11 +89,10 @@ async function createNotification(
   if (error) throw error;
 }
 
-async function sendDailyNudge() {
+async function sendStreakReminders() {
   const today = getTodayUTC();
   
   // Get users with active streaks who haven't been active today
-  // and have streak_reminder preference enabled
   const { data: users, error } = await supabase
     .from('profiles')
     .select('id, username, streak_count, last_activity_date, fcm_tokens, notification_preferences')
@@ -75,7 +101,7 @@ async function sendDailyNudge() {
     .is('deleted_at', null);
 
   if (error) {
-    console.error('[streak-cron] Failed to fetch users for daily nudge:', error);
+    console.error('[streak-cron] Failed to fetch users for streak reminders:', error);
     return { sent: 0, failed: 0 };
   }
 
@@ -83,9 +109,6 @@ async function sendDailyNudge() {
   let failed = 0;
 
   for (const user of users ?? []) {
-    const prefs = user.notification_preferences as Record<string, boolean> | null;
-    if (!prefs?.streak_reminder) continue;
-
     try {
       await createNotification(
         user.id,
@@ -96,7 +119,47 @@ async function sendDailyNudge() {
       );
       sent++;
     } catch (e) {
-      console.error(`[streak-cron] Failed to send daily nudge to ${user.id}:`, e);
+      console.error(`[streak-cron] Failed to send streak reminder to ${user.id}:`, e);
+      failed++;
+    }
+  }
+
+  return { sent, failed };
+}
+
+async function sendRetentionNudges() {
+  const today = getTodayUTC();
+  
+  // Get ALL users who have FCM tokens (not deleted)
+  const { data: users, error } = await supabase
+    .from('profiles')
+    .select('id, username, last_activity_date, fcm_tokens')
+    .is('deleted_at', null)
+    .not('fcm_tokens', 'is', null);
+
+  if (error) {
+    console.error('[streak-cron] Failed to fetch users for retention nudges:', error);
+    return { sent: 0, failed: 0 };
+  }
+
+  let sent = 0;
+  let failed = 0;
+
+  for (const user of users ?? []) {
+    const tokens = (user.fcm_tokens ?? []) as string[];
+    if (tokens.length === 0) continue;
+
+    try {
+      await createNotification(
+        user.id,
+        'session_reminder',
+        'Plan a game for tomorrow, Now! 🏓',
+        getRandomLine(RETENTION_NUDGE_LINES),
+        { retentionNudge: true }
+      );
+      sent++;
+    } catch (e) {
+      console.error(`[streak-cron] Failed to send retention nudge to ${user.id}:`, e);
       failed++;
     }
   }
@@ -125,9 +188,6 @@ async function sendAtRiskAlerts() {
   let failed = 0;
 
   for (const user of users ?? []) {
-    const prefs = user.notification_preferences as Record<string, boolean> | null;
-    if (!prefs?.streak_at_risk) continue;
-
     // Calculate hours since last activity
     const lastActive = new Date(`${user.last_activity_date}T00:00:00Z`);
     const now = new Date();
@@ -167,20 +227,30 @@ Deno.serve(async (req: Request) => {
     return new Response(err instanceof Error ? err.message : String(err), { status: 401 });
   }
 
+  // Reset broken streaks before sending notifications
+  const resetCount = await resetBrokenStreaks();
+  if (resetCount > 0) {
+    console.log(`[streak-cron] Reset ${resetCount} broken streaks to 0`);
+  }
+
   const body = await req.json().catch(() => ({}));
-  const { mode } = body as { mode?: 'daily' | 'at-risk' | 'both' };
+  const { mode } = body as { mode?: 'streak-reminder' | 'retention' | 'at-risk' | 'all' };
 
   const results: Record<string, { sent: number; failed: number }> = {};
 
-  if (mode === 'daily' || mode === 'both' || !mode) {
-    results.daily_nudge = await sendDailyNudge();
+  if (mode === 'streak-reminder' || mode === 'all' || !mode) {
+    results.streak_reminder = await sendStreakReminders();
   }
 
-  if (mode === 'at-risk' || mode === 'both' || !mode) {
+  if (mode === 'retention' || mode === 'all') {
+    results.retention_nudge = await sendRetentionNudges();
+  }
+
+  if (mode === 'at-risk' || mode === 'all') {
     results.at_risk = await sendAtRiskAlerts();
   }
 
-  return new Response(JSON.stringify(results), {
+  return new Response(JSON.stringify({ ...results, resetBrokenStreaks: resetCount }), {
     headers: { 'Content-Type': 'application/json' },
   });
 });

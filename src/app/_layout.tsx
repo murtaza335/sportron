@@ -141,6 +141,17 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="community/[id]/pending-matches"
+          options={{
+            headerShown: true,
+            title: 'Pending Matches',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
           name="community/[id]/edit"
           options={{
             headerShown: true,

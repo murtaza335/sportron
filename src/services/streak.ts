@@ -28,6 +28,35 @@ function getYesterdayUTC(): string {
   return yesterday.toISOString().split('T')[0];
 }
 
+function computeActualStreak(
+  profile: Pick<Profile, 'streak_count' | 'longest_streak' | 'last_activity_date'>
+): { streakCount: number; isAtRisk: boolean; hoursSinceLastActivity: number | null } {
+  const today = getTodayUTC();
+  const yesterday = getYesterdayUTC();
+  const lastActive = profile.last_activity_date;
+
+  if (!lastActive) {
+    return { streakCount: 0, isAtRisk: false, hoursSinceLastActivity: null };
+  }
+
+  if (lastActive === today) {
+    return { streakCount: profile.streak_count ?? 0, isAtRisk: false, hoursSinceLastActivity: 0 };
+  }
+
+  if (lastActive === yesterday) {
+    return { streakCount: profile.streak_count ?? 0, isAtRisk: false, hoursSinceLastActivity: 24 };
+  }
+
+  // Streak is broken - last activity was before yesterday
+  const lastActiveDate = new Date(`${lastActive}T00:00:00Z`);
+  const now = new Date();
+  const diffMs = now.getTime() - lastActiveDate.getTime();
+  const hoursSince = Math.floor(diffMs / (1000 * 60 * 60));
+  const isAtRisk = hoursSince >= 22 && (profile.streak_count ?? 0) > 0;
+
+  return { streakCount: 0, isAtRisk, hoursSinceLastActivity: hoursSince };
+}
+
 export async function computeStreak(
   profile: Pick<Profile, 'streak_count' | 'longest_streak' | 'last_activity_date' | 'streak_updated_at'>,
   activityDate: string = getTodayUTC()
@@ -131,24 +160,14 @@ export async function getStreakStatus(userId: string): Promise<{
     };
   }
 
-  const lastActive = profile.last_activity_date;
-  let hoursSinceLastActivity: number | null = null;
-  let isAtRisk = false;
-
-  if (lastActive) {
-    const lastActiveDate = new Date(`${lastActive}T00:00:00Z`);
-    const now = new Date();
-    const diffMs = now.getTime() - lastActiveDate.getTime();
-    hoursSinceLastActivity = Math.floor(diffMs / (1000 * 60 * 60));
-    isAtRisk = hoursSinceLastActivity >= 22 && profile.streak_count > 0;
-  }
+  const computed = computeActualStreak(profile);
 
   return {
-    streakCount: profile.streak_count ?? 0,
+    streakCount: computed.streakCount,
     longestStreak: profile.longest_streak ?? 0,
     lastActivityDate: profile.last_activity_date,
-    isAtRisk,
-    hoursSinceLastActivity,
+    isAtRisk: computed.isAtRisk,
+    hoursSinceLastActivity: computed.hoursSinceLastActivity,
   };
 }
 

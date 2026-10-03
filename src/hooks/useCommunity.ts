@@ -18,6 +18,7 @@ export function useCommunity(id: string, userId?: string) {
   const [myPendingInvite, setMyPendingInvite] = useState<CommunityInvite | null>(null);
   const [myJoinRequest, setMyJoinRequest] = useState<CommunityJoinRequest | null>(null);
   const [loading, setLoading] = useState(true);
+  const initialLoadRef = useRef(true);
 
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const mountedRef = useRef(true);
@@ -33,9 +34,12 @@ export function useCommunity(id: string, userId?: string) {
     };
   }, []);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (isInitialLoad: boolean = false) => {
     if (!id) return;
     try {
+      if (isInitialLoad) {
+        setLoading(true);
+      }
       const uid = userIdRef.current;
       const [communityData, memberData] = await Promise.all([
         fetchCommunityById(id),
@@ -64,7 +68,12 @@ export function useCommunity(id: string, userId?: string) {
 
   useFocusEffect(
     useCallback(() => {
-      load();
+      if (initialLoadRef.current) {
+        initialLoadRef.current = false;
+        load(true);
+      } else {
+        load(false);
+      }
     }, [load]),
   );
 
@@ -144,8 +153,7 @@ export function useCommunity(id: string, userId?: string) {
   }, [id, userId, load]);
 
   const refresh = useCallback(async () => {
-    setLoading(true);
-    await load();
+    await load(false);
   }, [load]);
 
   return {
