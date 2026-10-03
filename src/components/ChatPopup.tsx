@@ -39,6 +39,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { deleteChatPresence, upsertChatPresence } from '@/services/chat';
 import type { ChatThread } from '@/hooks/useChat';
 import type { ChatMessageBase } from '@/types';
+import { formatChatDate } from '@/lib/date';
 
 // How often the popup refreshes its presence heartbeat. The edge function's
 // PRESENCE_TTL (60s) only covers abrupt app kills, so a ~20s beat is safe.
@@ -545,8 +546,25 @@ const contextLayout = useMemo(() => {
     const isFirstUnread =
       firstUnreadIndex != null &&
       displayMessages.length - 1 - index === firstUnreadIndex;
+
+    // Date separator: show before the oldest message of each date group
+    // (i.e., when the NEXT/older message has a different date, or this is the last message)
+    const itemDate = formatChatDate(item.created_at);
+    const olderMsg = displayMessages[index + 1] ?? null;
+    const olderDate = olderMsg ? formatChatDate(olderMsg.created_at) : null;
+    const showDateSeparator = !olderMsg || itemDate !== olderDate;
+
     return (
       <View>
+        {showDateSeparator && (
+          <View style={styles.dateSeparator}>
+            <View style={[styles.dateSeparatorLine, { backgroundColor: theme.border }]} />
+            <ThemedText variant="caption" style={[styles.dateSeparatorText, { color: theme.textSecondary }]}>
+              {itemDate}
+            </ThemedText>
+            <View style={[styles.dateSeparatorLine, { backgroundColor: theme.border }]} />
+          </View>
+        )}
         {isFirstUnread && (
           <View style={styles.unreadDivider}>
             <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
@@ -1233,6 +1251,24 @@ const styles = StyleSheet.create({
     fontSize: 12,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+  },
+  dateSeparator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+    marginVertical: Spacing.md,
+    marginHorizontal: -Spacing.lg,
+    paddingHorizontal: Spacing.lg,
+  },
+  dateSeparatorLine: {
+    flex: 1,
+    height: StyleSheet.hairlineWidth,
+  },
+  dateSeparatorText: {
+    fontWeight: '600',
+    fontSize: 11,
+    letterSpacing: 0.5,
+    flexShrink: 0,
   },
   msgRow: {
     flexDirection: 'row',
