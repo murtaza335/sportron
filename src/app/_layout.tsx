@@ -3,8 +3,9 @@ import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, StyleSheet, View } from 'react-native';
+import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
+import { SplashScreen as AnimatedSplashScreen } from '@/components/SplashScreen';
 import Constants from 'expo-constants';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
@@ -24,6 +25,7 @@ function RootNavigator() {
   const segments = useSegments();
   const { session, profile, loading, profileLoading } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
   useEffect(() => {
     const loadFonts = async () => {
@@ -65,11 +67,9 @@ function RootNavigator() {
     }
   }, [session, profile, loading, profileLoading, segments, router]);
 
-  if (!fontsLoaded || loading) {
+  if (!fontsLoaded || loading || showSplash) {
     return (
-      <View style={[styles.loader, { backgroundColor: theme.background }]}>
-        <ActivityIndicator size="large" color={theme.text} />
-      </View>
+      <AnimatedSplashScreen onComplete={() => setShowSplash(false)} />
     );
   }
 
