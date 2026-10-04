@@ -41,3 +41,20 @@ export function formatDate(dateString: string): string {
     year: 'numeric',
   });
 }
+
+export function formatChatDate(dateString: string): string {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today.getTime() - 86400000);
+  const messageDate = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (messageDate.getTime() === today.getTime()) return 'Today';
+  if (messageDate.getTime() === yesterday.getTime()) return 'Yesterday';
+  return date.toLocaleDateString(undefined, {
+    month: 'short',
+    day: 'numeric',
+    year: 'numeric',
+  });
+}
