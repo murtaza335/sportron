@@ -1,7 +1,7 @@
 import { router, Tabs } from 'expo-router';
 import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
-import { Animated, Platform, Pressable, Text, View } from 'react-native';
-import { useRef, useState, useSyncExternalStore } from 'react';
+import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StreakModal } from '@/components/StreakModal';
@@ -100,6 +100,135 @@ function CommunitiesHeaderProfile() {
         <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
       </Animated.View>
     </Pressable>
+  );
+}
+
+function CreateSessionButton() {
+  const pulseAnim = useRef(new Animated.Value(0));
+  const glowAnim = useRef(new Animated.Value(0));
+  const scaleAnim = useRef(new Animated.Value(1));
+
+  useEffect(() => {
+    const pulse = Animated.loop(
+      Animated.sequence([
+        Animated.timing(pulseAnim.current, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(pulseAnim.current, {
+          toValue: 0,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    pulse.start();
+
+    const glow = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glowAnim.current, {
+          toValue: 1,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(glowAnim.current, {
+          toValue: 0,
+          duration: 2000,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    );
+    glow.start();
+
+    return () => {
+      pulse.stop();
+      glow.stop();
+    };
+  }, []);
+
+  const handlePressIn = () => {
+    Animated.spring(scaleAnim.current, {
+      toValue: 0.88,
+      useNativeDriver: true,
+      speed: 50,
+      bounciness: 4,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    Animated.spring(scaleAnim.current, {
+      toValue: 1,
+      useNativeDriver: true,
+      speed: 20,
+      bounciness: 8,
+    }).start();
+  };
+
+  return (
+    <View>
+      <Animated.View
+        style={{
+          shadowColor: '#10B981',
+          shadowOffset: { width: 0, height: 0 },
+          // eslint-disable-next-line react-hooks/refs
+          shadowOpacity: glowAnim.current.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0.3, 0.6],
+          }),
+          // eslint-disable-next-line react-hooks/refs
+          shadowRadius: glowAnim.current.interpolate({
+            inputRange: [0, 1],
+            outputRange: [8, 16],
+          }),
+          elevation: 8,
+        }}
+      >
+        <Pressable
+          onPress={() => router.navigate('/create-session')}
+          onPressIn={handlePressIn}
+          onPressOut={handlePressOut}
+          style={({ pressed }) => [
+            {
+              marginLeft: Spacing.md,
+              paddingTop: Platform.OS === 'ios' ? 4 : 0,
+              width: 44,
+              height: 44,
+              borderRadius: 22,
+              backgroundColor: '#10B981',
+              alignItems: 'center',
+              justifyContent: 'center',
+            },
+            pressed && { opacity: 0.9 },
+          ]}
+          hitSlop={16}
+          accessibilityLabel="Create session"
+          accessibilityRole="button"
+        >
+          <Animated.View
+            style={{
+              transform: [
+                // eslint-disable-next-line react-hooks/refs
+                { scale: scaleAnim.current },
+                {
+                  // eslint-disable-next-line react-hooks/refs
+                  scale: pulseAnim.current.interpolate({
+                    inputRange: [0, 1],
+                    outputRange: [1, 1.08],
+                  }),
+                },
+              ],
+            }}
+          >
+            <Plus size={28} color="#fff" strokeWidth={3.5} />
+          </Animated.View>
+        </Pressable>
+      </Animated.View>
+    </View>
   );
 }
 
@@ -212,17 +341,7 @@ export default function TabLayout() {
           tabBarLabel: 'Sessions',
           headerTitle: () => <DefaultHeaderTitle title="Sessions" />,
           headerRight: () => <SessionsHeaderRight />,
-          headerLeft: () => (
-            <Pressable
-              onPress={() => router.navigate('/create-session')}
-              style={({ pressed }) => [{ marginLeft: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }, pressed && { opacity: 0.6 }]}
-              hitSlop={16}
-              accessibilityLabel="Create session"
-              accessibilityRole="button"
-            >
-              <Plus size={24} color={theme.text} strokeWidth={3} />
-            </Pressable>
-          ),
+          headerLeft: () => <CreateSessionButton />,
           tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
         }}
       />
