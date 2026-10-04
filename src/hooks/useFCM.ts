@@ -164,26 +164,43 @@ export function useFCM() {
     try {
       if (Platform.OS === 'web') {
         // Web: set up foreground handler and token refresh listener
-        // Only if notifications are enabled and permission is granted
         const pushEnabled = await isNotificationsEnabled();
-        if (pushEnabled && Notification.permission === 'granted') {
-          const unsubscribeForeground = await setupWebForegroundHandler(async (payload: unknown) => {
-            if (!(await isNotificationsEnabled())) return;
-            // Handle foreground notification on web
-            // The payload from Firebase web SDK has a different structure
-            console.log('Foreground notification (Web):', payload);
-          });
-
-          const unsubscribeTokenRefresh = await setupWebTokenRefreshListener(async (token: string) => {
-            if (user?.id && (await isNotificationsEnabled())) {
-              await saveFCMTokenToProfile(user.id, token);
+        if (pushEnabled) {
+          // On iOS Safari, permission might be 'default' - we need to request it
+          if (Notification.permission === 'default') {
+            try {
+              const permission = await Notification.requestPermission();
+              if (permission !== 'granted') {
+                console.warn('Notification permission not granted on web');
+                setIsLoading(false);
+                return;
+              }
+            } catch (error) {
+              console.error('Failed to request notification permission on web:', error);
+              setIsLoading(false);
+              return;
             }
-          });
+          }
 
-          return () => {
-            unsubscribeForeground();
-            unsubscribeTokenRefresh();
-          };
+          if (Notification.permission === 'granted') {
+            const unsubscribeForeground = await setupWebForegroundHandler(async (payload: unknown) => {
+              if (!(await isNotificationsEnabled())) return;
+              // Handle foreground notification on web
+              // The payload from Firebase web SDK has a different structure
+              console.log('Foreground notification (Web):', payload);
+            });
+
+            const unsubscribeTokenRefresh = await setupWebTokenRefreshListener(async (token: string) => {
+              if (user?.id && (await isNotificationsEnabled())) {
+                await saveFCMTokenToProfile(user.id, token);
+              }
+            });
+
+            return () => {
+              unsubscribeForeground();
+              unsubscribeTokenRefresh();
+            };
+          }
         }
       } else {
         // Native platforms
