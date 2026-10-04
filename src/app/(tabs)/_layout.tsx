@@ -1,6 +1,6 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X } from 'lucide-react-native';
-import { Animated, Easing, Platform, Pressable, Text, View } from 'react-native';
+import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X, User } from 'lucide-react-native';
+import { Animated, ColorValue, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -20,6 +20,52 @@ import {
   setSessionsView,
   subscribeSessionsView,
 } from '@/lib/sessionsView';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
+const CURRENT_WHATS_NEW_VERSION = '1.0.1';
+
+async function getProfileDotViewedVersion(): Promise<string | null> {
+  try {
+    return await AsyncStorage.getItem(PROFILE_DOT_KEY);
+  } catch {
+    return null;
+  }
+}
+
+function ProfileTabIcon({ color, size }: { color: ColorValue; size: number }) {
+  const theme = useTheme();
+  const [showDot, setShowDot] = useState(false);
+
+  useEffect(() => {
+    const check = async () => {
+      const viewed = await getProfileDotViewedVersion();
+      setShowDot(viewed !== CURRENT_WHATS_NEW_VERSION);
+    };
+    check();
+  }, []);
+
+  return (
+    <View style={{ position: 'relative' }}>
+      <User size={size} color={color} strokeWidth={2.2} />
+      {showDot && (
+        <View
+          style={{
+            position: 'absolute',
+            top: -2,
+            right: -2,
+            width: 10,
+            height: 10,
+            borderRadius: 5,
+            backgroundColor: theme.error,
+            borderWidth: 2,
+            borderColor: theme.background,
+          }}
+        />
+      )}
+    </View>
+  );
+}
 
 function DefaultHeaderTitle({ title }: { title: string }) {
   const theme = useTheme();
@@ -406,6 +452,7 @@ export default function TabLayout() {
           title: 'Profile',
           headerTitle: () => <DefaultHeaderTitle title="Profile" />,
           href: null,
+          tabBarIcon: ({ color, size }) => <ProfileTabIcon color={color} size={size} />,
         }}
       />
     </Tabs>

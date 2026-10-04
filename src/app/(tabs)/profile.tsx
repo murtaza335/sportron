@@ -1,7 +1,8 @@
-import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X } from 'lucide-react-native';
+import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X, Sparkles } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from 'expo-router';
 
 import { alert } from '@/lib/alert';
 import { ProfileForm } from '@/components/ProfileForm';
@@ -19,6 +20,18 @@ import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { router } from 'expo-router';
+import { WHATS_NEW_CONTENT } from '@/lib/whatsNew';
+
+const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
+const CURRENT_WHATS_NEW_VERSION = '1.0.1';
+
+async function setProfileDotViewedVersion(version: string): Promise<void> {
+  try {
+    await AsyncStorage.setItem(PROFILE_DOT_KEY, version);
+  } catch {
+    // silently fail
+  }
+}
 
 export default function ProfileScreen() {
   const theme = useTheme();
@@ -32,6 +45,13 @@ export default function ProfileScreen() {
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [dismissedWebPrompt, setDismissedWebPrompt] = useState(false);
   const slideAnim = useMemo(() => new Animated.Value(0), []);
+
+  // Mark profile dot as viewed when screen is focused
+  useFocusEffect(
+    useMemo(() => () => {
+      setProfileDotViewedVersion(CURRENT_WHATS_NEW_VERSION);
+    }, [])
+  );
 
   // Detect web platform and OS
   const isWeb = Platform.OS === 'web';
@@ -116,6 +136,19 @@ export default function ProfileScreen() {
       alert('Sign out failed', message);
     } finally {
       setSigningOut(false);
+    }
+  };
+
+  const getTypeColor = (type: string) => {
+    switch (type) {
+      case 'feature':
+        return theme.accent;
+      case 'improvement':
+        return theme.success;
+      case 'fix':
+        return theme.warning ?? '#F59E0B';
+      default:
+        return theme.accent;
     }
   };
 
@@ -316,6 +349,41 @@ export default function ProfileScreen() {
 
         <Divider spacing={Spacing.md} />
 
+        <View style={styles.whatsNewSection}>
+          <View style={styles.whatsNewHeader}>
+            <View style={[styles.whatsNewIcon, { backgroundColor: theme.accent + '20' }]}>
+              <Sparkles size={22} color={theme.accent} />
+            </View>
+            <ThemedText variant="heading" style={styles.whatsNewTitle}>
+              What&apos;s New
+            </ThemedText>
+          </View>
+          <ThemedText variant="body" muted style={styles.whatsNewSubtitle}>
+            Version 1.0.1 — New features and improvements
+          </ThemedText>
+          <View style={styles.whatsNewList}>
+            {WHATS_NEW_CONTENT.map((item) => (
+              <View key={item.id} style={styles.whatsNewItem}>
+                <View style={[styles.whatsNewTypeBadge, { backgroundColor: getTypeColor(item.type) }]}>
+                  <ThemedText variant="caption" style={{ color: '#fff', fontWeight: '700', textTransform: 'uppercase' }}>
+                    {item.type}
+                  </ThemedText>
+                </View>
+                <View style={styles.whatsNewItemContent}>
+                  <ThemedText variant="body" style={styles.whatsNewItemTitle}>
+                    {item.title}
+                  </ThemedText>
+                  <ThemedText variant="caption" muted style={styles.whatsNewItemDesc}>
+                    {item.description}
+                  </ThemedText>
+                </View>
+              </View>
+            ))}
+          </View>
+        </View>
+
+        <Divider spacing={Spacing.md} />
+
         <View style={{ height: 80 }} />
 
         <Button
@@ -486,5 +554,57 @@ const styles = StyleSheet.create({
   webPromptLink: {
     marginTop: Spacing.xs,
     paddingTop: Spacing.xs,
+  },
+  whatsNewSection: {
+    borderRadius: Radius.lg,
+    padding: Spacing.lg,
+    gap: Spacing.md,
+    borderWidth: 1,
+  },
+  whatsNewHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.md,
+  },
+  whatsNewIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: Radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  whatsNewTitle: {
+    flex: 1,
+    fontSize: 20,
+    fontWeight: '800',
+  },
+  whatsNewSubtitle: {
+    marginTop: -Spacing.xs,
+  },
+  whatsNewList: {
+    gap: Spacing.md,
+    marginTop: Spacing.xs,
+  },
+  whatsNewItem: {
+    flexDirection: 'row',
+    gap: Spacing.md,
+    alignItems: 'flex-start',
+  },
+  whatsNewTypeBadge: {
+    paddingHorizontal: Spacing.sm,
+    paddingVertical: Spacing.xs,
+    borderRadius: Radius.sm,
+    minWidth: 64,
+    alignItems: 'center',
+  },
+  whatsNewItemContent: {
+    flex: 1,
+    gap: Spacing.xs,
+  },
+  whatsNewItemTitle: {
+    fontWeight: '700',
+  },
+  whatsNewItemDesc: {
+    lineHeight: 18,
   },
 });
