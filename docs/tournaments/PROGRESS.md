@@ -14,7 +14,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 3 | A DB | Admin write RPCs (086) | 🟡 | 2026-11-08 | `supabase/migrations/086_add_tournament_admin_rpcs.sql` written; awaiting owner apply |
 | 4 | A DB | Bracket engine (087) | 🟡 | 2026-11-08 | `supabase/migrations/087_add_tournament_bracket_engine.sql` written; awaiting owner apply |
 | 5 | A DB | SQL tests + owner SQL guide | 🟡 | 2026-11-08 | `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md` written; owner must run tests |
-| 6 | B Client | Types + service + errors + format | ⬜ | | |
+| 6 | B Client | Types + service + errors + format | ✅ | 2026-11-08 | Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers |
 | 7 | B Client | Hooks (+ realtime) | ⬜ | | |
 | 8 | B Client | Bracket layout lib | ⬜ | | |
 | 9 | C Nav | Centre tab with bump + route registration | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 6: Types + service + errors + format
+- **Done:** Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers
+- **Files:** src/types/tournaments.ts, src/services/tournaments.ts, src/lib/tournamentErrors.ts, src/lib/tournamentFormat.ts
+- **Verified:** tsc ✅ · eslint on new files ✅
+- **Next action:** Step 7 hooks
 
 ### 2026-11-08 — Steps 4 + 5: Bracket engine (087) and SQL tests / owner guide
 - **Done:** 087 with `generate_bracket`, `record_tournament_result`, `record_tournament_walkover`, `reset_tournament_match`, `schedule_tournament_match` and internal `_tournament_seed_order`, `_advance_tournament_match`, `_unadvance_tournament_match`, `_complete_tournament_module`. Tests cover core-field locks, permissions, entry validation/duplicates/PII, RLS write denial, brackets N=2/3/5/8/9/16 (+3rd place on 8 and 5), walkover/reset/edit/tie/downstream-locked, lifecycle guards. Owner guide has copy-paste SQL.
