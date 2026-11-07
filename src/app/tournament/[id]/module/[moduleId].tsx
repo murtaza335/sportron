@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BracketView } from '@/components/tournaments/BracketView';
 import { EntrySheet } from '@/components/tournaments/EntrySheet';
 import { ModuleEntriesTab } from '@/components/tournaments/ModuleEntriesTab';
 import { ModuleInfoTab } from '@/components/tournaments/ModuleInfoTab';
@@ -19,6 +20,7 @@ import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
@@ -39,6 +41,7 @@ const TABS: { value: Tab; label: string }[] = [
 export default function ModuleScreen() {
   const { id, moduleId } = useLocalSearchParams<{ id: string; moduleId: string }>();
   const theme = useTheme();
+  const { user } = useAuth();
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const { width } = useWindowDimensions();
@@ -133,7 +136,16 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'info' && <ModuleInfoTab module={mod} rounds={m.rounds} admins={m.admins} />}
-          {(tab === 'bracket' || tab === 'standings' || tab === 'matches') && (
+          {tab === 'bracket' && (
+            <BracketView
+              matches={m.bracket}
+              moduleStatus={mod.status}
+              viewerId={user?.id}
+              isAdmin={m.isModuleAdmin}
+              onSelectMatch={() => {}}
+            />
+          )}
+          {(tab === 'standings' || tab === 'matches') && (
             <View style={styles.empty}>
               <ThemedText muted>Coming soon</ThemedText>
             </View>
