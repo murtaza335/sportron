@@ -15,7 +15,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 4 | A DB | Bracket engine (087) | 🟡 | 2026-11-08 | `supabase/migrations/087_add_tournament_bracket_engine.sql` written; awaiting owner apply |
 | 5 | A DB | SQL tests + owner SQL guide | 🟡 | 2026-11-08 | `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md` written; owner must run tests |
 | 6 | B Client | Types + service + errors + format | ✅ | 2026-11-08 | Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers |
-| 7 | B Client | Hooks (+ realtime) | ⬜ | | |
+| 7 | B Client | Hooks (+ realtime) | ✅ | 2026-11-08 | useTournaments (scope, 30s SWR cache, focus reload), useTournament, useTournamentModule (detail+entries+bracket+standings, realtime on tournament_matches, 400ms debounce) |
 | 8 | B Client | Bracket layout lib | ⬜ | | |
 | 9 | C Nav | Centre tab with bump + route registration | ⬜ | | |
 | 10 | D Public | Tournaments list | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 7: Hooks
+- **Done:** useTournaments (scope, 30s SWR cache, focus reload), useTournament, useTournamentModule (detail+entries+bracket+standings, realtime on tournament_matches, 400ms debounce)
+- **Files:** src/hooks/useTournaments.ts, useTournament.ts, useTournamentModule.ts
+- **Verified:** tsc ✅ · eslint ✅ (realtime untested — needs DB)
+- **Next action:** Step 8 bracket layout
 
 ### 2026-11-08 — Step 6: Types + service + errors + format
 - **Done:** Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers
