@@ -19,7 +19,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 8 | B Client | Bracket layout lib | ✅ | 2026-11-08 | Pure bracket layout (nodes, connector paths, columns, 3rd-place under final) + devSelfCheck(). Sample output: size2 nodes=1 conn=0 w=196 h=104; size4 nodes=3 conn=2 w=432 h=196; size8 nodes=7 conn=6 w=668 h=380; size16 nodes=15 conn=14 w=904 h=748 |
 | 9 | C Nav | Centre tab with bump + route registration | 🟡 | 2026-11-08 | Centre Tournaments tab with raised circular button + SVG bump background (icon only), all tournament stack screens/modals registered with placeholder bodies |
 | 10 | D Public | Tournaments list | 🟡 | 2026-11-08 | Tournaments tab: Live/Upcoming/Past/Mine segmented scopes, TournamentCard (CommunityCard recipe, status pill, sport pills, role tag), empty/loading/pull-to-refresh. Added tournamentRoutes typed-href helper (generated route types lag new routes) |
-| 11 | D Public | Tournament page (champions → modules → about) | ⬜ | | |
+| 11 | D Public | Tournament page (champions → modules → about) | 🟡 | 2026-11-08 | Tournament page: cover, status/date/org/location, Champions strip above Modules, module cards, admin gear + Add module, About with read-more + admins, cancelled banner, empty states |
 | 12 | D Public | Module page shell + Info + Entries | ⬜ | | |
 | 13 | D Public | Bracket view | ⬜ | | |
 | 14 | D Public | Standings table + chart | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 11: Tournament page
+- **Done:** Tournament page: cover, status/date/org/location, Champions strip above Modules, module cards, admin gear + Add module, About with read-more + admins, cancelled banner, empty states
+- **Files:** src/app/tournament/[id].tsx, src/components/tournaments/{ChampionsStrip,ModuleCard}.tsx
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: view against seeded data
+- **Next action:** Step 12 module page shell
 
 ### 2026-11-08 — Step 10: Tournaments list
 - **Done:** Tournaments tab: Live/Upcoming/Past/Mine segmented scopes, TournamentCard (CommunityCard recipe, status pill, sport pills, role tag), empty/loading/pull-to-refresh. Added tournamentRoutes typed-href helper (generated route types lag new routes)
