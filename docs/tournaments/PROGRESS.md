@@ -9,7 +9,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 
 | # | Phase | Step | Status | Date | Files / notes |
 |---|---|---|---|---|---|
-| 1 | A DB | Schema (084) | ⬜ | | |
+| 1 | A DB | Schema (084) | 🟡 | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
 | 2 | A DB | Read RPCs (085) | ⬜ | | |
 | 3 | A DB | Admin write RPCs (086) | ⬜ | | |
 | 4 | A DB | Bracket engine (087) | ⬜ | | |
@@ -59,9 +59,20 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 
 ## Plan deviations
 
-_None yet._
+- No sport check existed on `communities.sport` (grep of migrations), so `tournament_modules.sport` uses an explicit `in (...)` list copied from the TS `Sport` union.
+- Core-field delete guard allows the delete when the parent tournament is already gone, so `on delete cascade` of a tournament still works.
+- Added `revoke insert/update/delete/truncate` from anon/authenticated on all 8 tables (defence in depth beyond "no write policies").
+- Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 1: Schema (084)
+- **Done:** wrote migration 084: 8 tables, helpers `is_tournament_admin/is_module_admin/can_view_tournament/can_view_module`, SELECT-only RLS, core-field seed + lock triggers, updated_at + audit triggers, realtime on `tournament_matches`.
+- **Files:** `supabase/migrations/084_add_tournaments.sql`
+- **Verified:** SQL not run (cannot apply migrations). `tsc`/`lint` unaffected (no TS changes). Needs owner: apply in the Supabase SQL editor; then check that insert into `tournaments` creates 5 core fields, and that deleting a test tournament cascades cleanly.
+- **Deviations:** see Plan deviations. A2, A3, A4, A6 were built in as written but are still **unconfirmed** by the owner.
+- **Open questions:** confirm A2/A3/A4/A6 (cheap to change now, before step 2+).
+- **Next action:** owner applies 084 and reports result; then Step 2 (085 read RPCs).
 
 <!--
 Template — copy for each session, newest on top:
