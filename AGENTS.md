@@ -434,6 +434,8 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 ---
 
 ## Next Up: Tournament Management (planned — nothing implemented yet)
+**The detailed plan is [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md) and progress is tracked in [`docs/tournaments/PROGRESS.md`](docs/tournaments/PROGRESS.md) — both supersede the generic notes below where they differ.** Work one step at a time (PLAN §14) and update PROGRESS.md each session (PLAN §15). v1 summary: Tournament (top entity, no sport; created + tournament admins assigned by the owner via SQL) → sport-linked **Modules** created by tournament admins → **Module admins** add entries (generic form: Name, CMS ID, School, Phone, Email + custom fields), run a single-elimination bracket (optional 3rd place, walkovers) and enter all results. Champions shown on the tournament page above modules. New centre tab with a raised bump in the bottom bar.
+
 No tournament code, tables, routes or notification types exist. Hooks to build on when adding it:
 - **Anchor to communities** (matches and sports already live there): a tournament belongs to a community (sport fixed by the community), admins create/manage it, members register. Reuse `isRacketSport`/`isTeamSport`, singles/doubles + team-name match model, and the approve/dispute flow for result reporting where it fits
 - **Likely entry points**: community home FAB/header, a new `community/[id]/tournaments` screen group, results surfacing in the posts+matches feed
