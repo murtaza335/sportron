@@ -34,6 +34,8 @@ Sportron was built for the community that loves to play — students, teachers, 
 - Discover communities by sport or search by name.
 - Cards show "created by", organization, sport, and visibility.
 - Community cover photos, member lists, and admin tools.
+- Community feed: share text and photo posts, with likes and comments, alongside approved match results.
+- Community chat for all approved members.
 
 ### Match Tracking
 - Record matches inside a community — singles or doubles.
@@ -42,18 +44,24 @@ Sportron was built for the community that loves to play — students, teachers, 
 - Opponent approval: your opponent confirms or challenges the result.
 - Likes, comments, win/loss records.
 
+### Streaks
+- Play, record a match, or join/host a session each day to build a daily streak.
+- Optional streak and daily reminder notifications.
+
 ### Find a Match (Sessions)
 - Create pickup sessions with sport, location, time, and capacity.
 - Sessions expire automatically if no one joins.
 - Apply, accept, reject, or leave — just like scheduling a real game.
 - Live chat for the host and accepted players, with push notifications on every message.
+- After a session, the host marks who showed up.
 
 ### Pings
 - Ping your whole community: *"Playing tonight, anyone in?"*
-- Members reply **Coming** or **Busy**, live.
+- A 15-minute cooldown prevents spam, and admins can turn member pings off.
 
 ### Notifications
-- Real-time activity. Get notified for session applications, join requests, match approvals, pings, and invites.
+- Real-time activity. Get notified for session applications, join requests, match approvals, pings, invites, and community posts.
+- Chats tab with unread badges for every community and session chat.
 - Push notifications delivered straight to your device; each type is customizable in Settings.
 
 ---

@@ -3,7 +3,7 @@
 ## Overview
 This guide documents the push notification setup for the **T3Seecs / Sportron** app using Firebase Cloud Messaging (FCM) with Expo and Supabase Edge Functions.
 
-Push delivery is **100% server-side**. When a row is inserted into `in_app_notifications` (match pending, pings, join requests, session apps, invites, ...) or into `session_messages` / `community_messages` (FCM-only chat), a Postgres trigger fires an async `pg_net.http_post` to an edge function that sends the FCM push. The client only inserts rows — it never calls the edge functions. Web can therefore always **send** pushes to app users (even though web cannot receive them).
+Push delivery is **100% server-side**. When a row is inserted into `in_app_notifications` (match pending, pings, join requests, session apps, invites, posts, streaks, ...; those rows are created by Postgres triggers (migration 068) and the `streak-cron`/`community-engagement-cron` edge functions) or into `session_messages` / `community_messages` (FCM-only chat), a Postgres trigger fires an async `pg_net.http_post` to an edge function that sends the FCM push. The client never inserts notification rows or calls the edge functions (chat message rows are its only relevant inserts) — it never calls the edge functions. Web can therefore always **send** pushes to app users (even though web cannot receive them).
 
 ## Current Configuration (app.json)
 
@@ -12,7 +12,7 @@ Push delivery is **100% server-side**. When a row is inserted into `in_app_notif
   "expo": {
     "name": "Sportron",
     "slug": "T3S",
-    "version": "1.0.0",
+    "version": "1.0.1",
     "scheme": "t3s",
     "plugins": [
       [

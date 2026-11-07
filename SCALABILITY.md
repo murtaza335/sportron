@@ -12,12 +12,16 @@ The Sportron/T3Seecs app is built on a **modular, multi-sport foundation**. It w
 - **Sessions**: pickup-play sessions with commitments, expiry, time-conflict checks
 - **Social**: likes, comments, approval workflow per community match
 - **Profiles**: username, bio, avatar
-- **Notifications**: in-app notifications + FCM push
+- **Notifications**: in-app notifications (DB-trigger created) + FCM push (server-side)
+- **Community posts**: text/photo feed with likes + comments
+- **Streaks**: daily activity streaks + cron-driven reminders
+- **Chat**: session + community live chat with unread tracking
+- **Ops**: maintenance mode / forced update gate (`site_config`), audit logging
 
 ### Scope Decisions Going Forward
 - `community_matches` is the single source of truth for played matches (legacy `matches`/`match_likes`/`match_comments` tables were dropped)
 - Sports, scoring formats, and match rules are extensible but currently stored as simple text/enum fields
-- No venue, team-object, or tournament abstractions exist yet
+- No venue, team-object, or tournament abstractions exist yet. **Tournament management is the next planned feature** — see the "Next Up" section in `AGENTS.md` for the integration checklist (additive migration 084+, DB-trigger notifications, backward compatibility)
 
 ---
 
