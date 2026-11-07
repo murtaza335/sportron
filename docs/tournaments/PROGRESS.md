@@ -12,8 +12,8 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 1 | A DB | Schema (084) | 🟡 | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
 | 2 | A DB | Read RPCs (085) | 🟡 | 2026-11-08 | `supabase/migrations/085_add_tournament_read_rpcs.sql` written (full `get_module_standings` included); awaiting owner apply |
 | 3 | A DB | Admin write RPCs (086) | 🟡 | 2026-11-08 | `supabase/migrations/086_add_tournament_admin_rpcs.sql` written; awaiting owner apply |
-| 4 | A DB | Bracket engine (087) | ⬜ | | |
-| 5 | A DB | SQL tests + owner SQL guide | ⬜ | | |
+| 4 | A DB | Bracket engine (087) | 🟡 | 2026-11-08 | `supabase/migrations/087_add_tournament_bracket_engine.sql` written; awaiting owner apply |
+| 5 | A DB | SQL tests + owner SQL guide | 🟡 | 2026-11-08 | `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md` written; owner must run tests |
 | 6 | B Client | Types + service + errors + format | ⬜ | | |
 | 7 | B Client | Hooks (+ realtime) | ⬜ | | |
 | 8 | B Client | Bracket layout lib | ⬜ | | |
@@ -67,9 +67,18 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - `get_module_standings` is full (not a stub) and lives in 085; 087 need not redefine it. `rank_label` is `-` for entries still alive in an unfinished module.
 - 086: all writes are blocked (INVALID_STATUS) when the parent tournament is `completed`/`cancelled` (PLAN §3.1: read-only except owner) via internal `_tournament_assert_writable`.
 - 086: `update_tournament_module` also blocks changing `third_place_match` once a bracket is generated (would desync rounds); admin must go seeding→open first. `withdraw_tournament_entry` lives in 086 (reason goes to audit log; no column). `set_module_seeds` requires the full list of active entries.
+- 087: `record_tournament_walkover` requires BOTH entries present (PLAN §5.4 allowed one empty slot). A one-sided walkover would let the still-undecided feeder match push an entry into the already-decided match. To handle a no-show, record the walkover on the match where the entrant faces an opponent.
+- 087: module completion is a shared internal `_complete_tournament_module` called whenever a terminal match (final or 3rd place) is decided, so either order works. A 3rd-place match is skipped when the bracket has only 1 round (N=2).
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Steps 4 + 5: Bracket engine (087) and SQL tests / owner guide
+- **Done:** 087 with `generate_bracket`, `record_tournament_result`, `record_tournament_walkover`, `reset_tournament_match`, `schedule_tournament_match` and internal `_tournament_seed_order`, `_advance_tournament_match`, `_unadvance_tournament_match`, `_complete_tournament_module`. Tests cover core-field locks, permissions, entry validation/duplicates/PII, RLS write denial, brackets N=2/3/5/8/9/16 (+3rd place on 8 and 5), walkover/reset/edit/tie/downstream-locked, lifecycle guards. Owner guide has copy-paste SQL.
+- **Files:** `supabase/migrations/087_add_tournament_bracket_engine.sql`, `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md`
+- **Verified:** NOT run (no DB access). Needs owner: apply 084→087 in order, run `sql-tests.sql`, paste the result/first FAIL here.
+- **Deviations:** see Plan deviations (087 bullets).
+- **Next action:** after the owner reports test results (fix any failures), Phase B Step 6 (types + service + errors + format).
 
 ### 2026-11-08 — Step 3: Admin write RPCs (086)
 - **Done:** 15 write RPCs (rename, entry-field upsert/archive/reorder, module create/update/delete, add/remove module admin, `set_module_status` per §3.2, entry upsert with field validation / delete / withdraw, `set_module_seeds`, `update_tournament_round`) + internal `_tournament_assert_writable`.
