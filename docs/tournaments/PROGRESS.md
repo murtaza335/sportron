@@ -24,7 +24,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 13 | D Public | Bracket view | 🟡 | 2026-11-08 | Bracket tab: absolutely-positioned 196x76 nodes from bracketLayout, SVG connectors, round pills that scroll to column, column headers with Bo-N, draft-bracket banner, own-path accent highlight, TBD/BYE/W/O/live-dot rendering, 3rd-place node under final, empty state. Realtime comes from useTournamentModule. Node tap handler is wired to the match sheet in step 15 |
 | 14 | D Public | Standings table + chart | 🟡 | 2026-11-08 | Standings tab with Table/Chart toggle. Table: pinned # + Entry, scrollable P/W/L/+-/Reached, champion row warning tint, own row selected bg, alive dot, tap opens EntrySheet. Chart: Views-only horizontal bars with round ticks |
 | 15 | D Public | Matches tab + match sheet (view) | 🟡 | 2026-11-08 | Matches tab grouped by round (plain Views, not SectionList, to avoid nested virtualization) with All/Upcoming/Results chips; read-only match sheet (round, Bo, time/venue/court, scores, game detail, note, advances-to line) opened from bracket nodes and match rows. Sheet takes a footer slot for admin actions (step 20). 'Recorded by' omitted — get_module_bracket does not return the recorder |
-| 16 | E Admin | Tournament manage + entry form editor | ⬜ | | |
+| 16 | E Admin | Tournament manage + entry form editor | 🟡 | 2026-11-08 | Tournament manage (inline rename, entry-form link, module list + add, read-only admins) and entry-form editor (locked core rows editable for label/placeholder only, custom fields add/edit/archive with confirm, ↑/↓ reorder, field editor sheet with type pills, select options, required/public switches). Shared form primitives (FormField, TextField, PillSelect, SwitchRow, ModalHeader) |
 | 17 | E Admin | Module create/edit | ⬜ | | |
 | 18 | E Admin | Module manage + module admins + entry form | ⬜ | | |
 | 19 | E Admin | Seeding + rounds + generate/start | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 16: Tournament manage + entry form editor
+- **Done:** Tournament manage (inline rename, entry-form link, module list + add, read-only admins) and entry-form editor (locked core rows editable for label/placeholder only, custom fields add/edit/archive with confirm, ↑/↓ reorder, field editor sheet with type pills, select options, required/public switches). Shared form primitives (FormField, TextField, PillSelect, SwitchRow, ModalHeader)
+- **Files:** src/app/tournament/[id]/{manage,fields}.tsx, src/components/tournaments/{form,EntryFieldEditorSheet}.tsx
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: core fields locked server-side (sql-tests) + on device
+- **Next action:** Step 17 module create/edit
 
 ### 2026-11-08 — Step 15: Matches tab + match sheet (view)
 - **Done:** Matches tab grouped by round (plain Views, not SectionList, to avoid nested virtualization) with All/Upcoming/Results chips; read-only match sheet (round, Bo, time/venue/court, scores, game detail, note, advances-to line) opened from bracket nodes and match rows. Sheet takes a footer slot for admin actions (step 20). 'Recorded by' omitted — get_module_bracket does not return the recorder
