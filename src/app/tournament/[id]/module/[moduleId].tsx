@@ -13,6 +13,8 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { BracketView } from '@/components/tournaments/BracketView';
+import { ResultEntrySheet } from '@/components/tournaments/ResultEntrySheet';
+import { ScheduleSheet } from '@/components/tournaments/ScheduleSheet';
 import { EntrySheet } from '@/components/tournaments/EntrySheet';
 import { ModuleEntriesTab } from '@/components/tournaments/ModuleEntriesTab';
 import { ModuleStandingsTab } from '@/components/tournaments/ModuleStandingsTab';
@@ -29,7 +31,7 @@ import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
-import { deleteEntry, withdrawEntry } from '@/services/tournaments';
+import { deleteEntry, resetMatch, withdrawEntry } from '@/services/tournaments';
 import { Button } from '@/components/ui/Button';
 import { formatMatchTime, moduleStatusTone, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
@@ -58,6 +60,8 @@ export default function ModuleScreen() {
   const [tab, setTab] = useState<Tab>('entries');
   const [selected, setSelected] = useState<TournamentEntry | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
+  const [resultMatchId, setResultMatchId] = useState<string | null>(null);
+  const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
   const defaulted = useRef(false);
 
   // Default tab: Bracket if a bracket exists, else Entries (once, after first load).
@@ -69,6 +73,59 @@ export default function ModuleScreen() {
   }, [m.loading, m.module, m.bracket.length, tabParam]);
 
   const mod = m.module;
+
+  const matchActions = (match: TournamentMatch) => {
+    if (!m.isModuleAdmin || !mod) return null;
+    const decided = match.status === 'completed' || match.status === 'walkover';
+    const bothPresent = !!match.entry_a && !!match.entry_b;
+    const live = mod.status === 'in_progress';
+    const canResult = live && bothPresent && match.status !== 'bye' && match.status !== 'cancelled';
+    const canSchedule =
+      (mod.status === 'seeding' || live) && (match.status === 'pending' || match.status === 'scheduled');
+    const canReset = live && decided;
+    if (!canResult && !canSchedule && !canReset) return null;
+    const doReset = () =>
+      alert('Reset this result?', 'The winner will be removed from the next match.', [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Reset',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await resetMatch(match.id);
+              setSelectedMatchId(null);
+              await m.refresh();
+            } catch (e) {
+              alert('Something went wrong', friendlyTournamentError(e));
+            }
+          },
+        },
+      ]);
+    return (
+      <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+        {canResult && (
+          <Button
+            label={decided ? 'Edit result' : 'Enter result'}
+            onPress={() => {
+              setSelectedMatchId(null);
+              setResultMatchId(match.id);
+            }}
+          />
+        )}
+        {canSchedule && (
+          <Button
+            label="Schedule"
+            variant="secondary"
+            onPress={() => {
+              setSelectedMatchId(null);
+              setScheduleMatchId(match.id);
+            }}
+          />
+        )}
+        {canReset && <Button label="Reset" variant="ghost" onPress={doReset} buttonStyle={{ borderColor: theme.error }} />}
+      </View>
+    );
+  };
 
   const entryActions = (entry: TournamentEntry) => {
     const status = mod?.status;
@@ -238,6 +295,21 @@ export default function ModuleScreen() {
         match={m.bracket.find((x) => x.id === selectedMatchId) ?? null}
         allMatches={m.bracket}
         onClose={() => setSelectedMatchId(null)}
+        footer={(() => {
+          const sel = m.bracket.find((x) => x.id === selectedMatchId);
+          return sel ? matchActions(sel) : null;
+        })()}
+      />
+      <ResultEntrySheet
+        match={m.bracket.find((x) => x.id === resultMatchId) ?? null}
+        sport={mod?.sport ?? 'other'}
+        onClose={() => setResultMatchId(null)}
+        onSaved={m.refresh}
+      />
+      <ScheduleSheet
+        match={m.bracket.find((x) => x.id === scheduleMatchId) ?? null}
+        onClose={() => setScheduleMatchId(null)}
+        onSaved={m.refresh}
       />
       <EntrySheet
         entry={selected}

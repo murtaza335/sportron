@@ -28,7 +28,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 17 | E Admin | Module create/edit | 🟡 | 2026-11-08 | Module create/edit modal (name, sport pills locked once bracket exists, venue, start date/time, max entries, description, rules, 3rd-place switch, seeding pills). DateTimeField: native date→time pickers, web datetime-local input (datetimepicker has no web support). After create → module manage |
 | 18 | E Admin | Module manage + module admins + entry form | 🟡 | 2026-11-08 | Module manage (status machine buttons incl. reopen entries, checklist, links, module admins add/remove for tournament admins, danger zone with confirm), entry form modal rendered from entry fields (client validation mirrors server, inline field errors, duplicate CMS ID shown under CMS ID, link app user, Save & add another), EntrySheet admin actions (Edit / Withdraw / Delete with confirms; withdraw in progress prompts to record a walkover). Module page accepts ?tab= |
 | 19 | E Admin | Seeding + rounds + generate/start | 🟡 | 2026-11-08 | Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists) |
-| 20 | E Admin | Results (played / walkover / reset / schedule) | ⬜ | | |
+| 20 | E Admin | Results (played / walkover / reset / schedule) | 🟡 | 2026-11-08 | Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…) |
 | 21 | F Notifs | Notification triggers (088) | ⬜ | | |
 | 22 | F Notifs | Client wiring (types, prefs, routing) | ⬜ | | |
 | 23 | G Finish | Polish + AGENTS.md + privacy draft | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 20: Results
+- **Done:** Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…)
+- **Files:** src/components/tournaments/{ResultEntrySheet,ScheduleSheet}.tsx, module page (match sheet footer actions)
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: full module run end-to-end on device (module auto-completes, champion shows on tournament page)
+- **Next action:** Step 21 notification triggers (088)
 
 ### 2026-11-08 — Step 19: Seeding + rounds + generate/start
 - **Done:** Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists)
