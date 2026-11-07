@@ -1,10 +1,12 @@
 import { router, Tabs } from 'expo-router';
-import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Users, X, User } from 'lucide-react-native';
+import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Trophy, Users, X, User } from 'lucide-react-native';
 import { Animated, ColorValue, Easing, Platform, Pressable, Text, View } from 'react-native';
 import { useRef, useState, useSyncExternalStore, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { StreakModal } from '@/components/StreakModal';
+import { TabBarBumpBackground } from '@/components/tournaments/TabBarBumpBackground';
+import { TournamentTabBarButton } from '@/components/tournaments/TournamentTabBarButton';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -355,6 +357,7 @@ export default function TabLayout() {
         tabBarStyle: {
           backgroundColor: theme.tabBar,
           borderTopWidth: 0,
+          overflow: 'visible',
           elevation: 0,
           shadowOpacity: 0,
           height: Platform.OS === 'ios' ? 92 : 60 + Math.max(insets.bottom, Spacing.md),
@@ -367,6 +370,7 @@ export default function TabLayout() {
           letterSpacing: 0.2,
         },
         tabBarShowLabel: true,
+        tabBarBackground: () => <TabBarBumpBackground />,
       }}
     >
       <Tabs.Screen
@@ -389,6 +393,17 @@ export default function TabLayout() {
           headerRight: () => <SessionsHeaderRight />,
           headerLeft: () => <CreateSessionButton />,
           tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
+        }}
+      />
+      <Tabs.Screen
+        name="tournaments"
+        options={{
+          title: 'Tournaments',
+          tabBarLabel: () => null,
+          tabBarAccessibilityLabel: 'Tournaments',
+          headerTitle: () => <DefaultHeaderTitle title="Tournaments" />,
+          tabBarIcon: ({ color, size }) => <Trophy size={size} color={color} strokeWidth={2.2} />,
+          tabBarButton: (props) => <TournamentTabBarButton {...props} />,
         }}
       />
       <Tabs.Screen

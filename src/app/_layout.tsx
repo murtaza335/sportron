@@ -198,6 +198,99 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="tournament/[id]"
+          options={{
+            headerShown: true,
+            title: 'Tournament',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/manage"
+          options={{
+            headerShown: true,
+            title: 'Manage tournament',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/fields"
+          options={{
+            headerShown: true,
+            title: 'Entry form',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module-form"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+            animationDuration: 50,
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module/[moduleId]"
+          options={{
+            headerShown: true,
+            title: 'Module',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module/[moduleId]/manage"
+          options={{
+            headerShown: true,
+            title: 'Manage module',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module/[moduleId]/entry-form"
+          options={{
+            presentation: 'fullScreenModal',
+            animation: 'slide_from_bottom',
+            animationDuration: 50,
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module/[moduleId]/seeding"
+          options={{
+            headerShown: true,
+            title: 'Seeding & bracket',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
+          name="tournament/[id]/module/[moduleId]/rounds"
+          options={{
+            headerShown: true,
+            title: 'Rounds',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
           name="profile/[id]"
           options={{
             headerShown: true,

@@ -17,7 +17,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 6 | B Client | Types + service + errors + format | ✅ | 2026-11-08 | Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers |
 | 7 | B Client | Hooks (+ realtime) | ✅ | 2026-11-08 | useTournaments (scope, 30s SWR cache, focus reload), useTournament, useTournamentModule (detail+entries+bracket+standings, realtime on tournament_matches, 400ms debounce) |
 | 8 | B Client | Bracket layout lib | ✅ | 2026-11-08 | Pure bracket layout (nodes, connector paths, columns, 3rd-place under final) + devSelfCheck(). Sample output: size2 nodes=1 conn=0 w=196 h=104; size4 nodes=3 conn=2 w=432 h=196; size8 nodes=7 conn=6 w=668 h=380; size16 nodes=15 conn=14 w=904 h=748 |
-| 9 | C Nav | Centre tab with bump + route registration | ⬜ | | |
+| 9 | C Nav | Centre tab with bump + route registration | 🟡 | 2026-11-08 | Centre Tournaments tab with raised circular button + SVG bump background (icon only), all tournament stack screens/modals registered with placeholder bodies |
 | 10 | D Public | Tournaments list | ⬜ | | |
 | 11 | D Public | Tournament page (champions → modules → about) | ⬜ | | |
 | 12 | D Public | Module page shell + Info + Entries | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 9: Centre tab with bump + route registration
+- **Done:** Centre Tournaments tab with raised circular button + SVG bump background (icon only), all tournament stack screens/modals registered with placeholder bodies
+- **Files:** src/components/tournaments/{TabBarBumpBackground,TournamentTabBarButton,PlaceholderScreen}.tsx, src/app/(tabs)/_layout.tsx, src/app/(tabs)/tournaments.tsx, src/app/tournament/**, src/app/_layout.tsx
+- **Verified:** tsc ✅ · lint no new errors ✅ · needs owner: device check (light/dark, Android 3-button/gesture nav, web, keyboard open, other tabs unaffected)
+- **Next action:** Step 10 tournaments list
 
 ### 2026-11-08 — Step 8: Bracket layout lib
 - **Done:** Pure bracket layout (nodes, connector paths, columns, 3rd-place under final) + devSelfCheck(). Sample output: size2 nodes=1 conn=0 w=196 h=104; size4 nodes=3 conn=2 w=432 h=196; size8 nodes=7 conn=6 w=668 h=380; size16 nodes=15 conn=14 w=904 h=748
