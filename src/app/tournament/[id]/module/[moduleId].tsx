@@ -27,6 +27,10 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
+import { alert } from '@/lib/alert';
+import { friendlyTournamentError } from '@/lib/tournamentErrors';
+import { deleteEntry, withdrawEntry } from '@/services/tournaments';
+import { Button } from '@/components/ui/Button';
 import { formatMatchTime, moduleStatusTone, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import type { TournamentEntry, TournamentMatch } from '@/types';
@@ -42,7 +46,7 @@ const TABS: { value: Tab; label: string }[] = [
 ];
 
 export default function ModuleScreen() {
-  const { id, moduleId } = useLocalSearchParams<{ id: string; moduleId: string }>();
+  const { id, moduleId, tab: tabParam } = useLocalSearchParams<{ id: string; moduleId: string; tab?: string }>();
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -60,10 +64,74 @@ export default function ModuleScreen() {
   useEffect(() => {
     if (m.loading || defaulted.current || !m.module) return;
     defaulted.current = true;
-    setTab(m.bracket.length > 0 ? 'bracket' : 'entries');
-  }, [m.loading, m.module, m.bracket.length]);
+    const requested = TABS.find((t) => t.value === tabParam)?.value;
+    setTab(requested ?? (m.bracket.length > 0 ? 'bracket' : 'entries'));
+  }, [m.loading, m.module, m.bracket.length, tabParam]);
 
   const mod = m.module;
+
+  const entryActions = (entry: TournamentEntry) => {
+    const status = mod?.status;
+    const canEdit = status === 'draft' || status === 'open';
+    const canWithdraw = entry.status === 'active' && (status === 'open' || status === 'in_progress');
+    const canDelete = status === 'draft' || status === 'open';
+    const doWithdraw = () =>
+      alert('Withdraw entry?', `${entry.name} will be marked as withdrawn.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Withdraw',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await withdrawEntry(entry.id);
+              setSelected(null);
+              await m.refresh();
+              if (status === 'in_progress') {
+                alert('Entry withdrawn', 'Record a walkover for their pending match from the Matches tab.');
+              }
+            } catch (e) {
+              alert('Something went wrong', friendlyTournamentError(e));
+            }
+          },
+        },
+      ]);
+    const doDelete = () =>
+      alert('Delete entry?', `${entry.name} will be removed permanently.`, [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await deleteEntry(entry.id);
+              setSelected(null);
+              await m.refresh();
+            } catch (e) {
+              alert('Something went wrong', friendlyTournamentError(e));
+            }
+          },
+        },
+      ]);
+    if (!m.isModuleAdmin || (!canEdit && !canWithdraw && !canDelete)) return null;
+    return (
+      <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+        {canEdit && entry.status === 'active' && (
+          <Button
+            label="Edit"
+            variant="secondary"
+            onPress={() => {
+              setSelected(null);
+              router.push(tournamentRoutes.entryForm(id, moduleId, entry.id));
+            }}
+          />
+        )}
+        {canWithdraw && <Button label="Withdraw" variant="ghost" onPress={doWithdraw} />}
+        {canDelete && (
+          <Button label="Delete" variant="ghost" onPress={doDelete} buttonStyle={{ borderColor: theme.error }} />
+        )}
+      </View>
+    );
+  };
   const champion = mod?.champion_entry_id ? m.entries.find((e) => e.id === mod.champion_entry_id) : null;
   const canAddEntries = m.isModuleAdmin && (mod?.status === 'draft' || mod?.status === 'open');
   const tabsWidth = Math.max(width - Spacing.md * 2, 440);
@@ -177,6 +245,7 @@ export default function ModuleScreen() {
         bracket={m.bracket}
         isAdmin={m.isModuleAdmin}
         onClose={() => setSelected(null)}
+        footer={selected ? entryActions(selected) : null}
         onOpenProfile={(pid) => {
           setSelected(null);
           router.push(tournamentRoutes.profile(pid));
