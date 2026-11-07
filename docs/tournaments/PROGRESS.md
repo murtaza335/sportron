@@ -11,7 +11,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 |---|---|---|---|---|---|
 | 1 | A DB | Schema (084) | 🟡 | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
 | 2 | A DB | Read RPCs (085) | 🟡 | 2026-11-08 | `supabase/migrations/085_add_tournament_read_rpcs.sql` written (full `get_module_standings` included); awaiting owner apply |
-| 3 | A DB | Admin write RPCs (086) | ⬜ | | |
+| 3 | A DB | Admin write RPCs (086) | 🟡 | 2026-11-08 | `supabase/migrations/086_add_tournament_admin_rpcs.sql` written; awaiting owner apply |
 | 4 | A DB | Bracket engine (087) | ⬜ | | |
 | 5 | A DB | SQL tests + owner SQL guide | ⬜ | | |
 | 6 | B Client | Types + service + errors + format | ⬜ | | |
@@ -65,9 +65,18 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added `revoke insert/update/delete/truncate` from anon/authenticated on all 8 tables (defence in depth beyond "no write policies").
 - `get_tournaments` scope `past` also includes `cancelled` tournaments (plan didn't say where they appear).
 - `get_module_standings` is full (not a stub) and lives in 085; 087 need not redefine it. `rank_label` is `-` for entries still alive in an unfinished module.
+- 086: all writes are blocked (INVALID_STATUS) when the parent tournament is `completed`/`cancelled` (PLAN §3.1: read-only except owner) via internal `_tournament_assert_writable`.
+- 086: `update_tournament_module` also blocks changing `third_place_match` once a bracket is generated (would desync rounds); admin must go seeding→open first. `withdraw_tournament_entry` lives in 086 (reason goes to audit log; no column). `set_module_seeds` requires the full list of active entries.
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 3: Admin write RPCs (086)
+- **Done:** 15 write RPCs (rename, entry-field upsert/archive/reorder, module create/update/delete, add/remove module admin, `set_module_status` per §3.2, entry upsert with field validation / delete / withdraw, `set_module_seeds`, `update_tournament_round`) + internal `_tournament_assert_writable`.
+- **Files:** `supabase/migrations/086_add_tournament_admin_rpcs.sql`
+- **Verified:** not run (cannot apply SQL). Needs owner: apply 084 → 085 → 086 in order and report any error text.
+- **Deviations:** see Plan deviations (086 bullets).
+- **Next action:** Step 4 (087 bracket engine: generate_bracket, record result/walkover, reset, schedule, `_advance_tournament_match`).
 
 ### 2026-11-08 — Step 2: Read RPCs (085)
 - **Done:** wrote 8 read RPCs: `get_tournaments`, `get_tournament_detail`, `get_tournament_entry_fields`, `get_module_detail`, `get_module_entries` (PII stripped for non-admins), `get_module_bracket`, `get_module_standings`, `search_profiles_for_tournament`.
