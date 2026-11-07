@@ -10,7 +10,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | # | Phase | Step | Status | Date | Files / notes |
 |---|---|---|---|---|---|
 | 1 | A DB | Schema (084) | 🟡 | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
-| 2 | A DB | Read RPCs (085) | ⬜ | | |
+| 2 | A DB | Read RPCs (085) | 🟡 | 2026-11-08 | `supabase/migrations/085_add_tournament_read_rpcs.sql` written (full `get_module_standings` included); awaiting owner apply |
 | 3 | A DB | Admin write RPCs (086) | ⬜ | | |
 | 4 | A DB | Bracket engine (087) | ⬜ | | |
 | 5 | A DB | SQL tests + owner SQL guide | ⬜ | | |
@@ -45,26 +45,36 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 2026-11-08 | Single elimination; 3rd-place match optional; walkovers recorded by module admins; admins enter all results |
 | 2026-11-08 | Champions shown on tournament page before modules; non-draft tournaments public |
 | 2026-11-08 | Centre tab in bottom bar with a raised circular bump |
+| 2026-11-08 | Owner confirmed ALL assumptions A1–A6 as written in PLAN §1.3 |
 
 ## Open assumptions (PLAN.md §1.3) — confirm before the dependent step
 
 | # | Assumption | Confirmed? |
 |---|---|---|
-| A1 | Tournament admins assign module admins | ⬜ |
-| A2 | Tournament admins have module-admin powers in all their modules | ⬜ |
-| A3 | Private: CMS ID, Phone, Email; Public: Name, School; custom fields default private | ⬜ |
-| A4 | CMS ID unique within a module | ⬜ |
-| A5 | Centre tab is icon-only (no label) | ⬜ |
-| A6 | Entries are name-only (no roster) in v1 | ⬜ |
+| A1 | Tournament admins assign module admins | ✅ 2026-11-08 |
+| A2 | Tournament admins have module-admin powers in all their modules | ✅ 2026-11-08 |
+| A3 | Private: CMS ID, Phone, Email; Public: Name, School; custom fields default private | ✅ 2026-11-08 |
+| A4 | CMS ID unique within a module | ✅ 2026-11-08 |
+| A5 | Centre tab is icon-only (no label) | ✅ 2026-11-08 |
+| A6 | Entries are name-only (no roster) in v1 | ✅ 2026-11-08 |
 
 ## Plan deviations
 
 - No sport check existed on `communities.sport` (grep of migrations), so `tournament_modules.sport` uses an explicit `in (...)` list copied from the TS `Sport` union.
 - Core-field delete guard allows the delete when the parent tournament is already gone, so `on delete cascade` of a tournament still works.
 - Added `revoke insert/update/delete/truncate` from anon/authenticated on all 8 tables (defence in depth beyond "no write policies").
+- `get_tournaments` scope `past` also includes `cancelled` tournaments (plan didn't say where they appear).
+- `get_module_standings` is full (not a stub) and lives in 085; 087 need not redefine it. `rank_label` is `-` for entries still alive in an unfinished module.
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 2: Read RPCs (085)
+- **Done:** wrote 8 read RPCs: `get_tournaments`, `get_tournament_detail`, `get_tournament_entry_fields`, `get_module_detail`, `get_module_entries` (PII stripped for non-admins), `get_module_bracket`, `get_module_standings`, `search_profiles_for_tournament`.
+- **Files:** `supabase/migrations/085_add_tournament_read_rpcs.sql`
+- **Verified:** not run (cannot apply SQL; syntax unchecked by a DB). Needs owner: apply 084 then 085; sample selects will come with the Step 5 test script.
+- **Deviations:** see Plan deviations. A1–A6 confirmed by owner this session.
+- **Next action:** Step 3 (086 admin write RPCs). Owner should confirm 084 and 085 applied without errors.
 
 ### 2026-11-08 — Step 1: Schema (084)
 - **Done:** wrote migration 084: 8 tables, helpers `is_tournament_admin/is_module_admin/can_view_tournament/can_view_module`, SELECT-only RLS, core-field seed + lock triggers, updated_at + audit triggers, realtime on `tournament_matches`.
