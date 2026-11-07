@@ -29,7 +29,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 18 | E Admin | Module manage + module admins + entry form | 🟡 | 2026-11-08 | Module manage (status machine buttons incl. reopen entries, checklist, links, module admins add/remove for tournament admins, danger zone with confirm), entry form modal rendered from entry fields (client validation mirrors server, inline field errors, duplicate CMS ID shown under CMS ID, link app user, Save & add another), EntrySheet admin actions (Edit / Withdraw / Delete with confirms; withdraw in progress prompts to record a walkover). Module page accepts ?tab= |
 | 19 | E Admin | Seeding + rounds + generate/start | 🟡 | 2026-11-08 | Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists) |
 | 20 | E Admin | Results (played / walkover / reset / schedule) | 🟡 | 2026-11-08 | Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…) |
-| 21 | F Notifs | Notification triggers (088) | ⬜ | | |
+| 21 | F Notifs | Notification triggers (088) | 🟡 | 2026-11-08 | Constraint widened with the 6 tournament types (082 list copied); triggers: tournament_admins insert, module_admins insert, entry added (insert / profile_id set), match scheduled + result (linked profiles of both entries), module completed (entrants + module admins). All except admin-assigned only fire while the tournament is published; deduped with _notification_already_exists. No edge-function change (trg_fcm_push → send-notification handles delivery) |
 | 22 | F Notifs | Client wiring (types, prefs, routing) | ⬜ | | |
 | 23 | G Finish | Polish + AGENTS.md + privacy draft | ⬜ | | |
 | 24 | G Finish | (optional) Tournament requests | ⬜ | | Only if owner confirms |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 21: Notification triggers (088)
+- **Done:** Constraint widened with the 6 tournament types (082 list copied); triggers: tournament_admins insert, module_admins insert, entry added (insert / profile_id set), match scheduled + result (linked profiles of both entries), module completed (entrants + module admins). All except admin-assigned only fire while the tournament is published; deduped with _notification_already_exists. No edge-function change (trg_fcm_push → send-notification handles delivery)
+- **Files:** supabase/migrations/088_add_tournament_notifications.sql
+- **Verified:** SQL not run — needs owner: apply 088, then create test rows and check in_app_notifications
+- **Next action:** Step 22 client wiring
 
 ### 2026-11-08 — Step 20: Results
 - **Done:** Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…)
