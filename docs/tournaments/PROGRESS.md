@@ -22,7 +22,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 11 | D Public | Tournament page (champions → modules → about) | 🟡 | 2026-11-08 | Tournament page: cover, status/date/org/location, Champions strip above Modules, module cards, admin gear + Add module, About with read-more + admins, cancelled banner, empty states |
 | 12 | D Public | Module page shell + Info + Entries | 🟡 | 2026-11-08 | Module page shell (header, champion row, 5 scrollable segmented tabs, default tab Bracket-if-exists else Entries), Info tab, Entries tab with search + EntrySheet (view only; private fields only come from the server for admins/own entry). Bracket/Standings/Matches tabs are stubs until steps 13-15. Generic BottomSheet component added |
 | 13 | D Public | Bracket view | 🟡 | 2026-11-08 | Bracket tab: absolutely-positioned 196x76 nodes from bracketLayout, SVG connectors, round pills that scroll to column, column headers with Bo-N, draft-bracket banner, own-path accent highlight, TBD/BYE/W/O/live-dot rendering, 3rd-place node under final, empty state. Realtime comes from useTournamentModule. Node tap handler is wired to the match sheet in step 15 |
-| 14 | D Public | Standings table + chart | ⬜ | | |
+| 14 | D Public | Standings table + chart | 🟡 | 2026-11-08 | Standings tab with Table/Chart toggle. Table: pinned # + Entry, scrollable P/W/L/+-/Reached, champion row warning tint, own row selected bg, alive dot, tap opens EntrySheet. Chart: Views-only horizontal bars with round ticks |
 | 15 | D Public | Matches tab + match sheet (view) | ⬜ | | |
 | 16 | E Admin | Tournament manage + entry form editor | ⬜ | | |
 | 17 | E Admin | Module create/edit | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 14: Standings table + chart
+- **Done:** Standings tab with Table/Chart toggle. Table: pinned # + Entry, scrollable P/W/L/+-/Reached, champion row warning tint, own row selected bg, alive dot, tap opens EntrySheet. Chart: Views-only horizontal bars with round ticks
+- **Files:** src/components/tournaments/{StandingsTable,StandingsChart,ModuleStandingsTab}.tsx
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: compare against sql-tests bracket
+- **Next action:** Step 15 matches tab + match sheet
 
 ### 2026-11-08 — Step 13: Bracket view
 - **Done:** Bracket tab: absolutely-positioned 196x76 nodes from bracketLayout, SVG connectors, round pills that scroll to column, column headers with Bo-N, draft-bracket banner, own-path accent highlight, TBD/BYE/W/O/live-dot rendering, 3rd-place node under final, empty state. Realtime comes from useTournamentModule. Node tap handler is wired to the match sheet in step 15
