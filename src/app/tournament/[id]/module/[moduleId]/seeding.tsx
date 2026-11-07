@@ -1,5 +1,226 @@
-import { PlaceholderScreen } from '@/components/tournaments/PlaceholderScreen';
+import { ArrowDown, ArrowUp, Shuffle } from 'lucide-react-native';
+import { useLocalSearchParams, useRouter } from 'expo-router';
+import { useEffect, useRef, useState } from 'react';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
+import { Button } from '@/components/ui/Button';
+import { ThemedText } from '@/components/ui/Text';
+import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useTheme } from '@/hooks/use-theme';
+import { useTournamentModule } from '@/hooks/useTournamentModule';
+import { alert } from '@/lib/alert';
+import { friendlyTournamentError } from '@/lib/tournamentErrors';
+import { tournamentRoutes } from '@/lib/tournamentRoutes';
+import { generateBracket, setModuleSeeds } from '@/services/tournaments';
+
+type Item = { id: string; name: string; seeded: boolean };
+
+function nextPow2(n: number): number {
+  let s = 2;
+  while (s < n) s *= 2;
+  return s;
+}
 
 export default function SeedingScreen() {
-  return <PlaceholderScreen title="Seeding & bracket" />;
+  const { id, moduleId } = useLocalSearchParams<{ id: string; moduleId: string }>();
+  const theme = useTheme();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
+  const m = useTournamentModule(moduleId);
+  const [order, setOrder] = useState<Item[] | null>(null);
+  const [dirty, setDirty] = useState(false);
+  const [busy, setBusy] = useState<'save' | 'generate' | null>(null);
+  const initialised = useRef(false);
+
+  const mod = m.module;
+
+  // Initialise the editable order once from the loaded entries (seeded first, by seed).
+  useEffect(() => {
+    if (initialised.current || m.loading) return;
+    initialised.current = true;
+    const active = m.entries.filter((e) => e.status === 'active');
+    const sorted = [...active].sort((a, b) => {
+      if (a.seed != null && b.seed != null) return a.seed - b.seed;
+      if (a.seed != null) return -1;
+      if (b.seed != null) return 1;
+      return a.name.localeCompare(b.name);
+    });
+    setOrder(sorted.map((e) => ({ id: e.id, name: e.name, seeded: e.seed != null })));
+  }, [m.loading, m.entries]);
+
+  if (m.loading || !order) return <ActivityIndicator color={theme.text} style={{ marginTop: Spacing.xxl }} />;
+  if (!mod || !m.isModuleAdmin) {
+    return (
+      <View style={styles.denied}>
+        <ThemedText variant="heading">No access</ThemedText>
+        <ThemedText muted>Only module admins can manage seeding.</ThemedText>
+      </View>
+    );
+  }
+
+  const n = order.length;
+  const size = n >= 2 ? nextPow2(n) : 0;
+  const byes = size ? size - n : 0;
+  const editable = mod.status === 'open' || mod.status === 'seeding';
+  const canGenerate = mod.status === 'seeding' && n >= 2;
+  const hasBracket = (m.counts?.matches ?? 0) > 0;
+  const unseeded = order.filter((o) => !o.seeded);
+
+  const move = (idx: number, dir: -1 | 1) => {
+    const j = idx + dir;
+    if (j < 0 || j >= order.length) return;
+    const next = [...order];
+    [next[idx], next[j]] = [next[j], next[idx]];
+    setOrder(next);
+    setDirty(true);
+  };
+
+  const shuffleUnseeded = () => {
+    const seeded = order.filter((o) => o.seeded);
+    const rest = [...unseeded];
+    for (let i = rest.length - 1; i > 0; i--) {
+      const j = Math.floor(Math.random() * (i + 1));
+      [rest[i], rest[j]] = [rest[j], rest[i]];
+    }
+    setOrder([...seeded, ...rest]);
+    setDirty(true);
+  };
+
+  const saveSeeds = async (): Promise<boolean> => {
+    try {
+      await setModuleSeeds(moduleId, order.map((o) => o.id));
+      setOrder(order.map((o) => ({ ...o, seeded: true })));
+      setDirty(false);
+      return true;
+    } catch (e) {
+      alert('Something went wrong', friendlyTournamentError(e));
+      return false;
+    }
+  };
+
+  const onSave = async () => {
+    setBusy('save');
+    if (await saveSeeds()) await m.refresh();
+    setBusy(null);
+  };
+
+  const doGenerate = async () => {
+    setBusy('generate');
+    try {
+      if (dirty || order.some((o) => !o.seeded)) {
+        if (!(await saveSeeds())) return;
+      }
+      const count = await generateBracket(moduleId);
+      await m.refresh();
+      alert('Bracket generated', `${count} matches created.`, [
+        { text: 'Later', style: 'cancel' },
+        { text: 'Preview', onPress: () => router.replace(`${tournamentRoutes.module(id, moduleId)}?tab=bracket` as never) },
+      ]);
+    } catch (e) {
+      alert('Something went wrong', friendlyTournamentError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  const onGenerate = () => {
+    if (hasBracket) {
+      alert('Regenerate bracket?', 'The current bracket will be replaced.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Regenerate', style: 'destructive', onPress: doGenerate },
+      ]);
+    } else {
+      doGenerate();
+    }
+  };
+
+  return (
+    <ScrollView
+      style={{ backgroundColor: theme.background }}
+      contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
+    >
+      <View style={{ gap: 2 }}>
+        <ThemedText variant="heading" style={{ fontSize: 20, lineHeight: 26 }}>
+          {n} {n === 1 ? 'entry' : 'entries'}{size ? ` → ${size}-slot bracket` : ''}
+        </ThemedText>
+        {byes > 0 && (
+          <ThemedText variant="caption" muted>
+            {byes} {byes === 1 ? 'bye goes' : 'byes go'} to seed{byes === 1 ? '' : 's'} 1{byes > 1 ? `–${byes}` : ''}
+          </ThemedText>
+        )}
+        {mod.seeding_method === 'random' && (
+          <ThemedText variant="caption" muted>Random seeding: unseeded entries are shuffled when you generate.</ThemedText>
+        )}
+        {!editable && (
+          <ThemedText variant="caption" style={{ color: theme.warning }}>
+            Seeds can only be changed while the module is Open or in Seeding.
+          </ThemedText>
+        )}
+        {mod.status === 'open' && (
+          <ThemedText variant="caption" muted>Close entries & start seeding from Manage to generate the bracket.</ThemedText>
+        )}
+      </View>
+
+      {editable && unseeded.length > 0 && (
+        <Button
+          label="Shuffle unseeded"
+          variant="secondary"
+          icon={<Shuffle size={18} color={theme.text} />}
+          onPress={shuffleUnseeded}
+          disabled={!!busy}
+        />
+      )}
+
+      <View style={[styles.list, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        {order.map((o, i) => (
+          <View key={o.id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
+            <View style={[styles.seed, { backgroundColor: theme.backgroundSelected }]}>
+              <ThemedText variant="caption" style={{ fontWeight: '700' }}>{i + 1}</ThemedText>
+            </View>
+            <ThemedText style={{ flex: 1, fontWeight: '600' }} numberOfLines={1}>{o.name}</ThemedText>
+            {!o.seeded && <ThemedText variant="caption" muted style={{ fontSize: 10 }}>UNSEEDED</ThemedText>}
+            {editable && (
+              <View style={styles.arrows}>
+                <Pressable onPress={() => move(i, -1)} hitSlop={8} disabled={i === 0} style={{ opacity: i === 0 ? 0.3 : 1 }} accessibilityLabel={`Move ${o.name} up`}>
+                  <ArrowUp size={18} color={theme.text} strokeWidth={2} />
+                </Pressable>
+                <Pressable onPress={() => move(i, 1)} hitSlop={8} disabled={i === n - 1} style={{ opacity: i === n - 1 ? 0.3 : 1 }} accessibilityLabel={`Move ${o.name} down`}>
+                  <ArrowDown size={18} color={theme.text} strokeWidth={2} />
+                </Pressable>
+              </View>
+            )}
+          </View>
+        ))}
+      </View>
+
+      {editable && (
+        <Button label="Save seeds" variant="secondary" onPress={onSave} loading={busy === 'save'} disabled={!!busy || !dirty} />
+      )}
+      {mod.status === 'seeding' && (
+        <Button
+          label={hasBracket ? 'Regenerate bracket' : 'Generate bracket'}
+          onPress={onGenerate}
+          loading={busy === 'generate'}
+          disabled={!!busy || !canGenerate}
+        />
+      )}
+      {hasBracket && (
+        <Button
+          label="Preview bracket"
+          variant="ghost"
+          onPress={() => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=bracket` as never)}
+        />
+      )}
+    </ScrollView>
+  );
 }
+
+const styles = StyleSheet.create({
+  denied: { alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xxxl, paddingHorizontal: Spacing.lg },
+  content: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Spacing.md, gap: Spacing.md },
+  list: { borderWidth: 1, borderRadius: Radius.lg, overflow: 'hidden' },
+  row: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md },
+  seed: { width: 28, height: 28, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
+  arrows: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
+});

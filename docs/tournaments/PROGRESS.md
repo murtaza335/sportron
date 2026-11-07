@@ -27,7 +27,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 16 | E Admin | Tournament manage + entry form editor | 🟡 | 2026-11-08 | Tournament manage (inline rename, entry-form link, module list + add, read-only admins) and entry-form editor (locked core rows editable for label/placeholder only, custom fields add/edit/archive with confirm, ↑/↓ reorder, field editor sheet with type pills, select options, required/public switches). Shared form primitives (FormField, TextField, PillSelect, SwitchRow, ModalHeader) |
 | 17 | E Admin | Module create/edit | 🟡 | 2026-11-08 | Module create/edit modal (name, sport pills locked once bracket exists, venue, start date/time, max entries, description, rules, 3rd-place switch, seeding pills). DateTimeField: native date→time pickers, web datetime-local input (datetimepicker has no web support). After create → module manage |
 | 18 | E Admin | Module manage + module admins + entry form | 🟡 | 2026-11-08 | Module manage (status machine buttons incl. reopen entries, checklist, links, module admins add/remove for tournament admins, danger zone with confirm), entry form modal rendered from entry fields (client validation mirrors server, inline field errors, duplicate CMS ID shown under CMS ID, link app user, Save & add another), EntrySheet admin actions (Edit / Withdraw / Delete with confirms; withdraw in progress prompts to record a walkover). Module page accepts ?tab= |
-| 19 | E Admin | Seeding + rounds + generate/start | ⬜ | | |
+| 19 | E Admin | Seeding + rounds + generate/start | 🟡 | 2026-11-08 | Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists) |
 | 20 | E Admin | Results (played / walkover / reset / schedule) | ⬜ | | |
 | 21 | F Notifs | Notification triggers (088) | ⬜ | | |
 | 22 | F Notifs | Client wiring (types, prefs, routing) | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 19: Seeding + rounds + generate/start
+- **Done:** Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists)
+- **Files:** src/app/tournament/[id]/module/[moduleId]/{seeding,rounds}.tsx
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: generate + start from the app (needs migrations applied)
+- **Next action:** Step 20 results
 
 ### 2026-11-08 — Step 18: Module manage + module admins + entry form
 - **Done:** Module manage (status machine buttons incl. reopen entries, checklist, links, module admins add/remove for tournament admins, danger zone with confirm), entry form modal rendered from entry fields (client validation mirrors server, inline field errors, duplicate CMS ID shown under CMS ID, link app user, Save & add another), EntrySheet admin actions (Edit / Withdraw / Delete with confirms; withdraw in progress prompts to record a walkover). Module page accepts ?tab=
