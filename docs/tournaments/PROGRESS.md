@@ -23,7 +23,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 12 | D Public | Module page shell + Info + Entries | 🟡 | 2026-11-08 | Module page shell (header, champion row, 5 scrollable segmented tabs, default tab Bracket-if-exists else Entries), Info tab, Entries tab with search + EntrySheet (view only; private fields only come from the server for admins/own entry). Bracket/Standings/Matches tabs are stubs until steps 13-15. Generic BottomSheet component added |
 | 13 | D Public | Bracket view | 🟡 | 2026-11-08 | Bracket tab: absolutely-positioned 196x76 nodes from bracketLayout, SVG connectors, round pills that scroll to column, column headers with Bo-N, draft-bracket banner, own-path accent highlight, TBD/BYE/W/O/live-dot rendering, 3rd-place node under final, empty state. Realtime comes from useTournamentModule. Node tap handler is wired to the match sheet in step 15 |
 | 14 | D Public | Standings table + chart | 🟡 | 2026-11-08 | Standings tab with Table/Chart toggle. Table: pinned # + Entry, scrollable P/W/L/+-/Reached, champion row warning tint, own row selected bg, alive dot, tap opens EntrySheet. Chart: Views-only horizontal bars with round ticks |
-| 15 | D Public | Matches tab + match sheet (view) | ⬜ | | |
+| 15 | D Public | Matches tab + match sheet (view) | 🟡 | 2026-11-08 | Matches tab grouped by round (plain Views, not SectionList, to avoid nested virtualization) with All/Upcoming/Results chips; read-only match sheet (round, Bo, time/venue/court, scores, game detail, note, advances-to line) opened from bracket nodes and match rows. Sheet takes a footer slot for admin actions (step 20). 'Recorded by' omitted — get_module_bracket does not return the recorder |
 | 16 | E Admin | Tournament manage + entry form editor | ⬜ | | |
 | 17 | E Admin | Module create/edit | ⬜ | | |
 | 18 | E Admin | Module manage + module admins + entry form | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 15: Matches tab + match sheet (view)
+- **Done:** Matches tab grouped by round (plain Views, not SectionList, to avoid nested virtualization) with All/Upcoming/Results chips; read-only match sheet (round, Bo, time/venue/court, scores, game detail, note, advances-to line) opened from bracket nodes and match rows. Sheet takes a footer slot for admin actions (step 20). 'Recorded by' omitted — get_module_bracket does not return the recorder
+- **Files:** src/components/tournaments/{TournamentMatchRow,ModuleMatchesTab,TournamentMatchSheet}.tsx, module page
+- **Verified:** tsc ✅ · eslint ✅
+- **Next action:** Step 16 tournament manage + entry form editor
 
 ### 2026-11-08 — Step 14: Standings table + chart
 - **Done:** Standings tab with Table/Chart toggle. Table: pinned # + Entry, scrollable P/W/L/+-/Reached, champion row warning tint, own row selected bg, alive dot, tap opens EntrySheet. Chart: Views-only horizontal bars with round ticks

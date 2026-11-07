@@ -16,6 +16,8 @@ import { BracketView } from '@/components/tournaments/BracketView';
 import { EntrySheet } from '@/components/tournaments/EntrySheet';
 import { ModuleEntriesTab } from '@/components/tournaments/ModuleEntriesTab';
 import { ModuleStandingsTab } from '@/components/tournaments/ModuleStandingsTab';
+import { ModuleMatchesTab } from '@/components/tournaments/ModuleMatchesTab';
+import { TournamentMatchSheet } from '@/components/tournaments/TournamentMatchSheet';
 import { ModuleInfoTab } from '@/components/tournaments/ModuleInfoTab';
 import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -27,7 +29,7 @@ import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { formatMatchTime, moduleStatusTone, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
-import type { TournamentEntry } from '@/types';
+import type { TournamentEntry, TournamentMatch } from '@/types';
 
 type Tab = 'bracket' | 'standings' | 'matches' | 'entries' | 'info';
 
@@ -51,6 +53,7 @@ export default function ModuleScreen() {
 
   const [tab, setTab] = useState<Tab>('entries');
   const [selected, setSelected] = useState<TournamentEntry | null>(null);
+  const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const defaulted = useRef(false);
 
   // Default tab: Bracket if a bracket exists, else Entries (once, after first load).
@@ -143,7 +146,7 @@ export default function ModuleScreen() {
               moduleStatus={mod.status}
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
-              onSelectMatch={() => {}}
+              onSelectMatch={(match: TournamentMatch) => setSelectedMatchId(match.id)}
             />
           )}
           {tab === 'standings' && (
@@ -158,13 +161,16 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'matches' && (
-            <View style={styles.empty}>
-              <ThemedText muted>Coming soon</ThemedText>
-            </View>
+            <ModuleMatchesTab matches={m.bracket} onSelect={(match) => setSelectedMatchId(match.id)} />
           )}
         </ScrollView>
       )}
 
+      <TournamentMatchSheet
+        match={m.bracket.find((x) => x.id === selectedMatchId) ?? null}
+        allMatches={m.bracket}
+        onClose={() => setSelectedMatchId(null)}
+      />
       <EntrySheet
         entry={selected}
         fields={fields}
