@@ -30,7 +30,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 19 | E Admin | Seeding + rounds + generate/start | 🟡 | 2026-11-08 | Seeding screen (entries → N-slot bracket, byes info, ↑/↓ reorder, shuffle unseeded, Save seeds, Generate/Regenerate with confirm, auto-saves unsaved order before generating, Preview) and Rounds screen (expandable rows: name, best-of pills, start, notes, save per row; empty copy before bracket exists) |
 | 20 | E Admin | Results (played / walkover / reset / schedule) | 🟡 | 2026-11-08 | Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…) |
 | 21 | F Notifs | Notification triggers (088) | 🟡 | 2026-11-08 | Constraint widened with the 6 tournament types (082 list copied); triggers: tournament_admins insert, module_admins insert, entry added (insert / profile_id set), match scheduled + result (linked profiles of both entries), module completed (entrants + module admins). All except admin-assigned only fire while the tournament is published; deduped with _notification_already_exists. No edge-function change (trg_fcm_push → send-notification handles delivery) |
-| 22 | F Notifs | Client wiring (types, prefs, routing) | ⬜ | | |
+| 22 | F Notifs | Client wiring (types, prefs, routing) | 🟡 | 2026-11-08 | 6 tournament types added to NotificationType (+ fcm NotificationType/NotificationData incl. tournamentId/moduleId); tournament_updates pref (optional key, default true); push tap (useFCM) routes to module or tournament; Activity cards show a trophy icon and route on tap; all tournament_* land in Past Activity (not actionable) |
 | 23 | G Finish | Polish + AGENTS.md + privacy draft | ⬜ | | |
 | 24 | G Finish | (optional) Tournament requests | ⬜ | | Only if owner confirms |
 
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 22: Client wiring
+- **Done:** 6 tournament types added to NotificationType (+ fcm NotificationType/NotificationData incl. tournamentId/moduleId); tournament_updates pref (optional key, default true); push tap (useFCM) routes to module or tournament; Activity cards show a trophy icon and route on tap; all tournament_* land in Past Activity (not actionable)
+- **Files:** src/types/index.ts, src/services/fcm.ts, src/hooks/useFCM.ts, src/components/ActivityCard.tsx
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: device push tap test after applying 088
+- **Next action:** Step 23 polish + docs
 
 ### 2026-11-08 — Step 21: Notification triggers (088)
 - **Done:** Constraint widened with the 6 tournament types (082 list copied); triggers: tournament_admins insert, module_admins insert, entry added (insert / profile_id set), match scheduled + result (linked profiles of both entries), module completed (entrants + module admins). All except admin-assigned only fire while the tournament is published; deduped with _notification_already_exists. No edge-function change (trg_fcm_push → send-notification handles delivery)

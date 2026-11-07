@@ -35,7 +35,13 @@ export type NotificationType =
   | 'session_chat_message'
   | 'session_chat_reply'
   | 'community_chat_message'
-  | 'community_chat_reply';
+  | 'community_chat_reply'
+  | 'tournament_admin_assigned'
+  | 'tournament_module_admin_assigned'
+  | 'tournament_entry_added'
+  | 'tournament_match_scheduled'
+  | 'tournament_match_result'
+  | 'tournament_module_completed';
 
 export interface NotificationData {
   type: NotificationType;
@@ -45,6 +51,8 @@ export interface NotificationData {
   commentId?: string;
   sessionId?: string;
   communityId?: string;
+  tournamentId?: string;
+  moduleId?: string;
   message?: string;
 }
 
@@ -236,6 +244,8 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     commentId: data?.commentId,
     sessionId: data?.sessionId,
     communityId: data?.communityId,
+    tournamentId: data?.tournamentId,
+    moduleId: data?.moduleId,
     message: data?.message,
   };
 

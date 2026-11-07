@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { removeFCMToken } from '@/services/profiles';
 import {
   registerForPushNotificationsAsync,
@@ -125,6 +126,19 @@ export function useFCM() {
               pathname: '/chat',
               params: { type: 'community', id: data.communityId },
             });
+          }
+          return;
+        }
+        case 'tournament_admin_assigned':
+        case 'tournament_module_admin_assigned':
+        case 'tournament_entry_added':
+        case 'tournament_match_scheduled':
+        case 'tournament_match_result':
+        case 'tournament_module_completed': {
+          if (data.tournamentId && data.moduleId) {
+            router.push(tournamentRoutes.module(data.tournamentId, data.moduleId));
+          } else if (data.tournamentId) {
+            router.push(tournamentRoutes.tournament(data.tournamentId));
           }
           return;
         }

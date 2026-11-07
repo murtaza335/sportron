@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { Bell, Check, CheckCircle, Swords, UserPlus, X, XCircle } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Bell, Check, CheckCircle, Swords, Trophy, UserPlus, X, XCircle } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
@@ -10,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
+import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
 import type { InAppNotification, NotificationType } from '@/types';
@@ -38,6 +40,13 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
       return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
     case 'community_match_pending':
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
+    case 'tournament_admin_assigned':
+    case 'tournament_module_admin_assigned':
+    case 'tournament_entry_added':
+    case 'tournament_match_scheduled':
+    case 'tournament_match_result':
+    case 'tournament_module_completed':
+      return <Trophy size={20} color={theme.text} strokeWidth={2.2} />;
     default:
       return <Bell size={20} color={theme.text} strokeWidth={2.2} />;
   }
@@ -267,7 +276,18 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
 
   return (
     <Pressable
-      onPress={() => markAsRead(notification.id)}
+      onPress={() => {
+        markAsRead(notification.id);
+        if (notification.type.startsWith('tournament_')) {
+          const tId = notification.data?.tournamentId;
+          const mId = notification.data?.moduleId;
+          if (typeof tId === 'string' && typeof mId === 'string') {
+            router.push(tournamentRoutes.module(tId, mId));
+          } else if (typeof tId === 'string') {
+            router.push(tournamentRoutes.tournament(tId));
+          }
+        }
+      }}
       style={({ pressed }) => ({
         backgroundColor: notification.read ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,

@@ -124,6 +124,8 @@ export type NotificationPreferences = {
   streak_reminder: boolean;
   streak_at_risk: boolean;
   streak_milestone: boolean;
+  /** All tournament_* notifications (optional: older stored prefs don't have it → treated as true). */
+  tournament_updates?: boolean;
 };
 
 export type Match = {
@@ -197,6 +199,7 @@ export const DEFAULT_NOTIFICATION_PREFERENCES: NotificationPreferences = {
   streak_reminder: true,
   streak_at_risk: true,
   streak_milestone: true,
+  tournament_updates: true,
 };
 
 export type MatchStats = {
@@ -242,7 +245,13 @@ export type NotificationType =
   | 'community_chat_reply'
   | 'streak_reminder'
   | 'streak_at_risk'
-  | 'streak_milestone';
+  | 'streak_milestone'
+  | 'tournament_admin_assigned'
+  | 'tournament_module_admin_assigned'
+  | 'tournament_entry_added'
+  | 'tournament_match_scheduled'
+  | 'tournament_match_result'
+  | 'tournament_module_completed';
 
 export type InAppNotification = {
   id: string;
