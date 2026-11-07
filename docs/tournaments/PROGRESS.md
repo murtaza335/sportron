@@ -31,7 +31,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 20 | E Admin | Results (played / walkover / reset / schedule) | 🟡 | 2026-11-08 | Admin match actions in the match sheet: Enter/Edit result (Played: per-game rows for racket sports with games-won auto-count + detail; single score row for team sports; winner pick only when level; Walkover mode with winner pick + default note), Schedule sheet (date/time, venue, court), Reset with confirm. Server errors mapped (TIE_NEEDS_WINNER, DOWNSTREAM_PLAYED…) |
 | 21 | F Notifs | Notification triggers (088) | 🟡 | 2026-11-08 | Constraint widened with the 6 tournament types (082 list copied); triggers: tournament_admins insert, module_admins insert, entry added (insert / profile_id set), match scheduled + result (linked profiles of both entries), module completed (entrants + module admins). All except admin-assigned only fire while the tournament is published; deduped with _notification_already_exists. No edge-function change (trg_fcm_push → send-notification handles delivery) |
 | 22 | F Notifs | Client wiring (types, prefs, routing) | 🟡 | 2026-11-08 | 6 tournament types added to NotificationType (+ fcm NotificationType/NotificationData incl. tournamentId/moduleId); tournament_updates pref (optional key, default true); push tap (useFCM) routes to module or tournament; Activity cards show a trophy icon and route on tap; all tournament_* land in Past Activity (not actionable) |
-| 23 | G Finish | Polish + AGENTS.md + privacy draft | ⬜ | | |
+| 23 | G Finish | Polish + AGENTS.md + privacy draft | 🟡 | 2026-11-08 | AGENTS.md updated (structure, feature section 10, data model, routing, notification count 43, next migration 089, history, remaining work); privacy-policy draft text written to docs/tournaments/privacy-draft.md (NOT applied to PRIVACY_POLICY.md); tournaments list got a load-error state; deviations recorded; accessibility labels on interactive controls |
 | 24 | G Finish | (optional) Tournament requests | ⬜ | | Only if owner confirms |
 
 ## Decisions (owner)
@@ -69,9 +69,19 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - 086: `update_tournament_module` also blocks changing `third_place_match` once a bracket is generated (would desync rounds); admin must go seeding→open first. `withdraw_tournament_entry` lives in 086 (reason goes to audit log; no column). `set_module_seeds` requires the full list of active entries.
 - 087: `record_tournament_walkover` requires BOTH entries present (PLAN §5.4 allowed one empty slot). A one-sided walkover would let the still-undecided feeder match push an entry into the already-decided match. To handle a no-show, record the walkover on the match where the entrant faces an opponent.
 - 087: module completion is a shared internal `_complete_tournament_module` called whenever a terminal match (final or 3rd place) is decided, so either order works. A 3rd-place match is skipped when the bracket has only 1 round (N=2).
+- Client: score entry uses a compact `MiniStepper` (−/value/+ with numeric input) instead of the hero `ScoreCounter` (144px tall, unusable for per-game rows); same icons/tokens.
+- Client: tournament hrefs go through `src/lib/tournamentRoutes.ts` (casts) because expo-router's generated route types don't know the new routes until the dev server regenerates them.
+- Client: matches tab uses plain grouped Views instead of `SectionList` (nested in the module ScrollView), which avoids nested-virtualization warnings; ≤127 matches per module.
+- Client: 'Shuffle unseeded' only appears while some entries have no saved seed; 'Recorded by' is not shown in the match sheet (bracket RPC doesn't return the recorder).
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 23: Polish + AGENTS.md + privacy draft
+- **Done:** AGENTS.md updated (structure, feature section 10, data model, routing, notification count 43, next migration 089, history, remaining work); privacy-policy draft text written to docs/tournaments/privacy-draft.md (NOT applied to PRIVACY_POLICY.md); tournaments list got a load-error state; deviations recorded; accessibility labels on interactive controls
+- **Files:** AGENTS.md, docs/tournaments/privacy-draft.md, src/app/(tabs)/tournaments.tsx (error state)
+- **Verified:** tsc ✅ · npm run lint: 21 problems both before and after my changes (all pre-existing, none in tournament files) · dark mode/web/device audit needs owner
+- **Next action:** Owner sign-off; step 24 optional (not started: needs owner confirmation)
 
 ### 2026-11-08 — Step 22: Client wiring
 - **Done:** 6 tournament types added to NotificationType (+ fcm NotificationType/NotificationData incl. tournamentId/moduleId); tournament_updates pref (optional key, default true); push tap (useFCM) routes to module or tournament; Activity cards show a trophy icon and route on tap; all tournament_* land in Past Activity (not actionable)

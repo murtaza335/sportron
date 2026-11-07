@@ -38,10 +38,12 @@ src/
 │   ├── community/[id]/join-requests.tsx # Admin review of join requests
 │   ├── community/[id]/pending-matches.tsx # Pending community matches awaiting approval
 │   ├── profile/[id].tsx        # Public profile view (+ per-community stats, streak)
+│   ├── tournament/[id].tsx (+ /manage, /fields, /module-form, /module/[moduleId] (+ /manage, /seeding, /rounds, /entry-form))   # Tournaments (see section 10)
 │   └── (tabs)/
-│       ├── _layout.tsx         # 4 visible tabs: Communities / Sessions / Chats / Activity; `profile` is a hidden tab (href: null) opened from the header avatar. Header: streak flame (left, Communities), What's-New dot
+│       ├── _layout.tsx         # 5 visible tabs: Communities / Sessions / **Tournaments (centre, raised bump button, icon only)** / Chats / Activity; `profile` is a hidden tab (href: null) opened from the header avatar. Header: streak flame (left, Communities), What's-New dot
 │       ├── index.tsx           # My communities (home)
 │       ├── history.tsx         # Sessions: New (All/Joined/My + purpose filter) or History view; also pops the post-session feedback popup
+│       ├── tournaments.tsx     # Tournaments list (Live / Upcoming / Past / Mine) — centre tab
 │       ├── chats.tsx           # Chats hub: community/session chat rows with unread badges
 │       ├── updates.tsx         # Activity - in-app notifications inbox
 │       └── profile.tsx         # Profile view/edit + theme + notification toggle + What's New
@@ -58,12 +60,14 @@ src/
 │   ├── FCMInitializer.tsx / EnablePushNotificationsButton.tsx    # push wiring (native) / permission prompt (web)
 │   ├── MaintenanceScreen.tsx / ForcedUpdateScreen.tsx / SplashScreen.tsx
 │   └── ui/                     # Button, Card, SegmentedControl, Text
+├── components/tournaments/       # TournamentCard, ModuleCard, ChampionsStrip, Bracket{View,MatchNode,Connectors}, Standings{Table,Chart}, Module{Entries,Info,Matches,Standings}Tab, EntrySheet, TournamentMatchSheet, ResultEntrySheet, ScheduleSheet, ProfilePickerSheet, EntryFieldEditorSheet, DateTimeField, BottomSheet, form primitives, StatusPill, TournamentTabBarButton, TabBarBumpBackground
 ├── contexts/
 │   ├── AuthContext.tsx              # Supabase auth + profile state + account re-enable
 │   ├── NotificationsContext.tsx     # Shared notifications feed + unread badge + realtime (INSERT/UPDATE/DELETE)
 │   ├── ThemeContext.tsx             # Theme provider (light/dark/system, persisted)
 │   └── MaintenanceContext.tsx       # Exists but the root layout does its own site_config check; not in the provider tree
 ├── hooks/
+│   ├── useTournaments.ts / useTournament.ts / useTournamentModule.ts / useTournamentFields.ts   # tournaments (list SWR cache, detail, module + realtime bracket, entry-form fields)
 │   ├── useCommunities.ts / useCommunity.ts / useCommunityPosts.ts
 │   ├── useSessions.ts               # Session feeds by scope (all/joined/my) + history
 │   ├── useChat.ts                   # Generic chat thread (optimistic send + realtime dedupe)
@@ -81,9 +85,11 @@ src/
 │   ├── notifications.ts        # READ-ONLY inbox ops (fetch/mark read/delete) — notifications are CREATED by DB triggers
 │   ├── streak.ts               # compute/update streak (match_recorded | session_joined | session_created)
 │   ├── config.ts               # site_config: maintenance flag + min app version
+│   ├── tournaments.ts          # tournament RPC wrappers (one fn per RPC; throw raw RPC message, mapped by lib/tournamentErrors)
 │   ├── audit.ts                # Read helpers for audit_logs (table is not client-readable — see migration 062)
 │   └── fcm.ts                  # FCM token management + listeners + local notifications
 ├── lib/
+│   ├── bracketLayout.ts / tournamentFormat.ts / tournamentErrors.ts / tournamentRoutes.ts   # tournaments: bracket math, status/format helpers, RPC error-code → copy, typed hrefs
 │   ├── supabase.ts, cloudinary.ts, firebase.ts (web), date.ts, alert.ts (cross-platform alert)
 │   ├── sessionsView.ts         # 'new' | 'history' toggle store (useSyncExternalStore)
 │   ├── chatUnreadStore.ts      # Tab-badge chat unread store
@@ -93,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 083 (next = 084) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 088 (next = 089) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -204,6 +210,15 @@ supabase/
 - **Push notification master toggle** (profile + `/settings`); per-type preferences exist in `profiles.notification_preferences` (`NotificationPreferences`, 33 keys) with defaults in `DEFAULT_NOTIFICATION_PREFERENCES`. Web shows `EnablePushNotificationsButton`
 - **Delete account** (soft delete); re-enabled on re-login
 
+### 10. Tournaments (migrations 084–088; full spec in [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md), status in [`PROGRESS.md`](docs/tournaments/PROGRESS.md))
+- **Hierarchy**: Tournament (no sport; created + admins assigned by the owner via SQL — [`owner-sql.md`](docs/tournaments/owner-sql.md)) → **Modules** (one sport each, created by tournament admins) → **entries** (added by module admins only, no self-registration) → single-elimination **bracket** (optional 3rd-place match, byes, walkovers). Tournament admins can only rename the tournament, edit the entry form, create modules and assign module admins; they also hold module-admin powers in all their modules
+- **Entry form** is per tournament: 5 locked core fields (Name, CMS ID, School, Phone, Email; Name+School public, CMS ID/Phone/Email private) + custom fields (archived instead of deleted). Entry values live in `tournament_entries.field_values`; private values are stripped for non-admins **server-side** by `get_module_entries`
+- **All writes go through SECURITY DEFINER RPCs** (clients have no INSERT/UPDATE/DELETE on any tournament table); reads through `get_tournaments`, `get_tournament_detail`, `get_module_*`; engine in 087 (`generate_bracket`, `record_tournament_result`, `record_tournament_walkover`, `reset_tournament_match`, `schedule_tournament_match`); errors are short codes (`NOT_ALLOWED`, `DUPLICATE_CMS_ID`, `TIE_NEEDS_WINNER`, `DOWNSTREAM_PLAYED`…) mapped client-side
+- **Walkover requires both entries present** (deviation from the original plan, see PROGRESS). Module auto-completes (final ranks + `completed`) when the final / 3rd-place match is decided
+- **Realtime**: `useTournamentModule` subscribes to `tournament_matches` (module filter, 400 ms debounce) so the bracket updates live
+- **Notifications** (088): 6 `tournament_*` types created by triggers (only while the tournament is `published`, except admin-assigned); push via the existing `trg_fcm_push`; tap → module/tournament screen. Optional pref `tournament_updates`
+- **Admin UI**: gear on tournament/module pages → manage screens (entry-form editor, module form, seeding, rounds); results via the match sheet (Enter/Edit result, Schedule, Reset)
+
 ---
 
 ## Data Model (Supabase)
@@ -309,6 +324,12 @@ audit_logs   -- migration 045: id, actor_id, action, table_name, record_id, old_
 site_config  -- migration 047: key, value jsonb  ('maintenance' {enabled,message}, 'min_app_version' {min_version,store_url,message})
 chat_presence -- migration 031: heartbeat rows used to skip pushes for active readers
 
+
+tournaments / tournament_admins / tournament_entry_fields / tournament_modules / tournament_module_admins /
+tournament_entries / tournament_rounds / tournament_matches   -- migration 084 (see PLAN §4)
+  -- RLS SELECT-only; helpers is_tournament_admin / is_module_admin / can_view_tournament / can_view_module;
+  -- core entry fields seeded + locked by triggers; tournament_matches is in the supabase_realtime publication
+
 -- profiles additionally: streak_count, longest_streak, last_activity_date, streak_updated_at (041);
 --   display_name (nullable), `role` made nullable and unused (040). Other users' profiles are read via the
 --   `public_profiles` VIEW (safe columns only); the profiles table itself is own-row SELECT (046)
@@ -328,7 +349,7 @@ chat_presence -- migration 031: heartbeat rows used to skip pushes for active re
 ```
 
 ### Notification Types
-See `NotificationType` in `src/types/index.ts` (37 types, `match_pending` … `streak_milestone`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`). The DB `in_app_notifications.type` check constraint (migrations 008/014/034/071/077/079/082) is the source of truth for stored types and also allows `member_joined`, `community_engagement` and `new_community`, which are **not** in the TS union yet — **adding any new notification type requires a migration extending that check constraint** (a past bug: streak types were inserted before the constraint allowed them, fixed in 071).
+See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `tournament_module_completed`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`). The DB `in_app_notifications.type` check constraint (migrations 008/014/034/071/077/079/082/088) is the source of truth for stored types and also allows `member_joined`, `community_engagement` and `new_community`, which are **not** in the TS union yet — **adding any new notification type requires a migration extending that check constraint** (a past bug: streak types were inserted before the constraint allowed them, fixed in 071).
 
 ---
 
@@ -345,10 +366,11 @@ See `NotificationType` in `src/types/index.ts` (37 types, `match_pending` … `s
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **084**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **089**
 
 ### Routing (expo-router v57)
-- Tabs: `/` (Communities), `/history` (Sessions), `/chats` (Chats), `/updates` (Activity); `/profile` is a hidden tab (`href: null`)
+- Tabs: `/` (Communities), `/history` (Sessions), `/tournaments` (Tournaments, centre), `/chats` (Chats), `/updates` (Activity); `/profile` is a hidden tab (`href: null`)
+- Tournament stack screens (`headerShown`): `/tournament/[id]`, `/tournament/[id]/manage`, `/tournament/[id]/fields`, `/tournament/[id]/module/[moduleId]` (+ `/manage`, `/seeding`, `/rounds`); modals: `/tournament/[id]/module-form`, `/tournament/[id]/module/[moduleId]/entry-form`. Use `tournamentRoutes` (`src/lib/tournamentRoutes.ts`) for hrefs (generated route types lag new routes)
 - Stack screens with `headerShown`: `/settings`, `/discover`, `/community/[id]`, `/community/[id]/members`, `/community/[id]/info`, `/community/[id]/edit`, `/community/[id]/pending-matches`, `/profile/[id]` (`/community/[id]/join-requests` is auto-registered, no explicit options)
 - Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`, `/chat`
 - `src/app/chat.tsx` reads `{ type: 'community' | 'session', id }` and renders the matching `CommunityChatPopup` / `SessionChatPopup` full screen. Chat **push notification** taps (`session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply`) navigate here directly via `useFCM.navigateToNotification` (previously they opened the community/history screen).
@@ -430,14 +452,9 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
   - "feat: daily streaks + streak/retention cron pushes (041/042/071/072), session feedback (showed up / no-show)"
   - "feat: community posts feed (text + photo, likes, comments) merged with matches, FAB menu (073–078)"
   - "feat: maintenance mode + forced-update gate via `site_config` (047), What's New, web push permission prompt, new-community discovery + admin engagement notifications (079–083)"
+  - "feat: tournaments — SQL schema/RPCs/bracket engine/notifications (084–088), centre Tournaments tab, bracket/standings/matches, admin management screens"
 
 ---
 
-## Next Up: Tournament Management (planned — nothing implemented yet)
-**The detailed plan is [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md) and progress is tracked in [`docs/tournaments/PROGRESS.md`](docs/tournaments/PROGRESS.md) — both supersede the generic notes below where they differ.** Work one step at a time (PLAN §14) and update PROGRESS.md each session (PLAN §15). v1 summary: Tournament (top entity, no sport; created + tournament admins assigned by the owner via SQL) → sport-linked **Modules** created by tournament admins → **Module admins** add entries (generic form: Name, CMS ID, School, Phone, Email + custom fields), run a single-elimination bracket (optional 3rd place, walkovers) and enter all results. Champions shown on the tournament page above modules. New centre tab with a raised bump in the bottom bar.
-
-No tournament code, tables, routes or notification types exist. Hooks to build on when adding it:
-- **Anchor to communities** (matches and sports already live there): a tournament belongs to a community (sport fixed by the community), admins create/manage it, members register. Reuse `isRacketSport`/`isTeamSport`, singles/doubles + team-name match model, and the approve/dispute flow for result reporting where it fits
-- **Likely entry points**: community home FAB/header, a new `community/[id]/tournaments` screen group, results surfacing in the posts+matches feed
-- **Checklist for the feature** (all conventions above apply): additive migration **084+** (never alter existing columns); RLS + `auth.uid()`-guarded RPCs for reads; notifications via **DB triggers** + extend the `in_app_notifications.type` check constraint + `NotificationType`/`NotificationPreferences`/`DEFAULT_NOTIFICATION_PREFERENCES`; tap-routing in `useFCM.navigateToNotification`; old installed builds must keep working (new tables only, no changes to `community_matches` shape they read); redeploy any edited edge function; `Edit` this file's structure/data-model sections when done
-- Existing planning notes: `SCALABILITY.md` (rough `tournaments`/`brackets`/`tournament_teams` sketch — treat as a starting idea, not a spec)
+## Tournaments — remaining work
+Implemented in code (steps 1–23 of [`PLAN.md`](docs/tournaments/PLAN.md) §14); **database steps need the owner to apply migrations 084–088 and run [`docs/tournaments/sql-tests.sql`](docs/tournaments/sql-tests.sql)**, and the screens need an on-device check (see PROGRESS.md "needs owner" notes). Not built: tournament requests (step 24, optional), self-registration, round-robin/double-elim, tournament chat, community-hosted tournaments (`tournaments.community_id` exists unused). Adding more tournament notification types needs another migration extending the `in_app_notifications.type` check constraint.

@@ -30,7 +30,7 @@ export default function TournamentsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const [scope, setScope] = useState<TournamentScope>('live');
-  const { tournaments, loading, refreshing, refresh } = useTournaments(scope);
+  const { tournaments, loading, refreshing, error, refresh } = useTournaments(scope);
   const empty = EMPTY[scope];
 
   return (
@@ -48,6 +48,12 @@ export default function TournamentsScreen() {
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator color={theme.text} style={styles.loader} />
+          ) : error ? (
+            <View style={styles.empty}>
+              <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
+              <ThemedText variant="heading">Couldn&apos;t load tournaments</ThemedText>
+              <ThemedText muted style={styles.emptySub}>Pull down to try again.</ThemedText>
+            </View>
           ) : (
             <View style={styles.empty}>
               <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
