@@ -20,7 +20,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 9 | C Nav | Centre tab with bump + route registration | 🟡 | 2026-11-08 | Centre Tournaments tab with raised circular button + SVG bump background (icon only), all tournament stack screens/modals registered with placeholder bodies |
 | 10 | D Public | Tournaments list | 🟡 | 2026-11-08 | Tournaments tab: Live/Upcoming/Past/Mine segmented scopes, TournamentCard (CommunityCard recipe, status pill, sport pills, role tag), empty/loading/pull-to-refresh. Added tournamentRoutes typed-href helper (generated route types lag new routes) |
 | 11 | D Public | Tournament page (champions → modules → about) | 🟡 | 2026-11-08 | Tournament page: cover, status/date/org/location, Champions strip above Modules, module cards, admin gear + Add module, About with read-more + admins, cancelled banner, empty states |
-| 12 | D Public | Module page shell + Info + Entries | ⬜ | | |
+| 12 | D Public | Module page shell + Info + Entries | 🟡 | 2026-11-08 | Module page shell (header, champion row, 5 scrollable segmented tabs, default tab Bracket-if-exists else Entries), Info tab, Entries tab with search + EntrySheet (view only; private fields only come from the server for admins/own entry). Bracket/Standings/Matches tabs are stubs until steps 13-15. Generic BottomSheet component added |
 | 13 | D Public | Bracket view | ⬜ | | |
 | 14 | D Public | Standings table + chart | ⬜ | | |
 | 15 | D Public | Matches tab + match sheet (view) | ⬜ | | |
@@ -72,6 +72,12 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Step 12: Module page shell + Info + Entries
+- **Done:** Module page shell (header, champion row, 5 scrollable segmented tabs, default tab Bracket-if-exists else Entries), Info tab, Entries tab with search + EntrySheet (view only; private fields only come from the server for admins/own entry). Bracket/Standings/Matches tabs are stubs until steps 13-15. Generic BottomSheet component added
+- **Files:** src/app/tournament/[id]/module/[moduleId].tsx, src/components/tournaments/{BottomSheet,EntrySheet,ModuleEntriesTab,ModuleInfoTab}.tsx, src/hooks/useTournamentFields.ts
+- **Verified:** tsc ✅ · eslint ✅ · needs owner: view against seeded data
+- **Next action:** Step 13 bracket view
 
 ### 2026-11-08 — Step 11: Tournament page
 - **Done:** Tournament page: cover, status/date/org/location, Champions strip above Modules, module cards, admin gear + Add module, About with read-more + admins, cancelled banner, empty states
