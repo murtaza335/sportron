@@ -4,6 +4,8 @@ import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { BottomSheet } from '@/components/tournaments/BottomSheet';
+import { PillSelect } from '@/components/tournaments/form';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -13,7 +15,7 @@ import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { generateLabel, previewTab, structureSummary } from '@/lib/tournamentFormat';
-import { generateBracket, setModuleSeeds } from '@/services/tournaments';
+import { generateBracket, moveGroupEntry, setModuleSeeds } from '@/services/tournaments';
 
 type Item = { id: string; name: string; seeded: boolean };
 
@@ -25,6 +27,7 @@ export default function SeedingScreen() {
   const m = useTournamentModule(moduleId);
   const [order, setOrder] = useState<Item[] | null>(null);
   const [dirty, setDirty] = useState(false);
+  const [moving, setMoving] = useState<{ entryId: string; name: string; groupId: string } | null>(null);
   const [busy, setBusy] = useState<'save' | 'generate' | null>(null);
   const initialised = useRef(false);
 
@@ -118,6 +121,20 @@ export default function SeedingScreen() {
     }
   };
 
+  const doMove = async (groupId: string) => {
+    if (!moving) return;
+    setBusy('save');
+    try {
+      await moveGroupEntry(moving.entryId, groupId);
+      setMoving(null);
+      await m.refresh();
+    } catch (e) {
+      alert('Something went wrong', friendlyTournamentError(e));
+    } finally {
+      setBusy(null);
+    }
+  };
+
   const onGenerate = () => {
     if (hasBracket) {
       alert('Regenerate?', 'The current fixtures and any results will be replaced.', [
@@ -184,6 +201,39 @@ export default function SeedingScreen() {
         ))}
       </View>
 
+      {mod.format === 'groups_knockout' && m.groups.length > 0 && (
+        <View style={{ gap: Spacing.sm }}>
+          <ThemedText variant="label" muted>GROUPS</ThemedText>
+          {m.groups.map((g) => (
+            <View key={g.id} style={[styles.list, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+              <View style={[styles.row, { borderBottomWidth: 1, borderBottomColor: theme.border }]}>
+                <ThemedText style={{ flex: 1, fontWeight: '700' }}>{g.name}</ThemedText>
+                <ThemedText variant="caption" muted>{g.entries.length} entries</ThemedText>
+              </View>
+              {g.entries.map((en, i) => (
+                <Pressable
+                  key={en.entry_id}
+                  disabled={mod.status !== 'seeding'}
+                  onPress={() => setMoving({ entryId: en.entry_id, name: en.name, groupId: g.id })}
+                  style={({ pressed }) => [styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }, pressed && { opacity: 0.6 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move ${en.name} to another group`}
+                >
+                  <View style={[styles.seed, { backgroundColor: theme.backgroundSelected }]}>
+                    <ThemedText variant="caption" style={{ fontWeight: '700' }}>{en.seed ?? '–'}</ThemedText>
+                  </View>
+                  <ThemedText style={{ flex: 1, fontWeight: '600' }} numberOfLines={1}>{en.name}</ThemedText>
+                  {mod.status === 'seeding' && <ThemedText variant="caption" muted>Move</ThemedText>}
+                </Pressable>
+              ))}
+            </View>
+          ))}
+          <ThemedText variant="caption" muted>
+            Tap an entry to move it to another group. Fixtures are rebuilt. Each group keeps 2–8 entries.
+          </ThemedText>
+        </View>
+      )}
+
       {editable && (
         <Button label="Save seeds" variant="secondary" onPress={onSave} loading={busy === 'save'} disabled={!!busy || !dirty} />
       )}
@@ -202,6 +252,20 @@ export default function SeedingScreen() {
           onPress={() => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=${previewTab(mod.format)}` as never)}
         />
       )}
+      <BottomSheet visible={!!moving} onClose={() => setMoving(null)}>
+        {moving && (
+          <View style={{ gap: Spacing.md, paddingBottom: Spacing.md }}>
+            <ThemedText variant="heading">Move {moving.name}</ThemedText>
+            <ThemedText variant="caption" muted>Pick the group to move them to.</ThemedText>
+            <PillSelect
+              options={m.groups.filter((g) => g.id !== moving.groupId).map((g) => ({ value: g.id, label: g.name }))}
+              value={null}
+              onChange={doMove}
+              disabled={busy !== null}
+            />
+          </View>
+        )}
+      </BottomSheet>
     </ScrollView>
   );
 }

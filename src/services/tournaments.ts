@@ -4,6 +4,7 @@ import type {
   ModuleDetail,
   ModuleFormInput,
   ModuleGroup,
+  KnockoutQualifier,
   ModuleSettingsPatch,
   StandingsV2,
   ProfileLite,
@@ -83,6 +84,7 @@ export async function fetchModuleDetail(moduleId: string): Promise<ModuleDetail>
       matches: Number(d.counts?.matches ?? 0),
       matches_decided: Number(d.counts?.matches_decided ?? 0),
       rosters_incomplete: Number(d.counts?.rosters_incomplete ?? 0),
+      groups_finished: !!d.counts?.groups_finished,
     },
   };
 }
@@ -113,6 +115,24 @@ export async function fetchModuleMatches(moduleId: string): Promise<TournamentMa
 export async function fetchModuleStandingsV2(moduleId: string): Promise<StandingsV2> {
   const d = await rpc<StandingsV2>('get_module_standings_v2', { p_module: moduleId });
   return d;
+}
+
+export async function moveGroupEntry(entryId: string, groupId: string): Promise<void> {
+  await rpc<null>('move_group_entry', { p_entry: entryId, p_group: groupId });
+}
+
+export async function previewKnockoutQualifiers(moduleId: string): Promise<KnockoutQualifier[]> {
+  const rows = await rpc<KnockoutQualifier[] | null>('preview_knockout_qualifiers', { p_module: moduleId });
+  return (rows ?? []).map((r) => ({ ...r, position: Number(r.position), suggested_seed: Number(r.suggested_seed) }));
+}
+
+/** `entryIds` = qualifier ids in the wanted seed order, or null for the suggested order. Returns the match count. */
+export async function buildKnockoutStage(moduleId: string, entryIds: string[] | null): Promise<number> {
+  return rpc<number>('build_knockout_stage', { p_module: moduleId, p_entry_ids: entryIds });
+}
+
+export async function resetKnockoutStage(moduleId: string): Promise<void> {
+  await rpc<null>('reset_knockout_stage', { p_module: moduleId });
 }
 
 export async function fetchModuleGroups(moduleId: string): Promise<ModuleGroup[]> {

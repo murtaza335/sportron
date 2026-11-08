@@ -244,6 +244,8 @@ export type ModuleDetail = {
     withdrawn: number;
     matches: number;
     matches_decided: number;
+    /** Groups + knockout: every group match decided. */
+    groups_finished: boolean;
     /** Team modules: active teams with fewer than roster_min players. */
     rosters_incomplete: number;
   };

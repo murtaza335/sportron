@@ -17,6 +17,7 @@ export const tournamentRoutes = {
   entryForm: (id: string, moduleId: string, entryId?: string) =>
     h(`/tournament/${id}/module/${moduleId}/entry-form${entryId ? `?entryId=${entryId}` : ''}`),
   seeding: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/seeding`),
+  knockout: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/knockout`),
   rounds: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/rounds`),
   profile: (id: string) => h(`/profile/${id}`),
 };

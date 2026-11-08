@@ -13,6 +13,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LeagueTable } from '@/components/tournaments/LeagueTable';
+import { ModuleGroupsTab } from '@/components/tournaments/ModuleGroupsTab';
 import { BracketView } from '@/components/tournaments/BracketView';
 import { ResultEntrySheet } from '@/components/tournaments/ResultEntrySheet';
 import { ScheduleSheet } from '@/components/tournaments/ScheduleSheet';
@@ -303,7 +304,7 @@ export default function ModuleScreen() {
           {tab === 'info' && <ModuleInfoTab module={mod} rounds={m.rounds} admins={m.admins} />}
           {tab === 'bracket' && (
             <BracketView
-              matches={m.bracket}
+              matches={mod.format === 'groups_knockout' ? m.bracket.filter((x) => x.stage_number === 2) : m.bracket}
               moduleStatus={mod.status}
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
@@ -332,6 +333,22 @@ export default function ModuleScreen() {
                 />
               )}
             </View>
+          )}
+          {tab === 'groups' && (
+            <ModuleGroupsTab
+              module={mod}
+              groups={m.standingsV2?.groups ?? []}
+              matches={m.matches.filter((x) => x.bracket_side === 'group')}
+              viewerId={user?.id}
+              isAdmin={m.isModuleAdmin}
+              groupsFinished={!!m.counts?.groups_finished}
+              onSelectEntry={(entryId) => {
+                const e = m.entries.find((x) => x.id === entryId);
+                if (e) setSelected(e);
+              }}
+              onSelectMatch={(match) => setSelectedMatchId(match.id)}
+              onBuildKnockout={() => router.push(tournamentRoutes.knockout(id, moduleId))}
+            />
           )}
           {tab === 'standings' && (
             <ModuleStandingsTab
