@@ -34,6 +34,33 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 23 | G Finish | Polish + AGENTS.md + privacy draft | 🟡 | 2026-11-08 | AGENTS.md updated (structure, feature section 10, data model, routing, notification count 43, next migration 089, history, remaining work); privacy-policy draft text written to docs/tournaments/privacy-draft.md (NOT applied to PRIVACY_POLICY.md); tournaments list got a load-error state; deviations recorded; accessibility labels on interactive controls |
 | 24 | G Finish | (optional) Tournament requests | ⬜ | | Only if owner confirms |
 
+## v2 — Rosters & formats (see `PLAN-v2.md` §13)
+
+| # | Phase | Step | Status | Date | Files / notes |
+|---|---|---|---|---|---|
+| 25 | H Rosters | Roster schema (090) | ⬜ | | Ask owner B1–B8 + PLAN-v2 Ground Rule 3 question first |
+| 26 | H Rosters | Roster RPCs + reads (091) | ⬜ | | |
+| 27 | H Rosters | Roster notifications (092) | ⬜ | | |
+| 28 | H Rosters | Client foundation (rosters) | ⬜ | | |
+| 29 | H Rosters | Module form: players section | ⬜ | | |
+| 30 | H Rosters | Team entry form + roster display | ⬜ | | |
+| 31 | H Rosters | Manage checklist + end-to-end | ⬜ | | |
+| 32 | I League | Formats schema (093) | ⬜ | | |
+| 33 | I League | Engine refactor + round-robin + draws (094) | ⬜ | | Run v1 sql-tests on the refactor before adding RR code |
+| 34 | I League | Client: formats foundation + league table | ⬜ | | |
+| 35 | I League | Module form: format section | ⬜ | | |
+| 36 | I League | RR matches + results + seeding copy | ⬜ | | |
+| 37 | J Groups | Group stage engine (095) | ⬜ | | |
+| 38 | J Groups | Knockout stage engine (096) | ⬜ | | |
+| 39 | J Groups | Double-elim engine (097) | ⬜ | | |
+| 40 | J Groups | Client: groups tab + seeding groups mode | ⬜ | | |
+| 41 | J Groups | Client: knockout builder | ⬜ | | |
+| 42 | K DE | Bracket layout generalisation | ⬜ | | v1 layout output must stay identical |
+| 43 | K DE | DE bracket UI + standings | ⬜ | | |
+| 44 | K Finish | Polish & docs | ⬜ | | |
+
+v2 open assumptions (PLAN-v2 §1.3): B1–B17. Record answers in Decisions below before the dependent step.
+
 ## Decisions (owner)
 
 | Date | Decision |
