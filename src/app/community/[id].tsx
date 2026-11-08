@@ -1,3 +1,4 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -21,7 +22,6 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -1058,7 +1058,7 @@ export default function CommunityDetailScreen() {
           animationType="fade"
           onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
         >
-          <KeyboardAvoidingView
+          <KeyboardAvoider modal
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
             style={styles.pingModalKeyboardAvoiding}
@@ -1118,7 +1118,7 @@ export default function CommunityDetailScreen() {
                 )}
               </Pressable>
             </Pressable>
-          </KeyboardAvoidingView>
+          </KeyboardAvoider>
         </Modal>
       )}
 

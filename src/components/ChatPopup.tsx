@@ -1,3 +1,4 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { BlurView } from 'expo-blur';
 import {
   AlertTriangle,
@@ -18,7 +19,6 @@ import {
   ActivityIndicator,
   FlatList,
   GestureResponderEvent,
-  KeyboardAvoidingView,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -707,7 +707,7 @@ const contextLayout = useMemo(() => {
             </Pressable>
           </View>
 
-          <KeyboardAvoidingView
+          <KeyboardAvoider modal
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
             style={styles.keyboardAvoiding}
@@ -947,7 +947,7 @@ const contextLayout = useMemo(() => {
                 </Pressable>
               </View>
             </View>
-          </KeyboardAvoidingView>
+          </KeyboardAvoider>
 
           {/* Floating long-press context menu. Rendered INLINE (not a Modal) so
               the keyboard stays open while it's showing. On iOS the backdrop is

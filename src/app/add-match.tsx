@@ -1,8 +1,8 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -157,7 +157,7 @@ return (
         </Pressable>
       </View>
 
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
@@ -282,7 +282,7 @@ return (
           </View>
 
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
 
       {/* Footer Save Button */}
       <View style={[styles.footer, { borderTopColor: theme.border, paddingBottom: Math.max(Spacing.md, insets.bottom) }]}>

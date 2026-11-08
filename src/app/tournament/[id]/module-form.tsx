@@ -1,6 +1,7 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
@@ -126,7 +127,7 @@ function ModuleFormBody({
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoider style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         contentContainerStyle={[styles.container, { paddingBottom: bottomInset + Spacing.xxl }]}
         keyboardShouldPersistTaps="handled"
@@ -185,7 +186,7 @@ function ModuleFormBody({
 
         <Button label={m ? 'Save changes' : 'Create module'} onPress={submit} loading={saving} disabled={!canSave} />
       </ScrollView>
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

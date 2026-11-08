@@ -1,8 +1,8 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useEffect, useRef, useState, type ReactNode } from 'react';
 import {
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -65,7 +65,7 @@ export function BottomSheet({
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoider modal style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.backdrop}>
           <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close" />
           <Animated.View
@@ -77,7 +77,7 @@ export function BottomSheet({
             {children}
           </Animated.View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </Modal>
   );
 }

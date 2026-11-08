@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
@@ -74,7 +75,7 @@ function RootNavigator() {
   }
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <KeyboardInsetView style={[styles.container, { backgroundColor: theme.background }]}>
       {Platform.OS !== 'web' && <FCMInitializer />}
       <StatusBar style={theme.resolvedColorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{
@@ -301,7 +302,7 @@ function RootNavigator() {
           }}
         />
       </Stack>
-    </View>
+    </KeyboardInsetView>
   );
 }
 

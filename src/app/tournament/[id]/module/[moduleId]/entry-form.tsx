@@ -1,7 +1,8 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { X } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { EntryFieldControl } from '@/components/tournaments/EntryFieldControl';
@@ -135,7 +136,7 @@ function EntryFormBody({
   };
 
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+    <KeyboardAvoider style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       <ScrollView
         ref={scrollRef}
         contentContainerStyle={[styles.container, { paddingBottom: bottomInset + Spacing.xxl }]}
@@ -206,7 +207,7 @@ function EntryFormBody({
           setPickerOpen(false);
         }}
       />
-    </KeyboardAvoidingView>
+    </KeyboardAvoider>
   );
 }
 

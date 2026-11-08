@@ -1,9 +1,9 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
 import {
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -166,7 +166,7 @@ export default function CreateSessionScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -480,7 +480,7 @@ export default function CreateSessionScreen() {
             buttonStyle={styles.submit}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

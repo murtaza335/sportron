@@ -1,10 +1,10 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, Trophy, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
   Alert,
   Image,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -184,7 +184,7 @@ export function CreatePostModal({
           },
         ]}
       >
-        <KeyboardAvoidingView
+        <KeyboardAvoider modal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.contentWrapper}
         >
@@ -327,7 +327,7 @@ export function CreatePostModal({
               </ThemedText>
             </Pressable>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </View>
     </Modal>
   );

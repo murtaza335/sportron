@@ -1,10 +1,10 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { X, Edit, Camera, Trophy, Megaphone, Plus, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { Alert } from 'react-native';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
-  KeyboardAvoidingView,
   Modal,
   Platform,
   Pressable,
@@ -415,7 +415,7 @@ export function PostDetailPopup({
                 </View>
               </ScrollView>
 
-              <KeyboardAvoidingView
+              <KeyboardAvoider modal
                 behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={0}
                 style={[styles.inputContainer, { borderTopColor: theme.border }]}
@@ -449,7 +449,7 @@ export function PostDetailPopup({
                     <Send size={20} color={commentText.trim() && !sendingComment ? theme.accent : theme.textSecondary} strokeWidth={2} />
                   </Pressable>
                 </View>
-              </KeyboardAvoidingView>
+              </KeyboardAvoider>
 
               {showMenu && (
                 <View style={styles.menuOverlay}>

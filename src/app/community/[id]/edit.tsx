@@ -1,3 +1,4 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
@@ -6,7 +7,6 @@ import {
   ActivityIndicator,
   Alert,
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -145,7 +145,7 @@ function EditCommunityForm({
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
@@ -369,7 +369,7 @@ function EditCommunityForm({
           />
 
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </View>
   );
 }

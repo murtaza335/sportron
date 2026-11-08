@@ -1,10 +1,10 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
 import {
   Image,
-  KeyboardAvoidingView,
   Platform,
   Pressable,
   ScrollView,
@@ -118,7 +118,7 @@ export default function CreateCommunityScreen() {
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -384,7 +384,7 @@ export default function CreateCommunityScreen() {
             buttonStyle={styles.submit}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

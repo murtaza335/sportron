@@ -1,3 +1,4 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { AlertTriangle, Calendar, Check, Clock, Globe, Heart, Lock, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
@@ -5,7 +6,6 @@ import {
   ActivityIndicator,
   Animated,
   Dimensions,
-  KeyboardAvoidingView,
   Modal,
   PanResponder,
   Platform,
@@ -311,7 +311,7 @@ export function MatchDetailPopup({
 
   return (
     <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView
+      <KeyboardAvoider modal
         style={styles.keyboardAvoid}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
@@ -564,7 +564,7 @@ export function MatchDetailPopup({
             )}
           </Animated.View>
         </View>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </Modal>
   );
 }
