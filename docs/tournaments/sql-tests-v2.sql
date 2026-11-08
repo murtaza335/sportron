@@ -109,6 +109,37 @@ begin
   end if;
 end $$;
 
+-- play ONE random playable non-grand-final match (random winner). Returns false when none is left.
+-- Asserts after every result that nobody sits in two undecided matches at once.
+create function tt_test.play_one_random(p_m uuid, p_include_gf boolean default true) returns boolean language plpgsql as $$
+declare v_id uuid; v_sa int; v_sb int; v_bad int;
+begin
+  perform tt_test.as_user('admin');
+  select id into v_id from public.tournament_matches
+  where module_id = p_m and status in ('pending','scheduled')
+    and entry_a_id is not null and entry_b_id is not null
+    and (p_include_gf or bracket_side <> 'grand_final')
+  order by random() limit 1;
+  if v_id is null then return false; end if;
+  if random() < 0.5 then v_sa := 3; v_sb := 1; else v_sa := 1; v_sb := 3; end if;
+  perform public.record_tournament_result(v_id, v_sa, v_sb, null, null, null);
+  select count(*) into v_bad from (
+    select e from (select entry_a_id e from public.tournament_matches where module_id = p_m and status in ('pending','scheduled')
+                   union all select entry_b_id from public.tournament_matches where module_id = p_m and status in ('pending','scheduled')) x
+    where e is not null group by e having count(*) > 1) y;
+  if v_bad > 0 then raise exception 'FAIL: an entry sits in two undecided matches at once'; end if;
+  return true;
+end $$;
+
+create function tt_test.play_random(p_m uuid, p_include_gf boolean default true) returns void language plpgsql as $$
+declare guard int := 0;
+begin
+  while tt_test.play_one_random(p_m, p_include_gf) loop
+    guard := guard + 1;
+    if guard > 400 then raise exception 'FAIL: play_random runaway'; end if;
+  end loop;
+end $$;
+
 -- play every playable match (side A wins 3–1) until nothing is left
 create function tt_test.play_all(p_m uuid) returns void language plpgsql as $$
 declare v_id uuid; guard int := 0;
@@ -641,6 +672,129 @@ begin
     perform tt_test.chk((select count(*) filter (where final_rank = 4) = 3 and count(*) filter (where final_rank = 7) = 3
                          and count(*) filter (where final_rank = 10) = 1 from public.tournament_entries where module_id = v_m),
                         'uneven groups: ranks 4 (x3, pos 2), 7 (x3, pos 3), 10 (pos 4)');
+  end;
+
+  -- ── section D1: double elimination (step 39)
+  declare n int; v_m uuid; v_s int; v_lb int; v_bad int; v_champ uuid; v_losses int; v_other int;
+  begin
+    perform setseed(0.42);
+    foreach n in array array[3, 4, 5, 6, 7, 8, 9, 12, 16] loop
+      v_m := tt_test.mk_format('DE' || n, 'table_tennis', n, '{"format":"double_elimination"}'::jsonb);
+      v_s := 2; while v_s < n loop v_s := v_s * 2; end loop;
+      v_lb := (select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'losers');
+      perform tt_test.chk(v_lb <= v_s - 2 and v_lb >= v_s / 2, format('DE n=%s: losers bracket has %s of at most %s matches', n, v_lb, v_s - 2));
+      perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'winners') = v_s - 1,
+                          format('DE n=%s: winners bracket has S-1 = %s matches', n, v_s - 1));
+      perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final') = 2,
+                          format('DE n=%s: grand final + reset exist', n));
+      perform tt_test.play_random(v_m);
+      perform tt_test.chk((select status = 'completed' and champion_entry_id is not null and runner_up_entry_id is not null
+                           from public.tournament_modules where id = v_m), format('DE n=%s completes', n));
+      select champion_entry_id into v_champ from public.tournament_modules where id = v_m;
+      select count(*) into v_losses from public.tournament_matches tm
+        where tm.module_id = v_m and tm.status in ('completed','walkover') and tm.winner_entry_id <> v_champ
+          and (tm.entry_a_id = v_champ or tm.entry_b_id = v_champ);
+      perform tt_test.chk(v_losses <= 1, format('DE n=%s: champion lost at most once (%s)', n, v_losses));
+      select count(*) into v_bad from public.tournament_entries e
+        where e.module_id = v_m and e.id <> v_champ and (
+          select count(*) from public.tournament_matches tm
+          where tm.module_id = v_m and tm.status in ('completed','walkover') and tm.winner_entry_id <> e.id
+            and (tm.entry_a_id = e.id or tm.entry_b_id = e.id)) <> 2;
+      perform tt_test.chk(v_bad = 0, format('DE n=%s: every other entry has exactly 2 losses', n));
+      perform tt_test.chk((select count(*) filter (where final_rank = 1) = 1 and count(*) filter (where final_rank = 2) = 1
+                                  and count(*) filter (where final_rank is null) = 0 from public.tournament_entries where module_id = v_m),
+                          format('DE n=%s: everybody is ranked', n));
+    end loop;
+
+    -- S=8 ranks: 1, 2, 3, 4, T-5 (x2), T-7 (x2)  (n = 8)
+    v_m := tt_test.mk_format('DEr8', 'table_tennis', 8, '{"format":"double_elimination"}'::jsonb);
+    perform tt_test.play_random(v_m);
+    perform tt_test.chk((select string_agg(final_rank::text, ',' order by final_rank) from public.tournament_entries where module_id = v_m) = '1,2,3,4,5,5,7,7',
+                        'DE n=8 final ranks are 1,2,3,4,5,5,7,7');
+    perform tt_test.chk(public.get_module_standings_v2(v_m) -> 'knockout' is null and jsonb_array_length(public.get_module_standings_v2(v_m) -> 'rows') = 8,
+                        'DE standings v2 has 8 knockout rows');
+    perform tt_test.chk((select bool_and((r ->> 'losses')::int in (0, 1, 2)) from jsonb_array_elements(public.get_module_standings_v2(v_m) -> 'rows') r),
+                        'DE standings rows carry losses');
+  end;
+
+  -- ── section D2: grand final cases, byes, edits
+  declare v_m uuid; v_gf1 uuid; v_gf2 uuid; v_champ uuid; v_a uuid; v_b uuid; v_x uuid; v_y uuid; v_lb uuid;
+  begin
+    -- WB champion wins GF1 → GF2 cancelled
+    v_m := tt_test.mk_format('DEg1', 'table_tennis', 4, '{"format":"double_elimination"}'::jsonb);
+    perform tt_test.play_random(v_m, false);
+    select id, entry_a_id, entry_b_id into v_gf1, v_a, v_b from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 1;
+    perform tt_test.chk(v_a is not null and v_b is not null, 'grand final has both finalists after the brackets finish');
+    perform public.record_tournament_result(v_gf1, 3, 0, null, null, null);   -- slot a (winners bracket) wins
+    perform tt_test.chk((select status = 'cancelled' from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 2),
+                        'WB champion wins GF1 → GF2 is cancelled');
+    perform tt_test.chk((select status = 'completed' and champion_entry_id = v_a and runner_up_entry_id = v_b from public.tournament_modules where id = v_m),
+                        'WB champion is the champion when GF1 is won');
+
+    -- LB champion wins GF1 → reset match is played
+    v_m := tt_test.mk_format('DEg2', 'table_tennis', 4, '{"format":"double_elimination"}'::jsonb);
+    perform tt_test.play_random(v_m, false);
+    select id, entry_a_id, entry_b_id into v_gf1, v_a, v_b from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 1;
+    perform public.record_tournament_result(v_gf1, 0, 3, null, null, null);   -- slot b (losers bracket) wins
+    perform tt_test.chk((select status = 'in_progress' from public.tournament_modules where id = v_m), 'module continues after the LB champion wins GF1');
+    select id into v_gf2 from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 2;
+    perform tt_test.chk((select entry_a_id = v_a and entry_b_id = v_b and status = 'pending' from public.tournament_matches where id = v_gf2), 'GF2 is filled with both finalists');
+  end;
+
+  declare v_m uuid; v_gf1 uuid; v_gf2 uuid; v_a uuid; v_b uuid;
+  begin
+    v_m := tt_test.mk_format('DEg3', 'table_tennis', 4, '{"format":"double_elimination"}'::jsonb);
+    perform tt_test.play_random(v_m, false);
+    select id, entry_a_id, entry_b_id into v_gf1, v_a, v_b from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 1;
+    perform public.record_tournament_result(v_gf1, 0, 3, null, null, null);
+    select id into v_gf2 from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 2;
+    -- undo GF1 before GF2 was played → GF2 emptied again
+    perform public.reset_tournament_match(v_gf1);
+    perform tt_test.chk((select entry_a_id is null and entry_b_id is null and status = 'pending' from public.tournament_matches where id = v_gf2), 'resetting GF1 empties GF2');
+    perform public.record_tournament_result(v_gf1, 0, 3, null, null, null);
+    perform public.record_tournament_result(v_gf2, 3, 2, null, null, null);   -- a (WB champion) wins the reset
+    perform tt_test.chk((select status = 'completed' and champion_entry_id = v_a from public.tournament_modules where id = v_m), 'GF2 decides the champion');
+    -- ranks: champion 1, runner-up 2
+    perform tt_test.chk((select final_rank from public.tournament_entries where id = v_a) = 1 and (select final_rank from public.tournament_entries where id = v_b) = 2, 'GF2 champion rank 1, runner-up rank 2');
+  end;
+
+  declare v_m uuid; v_gf1 uuid; v_a uuid; v_b uuid;
+  begin
+    -- reset off → one grand final decides everything
+    v_m := tt_test.mk_format('DEg4', 'table_tennis', 5, '{"format":"double_elimination","grand_final_reset":false}'::jsonb);
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final') = 1, 'no reset → only GF1 exists');
+    perform tt_test.play_random(v_m, false);
+    select id, entry_a_id, entry_b_id into v_gf1, v_a, v_b from public.tournament_matches where module_id = v_m and bracket_side = 'grand_final' and round_number = 1;
+    perform public.record_tournament_result(v_gf1, 0, 3, null, null, null);
+    perform tt_test.chk((select status = 'completed' and champion_entry_id = v_b from public.tournament_modules where id = v_m), 'reset off: LB champion wins GF1 and the module completes');
+  end;
+
+  -- auto-bye cascade (n = 5: three round-1 byes) and DOWNSTREAM_PLAYED
+  declare v_m uuid; v_wb uuid; v_lb1 uuid; v_loser uuid; v_next uuid; v_x uuid;
+  begin
+    v_m := tt_test.mk_format('DEa', 'table_tennis', 5, '{"format":"double_elimination"}'::jsonb);
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'losers') = 5,
+                        'n=5: one dead losers match is removed (5 of 6 remain)');
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'losers' and auto_bye) >= 1, 'n=5: auto-bye matches exist');
+    -- the only real WB round-1 match: seeds 4 v 5
+    select id into v_wb from public.tournament_matches where module_id = v_m and bracket_side = 'winners' and round_number = 1 and status = 'pending';
+    perform public.record_tournament_result(v_wb, 3, 1, null, null, null);
+    select (case when winner_entry_id = entry_a_id then entry_b_id else entry_a_id end) into v_loser from public.tournament_matches where id = v_wb;
+    perform tt_test.chk((select status = 'bye' and winner_entry_id = v_loser from public.tournament_matches where id = (select loser_next_match_id from public.tournament_matches where id = v_wb)),
+                        'the loser drops into an auto-bye match that resolves itself');
+    select loser_next_match_id into v_lb1 from public.tournament_matches where id = v_wb;
+    select next_match_id into v_next from public.tournament_matches where id = v_lb1;
+    perform tt_test.chk((select entry_a_id = v_loser or entry_b_id = v_loser from public.tournament_matches where id = v_next), 'and the entry advanced one round further');
+    -- reset the WB result → the cascade reverts cleanly
+    perform public.reset_tournament_match(v_wb);
+    perform tt_test.chk((select status = 'pending' and winner_entry_id is null and entry_a_id is null and entry_b_id is null from public.tournament_matches where id = v_lb1),
+                        'resetting the WB match empties the auto-bye match');
+    perform tt_test.chk((select entry_a_id is distinct from v_loser and entry_b_id is distinct from v_loser from public.tournament_matches where id = v_next), 'and the entry is gone from the next round');
+    -- play it again, then play a real downstream match → reset is blocked
+    perform public.record_tournament_result(v_wb, 3, 1, null, null, null);
+    select id into v_x from public.tournament_matches where module_id = v_m and bracket_side = 'winners' and round_number = 2 and entry_a_id is not null and entry_b_id is not null limit 1;
+    perform public.record_tournament_result(v_x, 3, 1, null, null, null);
+    perform tt_test.expect_err(format('select public.reset_tournament_match(%L)', v_wb), 'DOWNSTREAM_PLAYED', 'cannot reset a WB match whose winner already played on');
   end;
 
   -- @@END (new steps insert their test sections above this line)
