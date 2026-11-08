@@ -304,7 +304,13 @@ export default function ModuleScreen() {
           {tab === 'info' && <ModuleInfoTab module={mod} rounds={m.rounds} admins={m.admins} />}
           {tab === 'bracket' && (
             <BracketView
-              matches={mod.format === 'groups_knockout' ? m.bracket.filter((x) => x.stage_number === 2) : m.bracket}
+              matches={
+                mod.format === 'groups_knockout'
+                  ? m.bracket.filter((x) => x.stage_number === 2)
+                  : mod.format === 'double_elimination'
+                    ? m.matches.filter((x) => x.bracket_side !== 'main')
+                    : m.bracket
+              }
               moduleStatus={mod.status}
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
@@ -356,6 +362,8 @@ export default function ModuleScreen() {
               rounds={m.rounds}
               viewerId={user?.id}
               ownEntryIds={ownEntryIds}
+              showLosses={mod.format === 'double_elimination' && mod.status !== 'completed'}
+              allowChart={mod.format !== 'double_elimination'}
               onSelectEntry={(entryId) => {
                 const e = m.entries.find((x) => x.id === entryId);
                 if (e) setSelected(e);

@@ -17,12 +17,16 @@ export function ModuleStandingsTab({
   rounds,
   viewerId,
   ownEntryIds,
+  showLosses,
+  allowChart = true,
   onSelectEntry,
 }: {
   standings: TournamentStanding[];
   rounds: TournamentRound[];
   viewerId: string | undefined;
   ownEntryIds?: Set<string>;
+  showLosses?: boolean;
+  allowChart?: boolean;
   onSelectEntry: (entryId: string) => void;
 }) {
   const theme = useTheme();
@@ -40,7 +44,7 @@ export function ModuleStandingsTab({
 
   return (
     <View style={{ gap: Spacing.md }}>
-      <SegmentedControl
+      {allowChart && <SegmentedControl
         compact
         value={view}
         onChange={setView}
@@ -48,9 +52,9 @@ export function ModuleStandingsTab({
           { value: 'table', label: 'Table' },
           { value: 'chart', label: 'Chart' },
         ]}
-      />
-      {view === 'table' ? (
-        <StandingsTable standings={standings} viewerId={viewerId} ownEntryIds={ownEntryIds} onSelect={onSelectEntry} />
+      />}
+      {view === 'table' || !allowChart ? (
+        <StandingsTable standings={standings} viewerId={viewerId} ownEntryIds={ownEntryIds} showLosses={showLosses} onSelect={onSelectEntry} />
       ) : (
         <StandingsChart standings={standings} rounds={rounds} onSelect={onSelectEntry} />
       )}

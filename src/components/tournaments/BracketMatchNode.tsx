@@ -4,7 +4,7 @@ import { Pressable, StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius } from '@/constants/theme';
 import { NODE_H, NODE_W } from '@/lib/bracketLayout';
-import { formatMatchTime } from '@/lib/tournamentFormat';
+import { formatMatchTime, slotPlaceholder } from '@/lib/tournamentFormat';
 import { useTheme } from '@/hooks/use-theme';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
@@ -21,6 +21,7 @@ function Row({
   decided,
   mine,
   bye,
+  placeholder,
 }: {
   entry: BracketEntryRef | null;
   score: number | null;
@@ -28,6 +29,7 @@ function Row({
   decided: boolean;
   mine: boolean;
   bye: boolean;
+  placeholder: string;
 }) {
   const theme = useTheme();
   const loser = decided && !winner;
@@ -59,7 +61,7 @@ function Row({
         </>
       ) : (
         <ThemedText variant="caption" muted style={{ fontStyle: 'italic' }}>
-          {bye ? 'BYE' : 'TBD'}
+          {placeholder}
         </ThemedText>
       )}
     </View>
@@ -88,13 +90,17 @@ export function BracketMatchNode({
   const bye = match.status === 'bye';
   const wo = match.status === 'walkover';
   const live = match.status === 'scheduled' && isToday(match.scheduled_at);
-  const caption = wo
-    ? 'W/O'
-    : bye
-      ? null
-      : formatMatchTime(match.scheduled_at)
-        ? [formatMatchTime(match.scheduled_at), match.court].filter(Boolean).join(' · ')
-        : null;
+  const cancelled = match.status === 'cancelled';
+  const time = formatMatchTime(match.scheduled_at);
+  const caption = cancelled
+    ? 'Not needed'
+    : wo
+      ? 'W/O'
+      : bye
+        ? match.auto_bye ? 'BYE' : null
+        : time
+          ? [match.code, time, match.court].filter(Boolean).join(' · ')
+          : match.code;
 
   const scoreA = wo || bye ? null : match.score_a;
   const scoreB = wo || bye ? null : match.score_b;
@@ -108,6 +114,7 @@ export function BracketMatchNode({
           left: x,
           top: y,
           backgroundColor: theme.backgroundElement,
+          opacity: cancelled ? 0.5 : 1,
           borderColor: highlighted ? theme.accent : theme.border,
           borderWidth: highlighted ? 2 : 1,
         },
@@ -126,6 +133,7 @@ export function BracketMatchNode({
         decided={decided}
         mine={!!match.entry_a && myEntryIds.has(match.entry_a.id)}
         bye={bye}
+        placeholder={slotPlaceholder(match.entry_a_label, bye && !match.entry_a)}
       />
       <Row
         entry={match.entry_b}
@@ -134,6 +142,7 @@ export function BracketMatchNode({
         decided={decided}
         mine={!!match.entry_b && myEntryIds.has(match.entry_b.id)}
         bye={bye}
+        placeholder={slotPlaceholder(match.entry_b_label, bye && !match.entry_b)}
       />
       {(caption || live) && (
         <View style={styles.captionRow}>

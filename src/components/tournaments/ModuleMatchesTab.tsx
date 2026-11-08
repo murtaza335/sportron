@@ -37,7 +37,7 @@ export function ModuleMatchesTab({
   const sections = useMemo(() => {
     const visible = matches.filter((m) => {
       if (groupFilter !== 'all' && m.group_letter !== groupFilter) return false;
-      if (m.status === 'bye') return filter === 'all';
+      if (m.status === 'bye' || m.status === 'cancelled') return filter === 'all';
       const decided = m.status === 'completed' || m.status === 'walkover';
       if (filter === 'upcoming') return !decided;
       if (filter === 'results') return decided;

@@ -56,6 +56,11 @@ export function TournamentMatchSheet({
   const theme = useTheme();
   const decided = match ? match.status === 'completed' || match.status === 'walkover' : false;
   const next = match?.next_match_id ? allMatches.find((m) => m.id === match.next_match_id) : null;
+  const loserNext = match?.loser_next_match_id ? allMatches.find((m) => m.id === match.loser_next_match_id) : null;
+  const loser =
+    match && match.winner_entry_id
+      ? match.winner_entry_id === match.entry_a?.id ? match.entry_b : match.entry_a
+      : null;
   const winner =
     match?.winner_entry_id === match?.entry_a?.id
       ? match?.entry_a
@@ -101,7 +106,12 @@ export function TournamentMatchSheet({
           {match.result_note && match.result_note !== 'Walkover' && (
             <ThemedText variant="caption" muted>{match.result_note}</ThemedText>
           )}
-          {decided && winner && next && (
+          {decided && loser && loserNext && (
+            <ThemedText variant="caption">
+              {loser.name} drops to {loserNext.round_name}
+            </ThemedText>
+          )}
+          {decided && winner && next && match.bracket_side !== 'grand_final' && (
             <ThemedText variant="caption">
               {winner.name} advances to the {next.round_name}
             </ThemedText>

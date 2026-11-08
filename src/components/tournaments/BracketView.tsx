@@ -1,13 +1,14 @@
 import { GitBranch } from 'lucide-react-native';
-import { useMemo, useRef } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BracketConnectors } from '@/components/tournaments/BracketConnectors';
 import { BracketMatchNode } from '@/components/tournaments/BracketMatchNode';
+import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { HEADER_H, layoutBracket, NODE_W } from '@/lib/bracketLayout';
+import { HEADER_H, layoutTree, NODE_W } from '@/lib/bracketLayout';
 import { roundHeader, tint } from '@/lib/tournamentFormat';
 import type { ModuleStatus, TournamentMatch } from '@/types';
 
@@ -26,7 +27,17 @@ export function BracketView({
 }) {
   const theme = useTheme();
   const scrollRef = useRef<ScrollView>(null);
-  const layout = useMemo(() => layoutBracket(matches), [matches]);
+  const [section, setSection] = useState<Section>('winners');
+
+  // Double elimination shows one section at a time: winners bracket · losers bracket · grand final.
+  const isDouble = matches.some((m) => m.bracket_side === 'losers');
+  const sectionMatches = useMemo(() => {
+    if (!isDouble) return matches;
+    const side = section === 'final' ? 'grand_final' : section;
+    return matches.filter((m) => m.bracket_side === side);
+  }, [matches, isDouble, section]);
+
+  const layout = useMemo(() => layoutTree(sectionMatches), [sectionMatches]);
   const byId = useMemo(() => new Map(matches.map((m) => [m.id, m])), [matches]);
 
   // Entries linked to the viewer → highlight their path.
@@ -70,7 +81,7 @@ export function BracketView({
   }
 
   const roundInfo = new Map<number, { name: string; bestOf: number }>();
-  for (const m of matches) {
+  for (const m of sectionMatches) {
     if (!m.is_third_place && !roundInfo.has(m.round_number)) {
       roundInfo.set(m.round_number, { name: m.round_name, bestOf: m.best_of });
     }
@@ -84,6 +95,28 @@ export function BracketView({
             Draft bracket — may change
           </ThemedText>
         </View>
+      )}
+
+      {isDouble && (
+        <SegmentedControl
+          compact
+          value={section}
+          onChange={setSection}
+          options={[
+            { value: 'winners' as Section, label: 'Winners' },
+            { value: 'losers' as Section, label: 'Losers' },
+            { value: 'final' as Section, label: 'Final' },
+          ]}
+        />
+      )}
+      {isDouble && section === 'final' && (
+        <ThemedText variant="caption" muted>
+          {sectionMatches.find((m) => m.round_number === 2)?.status === 'cancelled'
+            ? 'The reset match wasn’t needed.'
+            : sectionMatches.some((m) => m.round_number === 2)
+              ? 'The reset match is only played if the losers-bracket team wins the final.'
+              : 'One match decides the champion.'}
+        </ThemedText>
       )}
 
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
@@ -147,6 +180,8 @@ export function BracketView({
     </View>
   );
 }
+
+type Section = 'winners' | 'losers' | 'final';
 
 const styles = StyleSheet.create({
   empty: { alignItems: 'center', gap: Spacing.sm, marginVertical: Spacing.xl },

@@ -25,12 +25,15 @@ export function StandingsTable({
   standings,
   viewerId,
   ownEntryIds,
+  showLosses,
   onSelect,
 }: {
   standings: TournamentStanding[];
   viewerId: string | undefined;
   /** Entries the viewer plays in (own entry or team member). */
   ownEntryIds?: Set<string>;
+  /** Double elimination while running: a Losses column replaces Reached. */
+  showLosses?: boolean;
   onSelect: (entryId: string) => void;
 }) {
   const theme = useTheme();
@@ -84,7 +87,7 @@ export function StandingsTable({
               <Header w={STAT_W}>W</Header>
               <Header w={STAT_W}>L</Header>
               <Header w={STAT_W + 8}>+/-</Header>
-              <Header w={REACHED_W} align="left">Reached</Header>
+              <Header w={REACHED_W} align="left">{showLosses ? 'Losses' : 'Reached'}</Header>
             </View>
             {standings.map((s) => (
               <Pressable
@@ -104,7 +107,11 @@ export function StandingsTable({
                 </View>
                 <View style={{ width: REACHED_W }}>
                   <ThemedText variant="caption" numberOfLines={1} style={dim(s) ? { color: theme.textSecondary } : undefined}>
-                    {s.status === 'withdrawn' ? 'Withdrawn' : (s.reached_label ?? '—')}
+                    {s.status === 'withdrawn'
+                      ? 'Withdrawn'
+                      : showLosses
+                        ? `${s.losses ?? s.lost} ${(s.losses ?? s.lost) === 1 ? 'loss' : 'losses'}`
+                        : (s.reached_label ?? '—')}
                   </ThemedText>
                 </View>
               </Pressable>
