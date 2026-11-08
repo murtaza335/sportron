@@ -1,4 +1,4 @@
-import { X } from 'lucide-react-native';
+import { Minus, Plus, X } from 'lucide-react-native';
 import { forwardRef, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View, type TextInputProps } from 'react-native';
 
@@ -149,6 +149,66 @@ export function ModalHeader({ title, onClose }: { title: string; onClose: () => 
   );
 }
 
+/** Compact − [n] + control with a min/max clamp (roster size, points, group counts). */
+export function NumberStepper({
+  value,
+  onChange,
+  min,
+  max,
+  label,
+  disabled,
+}: {
+  value: number;
+  onChange: (n: number) => void;
+  min: number;
+  max: number;
+  label: string;
+  disabled?: boolean;
+}) {
+  const theme = useTheme();
+  const clamp = (n: number) => Math.min(max, Math.max(min, n));
+  return (
+    <View
+      style={[
+        styles.stepper,
+        { borderColor: theme.border, backgroundColor: theme.background },
+        disabled && { opacity: 0.5 },
+      ]}
+    >
+      <Pressable
+        onPress={() => onChange(clamp(value - 1))}
+        disabled={disabled || value <= min}
+        hitSlop={8}
+        style={[styles.stepBtn, value <= min && { opacity: 0.35 }]}
+        accessibilityLabel={`${label} minus`}
+      >
+        <Minus size={18} color={theme.text} strokeWidth={2.5} />
+      </Pressable>
+      <TextInput
+        value={String(value)}
+        editable={!disabled}
+        onChangeText={(t) => {
+          const n = parseInt(t.replace(/[^0-9]/g, ''), 10);
+          onChange(Number.isNaN(n) ? min : clamp(n));
+        }}
+        keyboardType="number-pad"
+        selectTextOnFocus
+        style={[styles.stepInput, { color: theme.text }]}
+        accessibilityLabel={label}
+      />
+      <Pressable
+        onPress={() => onChange(clamp(value + 1))}
+        disabled={disabled || value >= max}
+        hitSlop={8}
+        style={[styles.stepBtn, value >= max && { opacity: 0.35 }]}
+        accessibilityLabel={`${label} plus`}
+      >
+        <Plus size={18} color={theme.text} strokeWidth={2.5} />
+      </Pressable>
+    </View>
+  );
+}
+
 export function SectionLabel({ children }: { children: string }) {
   return <ThemedText variant="label" muted>{children}</ThemedText>;
 }
@@ -167,6 +227,15 @@ const styles = StyleSheet.create({
   textArea: { minHeight: 80, textAlignVertical: 'top' },
   pills: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.sm },
   pill: { borderWidth: 1, borderRadius: Radius.full, paddingHorizontal: Spacing.md, paddingVertical: 8 },
+  stepper: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderRadius: Radius.md,
+    alignSelf: 'flex-start',
+  },
+  stepBtn: { paddingHorizontal: Spacing.md, paddingVertical: Spacing.sm },
+  stepInput: { minWidth: 44, textAlign: 'center', fontSize: 16, fontWeight: '700', paddingVertical: 6 },
   switchRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.md },
   header: {
     flexDirection: 'row',

@@ -5,7 +5,7 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
-import { FormField, ModalHeader, PillSelect, SwitchRow, TextField } from '@/components/tournaments/form';
+import { FormField, ModalHeader, NumberStepper, PillSelect, SwitchRow, TextField } from '@/components/tournaments/form';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -13,9 +13,15 @@ import { useTheme } from '@/hooks/use-theme';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
-import { createModule, fetchModuleDetail, updateModule } from '@/services/tournaments';
-import type { ModuleDetail, SeedingMethod, Sport } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { DEFAULT_ROSTER, allowedParticipantTypes } from '@/lib/tournamentFormat';
+import {
+  createModule,
+  fetchModuleDetail,
+  updateModule,
+  updateModuleSettings,
+} from '@/services/tournaments';
+import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, SeedingMethod, Sport } from '@/types';
+import { isRacketSport, isTeamSport, SPORT_LABELS } from '@/types';
 
 const SPORT_OPTIONS = (Object.keys(SPORT_LABELS) as Sport[]).map((s) => ({ value: s, label: SPORT_LABELS[s] }));
 
@@ -84,12 +90,44 @@ function ModuleFormBody({
   const [rules, setRules] = useState(m?.rules_text ?? '');
   const [third, setThird] = useState(m?.third_place_match ?? false);
   const [seeding, setSeeding] = useState<SeedingMethod>(m?.seeding_method ?? 'manual');
+  const [participantType, setParticipantType] = useState<ParticipantType>(
+    m?.participant_type ?? (isTeamSport(m?.sport ?? 'table_tennis') ? 'team' : 'individual'),
+  );
+  const [rosterMin, setRosterMin] = useState(m?.roster_min ?? DEFAULT_ROSTER[m?.sport ?? 'table_tennis'].min);
+  const [rosterMax, setRosterMax] = useState(m?.roster_max ?? DEFAULT_ROSTER[m?.sport ?? 'table_tennis'].max);
+  const [lineup, setLineup] = useState<number | null>(
+    m ? m.lineup_size : DEFAULT_ROSTER.table_tennis.lineup,
+  );
+  // If the first save created the module but the settings call failed, later saves edit it.
+  const [createdId, setCreatedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const hasBracket = !!m && (m.bracket_generated_at != null || (initial?.counts.matches ?? 0) > 0);
   const sportLocked = !!m && (hasBracket || (m.status !== 'draft' && m.status !== 'open'));
   const settingsLocked = !!m && (hasBracket || ['in_progress', 'completed', 'cancelled'].includes(m.status));
+  const playersLocked =
+    !!m && ((initial?.counts.entries ?? 0) + (initial?.counts.withdrawn ?? 0) > 0 || !['draft', 'open'].includes(m.status));
+  const allowedTypes = allowedParticipantTypes(sport);
+  const doubles = participantType === 'team' && isRacketSport(sport);
+
+  /** Changing the sport re-applies the player defaults (only while they are still editable). */
+  const onSportChange = (next: Sport) => {
+    setSport(next);
+    if (playersLocked) return;
+    const allowed = allowedParticipantTypes(next);
+    const type: ParticipantType = isTeamSport(next)
+      ? 'team'
+      : allowed.includes(participantType)
+        ? participantType
+        : allowed[0];
+    setParticipantType(type);
+    const d = DEFAULT_ROSTER[next];
+    setRosterMin(d.min);
+    setRosterMax(d.max);
+    setLineup(d.lineup);
+  };
+
   const maxN = maxEntries.trim() === '' ? null : parseInt(maxEntries, 10);
   const maxInvalid = maxN !== null && (Number.isNaN(maxN) || maxN < 2 || maxN > 128);
   const canSave = name.trim().length >= 2 && !maxInvalid && !saving;
@@ -112,13 +150,29 @@ function ModuleFormBody({
       third_place_match: third,
       seeding_method: seeding,
     };
+    const targetId = m?.id ?? createdId;
     try {
-      if (m) {
-        await updateModule(m.id, input);
-        onDone(m.id);
+      let id: string;
+      if (targetId) {
+        await updateModule(targetId, input);
+        id = targetId;
       } else {
-        onDone(await createModule(tournamentId, input));
+        id = await createModule(tournamentId, input);
+        setCreatedId(id);
       }
+      // v2 player settings. Skipped when nothing differs from what the module already has.
+      const wanted: ModuleSettingsPatch =
+        participantType === 'team'
+          ? { participant_type: 'team', roster_min: rosterMin, roster_max: rosterMax, lineup_size: lineup }
+          : { participant_type: 'individual' };
+      const current = m;
+      const changed =
+        !current ||
+        current.participant_type !== wanted.participant_type ||
+        (wanted.participant_type === 'team' &&
+          (current.roster_min !== rosterMin || current.roster_max !== rosterMax || current.lineup_size !== lineup));
+      if (changed && !playersLocked) await updateModuleSettings(id, wanted);
+      onDone(id);
     } catch (e) {
       alert('Something went wrong', friendlyTournamentError(e));
     } finally {
@@ -137,8 +191,93 @@ function ModuleFormBody({
         </FormField>
 
         <FormField label="Sport *" hint={sportLocked ? 'Sport can’t be changed once the bracket exists.' : undefined}>
-          <PillSelect options={SPORT_OPTIONS} value={sport} onChange={setSport} disabled={sportLocked} />
+          <PillSelect options={SPORT_OPTIONS} value={sport} onChange={onSportChange} disabled={sportLocked} />
         </FormField>
+
+        <FormField
+          label="Players *"
+          hint={playersLocked ? 'Can’t change after entries are added.' : undefined}
+        >
+          {isTeamSport(sport) ? (
+            <ThemedText variant="body" style={{ fontWeight: '600', marginLeft: Spacing.xs }}>Teams</ThemedText>
+          ) : (
+            <PillSelect
+              options={
+                isRacketSport(sport)
+                  ? [
+                      { value: 'individual' as ParticipantType, label: 'Singles' },
+                      { value: 'team' as ParticipantType, label: 'Doubles' },
+                    ]
+                  : [
+                      { value: 'individual' as ParticipantType, label: 'Individual' },
+                      { value: 'team' as ParticipantType, label: 'Teams' },
+                    ]
+              }
+              value={participantType}
+              onChange={(t) => {
+                setParticipantType(t);
+                if (t === 'team') {
+                  const d = DEFAULT_ROSTER[sport];
+                  setRosterMin(d.min);
+                  setRosterMax(d.max);
+                  setLineup(d.lineup);
+                }
+              }}
+              disabled={playersLocked || allowedTypes.length < 2}
+            />
+          )}
+        </FormField>
+
+        {participantType === 'team' && !doubles && (
+          <View style={{ gap: Spacing.md }}>
+            <View style={styles.rosterRow}>
+              <View style={{ gap: Spacing.xs }}>
+                <ThemedText variant="label" muted style={{ marginLeft: Spacing.xs }}>MIN PLAYERS</ThemedText>
+                <NumberStepper
+                  label="Minimum players"
+                  value={rosterMin}
+                  min={1}
+                  max={40}
+                  onChange={(n) => {
+                    setRosterMin(n);
+                    if (rosterMax < n) setRosterMax(n);
+                  }}
+                />
+              </View>
+              <View style={{ gap: Spacing.xs }}>
+                <ThemedText variant="label" muted style={{ marginLeft: Spacing.xs }}>MAX PLAYERS</ThemedText>
+                <NumberStepper
+                  label="Maximum players"
+                  value={rosterMax}
+                  min={1}
+                  max={40}
+                  onChange={(n) => {
+                    setRosterMax(n);
+                    if (rosterMin > n) setRosterMin(n);
+                  }}
+                />
+              </View>
+              <View style={{ gap: Spacing.xs }}>
+                <ThemedText variant="label" muted style={{ marginLeft: Spacing.xs }}>ON FIELD</ThemedText>
+                <NumberStepper
+                  label="Players on field"
+                  value={lineup ?? rosterMin}
+                  min={1}
+                  max={40}
+                  onChange={setLineup}
+                />
+              </View>
+            </View>
+            <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
+              Each team needs {rosterMin === rosterMax ? rosterMin : `${rosterMin}–${rosterMax}`} players before seeding.
+            </ThemedText>
+          </View>
+        )}
+        {doubles && (
+          <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
+            Each pair is a team of exactly 2 players.
+          </ThemedText>
+        )}
 
         <FormField label="Venue">
           <TextField value={venue} onChangeText={setVenue} placeholder="e.g. Main Hall" maxLength={120} />
@@ -192,5 +331,6 @@ function ModuleFormBody({
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  rosterRow: { flexDirection: 'row', flexWrap: 'wrap', gap: Spacing.lg },
   container: { width: '100%', maxWidth: MaxContentWidth, alignSelf: 'center', padding: Spacing.lg, gap: Spacing.md },
 });

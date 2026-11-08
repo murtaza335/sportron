@@ -42,7 +42,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 26 | H Rosters | Roster RPCs + reads (091) | 🟡 | 2026-11-08 | 091_add_tournament_roster_rpcs.sql (_validate_entry_field_values, update_tournament_module_settings [roster keys], upsert_team_entry, team guard in upsert_tournament_entry, set_module_status roster check, get_module_entries drop+create, get_module_bracket profile_ids, get_module_detail, entrant role patch) + docs/tournaments/sql-tests-v2.sql. Needs owner: apply 091, run sql-tests.sql then sql-tests-v2.sql |
 | 27 | H Rosters | Roster notifications (092) | 🟡 | 2026-11-08 | 092_update_tournament_notifications_for_rosters.sql: trg_tournament_member_added, match events + module completed notify entry+member profiles; tests section R3. Needs owner: apply 092, run tests |
 | 28 | H Rosters | Client foundation (rosters) | 🟡 | 2026-11-08 | types (ParticipantType/TournamentFormat/BracketSide, members, profile_ids, TeamMemberInput, ModuleSettingsPatch), services upsertTeamEntry/updateModuleSettings + members mapping, tournamentErrors @i parsing + roster codes, tournamentFormat roster helpers. tsc ✅ |
-| 29 | H Rosters | Module form: players section | ⬜ | | |
+| 29 | H Rosters | Module form: players section | 🟡 | 2026-11-08 | module-form: PLAYERS section (Singles/Doubles/Teams, roster steppers, sport defaults, lock rules), NumberStepper in form.tsx, save via updateModuleSettings (stays in edit mode if 2nd call fails). tsc ✅ lint ✅. Needs owner: device check |
 | 30 | H Rosters | Team entry form + roster display | ⬜ | | |
 | 31 | H Rosters | Manage checklist + end-to-end | ⬜ | | |
 | 32 | I League | Formats schema (093) | ⬜ | | |
