@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 088 (next = 089) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 088 (next = 090) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -210,8 +210,8 @@ supabase/
 - **Push notification master toggle** (profile + `/settings`); per-type preferences exist in `profiles.notification_preferences` (`NotificationPreferences`, 33 keys) with defaults in `DEFAULT_NOTIFICATION_PREFERENCES`. Web shows `EnablePushNotificationsButton`
 - **Delete account** (soft delete); re-enabled on re-login
 
-### 10. Tournaments (migrations 084–088; full spec in [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md), status in [`PROGRESS.md`](docs/tournaments/PROGRESS.md))
-- **Hierarchy**: Tournament (no sport; created + admins assigned by the owner via SQL — [`owner-sql.md`](docs/tournaments/owner-sql.md)) → **Modules** (one sport each, created by tournament admins) → **entries** (added by module admins only, no self-registration) → single-elimination **bracket** (optional 3rd-place match, byes, walkovers). Tournament admins can only rename the tournament, edit the entry form, create modules and assign module admins; they also hold module-admin powers in all their modules
+### 10. Tournaments (migrations 084–089; full spec in [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md), status in [`PROGRESS.md`](docs/tournaments/PROGRESS.md))
+- **Hierarchy**: Tournament (no sport; created + admins assigned by the owner via SQL — [`owner-sql.md`](docs/tournaments/owner-sql.md)) → **Modules** (one sport each, created by tournament admins) → **entries** (added by module admins only, no self-registration) → single-elimination **bracket** (optional 3rd-place match, byes, walkovers). Tournament admins can edit all tournament settings (name, description, organization, location, cover image, dates, status via `update_tournament`, migration 089), edit the entry form, create modules and assign module admins; they also hold module-admin powers in all their modules
 - **Entry form** is per tournament: 5 locked core fields (Name, CMS ID, School, Phone, Email; Name+School public, CMS ID/Phone/Email private) + custom fields (archived instead of deleted). Entry values live in `tournament_entries.field_values`; private values are stripped for non-admins **server-side** by `get_module_entries`
 - **All writes go through SECURITY DEFINER RPCs** (clients have no INSERT/UPDATE/DELETE on any tournament table); reads through `get_tournaments`, `get_tournament_detail`, `get_module_*`; engine in 087 (`generate_bracket`, `record_tournament_result`, `record_tournament_walkover`, `reset_tournament_match`, `schedule_tournament_match`); errors are short codes (`NOT_ALLOWED`, `DUPLICATE_CMS_ID`, `TIE_NEEDS_WINNER`, `DOWNSTREAM_PLAYED`…) mapped client-side
 - **Walkover requires both entries present** (deviation from the original plan, see PROGRESS). Module auto-completes (final ranks + `completed`) when the final / 3rd-place match is decided
@@ -366,7 +366,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **089**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **090**
 
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/tournaments` (Tournaments, centre), `/chats` (Chats), `/updates` (Activity); `/profile` is a hidden tab (`href: null`)
@@ -457,4 +457,4 @@ Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinar
 ---
 
 ## Tournaments — remaining work
-Implemented in code (steps 1–23 of [`PLAN.md`](docs/tournaments/PLAN.md) §14); **database steps need the owner to apply migrations 084–088 and run [`docs/tournaments/sql-tests.sql`](docs/tournaments/sql-tests.sql)**, and the screens need an on-device check (see PROGRESS.md "needs owner" notes). Not built: tournament requests (step 24, optional), self-registration, round-robin/double-elim, tournament chat, community-hosted tournaments (`tournaments.community_id` exists unused). Adding more tournament notification types needs another migration extending the `in_app_notifications.type` check constraint.
+Implemented in code (steps 1–23 of [`PLAN.md`](docs/tournaments/PLAN.md) §14); **database steps need the owner to apply migrations 084–089 and run [`docs/tournaments/sql-tests.sql`](docs/tournaments/sql-tests.sql)**, and the screens need an on-device check (see PROGRESS.md "needs owner" notes). Not built: tournament requests (step 24, optional), self-registration, round-robin/double-elim, tournament chat, community-hosted tournaments (`tournaments.community_id` exists unused). Adding more tournament notification types needs another migration extending the `in_app_notifications.type` check constraint.

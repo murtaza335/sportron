@@ -117,6 +117,15 @@ export async function renameTournament(tournamentId: string, name: string): Prom
   await rpc<null>('rename_tournament', { p_tournament: tournamentId, p_name: name });
 }
 
+export type TournamentSettingsPatch = Partial<
+  Pick<Tournament, 'name' | 'description' | 'organization' | 'location' | 'image_url' | 'starts_at' | 'ends_at' | 'status'>
+>;
+
+/** Tournament admin: edit any tournament setting. Only the keys present in `patch` are changed. */
+export async function updateTournament(tournamentId: string, patch: TournamentSettingsPatch): Promise<void> {
+  await rpc<null>('update_tournament', { p_tournament: tournamentId, p_set: patch });
+}
+
 export async function upsertEntryField(
   tournamentId: string,
   input: EntryFieldInput,
