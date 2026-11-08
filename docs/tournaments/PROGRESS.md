@@ -9,11 +9,11 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 
 | # | Phase | Step | Status | Date | Files / notes |
 |---|---|---|---|---|---|
-| 1 | A DB | Schema (084) | 🟡 | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
-| 2 | A DB | Read RPCs (085) | 🟡 | 2026-11-08 | `supabase/migrations/085_add_tournament_read_rpcs.sql` written (full `get_module_standings` included); awaiting owner apply |
-| 3 | A DB | Admin write RPCs (086) | 🟡 | 2026-11-08 | `supabase/migrations/086_add_tournament_admin_rpcs.sql` written; awaiting owner apply |
-| 4 | A DB | Bracket engine (087) | 🟡 | 2026-11-08 | `supabase/migrations/087_add_tournament_bracket_engine.sql` written; awaiting owner apply |
-| 5 | A DB | SQL tests + owner SQL guide | 🟡 | 2026-11-08 | `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md` written; owner must run tests |
+| 1 | A DB | Schema (084) | ✅ | 2026-11-08 | `supabase/migrations/084_add_tournaments.sql` written; awaiting owner to apply |
+| 2 | A DB | Read RPCs (085) | ✅ | 2026-11-08 | `supabase/migrations/085_add_tournament_read_rpcs.sql` written (full `get_module_standings` included); awaiting owner apply |
+| 3 | A DB | Admin write RPCs (086) | ✅ | 2026-11-08 | `supabase/migrations/086_add_tournament_admin_rpcs.sql` written; awaiting owner apply |
+| 4 | A DB | Bracket engine (087) | ✅ | 2026-11-08 | `supabase/migrations/087_add_tournament_bracket_engine.sql` written; awaiting owner apply |
+| 5 | A DB | SQL tests + owner SQL guide | ✅ | 2026-11-08 | `docs/tournaments/sql-tests.sql`, `docs/tournaments/owner-sql.md` written; owner must run tests |
 | 6 | B Client | Types + service + errors + format | ✅ | 2026-11-08 | Tournament types (re-exported from types/index), one service fn per RPC, RPC error-code → friendly message map, status/format/validation helpers |
 | 7 | B Client | Hooks (+ realtime) | ✅ | 2026-11-08 | useTournaments (scope, 30s SWR cache, focus reload), useTournament, useTournamentModule (detail+entries+bracket+standings, realtime on tournament_matches, 400ms debounce) |
 | 8 | B Client | Bracket layout lib | ✅ | 2026-11-08 | Pure bracket layout (nodes, connector paths, columns, 3rd-place under final) + devSelfCheck(). Sample output: size2 nodes=1 conn=0 w=196 h=104; size4 nodes=3 conn=2 w=432 h=196; size8 nodes=7 conn=6 w=668 h=380; size16 nodes=15 conn=14 w=904 h=748 |
@@ -76,6 +76,11 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 - Added a few extra indexes (admins by profile, entries by profile, tournaments by status).
 
 ## Session log
+
+### 2026-11-08 — Phase A verified by owner
+- **Result:** owner ran migrations 084–087 and `sql-tests.sql` (single self-rolling-back DO block) → `ALL TESTS PASSED — rolled back, nothing saved`. Steps 1–5 are ✅.
+- **Not covered by the tests:** 088 notification triggers (step 21), realtime, and all client screens (steps 9–23 still need device checks).
+- **Next action:** owner applies 088, then does the on-device checks listed per step.
 
 ### 2026-11-08 — Step 23: Polish + AGENTS.md + privacy draft
 - **Done:** AGENTS.md updated (structure, feature section 10, data model, routing, notification count 43, next migration 089, history, remaining work); privacy-policy draft text written to docs/tournaments/privacy-draft.md (NOT applied to PRIVACY_POLICY.md); tournaments list got a load-error state; deviations recorded; accessibility labels on interactive controls
