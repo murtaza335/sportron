@@ -281,6 +281,17 @@ function RootNavigator() {
           }}
         />
         <Stack.Screen
+          name="tournament/[id]/module/[moduleId]/knockout"
+          options={{
+            headerShown: true,
+            title: 'Build knockout',
+            animation: 'slide_from_right',
+            animationDuration: 50,
+            headerShadowVisible: false,
+            headerStyle: { backgroundColor: theme.background },
+          }}
+        />
+        <Stack.Screen
           name="tournament/[id]/module/[moduleId]/rounds"
           options={{
             headerShown: true,

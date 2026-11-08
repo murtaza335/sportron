@@ -403,3 +403,34 @@ export function previewTab(format: TournamentFormat): string {
 export function startLabel(format: TournamentFormat): string {
   return format === 'round_robin' ? 'Start league' : format === 'groups_knockout' ? 'Start group stage' : 'Start tournament';
 }
+
+// ─── Knockout builder (groups + knockout) ────────────────────────────────────
+
+/** Standard seed placement for a bracket of `size` (power of two); mirrors _tournament_seed_order in SQL. */
+export function seedOrder(size: number): number[] {
+  let order = [1, 2];
+  let k = 2;
+  while (k < size) {
+    const next: number[] = [];
+    for (const s of order) next.push(s, 2 * k + 1 - s);
+    order = next;
+    k *= 2;
+  }
+  return order;
+}
+
+/** First-round pairs (by list index) that put two entries of the same group against each other. */
+export function sameGroupConflicts(groupLetters: string[]): [number, number][] {
+  const q = groupLetters.length;
+  if (q < 2) return [];
+  let size = 2;
+  while (size < q) size *= 2;
+  const order = seedOrder(size);
+  const out: [number, number][] = [];
+  for (let i = 0; i < size / 2; i++) {
+    const a = order[2 * i] - 1;
+    const b = order[2 * i + 1] - 1;
+    if (a < q && b < q && groupLetters[a] === groupLetters[b]) out.push([a, b]);
+  }
+  return out;
+}

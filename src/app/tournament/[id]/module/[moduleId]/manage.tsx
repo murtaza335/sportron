@@ -54,6 +54,10 @@ export default function ModuleManageScreen() {
     mod.participant_type === 'team'
       ? activeEntries.filter((e) => e.member_count < (mod.roster_min ?? 0)).length
       : 0;
+  const groupMatches = m.matches.filter((x) => x.bracket_side === 'group');
+  const groupTotal = groupMatches.length;
+  const groupDecided = groupMatches.filter((x) => x.status === 'completed' || x.status === 'walkover').length;
+  const groupsDone = groupTotal > 0 && groupDecided === groupTotal;
   const seedsSet = activeEntries.length > 0 && activeEntries.every((e) => e.seed != null);
   const bracketGenerated = mod.bracket_generated_at != null && (m.counts?.matches ?? 0) > 0;
   const detailsSet = !!mod.name && !!mod.sport;
@@ -193,6 +197,11 @@ export default function ModuleManageScreen() {
             ? `${activeEntries.length} ${activeEntries.length === 1 ? entryNoun(mod) : entryNoun(mod, true)} added${mod.max_entries ? ` (max ${mod.max_entries})` : ''}`
             : `${activeEntries.length} ${activeEntries.length === 1 ? 'entry' : 'entries'} added${mod.max_entries ? ` (max ${mod.max_entries})` : ''}`,
         )}
+        {mod.format === 'groups_knockout' &&
+          check(
+            groupsDone,
+            `Group stage (${groupDecided}/${groupTotal} matches)${mod.current_stage === 2 ? ' · knockout built' : ''}`,
+          )}
         {mod.participant_type === 'team' &&
           check(
             incompleteRosters === 0 && activeEntries.length > 0,
@@ -207,6 +216,13 @@ export default function ModuleManageScreen() {
       <View style={{ gap: Spacing.sm }}>
         {link('Edit details', null, () => router.push(tournamentRoutes.moduleForm(id, moduleId)), finished || tournamentLocked)}
         {link('Entries', String(activeEntries.length), () => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=entries` as never))}
+        {mod.format === 'groups_knockout' && mod.status === 'in_progress' &&
+          link(
+            mod.current_stage === 2 ? 'Knockout (undo)' : 'Build knockout',
+            mod.current_stage === 2 ? null : groupsDone ? 'Ready' : `${groupDecided}/${groupTotal}`,
+            () => router.push(tournamentRoutes.knockout(id, moduleId)),
+            mod.current_stage !== 2 && !groupsDone,
+          )}
         {link('Rounds & schedule', null, () => router.push(tournamentRoutes.rounds(id, moduleId)))}
         {link(mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Seeding & bracket' : 'Seeding & fixtures', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
       </View>
