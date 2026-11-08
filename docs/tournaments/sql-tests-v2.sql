@@ -555,6 +555,94 @@ begin
       'FIELD_INVALID:advance_per_group', 'advance_per_group must leave at least one team out of each group (open → seeding)');
   end;
 
+  -- ── section G2: knockout stage (step 38)
+  declare v_m uuid; v_ids uuid[]; v_json jsonb; v_x uuid; v_n int;
+  begin
+    perform tt_test.as_user('admin');
+    -- 8 entries / 2 groups / top 2 → 4-team knockout
+    v_m := tt_test.mk_format('K8', 'table_tennis', 8, '{"format":"groups_knockout","group_count":2,"advance_per_group":2}'::jsonb);
+    perform tt_test.expect_err(format('select * from public.preview_knockout_qualifiers(%L)', v_m),
+      'GROUPS_NOT_FINISHED', 'preview needs every group match decided');
+    perform tt_test.expect_err(format('select public.build_knockout_stage(%L)', v_m),
+      'GROUPS_NOT_FINISHED', 'build needs every group match decided');
+    perform tt_test.play_all(v_m);
+    perform tt_test.chk((public.get_module_detail(v_m) -> 'counts' ->> 'groups_finished')::boolean, 'groups_finished turns true');
+    perform tt_test.chk((select status = 'in_progress' and current_stage = 1 from public.tournament_modules where id = v_m),
+                        'module stays in progress after the group stage');
+    perform tt_test.chk((select count(*) from public.preview_knockout_qualifiers(v_m)) = 4, 'preview lists 4 qualifiers');
+    perform tt_test.expect_err(format('select public.build_knockout_stage(%L, %L::uuid[])', v_m, array[gen_random_uuid(), gen_random_uuid(), gen_random_uuid(), gen_random_uuid()]),
+      'FIELD_INVALID:entry_ids', 'custom order must be exactly the qualifier set');
+    v_n := public.build_knockout_stage(v_m);
+    perform tt_test.chk(v_n = 3, 'knockout of 4 has 3 matches');
+    perform tt_test.chk((select current_stage = 2 from public.tournament_modules where id = v_m), 'current_stage = 2 after building');
+    perform tt_test.chk((select count(*) filter (where qualified) = 4 and count(*) filter (where not qualified) = 4
+                         from public.tournament_group_entries where module_id = v_m), 'qualified flags written');
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and stage_number = 2 and entry_a_label ~ '^[AB][12]$') >= 1,
+                        'knockout slots carry group labels (A1, B2 …)');
+    select id into v_x from public.tournament_matches where module_id = v_m and bracket_side = 'group' limit 1;
+    perform tt_test.expect_err(format('select public.record_tournament_result(%L,3,0,null,null,null)', v_x),
+      'STAGE_LOCKED', 'group results are locked once the knockout exists');
+    perform tt_test.expect_err(format('select public.reset_tournament_match(%L)', v_x),
+      'STAGE_LOCKED', 'group matches cannot be reset once the knockout exists');
+    -- undo + rebuild with a custom (reversed) order
+    perform public.reset_knockout_stage(v_m);
+    perform tt_test.chk((select current_stage = 1 from public.tournament_modules where id = v_m)
+                        and not exists (select 1 from public.tournament_matches where module_id = v_m and stage_number = 2),
+                        'reset_knockout_stage removes the knockout');
+    select array_agg(entry_id order by suggested_seed desc) into v_ids from public.preview_knockout_qualifiers(v_m);
+    perform public.build_knockout_stage(v_m, v_ids);
+    -- play the knockout
+    perform tt_test.play_all(v_m);
+    perform tt_test.chk((select status = 'completed' and champion_entry_id is not null and runner_up_entry_id is not null
+                         from public.tournament_modules where id = v_m), 'groups + knockout module completes');
+    perform tt_test.chk((select count(*) filter (where final_rank = 5) = 2 and count(*) filter (where final_rank = 7) = 2
+                         from public.tournament_entries where module_id = v_m),
+                        '3rd-placed group entries share rank 5, 4th-placed share rank 7 (4 qualifiers)');
+    perform tt_test.chk((select count(*) from public.tournament_entries where module_id = v_m and final_rank in (1, 2)) = 2,
+                        'champion and runner-up ranked 1 and 2');
+    perform tt_test.chk(jsonb_array_length(public.get_module_standings_v2(v_m) -> 'final') = 8
+                        and (public.get_module_standings_v2(v_m) -> 'final' -> 4 ->> 'rank_label') = 'T-5',
+                        'standings v2 final list has T-5 labels');
+    perform tt_test.chk(jsonb_array_length(public.get_module_standings_v2(v_m) -> 'knockout') = 4, 'standings v2 knockout rows cover the 4 qualifiers');
+    perform tt_test.expect_err(format('select public.reset_knockout_stage(%L)', v_m), 'INVALID_STATUS', 'completed module cannot reset the knockout');
+
+    -- undo is blocked once a knockout match was played
+    v_m := tt_test.mk_format('K8b', 'table_tennis', 8, '{"format":"groups_knockout","group_count":2,"advance_per_group":2}'::jsonb);
+    perform tt_test.play_all(v_m);
+    perform public.build_knockout_stage(v_m);
+    select id into v_x from public.tournament_matches where module_id = v_m and stage_number = 2 and entry_a_id is not null and entry_b_id is not null limit 1;
+    perform public.record_tournament_result(v_x, 3, 1, null, null, null);
+    perform tt_test.expect_err(format('select public.reset_knockout_stage(%L)', v_m), 'DOWNSTREAM_PLAYED',
+      'cannot undo the knockout once a knockout match is decided');
+
+    -- 16 entries / 4 groups / top 2: no same-group first-round pair; ranks T-9 and T-13
+    v_m := tt_test.mk_format('K16', 'table_tennis', 16, '{"format":"groups_knockout","group_count":4,"advance_per_group":2}'::jsonb);
+    perform tt_test.play_all(v_m);
+    perform public.build_knockout_stage(v_m);
+    perform tt_test.chk(not exists (
+        select 1 from public.tournament_matches tm
+        join public.tournament_group_entries ga on ga.entry_id = tm.entry_a_id
+        join public.tournament_group_entries gb on gb.entry_id = tm.entry_b_id
+        where tm.module_id = v_m and tm.stage_number = 2 and tm.round_number = 1 and ga.group_id = gb.group_id),
+                        '16/4/2: suggested order avoids same-group round-1 pairs');
+    perform tt_test.play_all(v_m);
+    perform tt_test.chk((select count(*) filter (where final_rank = 9) = 4 and count(*) filter (where final_rank = 13) = 4
+                         from public.tournament_entries where module_id = v_m), '16/4/2: 3rd-placed share 9 (T-9), 4th-placed share 13 (T-13)');
+    perform tt_test.chk((select status = 'completed' from public.tournament_modules where id = v_m), '16/4/2 completes');
+
+    -- 10 entries / 3 groups / top 1 → 3 qualifiers, one bye
+    v_m := tt_test.mk_format('K10', 'table_tennis', 10, '{"format":"groups_knockout","group_count":3,"advance_per_group":1}'::jsonb);
+    perform tt_test.play_all(v_m);
+    perform public.build_knockout_stage(v_m);
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and stage_number = 2 and status = 'bye') = 1,
+                        '3 qualifiers → one bye in the knockout');
+    perform tt_test.play_all(v_m);
+    perform tt_test.chk((select status = 'completed' from public.tournament_modules where id = v_m), '10/3/1 completes');
+    perform tt_test.chk((select count(*) filter (where final_rank = 4) = 3 and count(*) filter (where final_rank = 7) = 3
+                         and count(*) filter (where final_rank = 10) = 1 from public.tournament_entries where module_id = v_m),
+                        'uneven groups: ranks 4 (x3, pos 2), 7 (x3, pos 3), 10 (pos 4)');
+  end;
+
   -- @@END (new steps insert their test sections above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;

@@ -51,7 +51,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 35 | I League | Module form: format section | 🟡 | 2026-11-08 | module-form FORMAT section: 4 format pills (+hints), legs, draws toggle (hidden for racket), points steppers with validation, groups/advance steppers with live caption, GF reset toggle, 3rd-place only for knockout formats; saved through updateModuleSettings patch. tsc ✅ lint ✅ |
 | 36 | I League | RR matches + results + seeding copy | 🟡 | 2026-11-08 | Matches tab sections by stage/side/round/group (+ group chips), match codes + slot labels in rows/sheet, draws in ResultEntrySheet (no winner picker, 'Draw' label), per-format seeding copy/button labels (structureSummary, generateLabel, previewTab), manage start labels. tsc ✅ lint ✅. Needs owner: full league on device |
 | 37 | J Groups | Group stage engine (095) | 🟡 | 2026-11-08 | 095_add_tournament_group_stage.sql: snake draw _generate_groups, _rebuild_group_fixtures, move_group_entry, get_module_groups, group tables in standings v2, counts.groups_finished. Tests G1. VERIFIED in local Postgres container: v1 + v2 tests pass |
-| 38 | J Groups | Knockout stage engine (096) | ⬜ | | |
+| 38 | J Groups | Knockout stage engine (096) | 🟡 | 2026-11-08 | 096_add_tournament_knockout_stage.sql: preview_knockout_qualifiers (conflict-avoiding order), build_knockout_stage, reset_knockout_stage, _complete_groups_knockout (+non-qualifier shared ranks), stage-aware standings rows (_standings_main_rows). Tests G2 (8/2/2, 16/4/2, 10/3/1). VERIFIED in local Postgres container: v1 + v2 pass |
 | 39 | J Groups | Double-elim engine (097) | ⬜ | | |
 | 40 | J Groups | Client: groups tab + seeding groups mode | ⬜ | | |
 | 41 | J Groups | Client: knockout builder | ⬜ | | |
