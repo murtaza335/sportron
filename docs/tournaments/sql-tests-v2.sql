@@ -478,6 +478,83 @@ begin
       'TOO_MANY_ENTRIES', 'a league takes at most 20 entries');
   end;
 
+  -- ── section G1: group stage (step 37)
+  declare v_m uuid; v_a uuid; v_b uuid; v_names text; v_ids uuid[]; v_json jsonb; v_x uuid;
+  begin
+    perform tt_test.as_user('admin');
+    -- 8 entries, 2 groups, top 2: snake → A: 1,4,5,8  B: 2,3,6,7
+    v_m := tt_test.mk_format('G8', 'table_tennis', 8, '{"format":"groups_knockout","group_count":2,"advance_per_group":2}'::jsonb);
+    select string_agg(e.name, ',' order by e.seed) into v_names
+      from public.tournament_group_entries ge join public.tournament_groups g on g.id = ge.group_id
+      join public.tournament_entries e on e.id = ge.entry_id where g.module_id = v_m and g.letter = 'A';
+    perform tt_test.chk(v_names = 'P1,P4,P5,P8', format('snake draw: group A = P1,P4,P5,P8 (got %s)', v_names));
+    select string_agg(e.name, ',' order by e.seed) into v_names
+      from public.tournament_group_entries ge join public.tournament_groups g on g.id = ge.group_id
+      join public.tournament_entries e on e.id = ge.entry_id where g.module_id = v_m and g.letter = 'B';
+    perform tt_test.chk(v_names = 'P2,P3,P6,P7', format('snake draw: group B = P2,P3,P6,P7 (got %s)', v_names));
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'group') = 12,
+                        '2 groups of 4 → 12 group matches');
+    perform tt_test.chk((select count(distinct round_number) from public.tournament_matches where module_id = v_m) = 3,
+                        'groups share 3 matchdays');
+    perform tt_test.chk(not exists (
+        select 1 from (select round_number, match_number, count(*) c from public.tournament_matches where module_id = v_m group by 1, 2) x where c > 1),
+                        'match numbers are unique inside a round across groups');
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and code ~ '^[AB][0-9]+$') = 12,
+                        'group match codes look like A3 / B2');
+    perform tt_test.chk(not exists (
+        select 1 from public.tournament_matches tm join public.tournament_group_entries ga on ga.entry_id = tm.entry_a_id
+        join public.tournament_group_entries gb on gb.entry_id = tm.entry_b_id
+        where tm.module_id = v_m and (ga.group_id <> gb.group_id or tm.group_id <> ga.group_id)),
+                        'group matches only pair entries of the same group');
+    perform tt_test.chk((public.get_module_detail(v_m) -> 'counts' ->> 'groups_finished')::boolean is false, 'groups_finished is false at the start');
+    perform tt_test.chk(jsonb_array_length(public.get_module_groups(v_m)) = 2, 'get_module_groups returns both groups');
+    v_json := public.get_module_standings_v2(v_m);
+    perform tt_test.chk(v_json ->> 'kind' = 'groups' and jsonb_array_length(v_json -> 'groups') = 2
+                        and jsonb_array_length(v_json -> 'groups' -> 0 -> 'table') = 4 and (v_json -> 'groups' -> 0 ->> 'advance')::int = 2,
+                        'standings v2 (groups) has one table per group with the advance count');
+
+    -- 10 entries, 3 groups, top 1: sizes A=3 B=3 C=4
+    v_m := tt_test.mk_format('G10', 'table_tennis', 10, '{"format":"groups_knockout","group_count":3,"advance_per_group":1}'::jsonb);
+    perform tt_test.chk((select string_agg(c::text, ',' order by letter) from (
+        select g.letter, count(*) c from public.tournament_group_entries ge join public.tournament_groups g on g.id = ge.group_id
+        where g.module_id = v_m group by g.letter) x) = '3,3,4', '10 entries / 3 groups → sizes 3,3,4');
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m) = 12, '3+3+6 = 12 group matches');
+
+    -- 16 entries, 4 groups, top 2
+    v_m := tt_test.mk_format('G16', 'table_tennis', 16, '{"format":"groups_knockout","group_count":4,"advance_per_group":2}'::jsonb);
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m) = 24, '4 groups of 4 → 24 group matches');
+
+    -- move_group_entry (seeding only, keeps >= 2 per group, rebuilds fixtures)
+    v_m := tt_test.mk_format('GMove', 'table_tennis', 8, '{"format":"groups_knockout","group_count":2,"advance_per_group":2}'::jsonb, false);
+    perform public.generate_bracket(v_m);
+    select ge.entry_id, ge.group_id into v_x, v_a from public.tournament_group_entries ge
+      join public.tournament_groups g on g.id = ge.group_id where g.module_id = v_m and g.letter = 'A' order by ge.entry_id limit 1;
+    select id into v_b from public.tournament_groups where module_id = v_m and letter = 'B';
+    perform public.move_group_entry(v_x, v_b);
+    perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m) = 3 + 10,
+                        'moving an entry rebuilds fixtures (3 + 10 matches)');
+    perform tt_test.chk(not exists (select 1 from public.tournament_matches tm where tm.module_id = v_m and
+                        (tm.entry_a_id = v_x or tm.entry_b_id = v_x) and tm.group_id <> v_b), 'moved entry only plays in its new group');
+    -- shrink group A to 2 then refuse to go below
+    for v_x in select ge.entry_id from public.tournament_group_entries ge join public.tournament_groups g on g.id = ge.group_id
+               where g.module_id = v_m and g.letter = 'A' order by ge.entry_id limit 1 loop
+      perform public.move_group_entry(v_x, v_b);
+    end loop;
+    select ge.entry_id into v_x from public.tournament_group_entries ge join public.tournament_groups g on g.id = ge.group_id
+      where g.module_id = v_m and g.letter = 'A' limit 1;
+    perform tt_test.expect_err(format('select public.move_group_entry(%L,%L)', v_x, v_b), 'FIELD_INVALID:group',
+      'a group cannot drop below 2 entries');
+    perform tt_test.as_user('stranger');
+    perform tt_test.expect_err(format('select public.move_group_entry(%L,%L)', v_x, v_b), 'NOT_ALLOWED', 'plain user cannot move entries');
+    perform tt_test.as_user('admin');
+
+    -- setup guards at open → seeding
+    perform tt_test.expect_err(
+      format('select tt_test.mk_format(%L,%L,6,%L::jsonb,false)', 'GBad', 'table_tennis',
+             '{"format":"groups_knockout","group_count":3,"advance_per_group":2}'),
+      'FIELD_INVALID:advance_per_group', 'advance_per_group must leave at least one team out of each group (open → seeding)');
+  end;
+
   -- @@END (new steps insert their test sections above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
