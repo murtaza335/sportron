@@ -16,7 +16,7 @@ import { useTournament } from '@/hooks/useTournament';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
-import { moduleStatusTone } from '@/lib/tournamentFormat';
+import { entryNoun, moduleStatusTone } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { invalidateTournamentsCache } from '@/hooks/useTournaments';
 import {
@@ -50,6 +50,10 @@ export default function ModuleManageScreen() {
 
   const tournamentLocked = m.tournament?.status === 'completed' || m.tournament?.status === 'cancelled';
   const activeEntries = m.entries.filter((e) => e.status === 'active');
+  const incompleteRosters =
+    mod.participant_type === 'team'
+      ? activeEntries.filter((e) => e.member_count < (mod.roster_min ?? 0)).length
+      : 0;
   const seedsSet = activeEntries.length > 0 && activeEntries.every((e) => e.seed != null);
   const bracketGenerated = mod.bracket_generated_at != null && (m.counts?.matches ?? 0) > 0;
   const detailsSet = !!mod.name && !!mod.sport;
@@ -77,7 +81,7 @@ export default function ModuleManageScreen() {
       : mod.status === 'draft'
         ? { label: 'Publish module', onPress: () => changeStatus('open') }
         : mod.status === 'open'
-          ? { label: 'Close entries & start seeding', onPress: () => changeStatus('seeding') }
+          ? { label: 'Close entries & start seeding', onPress: () => changeStatus('seeding'), disabled: incompleteRosters > 0 }
           : mod.status === 'seeding'
             ? { label: 'Start tournament', onPress: () => changeStatus('in_progress'), disabled: !bracketGenerated }
             : null;
@@ -161,6 +165,11 @@ export default function ModuleManageScreen() {
           <StatusPill tone={moduleStatusTone(mod.status)} />
         </View>
         {primary && <Button label={primary.label} onPress={primary.onPress} loading={busy} disabled={primary.disabled} />}
+        {mod.status === 'open' && incompleteRosters > 0 && (
+          <ThemedText variant="caption" muted>
+            Every {entryNoun(mod)} needs at least {mod.roster_min} players before seeding.
+          </ThemedText>
+        )}
         {mod.status === 'in_progress' && (
           <ThemedText variant="caption" muted>Completes automatically after the final.</ThemedText>
         )}
@@ -180,8 +189,17 @@ export default function ModuleManageScreen() {
         {check(detailsSet, 'Details set')}
         {check(
           activeEntries.length >= 2,
-          `${activeEntries.length} ${activeEntries.length === 1 ? 'entry' : 'entries'} added${mod.max_entries ? ` (max ${mod.max_entries})` : ''}`,
+          mod.participant_type === 'team'
+            ? `${activeEntries.length} ${activeEntries.length === 1 ? entryNoun(mod) : entryNoun(mod, true)} added${mod.max_entries ? ` (max ${mod.max_entries})` : ''}`
+            : `${activeEntries.length} ${activeEntries.length === 1 ? 'entry' : 'entries'} added${mod.max_entries ? ` (max ${mod.max_entries})` : ''}`,
         )}
+        {mod.participant_type === 'team' &&
+          check(
+            incompleteRosters === 0 && activeEntries.length > 0,
+            incompleteRosters === 0
+              ? `Rosters complete (${activeEntries.length}/${activeEntries.length} ${entryNoun(mod, true)})`
+              : `${incompleteRosters} ${incompleteRosters === 1 ? entryNoun(mod) : entryNoun(mod, true)} need more players`,
+          )}
         {check(seedsSet, 'Seeds set')}
         {check(bracketGenerated, 'Bracket generated')}
       </View>
