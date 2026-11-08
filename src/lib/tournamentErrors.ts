@@ -79,7 +79,11 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('TIE_NEEDS_WINNER')) return 'Scores are level — pick the winner.';
   if (message.includes('DOWNSTREAM_PLAYED'))
     return 'The next match has already been played. Reset it first.';
-  if (message.includes('NOT_ENOUGH_ENTRIES')) return 'Add at least 2 entries first.';
+  if (message.includes('NOT_ENOUGH_ENTRIES')) return 'Not enough entries for this format yet.';
+  if (message.includes('TOO_MANY_ENTRIES')) return 'Too many entries for this format.';
+  if (message.includes('GROUPS_NOT_FINISHED')) return 'Finish all group matches first.';
+  if (message.includes('STAGE_LOCKED'))
+    return 'The knockout has been built — group results are locked. Undo the knockout first.';
   if (message.includes('CORE_FIELD_LOCKED')) return "Core fields can't be removed.";
   if (message.includes('NOT_FOUND')) return "We couldn't find that.";
 

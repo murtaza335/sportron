@@ -4,7 +4,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Spacing } from '@/constants/theme';
-import { bestOfLabel, formatMatchTime } from '@/lib/tournamentFormat';
+import { bestOfLabel, formatLine, formatMatchTime, pointsHint } from '@/lib/tournamentFormat';
 import type { ProfileLite, TournamentModule, TournamentRound } from '@/types';
 
 export function ModuleInfoTab({
@@ -16,7 +16,16 @@ export function ModuleInfoTab({
   rounds: TournamentRound[];
   admins: ProfileLite[];
 }) {
-  const format = `Single elimination${module.third_place_match ? ' · 3rd-place match on' : ''}`;
+  const leagueLike = module.format === 'round_robin' || module.format === 'groups_knockout';
+  const format = [
+    formatLine(module),
+    module.third_place_match && module.format !== 'round_robin' && module.format !== 'double_elimination'
+      ? '3rd-place match on'
+      : null,
+    module.format === 'double_elimination' ? (module.grand_final_reset ? 'grand final reset on' : 'no grand final reset') : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
   return (
     <View style={styles.wrap}>
       {module.description && (
@@ -34,6 +43,11 @@ export function ModuleInfoTab({
       <View style={styles.block}>
         <ThemedText variant="label" muted>Format</ThemedText>
         <ThemedText>{format}</ThemedText>
+        {leagueLike && (
+          <ThemedText variant="caption" muted>
+            Points: {pointsHint(module)}{module.allow_draws ? ' · draws allowed' : ''}
+          </ThemedText>
+        )}
         {module.max_entries != null && (
           <ThemedText variant="caption" muted>Up to {module.max_entries} entries</ThemedText>
         )}

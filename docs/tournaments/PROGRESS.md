@@ -57,9 +57,15 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 41 | J Groups | Client: knockout builder | 🟡 | 2026-11-08 | knockout.tsx builder screen (qualifier list, ↑/↓, live same-group warnings via seedOrder/sameGroupConflicts, reset to suggested, build with confirm, undo when built), route registered in _layout + tournamentRoutes.knockout, manage: group-stage checklist line + Build/Undo knockout link. tsc ✅ lint ✅ (0 errors). Needs owner: device check |
 | 42 | K DE | Bracket layout generalisation | 🟡 | 2026-11-08 | layoutTree(matches) generalisation (any round numbers, single/no in-section feeders, overlap push-down); layoutBracket is a thin wrapper. Verified with node: v1 output byte-identical for sizes 2..64 ±3rd place; devSelfCheck adds LB S=8 (6 nodes) / S=16 (14 nodes), no overlaps. tsc ✅ lint ✅ (v1 layout output must stay identical) |
 | 43 | K DE | DE bracket UI + standings | 🟡 | 2026-11-08 | BracketView: Winners/Losers/Final sections for DE (layoutTree per section), slot labels (Loser W2-1…) + BYE/Not needed captions + codes on nodes, own-path highlight from all matches, StandingsTable Losses column while running, chart hidden for DE, match sheet shows 'drops to …', cancelled matches only under 'All'. tsc ✅ lint: no new errors. Needs owner: 6- and 9-entry DE on device incl. GF reset |
-| 44 | K Finish | Polish & docs | ⬜ | | |
+| 44 | K Finish | Polish & docs | 🟡 | 2026-11-08 | error copy for TOO_MANY_ENTRIES/GROUPS_NOT_FINISHED/STAGE_LOCKED, Info tab shows format/points/GF reset, AGENTS.md (structure, features, next migration 098), PLAN.md note, privacy-draft addition, whats-new-draft.md, PROGRESS verification + deviations. Not touched: whatsNew.ts (version bump is a release decision) |
 
-v2 open assumptions (PLAN-v2 §1.3): B1–B17. Record answers in Decisions below before the dependent step.
+v2 open assumptions (PLAN-v2 §1.3): B1–B17 — all built with the recommended defaults (see Decisions).
+
+**v2 verification:** migrations 084–097 + `sql-tests.sql` + `sql-tests-v2.sql` were executed end-to-end against a throwaway
+Postgres 16 container (`docs/tournaments/local-db/run.sh`, with stubbed Supabase auth/profiles) — both files finish with
+`ALL TESTS PASSED`. TypeScript: `npx tsc --noEmit` clean; `npm run lint` has 4 pre-existing errors in an unrelated file and no new ones.
+**Still needs the owner:** apply 090–097 on the real Supabase project (in order), run both test files there, and do the on-device checks
+listed per step. No edge-function change was needed (no redeploy).
 
 ## Decisions (owner)
 
@@ -89,6 +95,16 @@ v2 open assumptions (PLAN-v2 §1.3): B1–B17. Record answers in Decisions below
 
 ## Plan deviations
 
+- **v2 (steps 25–44):**
+  - 090–097 used exactly the planned numbers (no shift). `get_module_entries` was dropped + recreated (owner confirmed tournaments were never released).
+  - No audit trigger on `tournament_group_entries` (composite key, the generic `audit_tournament_table()` reads `NEW.id`).
+  - `update_tournament_module_settings` is defined in 091 (roster keys) and replaced in 093 (roster + format keys); format-consistency checks run at `open → seeding` in `set_module_status` (094).
+  - `get_tournaments` / `get_tournament_detail` 'entrant' role is patched from the live definition inside a `DO` block (091) instead of copying whole functions; same for `counts.groups_finished` (095).
+  - The advance / un-advance / auto-bye / grand-final logic was written once, in 094 (all formats), rather than spread over 094–097; 095–097 only add generators, completion rules and standings.
+  - `_complete_tournament_module` returns early unless the module is `in_progress` (bye resolution during generation can never complete a module).
+  - Doubles entry uses two fixed player rows that open the same `MemberSheet` (not inline-expanding cards); the user picker and member sheet are shown one at a time (no nested modals).
+  - `knockout.tsx` mirrors the SQL seeding order in `lib/tournamentFormat.ts` (`seedOrder`) to show same-group warnings live.
+  - Added `docs/tournaments/local-db/` (Docker harness) and `whats-new-draft.md`; privacy draft extended for team rosters. `AGENTS.md` updated; `whatsNew.ts` intentionally NOT touched.
 - No sport check existed on `communities.sport` (grep of migrations), so `tournament_modules.sport` uses an explicit `in (...)` list copied from the TS `Sport` union.
 - Core-field delete guard allows the delete when the parent tournament is already gone, so `on delete cascade` of a tournament still works.
 - Added `revoke insert/update/delete/truncate` from anon/authenticated on all 8 tables (defence in depth beyond "no write policies").

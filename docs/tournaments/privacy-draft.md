@@ -24,3 +24,14 @@ school or department, phone number, email address** and other answers the organi
   address in this policy.
 - **Third parties.** Organisers are responsible for having a lawful basis to enter other people's
   details. We do not sell this information.
+
+---
+
+## Addition for v2: team rosters
+
+For team and doubles events, the organiser enters the details above **for every player on a team**
+(not only one contact person), plus an optional team captain and squad number. The same visibility
+rules apply per player: a player's name and school are visible to other signed-in users; their CMS ID,
+phone number and email are visible only to the tournament's administrators and to that player (if the
+organiser linked their Sportron account). Teammates do **not** see each other's private details.
+Linked players receive the notifications their team receives (schedule, results, completion).

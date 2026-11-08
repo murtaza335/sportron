@@ -2,7 +2,7 @@
 
 > **Audience:** the implementing agent (Claude Sonnet) and the project owner.
 > **Status:** PLAN — nothing implemented. Branch: `dev`.
-> **v2 (rosters/teams, round-robin, groups + knockout, double elimination) → [`PLAN-v2.md`](PLAN-v2.md)** — steps 25–44.
+> **v2 (rosters/teams, round-robin, groups + knockout, double elimination) → [`PLAN-v2.md`](PLAN-v2.md)** — steps 25–44. **Implemented** (migrations 090–097); the v1 "out of scope: other formats / teams" notes below are superseded.
 > **Before every work session:** read `AGENTS.md` → this file → `docs/tournaments/PROGRESS.md`. Do **one step** from §14, then update `PROGRESS.md` (see §15). Never do several phases in one go.
 
 ---
