@@ -37,14 +37,24 @@ export type BracketLayout = {
   height: number;
 };
 
-export function layoutBracket(matches: LayoutMatch[]): BracketLayout {
+/**
+ * Generalised tree layout (PLAN-v2 §8.3) for ONE section of a bracket (a single-elimination tree,
+ * the winners bracket, the losers bracket, the grand final …). Columns are the rounds present, in order.
+ *  - first column: stacked by match number
+ *  - later columns: midpoint of the in-section feeders; a single feeder → that feeder's y;
+ *    no feeder (e.g. the other source of a losers-bracket match lives in the winners bracket, or a dead
+ *    match was removed) → stacked by match number at the previous column's pitch
+ *  - overlapping nodes in a column are pushed down, so nothing ever overlaps
+ * The optional 3rd-place match is placed under the final.
+ */
+export function layoutTree(matches: LayoutMatch[]): BracketLayout {
   const main = matches.filter((m) => !m.is_third_place);
   const third = matches.find((m) => m.is_third_place) ?? null;
   if (main.length === 0) {
     return { nodes: [], connectors: [], columns: [], width: 0, height: 0 };
   }
 
-  const rounds = Math.max(...main.map((m) => m.round_number));
+  const roundNumbers = [...new Set(main.map((m) => m.round_number))].sort((a, b) => a - b);
   const byRound = new Map<number, LayoutMatch[]>();
   for (const m of main) {
     const list = byRound.get(m.round_number) ?? [];
@@ -53,16 +63,22 @@ export function layoutBracket(matches: LayoutMatch[]): BracketLayout {
   }
   for (const list of byRound.values()) list.sort((a, b) => a.match_number - b.match_number);
 
-  const x = (r: number) => (r - 1) * (NODE_W + COL_GAP);
+  const colIndex = new Map(roundNumbers.map((r, i) => [r, i]));
+  const x = (r: number) => (colIndex.get(r) ?? 0) * (NODE_W + COL_GAP);
   const yById = new Map<string, number>();
+  const STEP = NODE_H + ROW_GAP;
 
-  const first = byRound.get(1) ?? [];
-  first.forEach((m, i) => yById.set(m.id, HEADER_H + i * (NODE_H + ROW_GAP)));
+  const first = byRound.get(roundNumbers[0]) ?? [];
+  first.forEach((m, i) => yById.set(m.id, HEADER_H + i * STEP));
 
-  for (let r = 2; r <= rounds; r++) {
+  let prevPitch = STEP;
+  for (let ci = 1; ci < roundNumbers.length; ci++) {
+    const r = roundNumbers[ci];
     const list = byRound.get(r) ?? [];
+    const prevList = byRound.get(roundNumbers[ci - 1]) ?? [];
     for (const m of list) {
-      const feeders = (byRound.get(r - 1) ?? []).filter((f) => f.next_match_id === m.id);
+      // feeders from ANY earlier column of this section
+      const feeders = main.filter((f) => f.next_match_id === m.id);
       const centres = feeders
         .map((f) => yById.get(f.id))
         .filter((v): v is number => v !== undefined)
@@ -71,12 +87,19 @@ export function layoutBracket(matches: LayoutMatch[]): BracketLayout {
         const mid = centres.reduce((a, b) => a + b, 0) / centres.length;
         yById.set(m.id, mid - NODE_H / 2);
       } else {
-        // fallback: spread evenly
-        const idx = list.indexOf(m);
-        const span = (first.length * (NODE_H + ROW_GAP)) / Math.max(list.length, 1);
-        yById.set(m.id, HEADER_H + idx * span + span / 2 - NODE_H / 2 - ROW_GAP / 2);
+        yById.set(m.id, HEADER_H + (m.match_number - 1) * prevPitch);
       }
     }
+    // never overlap inside a column
+    let lastBottom = -Infinity;
+    for (const m of list) {
+      const y = Math.max(yById.get(m.id) ?? HEADER_H, lastBottom + ROW_GAP);
+      yById.set(m.id, y);
+      lastBottom = y + NODE_H;
+    }
+    // pitch used by orphans of the next column
+    const ys = prevList.map((p) => yById.get(p.id) ?? 0).sort((a, b) => a - b);
+    prevPitch = ys.length >= 2 ? Math.max((ys[ys.length - 1] - ys[0]) / (ys.length - 1), STEP) : STEP;
   }
 
   const nodes: LayoutNode[] = main.map((m) => ({
@@ -106,30 +129,29 @@ export function layoutBracket(matches: LayoutMatch[]): BracketLayout {
     });
   }
 
+  const lastRound = roundNumbers[roundNumbers.length - 1];
   let height = Math.max(...nodes.map((n) => n.y + NODE_H));
   if (third) {
-    const finalNode = nodes.find((n) => n.round === rounds);
+    const finalNode = nodes.find((n) => n.round === lastRound);
     const ty = (finalNode ? finalNode.y + NODE_H : height) + THIRD_GAP;
-    nodes.push({
-      matchId: third.id,
-      x: x(rounds),
-      y: ty,
-      round: rounds,
-      isThird: true,
-    });
+    nodes.push({ matchId: third.id, x: x(lastRound), y: ty, round: lastRound, isThird: true });
     height = Math.max(height, ty + NODE_H);
   }
 
-  const columns: LayoutColumn[] = [];
-  for (let r = 1; r <= rounds; r++) columns.push({ round: r, x: x(r) });
+  const columns: LayoutColumn[] = roundNumbers.map((r) => ({ round: r, x: x(r) }));
 
   return {
     nodes,
     connectors,
     columns,
-    width: x(rounds) + NODE_W,
+    width: x(lastRound) + NODE_W,
     height,
   };
+}
+
+/** v1 entry point: a single-elimination tree. Same output as before the generalisation. */
+export function layoutBracket(matches: LayoutMatch[]): BracketLayout {
+  return layoutTree(matches);
 }
 
 /** Match ids on the path of an entry: every match that contains it (used for highlighting). */
@@ -172,6 +194,30 @@ export function devSelfCheck(): string[] {
     if (l.connectors.length !== Math.max(size - 2, 0)) {
       // each non-final match has one connector: size - 2
       out.push(`  !! expected ${size - 2} connectors`);
+    }
+  }
+  // losers-bracket samples (PLAN-v2 §8.3): S=8 → 6 matches, S=16 → 14 matches, nothing overlaps
+  for (const size of [8, 16]) {
+    const k = Math.log2(size);
+    const rounds = 2 * (k - 1);
+    const ms: LayoutMatch[] = [];
+    const idOf = (r: number, m: number) => `l${r}m${m}`;
+    const countOf = (r: number) => size >> (Math.ceil(r / 2) + 1);
+    for (let r = 1; r <= rounds; r++) {
+      for (let m = 1; m <= countOf(r); m++) {
+        const next =
+          r === rounds ? null : r % 2 === 1 ? idOf(r + 1, m) : idOf(r + 1, Math.ceil(m / 2));
+        ms.push({ id: idOf(r, m), round_number: r, match_number: m, is_third_place: false, next_match_id: next });
+      }
+    }
+    const l = layoutTree(ms);
+    out.push(`LB size ${size}: nodes=${l.nodes.length} connectors=${l.connectors.length} w=${l.width} h=${l.height}`);
+    if (l.nodes.length !== size - 2) out.push(`  !! expected ${size - 2} nodes`);
+    for (const col of l.columns) {
+      const ys = l.nodes.filter((n) => n.x === col.x).map((n) => n.y).sort((a, b) => a - b);
+      for (let i = 1; i < ys.length; i++) {
+        if (ys[i] < ys[i - 1] + NODE_H) out.push(`  !! overlapping nodes in LB round ${col.round}`);
+      }
     }
   }
   return out;
