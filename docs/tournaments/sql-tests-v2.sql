@@ -311,6 +311,35 @@ begin
     update public.tournaments set status = 'published' where id = v_t;
   end;
 
+  -- ── section F0: format settings (step 32)
+  declare v_t uuid := tt_test.ctx('t')::uuid; v_m uuid; v_r uuid;
+  begin
+    perform tt_test.as_user('admin');
+    v_m := public.create_tournament_module(v_t, 'Fmt', 'football', null, null, null, null, null, false, 'manual');
+    perform public.update_tournament_module_settings(v_m,
+      '{"participant_type":"team","roster_min":3,"roster_max":5,"format":"round_robin","allow_draws":true,"rr_legs":2,"points_win":3,"points_draw":1,"points_loss":0}'::jsonb);
+    perform tt_test.chk((select format = 'round_robin' and allow_draws and rr_legs = 2 from public.tournament_modules where id = v_m),
+                        'format settings saved');
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_m, '{"points_win":1,"points_draw":1}'),
+      'FIELD_INVALID:points', 'win must beat draw');
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_m, '{"group_count":4}'),
+      'FIELD_INVALID:group_count', 'group_count only for groups_knockout');
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_m, '{"grand_final_reset":false}'),
+      'FIELD_INVALID:grand_final_reset', 'grand_final_reset only for double elimination');
+    perform public.update_tournament_module_settings(v_m, '{"format":"groups_knockout","group_count":4,"advance_per_group":2}'::jsonb);
+    perform tt_test.chk((select group_count = 4 and advance_per_group = 2 from public.tournament_modules where id = v_m), 'group settings saved');
+    perform public.update_tournament_module_settings(v_m, '{"format":"single_elimination","allow_draws":false}'::jsonb);
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_m, '{"allow_draws":true}'),
+      'FIELD_INVALID:allow_draws', 'draws only for league / groups');
+    -- racket sports can never allow draws
+    v_r := public.create_tournament_module(v_t, 'FmtR', 'badminton', null, null, null, null, null, false, 'manual');
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_r, '{"format":"round_robin","allow_draws":true}'),
+      'FIELD_INVALID:allow_draws', 'racket sports cannot allow draws');
+    perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_r, '{"format":"nonsense"}'),
+      'FIELD_INVALID:format', 'unknown format rejected');
+    perform tt_test.chk(exists (select 1 from pg_indexes where indexname = 'tmatch_unique_v2'), 'v2 unique index on matches exists');
+  end;
+
   -- @@END (new steps insert their test sections above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
