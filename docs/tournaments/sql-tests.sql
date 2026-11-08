@@ -11,6 +11,8 @@
 
 begin;
 
+create temp table t_ctx (k text primary key, v text);
+
 -- ── helpers (pg_temp: vanish at rollback) ───────────────────────────────────────────────────
 create function pg_temp.ctx(p_k text) returns text language sql as
   $$ select v from t_ctx where k = p_k $$;
@@ -41,8 +43,6 @@ begin
   end;
   raise exception 'FAIL: % — expected error % but the call succeeded', p_msg, p_code;
 end $$;
-
-create temp table t_ctx (k text primary key, v text);
 
 -- build a module with n entries, move it to in_progress (bracket generated + started)
 create function pg_temp.mk_module(p_name text, p_n int, p_third boolean) returns uuid language plpgsql as $$
