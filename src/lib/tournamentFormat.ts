@@ -1,10 +1,12 @@
 import type { ThemeColor } from '@/constants/theme';
 import { isRacketSport, SPORT_LABELS } from '@/types';
 import type {
+  BracketSide,
   EntryFieldType,
   ModuleStatus,
   ParticipantType,
   Sport,
+  TournamentFormat,
   TournamentModule,
   TournamentEntryField,
   TournamentListItem,
@@ -228,4 +230,61 @@ export function entryNoun(m: Pick<TournamentModule, 'participant_type' | 'roster
 /** "Ali R. / Omar F." for a doubles pair, else the entry name. */
 export function pairLine(members: { name: string }[]): string {
   return members.map((p) => p.name).join(' / ');
+}
+
+// ─── Formats (v2) ────────────────────────────────────────────────────────────
+
+export const FORMAT_LABEL: Record<TournamentFormat, string> = {
+  single_elimination: 'Knockout',
+  round_robin: 'League',
+  groups_knockout: 'Groups + knockout',
+  double_elimination: 'Double elimination',
+};
+
+export const FORMAT_HINT: Record<TournamentFormat, string> = {
+  single_elimination: 'Lose once and you’re out.',
+  round_robin: 'Everyone plays everyone. Most points wins.',
+  groups_knockout: 'Groups of round-robins, then the best go into a knockout.',
+  double_elimination: 'You’re out after two losses.',
+};
+
+/** "Win 3 · Draw 1 · Loss 0" caption for league tables. */
+export function pointsHint(m: Pick<TournamentModule, 'points_win' | 'points_draw' | 'points_loss' | 'allow_draws'>): string {
+  return m.allow_draws
+    ? `W ${m.points_win} · D ${m.points_draw} · L ${m.points_loss}`
+    : `W ${m.points_win} · L ${m.points_loss}`;
+}
+
+/** Header line: "Groups + knockout · Teams (11–18 players) · 4 groups, top 2". */
+export function formatLine(m: TournamentModule): string {
+  const parts: string[] = [FORMAT_LABEL[m.format], participantLabel(m)];
+  if (m.format === 'groups_knockout' && m.group_count && m.advance_per_group) {
+    parts.push(`${m.group_count} groups, top ${m.advance_per_group}`);
+  }
+  if ((m.format === 'round_robin' || m.format === 'groups_knockout') && m.rr_legs === 2) {
+    parts.push('home & away');
+  }
+  return parts.join(' · ');
+}
+
+export function sideLabel(side: BracketSide): string {
+  switch (side) {
+    case 'winners':
+      return 'Winners bracket';
+    case 'losers':
+      return 'Losers bracket';
+    case 'grand_final':
+      return 'Grand final';
+    case 'group':
+      return 'Group stage';
+    case 'league':
+      return 'League';
+    case 'main':
+    default:
+      return 'Bracket';
+  }
+}
+
+export function defaultAllowDraws(sport: Sport): boolean {
+  return !isRacketSport(sport);
 }

@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LeagueTable } from '@/components/tournaments/LeagueTable';
 import { BracketView } from '@/components/tournaments/BracketView';
 import { ResultEntrySheet } from '@/components/tournaments/ResultEntrySheet';
 import { ScheduleSheet } from '@/components/tournaments/ScheduleSheet';
@@ -33,19 +34,32 @@ import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { deleteEntry, resetMatch, withdrawEntry } from '@/services/tournaments';
 import { Button } from '@/components/ui/Button';
-import { entryNoun, formatMatchTime, moduleStatusTone, participantLabel, sportLabel } from '@/lib/tournamentFormat';
+import { entryNoun, formatLine, formatMatchTime, moduleStatusTone, pointsHint, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
-import type { TournamentEntry, TournamentMatch } from '@/types';
+import type { TournamentEntry, TournamentFormat, TournamentMatch } from '@/types';
 
-type Tab = 'bracket' | 'standings' | 'matches' | 'entries' | 'info';
+type Tab = 'bracket' | 'standings' | 'matches' | 'entries' | 'info' | 'table' | 'groups';
 
-const TABS: { value: Tab; label: string }[] = [
-  { value: 'bracket', label: 'Bracket' },
-  { value: 'standings', label: 'Standings' },
-  { value: 'matches', label: 'Matches' },
-  { value: 'entries', label: 'Entries' },
-  { value: 'info', label: 'Info' },
-];
+const ALL_TABS: Record<Tab, string> = {
+  bracket: 'Bracket',
+  standings: 'Standings',
+  matches: 'Matches',
+  entries: 'Entries',
+  info: 'Info',
+  table: 'Table',
+  groups: 'Groups',
+};
+
+/** Tabs per format (PLAN-v2 §9.4). */
+function tabsFor(format: TournamentFormat | undefined): { value: Tab; label: string }[] {
+  const order: Tab[] =
+    format === 'round_robin'
+      ? ['table', 'matches', 'entries', 'info']
+      : format === 'groups_knockout'
+        ? ['groups', 'bracket', 'matches', 'entries', 'info']
+        : ['bracket', 'standings', 'matches', 'entries', 'info'];
+  return order.map((value) => ({ value, label: ALL_TABS[value] }));
+}
 
 export default function ModuleScreen() {
   const { id, moduleId, tab: tabParam } = useLocalSearchParams<{ id: string; moduleId: string; tab?: string }>();
@@ -68,9 +82,18 @@ export default function ModuleScreen() {
   useEffect(() => {
     if (m.loading || defaulted.current || !m.module) return;
     defaulted.current = true;
-    const requested = TABS.find((t) => t.value === tabParam)?.value;
-    setTab(requested ?? (m.bracket.length > 0 ? 'bracket' : 'entries'));
-  }, [m.loading, m.module, m.bracket.length, tabParam]);
+    const available = tabsFor(m.module.format);
+    const requested = available.find((t) => t.value === tabParam)?.value;
+    const hasFixtures = m.matches.length > 0;
+    const fallback: Tab = !hasFixtures
+      ? 'entries'
+      : m.module.format === 'round_robin'
+        ? 'table'
+        : m.module.format === 'groups_knockout'
+          ? m.module.current_stage === 2 ? 'bracket' : 'groups'
+          : 'bracket';
+    setTab(requested ?? fallback);
+  }, [m.loading, m.module, m.matches.length, tabParam]);
 
   const mod = m.module;
   // Entries the viewer plays in — their own entry or a team they are a member of.
@@ -136,7 +159,11 @@ export default function ModuleScreen() {
 
   const entryActions = (entry: TournamentEntry) => {
     const status = mod?.status;
-    const canEdit = status === 'draft' || status === 'open';
+    const isTeamEntry = mod?.participant_type === 'team';
+    // B5: team rosters stay editable until the module is completed; individual entries only while open
+    const canEdit =
+      status === 'draft' || status === 'open' ||
+      (isTeamEntry && (status === 'seeding' || status === 'in_progress'));
     const canWithdraw = entry.status === 'active' && (status === 'open' || status === 'in_progress');
     const canDelete = status === 'draft' || status === 'open';
     const doWithdraw = () =>
@@ -238,7 +265,7 @@ export default function ModuleScreen() {
               <StatusPill tone={moduleStatusTone(mod.status)} />
             </View>
             <ThemedText variant="caption" muted>
-              {m.counts?.entries ?? 0} {mod.participant_type === 'team' ? entryNoun(mod, true) : 'entries'} · {participantLabel(mod)} · Single elimination
+              {m.counts?.entries ?? 0} {mod.participant_type === 'team' ? entryNoun(mod, true) : 'entries'} · {formatLine(mod)}
             </ThemedText>
             {(mod.venue || mod.starts_at) && (
               <View style={styles.meta}>
@@ -258,7 +285,7 @@ export default function ModuleScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ width: tabsWidth }}>
-              <SegmentedControl options={TABS} value={tab} onChange={setTab} compact />
+              <SegmentedControl options={tabsFor(mod.format)} value={tab} onChange={setTab} compact />
             </View>
           </ScrollView>
 
@@ -283,6 +310,29 @@ export default function ModuleScreen() {
               onSelectMatch={(match: TournamentMatch) => setSelectedMatchId(match.id)}
             />
           )}
+          {tab === 'table' && (
+            <View style={{ gap: Spacing.md }}>
+              {(m.standingsV2?.table ?? []).length === 0 ? (
+                <View style={styles.empty}>
+                  <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
+                  <ThemedText variant="heading">No table yet</ThemedText>
+                  <ThemedText muted style={{ textAlign: 'center' }}>The table appears once fixtures are generated.</ThemedText>
+                </View>
+              ) : (
+                <LeagueTable
+                  rows={m.standingsV2?.table ?? []}
+                  viewerId={user?.id}
+                  hideDraws={!mod.allow_draws}
+                  champion={mod.status === 'completed'}
+                  pointsHint={pointsHint(mod)}
+                  onSelect={(entryId) => {
+                    const e = m.entries.find((x) => x.id === entryId);
+                    if (e) setSelected(e);
+                  }}
+                />
+              )}
+            </View>
+          )}
           {tab === 'standings' && (
             <ModuleStandingsTab
               standings={m.standings}
@@ -296,28 +346,28 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'matches' && (
-            <ModuleMatchesTab matches={m.bracket} onSelect={(match) => setSelectedMatchId(match.id)} />
+            <ModuleMatchesTab matches={m.matches} onSelect={(match) => setSelectedMatchId(match.id)} />
           )}
         </ScrollView>
       )}
 
       <TournamentMatchSheet
-        match={m.bracket.find((x) => x.id === selectedMatchId) ?? null}
-        allMatches={m.bracket}
+        match={m.matches.find((x) => x.id === selectedMatchId) ?? null}
+        allMatches={m.matches}
         onClose={() => setSelectedMatchId(null)}
         footer={(() => {
-          const sel = m.bracket.find((x) => x.id === selectedMatchId);
+          const sel = m.matches.find((x) => x.id === selectedMatchId);
           return sel ? matchActions(sel) : null;
         })()}
       />
       <ResultEntrySheet
-        match={m.bracket.find((x) => x.id === resultMatchId) ?? null}
+        match={m.matches.find((x) => x.id === resultMatchId) ?? null}
         sport={mod?.sport ?? 'other'}
         onClose={() => setResultMatchId(null)}
         onSaved={m.refresh}
       />
       <ScheduleSheet
-        match={m.bracket.find((x) => x.id === scheduleMatchId) ?? null}
+        match={m.matches.find((x) => x.id === scheduleMatchId) ?? null}
         onClose={() => setScheduleMatchId(null)}
         onSaved={m.refresh}
       />
@@ -325,7 +375,7 @@ export default function ModuleScreen() {
         module={mod}
         entry={selected}
         fields={fields}
-        bracket={m.bracket}
+        bracket={m.matches}
         isAdmin={m.isModuleAdmin}
         onClose={() => setSelected(null)}
         footer={selected ? entryActions(selected) : null}

@@ -84,6 +84,16 @@ export type TournamentModule = {
   runner_up_entry_id: string | null;
   third_place_entry_id: string | null;
   sort_order: number;
+  // v2 settings (migration 093)
+  allow_draws: boolean;
+  points_win: number;
+  points_draw: number;
+  points_loss: number;
+  rr_legs: 1 | 2;
+  group_count: number | null;
+  advance_per_group: number | null;
+  grand_final_reset: boolean;
+  current_stage: 1 | 2;
 };
 
 export type TournamentRound = {
@@ -154,6 +164,19 @@ export type TournamentMatch = {
   completed_at: string | null;
   round_name: string;
   best_of: number;
+  // v2 structure (get_module_matches)
+  stage_number: number;
+  bracket_side: BracketSide;
+  group_id: string | null;
+  group_letter: string | null;
+  code: string | null;
+  entry_a_label: string | null;
+  entry_b_label: string | null;
+  loser_next_match_id: string | null;
+  loser_next_slot: 'a' | 'b' | null;
+  is_draw: boolean;
+  auto_bye: boolean;
+  can_draw: boolean;
 };
 
 export type TournamentStanding = {
@@ -173,6 +196,9 @@ export type TournamentStanding = {
   reached_label: string | null;
   status: StandingStatus;
   eliminated_by: string | null;
+  eliminated_side?: BracketSide | null;
+  /** Double elimination: 0 / 1 / 2. */
+  losses?: number;
 };
 
 export type ChampionRef = { id: string; name: string };
@@ -257,6 +283,59 @@ export type TeamMemberInput = {
   squad_number: number | null;
 };
 
+export type LeagueRow = {
+  rank: number;
+  entry_id: string;
+  name: string;
+  seed: number | null;
+  profile_ids: string[];
+  played: number;
+  won: number;
+  drawn: number;
+  lost: number;
+  score_for: number;
+  score_against: number;
+  score_diff: number;
+  points: number;
+  form: ('W' | 'D' | 'L')[];
+  status: 'active' | 'withdrawn';
+  qualified?: boolean | null;
+  final_position?: number | null;
+};
+
+export type StandingsGroup = {
+  id: string;
+  letter: string;
+  name: string;
+  advance: number;
+  table: LeagueRow[];
+};
+
+export type StandingsV2 = {
+  kind: 'knockout' | 'league' | 'groups';
+  rows?: TournamentStanding[];
+  table?: LeagueRow[];
+  groups?: StandingsGroup[];
+  knockout?: TournamentStanding[];
+  final?: { rank: number; rank_label: string; entry_id: string; name: string }[];
+};
+
+export type ModuleGroup = {
+  id: string;
+  letter: string;
+  name: string;
+  entries: { entry_id: string; name: string; seed: number | null }[];
+};
+
+export type KnockoutQualifier = {
+  entry_id: string;
+  name: string;
+  group_letter: string;
+  position: number;
+  label: string;
+  suggested_seed: number;
+};
+
 /** Patch for `update_tournament_module_settings` (only the keys present are changed). */
 export type ModuleSettingsPatch = Partial<
   Pick<
@@ -266,5 +345,13 @@ export type ModuleSettingsPatch = Partial<
     | 'roster_max'
     | 'lineup_size'
     | 'format'
+    | 'allow_draws'
+    | 'points_win'
+    | 'points_draw'
+    | 'points_loss'
+    | 'rr_legs'
+    | 'group_count'
+    | 'advance_per_group'
+    | 'grand_final_reset'
   >
 >;

@@ -1,10 +1,11 @@
 import { supabase } from '@/lib/supabase';
 import type {
-  BracketEntryRef,
   EntryFieldInput,
   ModuleDetail,
   ModuleFormInput,
+  ModuleGroup,
   ModuleSettingsPatch,
+  StandingsV2,
   ProfileLite,
   ScoreDetailRow,
   Sport,
@@ -17,7 +18,6 @@ import type {
   TournamentListItem,
   TournamentMatch,
   TournamentScope,
-  TournamentStanding,
   TournamentRole,
   ModuleStatus,
   TournamentRound,
@@ -100,21 +100,23 @@ export async function fetchModuleEntries(moduleId: string): Promise<TournamentEn
   }));
 }
 
-type BracketRow = Omit<TournamentMatch, 'entry_a' | 'entry_b'> & {
-  entry_a: BracketEntryRef | null;
-  entry_b: BracketEntryRef | null;
-};
-
-export async function fetchModuleBracket(moduleId: string): Promise<TournamentMatch[]> {
-  const rows = await rpc<BracketRow[] | null>('get_module_bracket', { p_module: moduleId });
+export async function fetchModuleMatches(moduleId: string): Promise<TournamentMatch[]> {
+  const rows = await rpc<TournamentMatch[] | null>('get_module_matches', { p_module: moduleId });
   return (rows ?? []).map((r) => ({
     ...r,
     score_detail: (r.score_detail ?? null) as ScoreDetailRow[] | null,
+    entry_a: r.entry_a ? { ...r.entry_a, profile_ids: r.entry_a.profile_ids ?? [] } : null,
+    entry_b: r.entry_b ? { ...r.entry_b, profile_ids: r.entry_b.profile_ids ?? [] } : null,
   }));
 }
 
-export async function fetchModuleStandings(moduleId: string): Promise<TournamentStanding[]> {
-  const rows = await rpc<TournamentStanding[] | null>('get_module_standings', { p_module: moduleId });
+export async function fetchModuleStandingsV2(moduleId: string): Promise<StandingsV2> {
+  const d = await rpc<StandingsV2>('get_module_standings_v2', { p_module: moduleId });
+  return d;
+}
+
+export async function fetchModuleGroups(moduleId: string): Promise<ModuleGroup[]> {
+  const rows = await rpc<ModuleGroup[] | null>('get_module_groups', { p_module: moduleId });
   return rows ?? [];
 }
 
