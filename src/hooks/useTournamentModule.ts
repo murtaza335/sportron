@@ -85,8 +85,11 @@ export function useTournamentModule(moduleId: string | undefined) {
   useEffect(() => {
     if (!moduleId) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
+    // Unique topic per hook instance: the module screen and its manage/seeding/rounds screens are
+    // mounted simultaneously in the stack, and supabase.channel() returns the SAME (already
+    // subscribed) channel for a repeated topic, making .on() throw.
     const channel = supabase
-      .channel(`tournament-module-${moduleId}`)
+      .channel(`tournament-module-${moduleId}-${Math.random().toString(36).slice(2)}`)
       .on(
         'postgres_changes',
         {
