@@ -16,7 +16,7 @@ import { useTournament } from '@/hooks/useTournament';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
-import { entryNoun, moduleStatusTone } from '@/lib/tournamentFormat';
+import { entryNoun, moduleStatusTone, startLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { invalidateTournamentsCache } from '@/hooks/useTournaments';
 import {
@@ -83,7 +83,7 @@ export default function ModuleManageScreen() {
         : mod.status === 'open'
           ? { label: 'Close entries & start seeding', onPress: () => changeStatus('seeding'), disabled: incompleteRosters > 0 }
           : mod.status === 'seeding'
-            ? { label: 'Start tournament', onPress: () => changeStatus('in_progress'), disabled: !bracketGenerated }
+            ? { label: startLabel(mod.format), onPress: () => changeStatus('in_progress'), disabled: !bracketGenerated }
             : null;
 
   const reopen = () =>
@@ -174,7 +174,7 @@ export default function ModuleManageScreen() {
           <ThemedText variant="caption" muted>Completes automatically after the final.</ThemedText>
         )}
         {mod.status === 'seeding' && !bracketGenerated && (
-          <ThemedText variant="caption" muted>Generate the bracket from Seeding & bracket first.</ThemedText>
+          <ThemedText variant="caption" muted>Generate the fixtures from Seeding first.</ThemedText>
         )}
         {mod.status === 'open' && !tournamentLocked && (
           <Button label="Back to draft" variant="ghost" onPress={() => changeStatus('draft')} disabled={busy} />
@@ -201,14 +201,14 @@ export default function ModuleManageScreen() {
               : `${incompleteRosters} ${incompleteRosters === 1 ? entryNoun(mod) : entryNoun(mod, true)} need more players`,
           )}
         {check(seedsSet, 'Seeds set')}
-        {check(bracketGenerated, 'Bracket generated')}
+        {check(bracketGenerated, mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Bracket generated' : 'Fixtures generated')}
       </View>
 
       <View style={{ gap: Spacing.sm }}>
         {link('Edit details', null, () => router.push(tournamentRoutes.moduleForm(id, moduleId)), finished || tournamentLocked)}
         {link('Entries', String(activeEntries.length), () => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=entries` as never))}
         {link('Rounds & schedule', null, () => router.push(tournamentRoutes.rounds(id, moduleId)))}
-        {link('Seeding & bracket', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
+        {link(mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Seeding & bracket' : 'Seeding & fixtures', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
       </View>
 
       <View style={{ gap: Spacing.sm }}>

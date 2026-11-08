@@ -5,7 +5,7 @@ import { BottomSheet } from '@/components/tournaments/BottomSheet';
 import { ThemedText } from '@/components/ui/Text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { bestOfLabel, formatMatchTime, matchStatusLabel } from '@/lib/tournamentFormat';
+import { bestOfLabel, formatMatchTime, matchStatusLabel, matchTitle, slotPlaceholder } from '@/lib/tournamentFormat';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
 function EntryLine({
@@ -13,11 +13,13 @@ function EntryLine({
   score,
   winner,
   dim,
+  placeholder,
 }: {
   entry: BracketEntryRef | null;
   score: number | null;
   winner: boolean;
   dim: boolean;
+  placeholder: string;
 }) {
   const theme = useTheme();
   return (
@@ -27,7 +29,7 @@ function EntryLine({
         numberOfLines={1}
         style={[{ flex: 1, fontWeight: winner ? '700' : '500' }, !entry && { fontStyle: 'italic' }, (dim || !entry) && { color: theme.textSecondary }]}
       >
-        {entry ? `${entry.seed != null ? `(${entry.seed}) ` : ''}${entry.name}` : 'TBD'}
+        {entry ? `${entry.seed != null ? `(${entry.seed}) ` : ''}${entry.name}` : placeholder}
       </ThemedText>
       {winner && <Check size={16} color={theme.success} strokeWidth={3} />}
       {score != null && (
@@ -69,10 +71,10 @@ export function TournamentMatchSheet({
       {match && (
         <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
           <ThemedText variant="heading" style={{ fontSize: 20, lineHeight: 26 }}>
-            {match.is_third_place ? '3rd Place' : match.round_name} · {bestOfLabel(match.best_of)}
+            {match.group_letter ? `Group ${match.group_letter} · ` : ''}{matchTitle(match)} · {bestOfLabel(match.best_of)}
           </ThemedText>
           <ThemedText variant="caption" muted>
-            {[matchStatusLabel(match.status), when, where].filter(Boolean).join(' · ')}
+            {[match.is_draw ? 'Draw' : matchStatusLabel(match.status), when, where].filter(Boolean).join(' · ')}
           </ThemedText>
 
           <View style={[styles.box, { borderColor: theme.border }]}>
@@ -80,13 +82,15 @@ export function TournamentMatchSheet({
               entry={match.entry_a}
               score={match.status === 'completed' ? match.score_a : null}
               winner={decided && !!match.entry_a && match.winner_entry_id === match.entry_a.id}
-              dim={decided && match.winner_entry_id !== match.entry_a?.id}
+              dim={decided && !match.is_draw && match.winner_entry_id !== match.entry_a?.id}
+              placeholder={slotPlaceholder(match.entry_a_label, match.status === 'bye')}
             />
             <EntryLine
               entry={match.entry_b}
               score={match.status === 'completed' ? match.score_b : null}
               winner={decided && !!match.entry_b && match.winner_entry_id === match.entry_b.id}
-              dim={decided && match.winner_entry_id !== match.entry_b?.id}
+              dim={decided && !match.is_draw && match.winner_entry_id !== match.entry_b?.id}
+              placeholder={slotPlaceholder(match.entry_b_label, match.status === 'bye')}
             />
           </View>
 

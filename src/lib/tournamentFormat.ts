@@ -10,6 +10,7 @@ import type {
   TournamentModule,
   TournamentEntryField,
   TournamentListItem,
+  TournamentMatch,
   TournamentMatchStatus,
   TournamentRole,
   TournamentStatus,
@@ -287,4 +288,118 @@ export function sideLabel(side: BracketSide): string {
 
 export function defaultAllowDraws(sport: Sport): boolean {
   return !isRacketSport(sport);
+}
+
+// ─── Match presentation (v2) ─────────────────────────────────────────────────
+
+const SIDE_ORDER: Record<BracketSide, number> = {
+  winners: 1,
+  losers: 2,
+  grand_final: 3,
+  main: 4,
+  group: 5,
+  league: 6,
+};
+
+/** Sort key for a section of the Matches tab: stage → side → round → group. */
+export function matchSectionOrder(m: TournamentMatch): number {
+  return (
+    m.stage_number * 1_000_000 +
+    SIDE_ORDER[m.bracket_side] * 100_000 +
+    (m.is_third_place ? 50_000 : 0) +
+    m.round_number * 100 +
+    (m.group_letter ? m.group_letter.charCodeAt(0) - 64 : 0)
+  );
+}
+
+export function matchSectionKey(m: TournamentMatch): string {
+  return [m.stage_number, m.bracket_side, m.round_number, m.is_third_place ? 't' : 'm', m.group_letter ?? '-'].join('|');
+}
+
+/** "Matchday 3" · "Group A · Matchday 1" · "Semi-finals · Bo3". */
+export function matchSectionTitle(m: TournamentMatch): string {
+  const base = roundHeader(m.is_third_place ? '3rd Place' : m.round_name, m.best_of);
+  return m.group_letter ? `Group ${m.group_letter} · ${base}` : base;
+}
+
+/** "SF1 · Final" style title for a match. */
+export function matchTitle(m: TournamentMatch): string {
+  const base = m.is_third_place ? '3rd Place' : m.round_name;
+  return m.code ? `${m.code} · ${base}` : base;
+}
+
+/** Shown in an empty slot: the slot label ("A1", "Loser W2-1") else TBD. */
+export function slotPlaceholder(label: string | null, bye: boolean): string {
+  if (bye) return 'BYE';
+  return label || 'TBD';
+}
+
+function ceilDiv(a: number, b: number): number {
+  return Math.ceil(a / b);
+}
+
+/** Pairs in one round-robin of n entries. */
+function rrMatches(n: number): number {
+  return (n * (n - 1)) / 2;
+}
+
+/** One-line summary of the structure that will be generated, for the seeding screen. */
+export function structureSummary(
+  m: Pick<TournamentModule, 'format' | 'rr_legs' | 'group_count' | 'advance_per_group' | 'participant_type' | 'roster_min' | 'roster_max'>,
+  n: number,
+): { title: string; detail: string | null } {
+  const noun = n === 1 ? entryNoun(m) : entryNoun(m, true);
+  if (n < 2) return { title: `${n} ${noun}`, detail: null };
+  if (m.format === 'round_robin') {
+    const perLeg = n % 2 === 0 ? n - 1 : n;
+    return {
+      title: `${n} ${noun} · ${perLeg * m.rr_legs} matchdays · ${rrMatches(n) * m.rr_legs} matches`,
+      detail: n % 2 === 1 ? 'With an odd number of entries, one rests each matchday.' : null,
+    };
+  }
+  if (m.format === 'groups_knockout' && m.group_count) {
+    const g = m.group_count;
+    const base = Math.floor(n / g);
+    const extra = n % g;
+    const matches = Array.from({ length: g }, (_, i) => base + (i < extra ? 1 : 0)).reduce(
+      (sum, size) => sum + rrMatches(size) * m.rr_legs,
+      0,
+    );
+    const sizes = extra ? `${base}–${ceilDiv(n, g)}` : String(base);
+    return {
+      title: `${n} ${noun} → ${g} groups of ${sizes} · ${matches} group matches`,
+      detail: m.advance_per_group ? `Top ${m.advance_per_group} of each group go into the knockout.` : null,
+    };
+  }
+  let size = 2;
+  while (size < n) size *= 2;
+  const byes = size - n;
+  if (m.format === 'double_elimination') {
+    return {
+      title: `${n} ${noun} → ${size}-slot winners bracket${byes ? ` · ${byes} ${byes === 1 ? 'bye' : 'byes'}` : ''}`,
+      detail: 'Lose twice and you’re out.',
+    };
+  }
+  return {
+    title: `${n} ${noun} → ${size}-slot bracket`,
+    detail: byes > 0 ? `${byes} ${byes === 1 ? 'bye goes' : 'byes go'} to seed${byes === 1 ? '' : 's'} 1${byes > 1 ? `–${byes}` : ''}` : null,
+  };
+}
+
+/** Button copy for generating the structure. */
+export function generateLabel(format: TournamentFormat, regenerate: boolean): string {
+  const noun =
+    format === 'round_robin' ? 'fixtures' : format === 'groups_knockout' ? 'groups & fixtures' : 'bracket';
+  if (format === 'groups_knockout') return regenerate ? 'Redraw groups & fixtures' : 'Draw groups & fixtures';
+  return `${regenerate ? 'Regenerate' : 'Generate'} ${noun}`;
+}
+
+/** Tab that previews the generated structure. */
+export function previewTab(format: TournamentFormat): string {
+  return format === 'round_robin' ? 'table' : format === 'groups_knockout' ? 'groups' : 'bracket';
+}
+
+/** Primary button on the manage screen when the module is in seeding. */
+export function startLabel(format: TournamentFormat): string {
+  return format === 'round_robin' ? 'Start league' : format === 'groups_knockout' ? 'Start group stage' : 'Start tournament';
 }

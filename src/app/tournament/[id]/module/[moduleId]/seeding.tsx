@@ -12,15 +12,10 @@ import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
+import { generateLabel, previewTab, structureSummary } from '@/lib/tournamentFormat';
 import { generateBracket, setModuleSeeds } from '@/services/tournaments';
 
 type Item = { id: string; name: string; seeded: boolean };
-
-function nextPow2(n: number): number {
-  let s = 2;
-  while (s < n) s *= 2;
-  return s;
-}
 
 export default function SeedingScreen() {
   const { id, moduleId } = useLocalSearchParams<{ id: string; moduleId: string }>();
@@ -60,8 +55,7 @@ export default function SeedingScreen() {
   }
 
   const n = order.length;
-  const size = n >= 2 ? nextPow2(n) : 0;
-  const byes = size ? size - n : 0;
+  const summary = structureSummary(mod, n);
   const editable = mod.status === 'open' || mod.status === 'seeding';
   const canGenerate = mod.status === 'seeding' && n >= 2;
   const hasBracket = (m.counts?.matches ?? 0) > 0;
@@ -113,9 +107,9 @@ export default function SeedingScreen() {
       }
       const count = await generateBracket(moduleId);
       await m.refresh();
-      alert('Bracket generated', `${count} matches created.`, [
+      alert(mod?.format === 'single_elimination' ? 'Bracket generated' : 'Fixtures generated', `${count} matches created.`, [
         { text: 'Later', style: 'cancel' },
-        { text: 'Preview', onPress: () => router.replace(`${tournamentRoutes.module(id, moduleId)}?tab=bracket` as never) },
+        { text: 'Preview', onPress: () => router.replace(`${tournamentRoutes.module(id, moduleId)}?tab=${previewTab(mod!.format)}` as never) },
       ]);
     } catch (e) {
       alert('Something went wrong', friendlyTournamentError(e));
@@ -126,7 +120,7 @@ export default function SeedingScreen() {
 
   const onGenerate = () => {
     if (hasBracket) {
-      alert('Regenerate bracket?', 'The current bracket will be replaced.', [
+      alert('Regenerate?', 'The current fixtures and any results will be replaced.', [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Regenerate', style: 'destructive', onPress: doGenerate },
       ]);
@@ -142,13 +136,9 @@ export default function SeedingScreen() {
     >
       <View style={{ gap: 2 }}>
         <ThemedText variant="heading" style={{ fontSize: 20, lineHeight: 26 }}>
-          {n} {n === 1 ? 'entry' : 'entries'}{size ? ` → ${size}-slot bracket` : ''}
+          {summary.title}
         </ThemedText>
-        {byes > 0 && (
-          <ThemedText variant="caption" muted>
-            {byes} {byes === 1 ? 'bye goes' : 'byes go'} to seed{byes === 1 ? '' : 's'} 1{byes > 1 ? `–${byes}` : ''}
-          </ThemedText>
-        )}
+        {summary.detail && <ThemedText variant="caption" muted>{summary.detail}</ThemedText>}
         {mod.seeding_method === 'random' && (
           <ThemedText variant="caption" muted>Random seeding: unseeded entries are shuffled when you generate.</ThemedText>
         )}
@@ -158,7 +148,7 @@ export default function SeedingScreen() {
           </ThemedText>
         )}
         {mod.status === 'open' && (
-          <ThemedText variant="caption" muted>Close entries & start seeding from Manage to generate the bracket.</ThemedText>
+          <ThemedText variant="caption" muted>Close entries & start seeding from Manage to generate the fixtures.</ThemedText>
         )}
       </View>
 
@@ -199,7 +189,7 @@ export default function SeedingScreen() {
       )}
       {mod.status === 'seeding' && (
         <Button
-          label={hasBracket ? 'Regenerate bracket' : 'Generate bracket'}
+          label={generateLabel(mod.format, hasBracket)}
           onPress={onGenerate}
           loading={busy === 'generate'}
           disabled={!!busy || !canGenerate}
@@ -207,9 +197,9 @@ export default function SeedingScreen() {
       )}
       {hasBracket && (
         <Button
-          label="Preview bracket"
+          label={mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Preview bracket' : 'Preview fixtures'}
           variant="ghost"
-          onPress={() => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=bracket` as never)}
+          onPress={() => router.push(`${tournamentRoutes.module(id, moduleId)}?tab=${previewTab(mod.format)}` as never)}
         />
       )}
     </ScrollView>

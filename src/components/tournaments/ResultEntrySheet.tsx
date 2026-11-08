@@ -11,6 +11,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
+import { matchTitle } from '@/lib/tournamentFormat';
 import { recordResult, recordWalkover } from '@/services/tournaments';
 import type { ScoreDetailRow, Sport, TournamentMatch } from '@/types';
 import { isRacketSport } from '@/types';
@@ -97,6 +98,8 @@ function ResultBody({
   const scoreB = racket ? gamesB : single.b;
   const tie = scoreA === scoreB;
   const levelGame = racket && played.some((g) => g.a === g.b);
+  /** League / group match with draws on: a level score is simply a draw, no winner to pick. */
+  const drawOk = match.can_draw && tie && !levelGame;
 
   const setGame = (i: number, side: 'a' | 'b', v: number) =>
     setGames((prev) => prev.map((g, idx) => (idx === i ? { ...g, [side]: v } : g)));
@@ -124,7 +127,7 @@ function ResultBody({
           alert('Enter a score', 'Add at least one game score.');
           return;
         }
-        if (tie && !winner) {
+        if (tie && !winner && !match.can_draw) {
           alert('Scores are level', 'Pick the winner.');
           return;
         }
@@ -133,7 +136,7 @@ function ResultBody({
           scoreA,
           scoreB,
           scoreDetail: racket ? played : null,
-          winnerEntryId: tie ? winner : null,
+          winnerEntryId: tie && !match.can_draw ? winner : null,
           note: note.trim() || null,
         });
       }
@@ -150,7 +153,7 @@ function ResultBody({
     <ScrollView contentContainerStyle={styles.content} keyboardShouldPersistTaps="handled">
       <ThemedText variant="heading" style={{ fontSize: 20, lineHeight: 26 }}>
         {match.status === 'completed' || match.status === 'walkover' ? 'Edit result' : 'Enter result'} ·{' '}
-        {match.is_third_place ? '3rd Place' : match.round_name}
+        {match.group_letter ? `Group ${match.group_letter} · ` : ''}{matchTitle(match)}
         {bestOf > 1 ? ` · Bo${bestOf}` : ''}
       </ThemedText>
 
@@ -204,10 +207,15 @@ function ResultBody({
             </View>
           )}
 
-          {tie && !levelGame && (
+          {tie && !levelGame && !drawOk && (
             <FormField label="Winner (scores are level)">
               <PillSelect options={winnerOptions} value={winner} onChange={setWinner} />
             </FormField>
+          )}
+          {drawOk && (
+            <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
+              Level score — recorded as a draw.
+            </ThemedText>
           )}
         </>
       ) : (

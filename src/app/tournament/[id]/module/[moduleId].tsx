@@ -346,7 +346,7 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'matches' && (
-            <ModuleMatchesTab matches={m.matches} onSelect={(match) => setSelectedMatchId(match.id)} />
+            <ModuleMatchesTab matches={m.matches} viewerId={user?.id} onSelect={(match) => setSelectedMatchId(match.id)} />
           )}
         </ScrollView>
       )}
