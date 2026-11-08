@@ -68,6 +68,47 @@ begin
   return v_m;
 end $$;
 
+-- individual module with n entries named P1..Pn (cms '<name>-i'), format settings applied, status 'seeding' → generated → in_progress
+create function tt_test.mk_format(p_name text, p_sport text, p_n int, p_settings jsonb, p_start boolean default true)
+returns uuid language plpgsql as $$
+declare v_t uuid := tt_test.ctx('t')::uuid; v_m uuid; i int;
+begin
+  perform tt_test.as_user('admin');
+  v_m := public.create_tournament_module(v_t, p_name, p_sport, null, null, null, null, null, false, 'manual');
+  if p_settings is not null then perform public.update_tournament_module_settings(v_m, p_settings); end if;
+  perform public.set_module_status(v_m, 'open');
+  for i in 1..p_n loop
+    perform public.upsert_tournament_entry(v_m, null, 'P' || i, null,
+      jsonb_build_object('cms_id', p_name || '-' || i, 'school', 'S' || (i % 3),
+                         'phone', '03001234567', 'email', 'p' || i || '@example.com'));
+  end loop;
+  perform public.set_module_status(v_m, 'seeding');
+  if p_start then
+    perform public.generate_bracket(v_m);
+    perform public.set_module_status(v_m, 'in_progress');
+  end if;
+  return v_m;
+end $$;
+
+-- entry id by name inside a module
+create function tt_test.eid(p_m uuid, p_name text) returns uuid language sql stable as
+  $$ select id from public.tournament_entries where module_id = p_m and name = p_name $$;
+
+-- record "x scores sx, y scores sy" on the match between entries named x and y
+create function tt_test.rec(p_m uuid, p_x text, p_y text, p_sx int, p_sy int) returns void language plpgsql as $$
+declare v_x uuid := tt_test.eid(p_m, p_x); v_y uuid := tt_test.eid(p_m, p_y); v_match public.tournament_matches;
+begin
+  perform tt_test.as_user('admin');
+  select * into v_match from public.tournament_matches
+  where module_id = p_m and ((entry_a_id = v_x and entry_b_id = v_y) or (entry_a_id = v_y and entry_b_id = v_x)) limit 1;
+  if v_match.id is null then raise exception 'FAIL: no match between % and %', p_x, p_y; end if;
+  if v_match.entry_a_id = v_x then
+    perform public.record_tournament_result(v_match.id, p_sx, p_sy, null, null, null);
+  else
+    perform public.record_tournament_result(v_match.id, p_sy, p_sx, null, null, null);
+  end if;
+end $$;
+
 -- play every playable match (side A wins 3–1) until nothing is left
 create function tt_test.play_all(p_m uuid) returns void language plpgsql as $$
 declare v_id uuid; guard int := 0;
@@ -113,7 +154,7 @@ begin
     v_m := tt_test.mk_team_module('Foot2', 'football', 3, 5, false);
     perform tt_test.expect_err(
       format('select public.update_tournament_module_settings(%L, %L::jsonb)', v_m, '{"participant_type":"individual"}'),
-      'INVALID_STATUS', 'participant_type cannot change after the module is open');
+      'FIELD_INVALID:participant_type', 'a team sport cannot be switched to individual entries');
 
     perform tt_test.expect_err(
       format('select public.upsert_tournament_entry(%L,null,%L,null,%L::jsonb)', v_m, 'Solo', '{}'),
@@ -247,6 +288,7 @@ begin
                         'stranger sees public member fields only');
 
     -- roles
+    perform tt_test.as_user('member');
     perform tt_test.chk((select my_role from public.get_tournaments('all') where id = v_t) = 'entrant',
                         'linked member has my_role = entrant in get_tournaments');
     perform tt_test.chk(public.get_module_detail(v_m) ->> 'my_role' = 'entrant', 'linked member has my_role = entrant in get_module_detail');
@@ -338,6 +380,102 @@ begin
     perform tt_test.expect_err(format('select public.update_tournament_module_settings(%L,%L::jsonb)', v_r, '{"format":"nonsense"}'),
       'FIELD_INVALID:format', 'unknown format rejected');
     perform tt_test.chk(exists (select 1 from pg_indexes where indexname = 'tmatch_unique_v2'), 'v2 unique index on matches exists');
+  end;
+
+  -- ── section L1: round-robin structure (step 33)
+  declare n int; legs int; v_m uuid; v_rounds int; v_expected int;
+  begin
+    for n in 2..7 loop
+      for legs in 1..2 loop
+        v_m := tt_test.mk_format('RR' || n || '_' || legs, 'table_tennis', n,
+                 jsonb_build_object('format', 'round_robin', 'rr_legs', legs));
+        v_expected := legs * n * (n - 1) / 2;
+        perform tt_test.chk((select count(*) from public.tournament_matches where module_id = v_m and bracket_side = 'league') = v_expected,
+          format('RR n=%s legs=%s creates %s matches', n, legs, v_expected));
+        perform tt_test.chk(not exists (
+            select 1 from (select least(entry_a_id, entry_b_id) a, greatest(entry_a_id, entry_b_id) b, count(*) c
+                           from public.tournament_matches where module_id = v_m group by 1, 2) x where x.c <> legs)
+          and (select count(*) from (select distinct least(entry_a_id, entry_b_id), greatest(entry_a_id, entry_b_id)
+                                     from public.tournament_matches where module_id = v_m) d) = n * (n - 1) / 2,
+          format('RR n=%s legs=%s: every pair meets exactly %s time(s)', n, legs, legs));
+        perform tt_test.chk(not exists (
+            select 1 from (select tm.round_number, v.e from public.tournament_matches tm
+                           cross join lateral (values (tm.entry_a_id), (tm.entry_b_id)) v(e)
+                           where tm.module_id = v_m) x group by x.round_number, x.e having count(*) > 1),
+          format('RR n=%s legs=%s: nobody plays twice in a matchday', n, legs));
+        v_rounds := (select count(distinct round_number) from public.tournament_matches where module_id = v_m);
+        perform tt_test.chk(not exists (
+            select 1 from public.tournament_entries e
+            where e.module_id = v_m
+              and v_rounds - (select count(*) from public.tournament_matches tm
+                              where tm.module_id = v_m and (tm.entry_a_id = e.id or tm.entry_b_id = e.id))
+                  <> case when n % 2 = 1 then legs else 0 end),
+          format('RR n=%s legs=%s: rest days are right (odd n rests once per leg)', n, legs));
+      end loop;
+    end loop;
+  end;
+
+  -- ── section L2: draws, tiebreakers, completion
+  declare v_t uuid := tt_test.ctx('t')::uuid; v_m uuid; v_x uuid; r jsonb; v_row record; v_names text;
+  begin
+    perform tt_test.as_user('admin');
+    -- draws allowed (football, individual entries)
+    v_m := tt_test.mk_format('Draws', 'football', 3, '{"format":"round_robin","allow_draws":true}'::jsonb);
+    select id into v_x from public.tournament_matches where module_id = v_m order by round_number, match_number limit 1;
+    r := public.record_tournament_result(v_x, 1, 1, null, null, null);
+    perform tt_test.chk((r->>'is_draw')::boolean and r->>'winner_entry_id' is null and r->>'status' = 'completed',
+                        'level score in a league with draws allowed is a draw');
+    perform tt_test.chk((select sum(points) from public._league_table(v_m, null)) = 2,
+                        'a draw gives 1 point to each side');
+    -- draws not allowed
+    v_m := tt_test.mk_format('NoDraws', 'football', 3, '{"format":"round_robin"}'::jsonb);
+    select id into v_x from public.tournament_matches where module_id = v_m order by round_number, match_number limit 1;
+    perform tt_test.expect_err(format('select public.record_tournament_result(%L,1,1,null,null,null)', v_x),
+      'TIE_NEEDS_WINNER', 'level score without allow_draws needs a winner');
+    perform public.record_tournament_walkover(v_x, (select entry_a_id from public.tournament_matches where id = v_x), null);
+    perform tt_test.chk((select won = 1 from public._league_table(v_m, null) where entry_id = (select entry_a_id from public.tournament_matches where id = v_x)),
+                        'league walkover counts as a win');
+    perform public.reset_tournament_match(v_x);
+    perform tt_test.chk((select count(*) from public._league_table(v_m, null) where played > 0) = 0, 'reset removes the result from the table');
+
+    -- 2-way tie on points broken by head-to-head (A=P1 B=P2 C=P3 D=P4)
+    v_m := tt_test.mk_format('Tie2', 'table_tennis', 4, '{"format":"round_robin"}'::jsonb);
+    perform tt_test.rec(v_m, 'P1', 'P2', 2, 3);   -- B beats A
+    perform tt_test.rec(v_m, 'P1', 'P3', 3, 0);
+    perform tt_test.rec(v_m, 'P1', 'P4', 3, 0);
+    perform tt_test.rec(v_m, 'P2', 'P3', 3, 2);
+    perform tt_test.rec(v_m, 'P2', 'P4', 0, 3);   -- D beats B
+    perform tt_test.rec(v_m, 'P3', 'P4', 3, 0);   -- C beats D
+    select string_agg(name, ',' order by rnk) into v_names from public._league_table(v_m, null);
+    perform tt_test.chk(v_names = 'P2,P1,P3,P4', format('head-to-head beats score difference (got %s)', v_names));
+    perform tt_test.chk((select status = 'completed' from public.tournament_modules where id = v_m), 'league completes when every match is decided');
+    perform tt_test.chk((select count(distinct final_rank) = 4 and min(final_rank) = 1 and max(final_rank) = 4
+                         from public.tournament_entries where module_id = v_m), 'final ranks are 1..N');
+    perform tt_test.chk((select champion_entry_id = tt_test.eid(v_m, 'P2') and runner_up_entry_id = tt_test.eid(v_m, 'P1')
+                                and third_place_entry_id = tt_test.eid(v_m, 'P3') from public.tournament_modules where id = v_m),
+                        'champion / runner-up / third are the top three');
+    perform tt_test.expect_err(format('select public.record_tournament_result(%L,1,0,null,null,null)',
+        (select id from public.tournament_matches where module_id = v_m limit 1)),
+      'INVALID_STATUS', 'completed league is read-only');
+
+    -- 3-way tie: head-to-head equal → score difference → score for
+    v_m := tt_test.mk_format('Tie3', 'table_tennis', 4, '{"format":"round_robin"}'::jsonb);
+    perform tt_test.rec(v_m, 'P1', 'P2', 3, 0);
+    perform tt_test.rec(v_m, 'P2', 'P3', 3, 1);
+    perform tt_test.rec(v_m, 'P3', 'P1', 3, 2);
+    perform tt_test.rec(v_m, 'P1', 'P4', 3, 0);
+    perform tt_test.rec(v_m, 'P2', 'P4', 3, 0);
+    perform tt_test.rec(v_m, 'P3', 'P4', 3, 0);
+    select string_agg(name, ',' order by rnk) into v_names from public._league_table(v_m, null);
+    perform tt_test.chk(v_names = 'P1,P3,P2,P4', format('3-way tie falls through to diff then score for (got %s)', v_names));
+
+    -- limits
+    v_m := tt_test.mk_format('Big', 'table_tennis', 20, '{"format":"round_robin"}'::jsonb, false);
+    perform public.set_module_status(v_m, 'open');
+    perform public.upsert_tournament_entry(v_m, null, 'P21', null,
+      '{"cms_id":"big-21","school":"s","phone":"03001234567","email":"p21@example.com"}'::jsonb);
+    perform tt_test.expect_err(format('select public.set_module_status(%L,%L)', v_m, 'seeding'),
+      'TOO_MANY_ENTRIES', 'a league takes at most 20 entries');
   end;
 
   -- @@END (new steps insert their test sections above this line)
