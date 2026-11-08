@@ -75,6 +75,9 @@ export function SegmentedControl<T extends string>({
             accessibilityState={{ selected }}>
             <View style={styles.segmentContent}>
               <Text
+                numberOfLines={1}
+                adjustsFontSizeToFit
+                minimumFontScale={0.7}
                 style={[
                   styles.label,
                   compact && styles.labelCompact,
@@ -114,7 +117,7 @@ const styles = StyleSheet.create({
     flex: 1,
     minHeight: 48,
     paddingVertical: Spacing.md,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.sm,
     alignItems: 'center',
     justifyContent: 'center',
     zIndex: 1,
@@ -122,9 +125,11 @@ const styles = StyleSheet.create({
   segmentCompact: {
     minHeight: 32,
     paddingVertical: 4,
-    paddingHorizontal: Spacing.md,
+    paddingHorizontal: Spacing.xs,
   },
   segmentContent: {
+    maxWidth: '100%',
+    flexShrink: 1,
     flexDirection: 'row',
     alignItems: 'center',
     gap: 6,
@@ -135,6 +140,7 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   label: {
+    flexShrink: 1,
     fontSize: 14,
     fontWeight: '700',
   },

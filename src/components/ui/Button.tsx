@@ -52,7 +52,7 @@ export function Button({
       ) : (
         <View style={styles.content}>
           {icon}
-          <Text style={[styles.label, { color: textColor }]}>{label}</Text>
+          <Text numberOfLines={1} adjustsFontSizeToFit minimumFontScale={0.75} style={[styles.label, { color: textColor }]}>{label}</Text>
         </View>
       )}
     </Pressable>

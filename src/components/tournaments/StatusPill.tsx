@@ -11,7 +11,7 @@ export function StatusPill({ tone }: { tone: StatusTone }) {
   const color = theme[tone.token];
   return (
     <View style={[styles.pill, { backgroundColor: tint(color) }]}>
-      <ThemedText variant="caption" style={[styles.text, { color }]}>
+      <ThemedText variant="caption" numberOfLines={1} style={[styles.text, { color }]}>
         {tone.label}
       </ThemedText>
     </View>
@@ -24,7 +24,7 @@ export function InfoPill({ label }: { label: string }) {
   const isDark = theme.resolvedColorScheme === 'dark';
   return (
     <View style={[styles.pill, { backgroundColor: isDark ? 'rgba(0, 168, 181, 0.15)' : 'rgba(0, 168, 181, 0.1)' }]}>
-      <ThemedText variant="caption" style={[styles.text, { color: isDark ? '#2DD4BF' : '#00A8B5' }]}>
+      <ThemedText variant="caption" numberOfLines={1} style={[styles.text, { color: isDark ? '#2DD4BF' : '#00A8B5' }]}>
         {label}
       </ThemedText>
     </View>
@@ -37,7 +37,7 @@ export function RoleTag({ label }: { label: string }) {
   const isDark = theme.resolvedColorScheme === 'dark';
   return (
     <View style={[styles.pill, { backgroundColor: isDark ? 'rgba(16, 185, 129, 0.15)' : 'rgba(16, 185, 129, 0.1)' }]}>
-      <ThemedText variant="caption" style={[styles.text, { color: isDark ? '#34D399' : '#10B981' }]}>
+      <ThemedText variant="caption" numberOfLines={1} style={[styles.text, { color: isDark ? '#34D399' : '#10B981' }]}>
         {label}
       </ThemedText>
     </View>

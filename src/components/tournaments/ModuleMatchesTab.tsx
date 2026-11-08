@@ -69,7 +69,7 @@ export function ModuleMatchesTab({
               accessibilityRole="button"
               accessibilityState={{ selected: sel }}
             >
-              <ThemedText variant="caption" style={{ fontWeight: '700', color: sel ? theme.background : theme.text }}>
+              <ThemedText variant="caption" numberOfLines={1} style={{ fontWeight: '700', color: sel ? theme.background : theme.text }}>
                 {f.label}
               </ThemedText>
             </Pressable>
