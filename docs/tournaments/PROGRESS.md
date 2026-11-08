@@ -38,7 +38,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 
 | # | Phase | Step | Status | Date | Files / notes |
 |---|---|---|---|---|---|
-| 25 | H Rosters | Roster schema (090) | ⬜ | | Ask owner B1–B8 + PLAN-v2 Ground Rule 3 question first |
+| 25 | H Rosters | Roster schema (090) | 🟡 | 2026-11-08 | 090_add_tournament_rosters.sql: module roster cols, tournament_entry_members (+RLS select-only, indexes, updated_at/audit triggers), helpers _entry_profile_ids/is_entry_participant/is_module_participant. Owner decisions recorded (see Decisions). Needs owner: apply 090, run sql-tests.sql (Ask owner B1–B8 + PLAN-v2 Ground Rule 3 question first) |
 | 26 | H Rosters | Roster RPCs + reads (091) | ⬜ | | |
 | 27 | H Rosters | Roster notifications (092) | ⬜ | | |
 | 28 | H Rosters | Client foundation (rosters) | ⬜ | | |
@@ -65,6 +65,8 @@ v2 open assumptions (PLAN-v2 §1.3): B1–B17. Record answers in Decisions below
 
 | Date | Decision |
 |---|---|
+| 2026-11-08 | v2 Ground Rule 3: tournaments never released → v1 tournament RPCs may be drop+recreated |
+| 2026-11-08 | v2 assumptions B1–B17 use the PLAN-v2 §1.3 recommended defaults |
 | 2026-11-08 | Tournament = top entity, no sport. Modules inside are sport-linked. Hierarchy: owner → tournament admins → modules → module admins |
 | 2026-11-08 | Tournaments created + tournament admins assigned by owner via SQL only; tournament admins can rename the tournament (only editable tournament field) |
 | 2026-11-08 | No self-registration — module admins add entries |
