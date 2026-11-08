@@ -16,11 +16,13 @@ export function ModuleStandingsTab({
   standings,
   rounds,
   viewerId,
+  ownEntryIds,
   onSelectEntry,
 }: {
   standings: TournamentStanding[];
   rounds: TournamentRound[];
   viewerId: string | undefined;
+  ownEntryIds?: Set<string>;
   onSelectEntry: (entryId: string) => void;
 }) {
   const theme = useTheme();
@@ -48,7 +50,7 @@ export function ModuleStandingsTab({
         ]}
       />
       {view === 'table' ? (
-        <StandingsTable standings={standings} viewerId={viewerId} onSelect={onSelectEntry} />
+        <StandingsTable standings={standings} viewerId={viewerId} ownEntryIds={ownEntryIds} onSelect={onSelectEntry} />
       ) : (
         <StandingsChart standings={standings} rounds={rounds} onSelect={onSelectEntry} />
       )}

@@ -34,8 +34,8 @@ export function BracketView({
     const ids = new Set<string>();
     if (!viewerId) return ids;
     for (const m of matches) {
-      if (m.entry_a?.profile_id === viewerId) ids.add(m.entry_a.id);
-      if (m.entry_b?.profile_id === viewerId) ids.add(m.entry_b.id);
+      if (m.entry_a && (m.entry_a.profile_ids?.includes(viewerId) || m.entry_a.profile_id === viewerId)) ids.add(m.entry_a.id);
+      if (m.entry_b && (m.entry_b.profile_ids?.includes(viewerId) || m.entry_b.profile_id === viewerId)) ids.add(m.entry_b.id);
     }
     return ids;
   }, [matches, viewerId]);

@@ -24,17 +24,20 @@ function Header({ children, w, align = 'center' }: { children: string; w?: numbe
 export function StandingsTable({
   standings,
   viewerId,
+  ownEntryIds,
   onSelect,
 }: {
   standings: TournamentStanding[];
   viewerId: string | undefined;
+  /** Entries the viewer plays in (own entry or team member). */
+  ownEntryIds?: Set<string>;
   onSelect: (entryId: string) => void;
 }) {
   const theme = useTheme();
   const rowBg = (s: TournamentStanding) =>
     s.status === 'champion'
       ? tint(theme.warning)
-      : viewerId && s.profile_id === viewerId
+      : (viewerId && s.profile_id === viewerId) || ownEntryIds?.has(s.entry_id)
         ? theme.backgroundSelected
         : 'transparent';
   const dim = (s: TournamentStanding) => s.status === 'eliminated' || s.status === 'withdrawn';

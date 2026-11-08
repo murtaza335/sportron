@@ -8,6 +8,7 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import { EntryFieldControl } from '@/components/tournaments/EntryFieldControl';
 import { FormField, ModalHeader, TextField } from '@/components/tournaments/form';
 import { ProfilePickerSheet } from '@/components/tournaments/ProfilePickerSheet';
+import { TeamEntryForm } from '@/components/tournaments/TeamEntryForm';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
@@ -17,8 +18,8 @@ import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { validateFieldValue } from '@/lib/tournamentFormat';
-import { fetchModuleEntries, upsertEntry } from '@/services/tournaments';
-import type { ProfileLite, TournamentEntry, TournamentEntryField } from '@/types';
+import { fetchModuleDetail, fetchModuleEntries, upsertEntry } from '@/services/tournaments';
+import type { ProfileLite, TournamentEntry, TournamentEntryField, TournamentModule } from '@/types';
 
 export default function EntryFormScreen() {
   const { id, moduleId, entryId } = useLocalSearchParams<{ id: string; moduleId: string; entryId?: string }>();
@@ -28,6 +29,17 @@ export default function EntryFormScreen() {
   const { fields, loading: fLoading } = useTournamentFields(id);
   const [entry, setEntry] = useState<TournamentEntry | null>(null);
   const [eLoading, setELoading] = useState(!!entryId);
+  const [module, setModule] = useState<TournamentModule | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    fetchModuleDetail(moduleId)
+      .then((d) => alive && setModule(d.module))
+      .catch((e) => alert('Something went wrong', friendlyTournamentError(e)));
+    return () => {
+      alive = false;
+    };
+  }, [moduleId]);
 
   useEffect(() => {
     if (!entryId) return;
@@ -43,9 +55,25 @@ export default function EntryFormScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.background }]} edges={['top']}>
-      <ModalHeader title={entryId ? 'Edit Entry' : 'Add Entry'} onClose={() => router.back()} />
-      {fLoading || eLoading ? (
+      <ModalHeader
+        title={
+          module?.participant_type === 'team'
+            ? entryId ? 'Edit Team' : 'Add Team'
+            : entryId ? 'Edit Entry' : 'Add Entry'
+        }
+        onClose={() => router.back()}
+      />
+      {fLoading || eLoading || !module ? (
         <ActivityIndicator color={theme.text} style={{ marginTop: Spacing.xxl }} />
+      ) : module.participant_type === 'team' ? (
+        <TeamEntryForm
+          key={entry?.id ?? 'new'}
+          module={module}
+          fields={fields}
+          entry={entry}
+          bottomInset={insets.bottom}
+          onClose={() => router.back()}
+        />
       ) : (
         <EntryFormBody
           key={entry?.id ?? 'new'}

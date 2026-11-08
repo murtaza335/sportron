@@ -33,7 +33,7 @@ import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { deleteEntry, resetMatch, withdrawEntry } from '@/services/tournaments';
 import { Button } from '@/components/ui/Button';
-import { formatMatchTime, moduleStatusTone, sportLabel } from '@/lib/tournamentFormat';
+import { entryNoun, formatMatchTime, moduleStatusTone, participantLabel, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import type { TournamentEntry, TournamentMatch } from '@/types';
 
@@ -73,6 +73,13 @@ export default function ModuleScreen() {
   }, [m.loading, m.module, m.bracket.length, tabParam]);
 
   const mod = m.module;
+  // Entries the viewer plays in — their own entry or a team they are a member of.
+  const ownEntryIds = new Set<string>();
+  if (user?.id) {
+    for (const e of m.entries) {
+      if (e.profile?.id === user.id || e.members.some((x) => x.profile?.id === user.id)) ownEntryIds.add(e.id);
+    }
+  }
 
   const matchActions = (match: TournamentMatch) => {
     if (!m.isModuleAdmin || !mod) return null;
@@ -231,7 +238,7 @@ export default function ModuleScreen() {
               <StatusPill tone={moduleStatusTone(mod.status)} />
             </View>
             <ThemedText variant="caption" muted>
-              {m.counts?.entries ?? 0} entries · Single elimination
+              {m.counts?.entries ?? 0} {mod.participant_type === 'team' ? entryNoun(mod, true) : 'entries'} · {participantLabel(mod)} · Single elimination
             </ThemedText>
             {(mod.venue || mod.starts_at) && (
               <View style={styles.meta}>
@@ -257,6 +264,8 @@ export default function ModuleScreen() {
 
           {tab === 'entries' && (
             <ModuleEntriesTab
+              module={mod}
+              isAdmin={m.isModuleAdmin}
               entries={m.entries}
               fields={fields}
               canAdd={!!canAddEntries}
@@ -279,6 +288,7 @@ export default function ModuleScreen() {
               standings={m.standings}
               rounds={m.rounds}
               viewerId={user?.id}
+              ownEntryIds={ownEntryIds}
               onSelectEntry={(entryId) => {
                 const e = m.entries.find((x) => x.id === entryId);
                 if (e) setSelected(e);
@@ -312,6 +322,7 @@ export default function ModuleScreen() {
         onSaved={m.refresh}
       />
       <EntrySheet
+        module={mod}
         entry={selected}
         fields={fields}
         bracket={m.bracket}

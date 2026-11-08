@@ -43,7 +43,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 | 27 | H Rosters | Roster notifications (092) | 🟡 | 2026-11-08 | 092_update_tournament_notifications_for_rosters.sql: trg_tournament_member_added, match events + module completed notify entry+member profiles; tests section R3. Needs owner: apply 092, run tests |
 | 28 | H Rosters | Client foundation (rosters) | 🟡 | 2026-11-08 | types (ParticipantType/TournamentFormat/BracketSide, members, profile_ids, TeamMemberInput, ModuleSettingsPatch), services upsertTeamEntry/updateModuleSettings + members mapping, tournamentErrors @i parsing + roster codes, tournamentFormat roster helpers. tsc ✅ |
 | 29 | H Rosters | Module form: players section | 🟡 | 2026-11-08 | module-form: PLAYERS section (Singles/Doubles/Teams, roster steppers, sport defaults, lock rules), NumberStepper in form.tsx, save via updateModuleSettings (stays in edit mode if 2nd call fails). tsc ✅ lint ✅. Needs owner: device check |
-| 30 | H Rosters | Team entry form + roster display | ⬜ | | |
+| 30 | H Rosters | Team entry form + roster display | 🟡 | 2026-11-08 | TeamEntryForm + MemberSheet (doubles uses 2 fixed rows opening the sheet, not inline-expanding cards), entry-form team variant, Entries tab team rows/warning/search by member, EntrySheet roster, own-path highlight via profile_ids/ownEntryIds. tsc ✅ lint ✅. Needs owner: device check (12-player football team, stranger account) |
 | 31 | H Rosters | Manage checklist + end-to-end | ⬜ | | |
 | 32 | I League | Formats schema (093) | ⬜ | | |
 | 33 | I League | Engine refactor + round-robin + draws (094) | ⬜ | | Run v1 sql-tests on the refactor before adding RR code |

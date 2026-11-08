@@ -1,4 +1,4 @@
-import { Lock } from 'lucide-react-native';
+import { Crown, Lock } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { BottomSheet } from '@/components/tournaments/BottomSheet';
@@ -6,7 +6,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { ThemedText } from '@/components/ui/Text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import type { TournamentEntry, TournamentEntryField, TournamentMatch } from '@/types';
+import type { TournamentEntry, TournamentEntryField, TournamentMatch, TournamentModule } from '@/types';
 
 /** Result path of an entry, e.g. "Quarter-finals: beat Zain M. 3–1". */
 function entryPath(entryId: string, bracket: TournamentMatch[]): string[] {
@@ -35,6 +35,7 @@ function entryPath(entryId: string, bracket: TournamentMatch[]): string[] {
 }
 
 export function EntrySheet({
+  module,
   entry,
   fields,
   bracket,
@@ -43,6 +44,7 @@ export function EntrySheet({
   onOpenProfile,
   footer,
 }: {
+  module?: Pick<TournamentModule, 'participant_type' | 'roster_min' | 'roster_max'> | null;
   entry: TournamentEntry | null;
   fields: TournamentEntryField[];
   bracket: TournamentMatch[];
@@ -85,6 +87,45 @@ export function EntrySheet({
             </Pressable>
           )}
 
+          {entry.members.length > 0 && (
+            <View style={styles.roster}>
+              <ThemedText variant="label" muted>
+                ROSTER ({entry.members.length}
+                {module?.roster_min != null && module.roster_max != null
+                  ? ` · ${module.roster_min === module.roster_max ? module.roster_max : `${module.roster_min}–${module.roster_max}`} allowed`
+                  : ''}
+                )
+              </ThemedText>
+              {entry.members.map((mem) => {
+                const memberRows = fields
+                  .filter((f) => f.key !== 'name')
+                  .map((f) => ({ field: f, value: mem.fields[f.key] }))
+                  .filter((r) => r.value !== undefined && r.value !== '');
+                return (
+                  <View key={mem.id} style={[styles.member, { borderColor: theme.border }]}>
+                    <Pressable
+                      disabled={!mem.profile}
+                      onPress={() => mem.profile && onOpenProfile(mem.profile.id)}
+                      style={({ pressed }) => [styles.memberHead, pressed && { opacity: 0.6 }]}
+                      accessibilityRole={mem.profile ? 'button' : undefined}
+                    >
+                      {mem.profile && <UserAvatar avatarUrl={mem.profile.avatar_url} size={24} />}
+                      <ThemedText style={{ fontWeight: '600', flexShrink: 1 }} numberOfLines={1}>{mem.name}</ThemedText>
+                      {mem.is_captain && <Crown size={13} color={theme.warning} strokeWidth={2} />}
+                      {mem.squad_number != null && <ThemedText variant="caption" muted>#{mem.squad_number}</ThemedText>}
+                    </Pressable>
+                    {memberRows.length > 0 && (
+                      <ThemedText variant="caption" muted>
+                        {memberRows.map((r) => r.value).join(' · ')}
+                        {isAdmin && memberRows.some((r) => !r.field.is_public) ? '  🔒' : ''}
+                      </ThemedText>
+                    )}
+                  </View>
+                );
+              })}
+            </View>
+          )}
+
           {rows.map(({ field, value }) => (
             <View key={field.key} style={[styles.row, { borderColor: theme.border }]}>
               <View style={styles.labelWrap}>
@@ -119,5 +160,8 @@ const styles = StyleSheet.create({
   row: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: Spacing.md, borderBottomWidth: 1, paddingVertical: Spacing.sm },
   labelWrap: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   value: { flexShrink: 1, textAlign: 'right', fontWeight: '500' },
+  roster: { gap: Spacing.xs, marginTop: Spacing.xs },
+  member: { borderBottomWidth: 1, paddingVertical: Spacing.sm, gap: 2 },
+  memberHead: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   path: { gap: 2, marginTop: Spacing.sm },
 });
