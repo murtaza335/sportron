@@ -14,6 +14,13 @@ export type TournamentMatchStatus =
 export type TournamentScope = 'live' | 'upcoming' | 'past' | 'mine' | 'all';
 export type SeedingMethod = 'manual' | 'random';
 export type StandingStatus = 'champion' | 'alive' | 'eliminated' | 'withdrawn';
+export type ParticipantType = 'individual' | 'team';
+export type TournamentFormat =
+  | 'single_elimination'
+  | 'round_robin'
+  | 'groups_knockout'
+  | 'double_elimination';
+export type BracketSide = 'main' | 'winners' | 'losers' | 'grand_final' | 'league' | 'group';
 
 export type ProfileLite = Pick<Profile, 'id' | 'username' | 'avatar_url'>;
 
@@ -63,7 +70,11 @@ export type TournamentModule = {
   rules_text: string | null;
   venue: string | null;
   starts_at: string | null;
-  format: 'single_elimination';
+  format: TournamentFormat;
+  participant_type: ParticipantType;
+  roster_min: number | null;
+  roster_max: number | null;
+  lineup_size: number | null;
   status: ModuleStatus;
   third_place_match: boolean;
   seeding_method: SeedingMethod;
@@ -86,6 +97,15 @@ export type TournamentRound = {
   scheduled_start: string | null;
 };
 
+export type TournamentEntryMember = {
+  id: string;
+  name: string;
+  is_captain: boolean;
+  squad_number: number | null;
+  profile: ProfileLite | null;
+  fields: Record<string, string>;
+};
+
 export type TournamentEntry = {
   id: string;
   name: string;
@@ -95,6 +115,9 @@ export type TournamentEntry = {
   final_rank: number | null;
   profile: ProfileLite | null;
   fields: Record<string, string>;
+  /** Team modules only (individual modules: 0 / []). */
+  member_count: number;
+  members: TournamentEntryMember[];
 };
 
 export type BracketEntryRef = {
@@ -102,6 +125,8 @@ export type BracketEntryRef = {
   name: string;
   seed: number | null;
   profile_id: string | null;
+  /** Linked app users of this entry (the entry's own profile + its members). */
+  profile_ids: string[];
 };
 
 export type ScoreDetailRow = { a: number; b: number };
@@ -188,7 +213,14 @@ export type ModuleDetail = {
   rounds: TournamentRound[];
   admins: ProfileLite[];
   my_role: TournamentRole;
-  counts: { entries: number; withdrawn: number; matches: number; matches_decided: number };
+  counts: {
+    entries: number;
+    withdrawn: number;
+    matches: number;
+    matches_decided: number;
+    /** Team modules: active teams with fewer than roster_min players. */
+    rosters_incomplete: number;
+  };
 };
 
 export type ModuleFormInput = {
@@ -214,3 +246,25 @@ export type EntryFieldInput = {
   is_public: boolean;
   sort_order: number | null;
 };
+
+/** Player payload for `upsert_team_entry` (the whole roster is sent every time). */
+export type TeamMemberInput = {
+  id?: string;
+  name: string;
+  profile_id: string | null;
+  field_values: Record<string, string>;
+  is_captain: boolean;
+  squad_number: number | null;
+};
+
+/** Patch for `update_tournament_module_settings` (only the keys present are changed). */
+export type ModuleSettingsPatch = Partial<
+  Pick<
+    TournamentModule,
+    | 'participant_type'
+    | 'roster_min'
+    | 'roster_max'
+    | 'lineup_size'
+    | 'format'
+  >
+>;

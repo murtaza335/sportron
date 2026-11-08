@@ -10,6 +10,23 @@ const FIELD_LABELS: Record<string, string> = {
   winner: 'Winner',
 };
 
+/** "@2" → "Player 3: " (the server index is 0-based). */
+function playerPrefix(index: string | undefined): string {
+  return index === undefined ? '' : `Player ${Number(index) + 1}: `;
+}
+
+/** Extracts the 0-based player index from an `@i` suffix, or null. */
+export function playerIndexFromError(err: unknown): number | null {
+  const raw =
+    typeof err === 'string'
+      ? err
+      : err && typeof err === 'object' && 'message' in err
+        ? String((err as { message: unknown }).message)
+        : '';
+  const m = raw.match(/@(\d+)/);
+  return m ? Number(m[1]) : null;
+}
+
 function prettyKey(key: string, labels?: Record<string, string>): string {
   if (labels?.[key]) return labels[key];
   if (FIELD_LABELS[key]) return FIELD_LABELS[key];
@@ -29,10 +46,28 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
         : '';
   const message = raw.trim();
 
-  const fieldRequired = message.match(/FIELD_REQUIRED:([a-z0-9_]+)/);
-  if (fieldRequired) return `${prettyKey(fieldRequired[1], labels)} is required.`;
-  const fieldInvalid = message.match(/FIELD_INVALID:([a-z0-9_]+)/);
-  if (fieldInvalid) return `${prettyKey(fieldInvalid[1], labels)} looks invalid.`;
+  // Roster errors may carry a 0-based player index: FIELD_REQUIRED:cms_id@2 → "Player 3: CMS ID is required."
+  const fieldRequired = message.match(/FIELD_REQUIRED:([a-z0-9_]+)(?:@(\d+))?/);
+  if (fieldRequired) {
+    return `${playerPrefix(fieldRequired[2])}${prettyKey(fieldRequired[1], labels)} is required.`;
+  }
+  const fieldInvalid = message.match(/FIELD_INVALID:([a-z0-9_]+)(?:@(\d+))?/);
+  if (fieldInvalid) {
+    return `${playerPrefix(fieldInvalid[2])}${prettyKey(fieldInvalid[1], labels)} looks invalid.`;
+  }
+  const dupCms = message.match(/DUPLICATE_MEMBER_CMS_ID(?:@(\d+))?/);
+  if (dupCms) {
+    return `${playerPrefix(dupCms[1])}A player with this CMS ID is already on a team in this module.`;
+  }
+  const dupProfile = message.match(/DUPLICATE_MEMBER_PROFILE(?:@(\d+))?/);
+  if (dupProfile) {
+    return `${playerPrefix(dupProfile[1])}This user is already on a team in this module.`;
+  }
+  if (message.includes('WRONG_PARTICIPANT_TYPE'))
+    return "This module's players don't match that entry type (teams vs individuals).";
+  if (message.includes('ROSTER_INCOMPLETE')) return "Some teams don't have enough players yet.";
+  if (message.includes('ROSTER_TOO_LARGE')) return 'This team has more players than allowed.';
+  if (message.includes('DUPLICATE_SQUAD_NUMBER')) return 'Two players have the same squad number.';
 
   if (message.includes('NOT_ALLOWED')) return "You don't have permission to do that.";
   if (message.includes('INVALID_STATUS')) return "That isn't possible at this stage.";

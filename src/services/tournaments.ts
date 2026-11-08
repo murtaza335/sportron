@@ -4,12 +4,15 @@ import type {
   EntryFieldInput,
   ModuleDetail,
   ModuleFormInput,
+  ModuleSettingsPatch,
   ProfileLite,
   ScoreDetailRow,
   Sport,
   Tournament,
   TournamentDetail,
+  TeamMemberInput,
   TournamentEntry,
+  TournamentEntryMember,
   TournamentEntryField,
   TournamentListItem,
   TournamentMatch,
@@ -79,13 +82,22 @@ export async function fetchModuleDetail(moduleId: string): Promise<ModuleDetail>
       withdrawn: Number(d.counts?.withdrawn ?? 0),
       matches: Number(d.counts?.matches ?? 0),
       matches_decided: Number(d.counts?.matches_decided ?? 0),
+      rosters_incomplete: Number(d.counts?.rosters_incomplete ?? 0),
     },
   };
 }
 
 export async function fetchModuleEntries(moduleId: string): Promise<TournamentEntry[]> {
   const rows = await rpc<TournamentEntry[] | null>('get_module_entries', { p_module: moduleId });
-  return (rows ?? []).map((e) => ({ ...e, fields: e.fields ?? {} }));
+  return (rows ?? []).map((e) => ({
+    ...e,
+    fields: e.fields ?? {},
+    member_count: Number(e.member_count ?? 0),
+    members: ((e.members ?? []) as TournamentEntryMember[]).map((m) => ({
+      ...m,
+      fields: m.fields ?? {},
+    })),
+  }));
 }
 
 type BracketRow = Omit<TournamentMatch, 'entry_a' | 'entry_b'> & {
@@ -214,6 +226,29 @@ export async function upsertEntry(
     p_profile: profileId,
     p_field_values: fieldValues,
   });
+}
+
+/** Create/edit a team entry; `members` is the FULL roster (absent ids are removed). */
+export async function upsertTeamEntry(
+  moduleId: string,
+  entryId: string | null,
+  name: string,
+  members: TeamMemberInput[],
+): Promise<string> {
+  return rpc<string>('upsert_team_entry', {
+    p_module: moduleId,
+    p_entry: entryId,
+    p_name: name,
+    p_members: members,
+  });
+}
+
+/** v2 settings patch (participant type, roster size, …). Send after create/updateModule. */
+export async function updateModuleSettings(
+  moduleId: string,
+  patch: ModuleSettingsPatch,
+): Promise<void> {
+  await rpc<null>('update_tournament_module_settings', { p_module: moduleId, p_set: patch });
 }
 
 export async function deleteEntry(entryId: string): Promise<void> {

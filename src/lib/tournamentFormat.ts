@@ -1,9 +1,11 @@
 import type { ThemeColor } from '@/constants/theme';
-import { SPORT_LABELS } from '@/types';
+import { isRacketSport, SPORT_LABELS } from '@/types';
 import type {
   EntryFieldType,
   ModuleStatus,
+  ParticipantType,
   Sport,
+  TournamentModule,
   TournamentEntryField,
   TournamentListItem,
   TournamentMatchStatus,
@@ -170,4 +172,60 @@ export function formatMatchTime(iso: string | null): string | null {
 
 export function listSportsLabel(t: Pick<TournamentListItem, 'sports'>): string {
   return t.sports.map(sportLabel).join(', ');
+}
+
+// ─── Rosters (v2) ────────────────────────────────────────────────────────────
+
+export type RosterDefaults = { min: number; max: number; lineup: number | null };
+
+/** Default roster sizes per sport (PLAN-v2 §3.1). Racket sports = doubles; null = no preset. */
+export const DEFAULT_ROSTER: Record<Sport, RosterDefaults> = {
+  table_tennis: { min: 2, max: 2, lineup: 2 },
+  badminton: { min: 2, max: 2, lineup: 2 },
+  tennis: { min: 2, max: 2, lineup: 2 },
+  squash: { min: 2, max: 2, lineup: 2 },
+  pickleball: { min: 2, max: 2, lineup: 2 },
+  football: { min: 11, max: 18, lineup: 11 },
+  cricket: { min: 11, max: 15, lineup: 11 },
+  volleyball: { min: 6, max: 12, lineup: 6 },
+  basketball: { min: 5, max: 12, lineup: 5 },
+  handball: { min: 7, max: 14, lineup: 7 },
+  other: { min: 2, max: 20, lineup: null },
+};
+
+/** B3: racket → singles or doubles, team sports → teams only, other → either. */
+export function allowedParticipantTypes(sport: Sport): ParticipantType[] {
+  if (isRacketSport(sport)) return ['individual', 'team'];
+  if (sport === 'other') return ['individual', 'team'];
+  return ['team'];
+}
+
+/** Doubles = a team module with exactly two players. */
+export function isDoubles(m: Pick<TournamentModule, 'participant_type' | 'roster_min' | 'roster_max'>): boolean {
+  return m.participant_type === 'team' && m.roster_min === 2 && m.roster_max === 2;
+}
+
+/** "Singles" · "Doubles" · "Teams (11–18 players)". */
+export function participantLabel(
+  m: Pick<TournamentModule, 'participant_type' | 'roster_min' | 'roster_max'>,
+): string {
+  if (m.participant_type !== 'team') return 'Singles';
+  if (isDoubles(m)) return 'Doubles';
+  if (m.roster_min != null && m.roster_max != null) {
+    return m.roster_min === m.roster_max
+      ? `Teams (${m.roster_max} players)`
+      : `Teams (${m.roster_min}–${m.roster_max} players)`;
+  }
+  return 'Teams';
+}
+
+/** Word for one entry: team modules say "team"/"pair", individual modules "player". */
+export function entryNoun(m: Pick<TournamentModule, 'participant_type' | 'roster_min' | 'roster_max'>, plural = false): string {
+  const base = m.participant_type !== 'team' ? 'player' : isDoubles(m) ? 'pair' : 'team';
+  return plural ? `${base}s` : base;
+}
+
+/** "Ali R. / Omar F." for a doubles pair, else the entry name. */
+export function pairLine(members: { name: string }[]): string {
+  return members.map((p) => p.name).join(' / ');
 }
