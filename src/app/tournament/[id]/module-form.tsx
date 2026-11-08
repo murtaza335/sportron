@@ -13,15 +13,18 @@ import { useTheme } from '@/hooks/use-theme';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
-import { DEFAULT_ROSTER, allowedParticipantTypes } from '@/lib/tournamentFormat';
+import { DEFAULT_ROSTER, FORMAT_HINT, FORMAT_LABEL, allowedParticipantTypes, defaultAllowDraws } from '@/lib/tournamentFormat';
 import {
   createModule,
   fetchModuleDetail,
   updateModule,
   updateModuleSettings,
 } from '@/services/tournaments';
-import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, SeedingMethod, Sport } from '@/types';
+import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, SeedingMethod, Sport, TournamentFormat } from '@/types';
 import { isRacketSport, isTeamSport, SPORT_LABELS } from '@/types';
+
+const FORMATS: TournamentFormat[] = ['single_elimination', 'round_robin', 'groups_knockout', 'double_elimination'];
+const FORMAT_OPTIONS = FORMATS.map((f) => ({ value: f, label: FORMAT_LABEL[f] }));
 
 const SPORT_OPTIONS = (Object.keys(SPORT_LABELS) as Sport[]).map((s) => ({ value: s, label: SPORT_LABELS[s] }));
 
@@ -98,6 +101,15 @@ function ModuleFormBody({
   const [lineup, setLineup] = useState<number | null>(
     m ? m.lineup_size : DEFAULT_ROSTER.table_tennis.lineup,
   );
+  const [format, setFormat] = useState<TournamentFormat>(m?.format ?? 'single_elimination');
+  const [legs, setLegs] = useState<1 | 2>(m?.rr_legs ?? 1);
+  const [allowDraws, setAllowDraws] = useState(m?.allow_draws ?? false);
+  const [pointsWin, setPointsWin] = useState(m?.points_win ?? 3);
+  const [pointsDraw, setPointsDraw] = useState(m?.points_draw ?? 1);
+  const [pointsLoss, setPointsLoss] = useState(m?.points_loss ?? 0);
+  const [groupCount, setGroupCount] = useState(m?.group_count ?? 4);
+  const [advance, setAdvance] = useState(m?.advance_per_group ?? 2);
+  const [gfReset, setGfReset] = useState(m?.grand_final_reset ?? true);
   // If the first save created the module but the settings call failed, later saves edit it.
   const [createdId, setCreatedId] = useState<string | null>(null);
   const [saving, setSaving] = useState(false);
@@ -106,6 +118,11 @@ function ModuleFormBody({
   const hasBracket = !!m && (m.bracket_generated_at != null || (initial?.counts.matches ?? 0) > 0);
   const sportLocked = !!m && (hasBracket || (m.status !== 'draft' && m.status !== 'open'));
   const settingsLocked = !!m && (hasBracket || ['in_progress', 'completed', 'cancelled'].includes(m.status));
+  const formatLocked = !!m && (hasBracket || !['draft', 'open'].includes(m.status));
+  const entryCount = initial?.counts.entries ?? 0;
+  const isLeagueLike = format === 'round_robin' || format === 'groups_knockout';
+  const racket = isRacketSport(sport);
+  const pointsInvalid = isLeagueLike && !(pointsWin > pointsDraw && pointsDraw >= pointsLoss);
   const playersLocked =
     !!m && ((initial?.counts.entries ?? 0) + (initial?.counts.withdrawn ?? 0) > 0 || !['draft', 'open'].includes(m.status));
   const allowedTypes = allowedParticipantTypes(sport);
@@ -122,6 +139,7 @@ function ModuleFormBody({
         ? participantType
         : allowed[0];
     setParticipantType(type);
+    if (!formatLocked) setAllowDraws(defaultAllowDraws(next) && isLeagueLike);
     const d = DEFAULT_ROSTER[next];
     setRosterMin(d.min);
     setRosterMax(d.max);
@@ -130,7 +148,7 @@ function ModuleFormBody({
 
   const maxN = maxEntries.trim() === '' ? null : parseInt(maxEntries, 10);
   const maxInvalid = maxN !== null && (Number.isNaN(maxN) || maxN < 2 || maxN > 128);
-  const canSave = name.trim().length >= 2 && !maxInvalid && !saving;
+  const canSave = name.trim().length >= 2 && !maxInvalid && !pointsInvalid && !saving;
 
   const submit = async () => {
     if (!canSave) {
@@ -147,7 +165,7 @@ function ModuleFormBody({
       venue: venue.trim() || null,
       starts_at: startsAt ? startsAt.toISOString() : null,
       max_entries: maxN,
-      third_place_match: third,
+      third_place_match: format === 'single_elimination' || format === 'groups_knockout' ? third : false,
       seeding_method: seeding,
     };
     const targetId = m?.id ?? createdId;
@@ -161,17 +179,30 @@ function ModuleFormBody({
         setCreatedId(id);
       }
       // v2 player settings. Skipped when nothing differs from what the module already has.
-      const wanted: ModuleSettingsPatch =
-        participantType === 'team'
-          ? { participant_type: 'team', roster_min: rosterMin, roster_max: rosterMax, lineup_size: lineup }
-          : { participant_type: 'individual' };
-      const current = m;
-      const changed =
-        !current ||
-        current.participant_type !== wanted.participant_type ||
-        (wanted.participant_type === 'team' &&
-          (current.roster_min !== rosterMin || current.roster_max !== rosterMax || current.lineup_size !== lineup));
-      if (changed && !playersLocked) await updateModuleSettings(id, wanted);
+      const patch: ModuleSettingsPatch = {};
+      if (!playersLocked) {
+        Object.assign(
+          patch,
+          participantType === 'team'
+            ? { participant_type: 'team', roster_min: rosterMin, roster_max: rosterMax, lineup_size: lineup }
+            : { participant_type: 'individual' },
+        );
+      }
+      if (!formatLocked) patch.format = format;
+      if (isLeagueLike) {
+        const draws = allowDraws && !racket;
+        patch.allow_draws = draws;
+        patch.rr_legs = legs;
+        patch.points_win = pointsWin;
+        patch.points_draw = draws ? pointsDraw : Math.max(pointsLoss, Math.min(pointsDraw, pointsWin - 1));
+        patch.points_loss = pointsLoss;
+      }
+      if (format === 'groups_knockout') {
+        patch.group_count = groupCount;
+        patch.advance_per_group = advance;
+      }
+      if (format === 'double_elimination') patch.grand_final_reset = gfReset;
+      if (Object.keys(patch).length > 0) await updateModuleSettings(id, patch);
       onDone(id);
     } catch (e) {
       alert('Something went wrong', friendlyTournamentError(e));
@@ -193,6 +224,98 @@ function ModuleFormBody({
         <FormField label="Sport *" hint={sportLocked ? 'Sport can’t be changed once the bracket exists.' : undefined}>
           <PillSelect options={SPORT_OPTIONS} value={sport} onChange={onSportChange} disabled={sportLocked} />
         </FormField>
+
+        <FormField
+          label="Format *"
+          hint={formatLocked ? 'Format can’t be changed once fixtures are generated.' : FORMAT_HINT[format]}
+        >
+          <PillSelect
+            options={FORMAT_OPTIONS}
+            value={format}
+            onChange={(f) => {
+              setFormat(f);
+              if (f !== 'round_robin' && f !== 'groups_knockout') setAllowDraws(false);
+              else if (!allowDraws) setAllowDraws(defaultAllowDraws(sport));
+            }}
+            disabled={formatLocked}
+          />
+        </FormField>
+
+        {isLeagueLike && (
+          <View style={{ gap: Spacing.md }}>
+            <FormField label="Legs" hint={format === 'groups_knockout' ? 'Applies inside every group.' : undefined}>
+              <PillSelect
+                options={[
+                  { value: 1 as const, label: 'Once' },
+                  { value: 2 as const, label: 'Home & away' },
+                ]}
+                value={legs}
+                onChange={setLegs}
+                disabled={formatLocked}
+              />
+            </FormField>
+            {!racket && (
+              <SwitchRow
+                label="Draws allowed"
+                hint="A level score in a league match is recorded as a draw."
+                value={allowDraws}
+                onChange={setAllowDraws}
+                disabled={!!m && m.status === 'in_progress'}
+              />
+            )}
+            <FormField
+              label="Points"
+              error={pointsInvalid ? 'A win must be worth more than a draw, and a draw at least a loss.' : null}
+            >
+              <View style={styles.rosterRow}>
+                <View style={{ gap: Spacing.xs }}>
+                  <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>Win</ThemedText>
+                  <NumberStepper label="Points for a win" value={pointsWin} min={0} max={10} onChange={setPointsWin} disabled={!!m && m.status === 'in_progress'} />
+                </View>
+                {allowDraws && !racket && (
+                  <View style={{ gap: Spacing.xs }}>
+                    <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>Draw</ThemedText>
+                    <NumberStepper label="Points for a draw" value={pointsDraw} min={0} max={10} onChange={setPointsDraw} disabled={!!m && m.status === 'in_progress'} />
+                  </View>
+                )}
+                <View style={{ gap: Spacing.xs }}>
+                  <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>Loss</ThemedText>
+                  <NumberStepper label="Points for a loss" value={pointsLoss} min={0} max={10} onChange={setPointsLoss} disabled={!!m && m.status === 'in_progress'} />
+                </View>
+              </View>
+            </FormField>
+          </View>
+        )}
+
+        {format === 'groups_knockout' && (
+          <View style={{ gap: Spacing.sm }}>
+            <View style={styles.rosterRow}>
+              <View style={{ gap: Spacing.xs }}>
+                <ThemedText variant="label" muted style={{ marginLeft: Spacing.xs }}>GROUPS</ThemedText>
+                <NumberStepper label="Number of groups" value={groupCount} min={2} max={16} onChange={setGroupCount} disabled={formatLocked} />
+              </View>
+              <View style={{ gap: Spacing.xs }}>
+                <ThemedText variant="label" muted style={{ marginLeft: Spacing.xs }}>ADVANCE PER GROUP</ThemedText>
+                <NumberStepper label="Teams advancing per group" value={advance} min={1} max={4} onChange={setAdvance} disabled={formatLocked} />
+              </View>
+            </View>
+            <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
+              {entryCount >= groupCount * 2
+                ? `${entryCount} entries → ${groupCount} groups of ${Math.floor(entryCount / groupCount)}${entryCount % groupCount ? '–' + Math.ceil(entryCount / groupCount) : ''} · top ${advance} → ${nextPow2(groupCount * advance)}-slot knockout`
+                : `${groupCount} groups · top ${advance} → ${groupCount * advance} qualify for the knockout (needs at least ${groupCount * 2} entries)`}
+            </ThemedText>
+          </View>
+        )}
+
+        {format === 'double_elimination' && (
+          <SwitchRow
+            label="Grand final reset"
+            hint="If the losers-bracket team wins the final, play once more."
+            value={gfReset}
+            onChange={setGfReset}
+            disabled={!!m && m.status === 'in_progress'}
+          />
+        )}
 
         <FormField
           label="Players *"
@@ -300,6 +423,7 @@ function ModuleFormBody({
         </FormField>
 
         <View style={{ gap: Spacing.md }}>
+          {(format === 'single_elimination' || format === 'groups_knockout') && (
           <SwitchRow
             label="3rd-place match"
             hint={settingsLocked ? 'Locked once the bracket is generated.' : 'Adds a match between the semi-final losers.'}
@@ -307,6 +431,7 @@ function ModuleFormBody({
             onChange={setThird}
             disabled={settingsLocked}
           />
+          )}
           <FormField label="Seeding">
             <PillSelect
               options={[
@@ -318,7 +443,9 @@ function ModuleFormBody({
               disabled={!!m && ['in_progress', 'completed', 'cancelled'].includes(m.status)}
             />
             <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
-              Random shuffles entries you haven’t seeded when the bracket is generated.
+              {isLeagueLike
+                ? 'Seeding decides the fixture order and the last tiebreak. Random shuffles entries you haven’t seeded.'
+                : 'Random shuffles entries you haven’t seeded when the bracket is generated.'}
             </ThemedText>
           </FormField>
         </View>
@@ -327,6 +454,12 @@ function ModuleFormBody({
       </ScrollView>
     </KeyboardAvoider>
   );
+}
+
+function nextPow2(n: number): number {
+  let p = 2;
+  while (p < n) p *= 2;
+  return p;
 }
 
 const styles = StyleSheet.create({
