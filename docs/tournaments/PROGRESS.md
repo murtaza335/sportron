@@ -40,7 +40,7 @@ Legend: ⬜ Not started · 🔄 In progress · 🟡 Written – awaiting owner (
 |---|---|---|---|---|---|
 | 25 | H Rosters | Roster schema (090) | 🟡 | 2026-11-08 | 090_add_tournament_rosters.sql: module roster cols, tournament_entry_members (+RLS select-only, indexes, updated_at/audit triggers), helpers _entry_profile_ids/is_entry_participant/is_module_participant. Owner decisions recorded (see Decisions). Needs owner: apply 090, run sql-tests.sql (Ask owner B1–B8 + PLAN-v2 Ground Rule 3 question first) |
 | 26 | H Rosters | Roster RPCs + reads (091) | 🟡 | 2026-11-08 | 091_add_tournament_roster_rpcs.sql (_validate_entry_field_values, update_tournament_module_settings [roster keys], upsert_team_entry, team guard in upsert_tournament_entry, set_module_status roster check, get_module_entries drop+create, get_module_bracket profile_ids, get_module_detail, entrant role patch) + docs/tournaments/sql-tests-v2.sql. Needs owner: apply 091, run sql-tests.sql then sql-tests-v2.sql |
-| 27 | H Rosters | Roster notifications (092) | ⬜ | | |
+| 27 | H Rosters | Roster notifications (092) | 🟡 | 2026-11-08 | 092_update_tournament_notifications_for_rosters.sql: trg_tournament_member_added, match events + module completed notify entry+member profiles; tests section R3. Needs owner: apply 092, run tests |
 | 28 | H Rosters | Client foundation (rosters) | ⬜ | | |
 | 29 | H Rosters | Module form: players section | ⬜ | | |
 | 30 | H Rosters | Team entry form + roster display | ⬜ | | |

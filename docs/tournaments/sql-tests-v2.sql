@@ -273,6 +273,44 @@ begin
       'INVALID_STATUS', 'completed module rosters are read-only');
   end;
 
+  -- ── section R3: roster notifications (step 27)
+  declare v_t uuid := tt_test.ctx('t')::uuid; v_m uuid; v_a uuid; v_b uuid; v_match uuid; v_before int;
+  begin
+    perform tt_test.as_user('admin');
+    v_m := tt_test.mk_team_module('NotifyTeams', 'football', 2, 4, false);
+    v_before := (select count(*) from public.in_app_notifications where user_id = tt_test.ctx('member')::uuid);
+    v_a := public.upsert_team_entry(v_m, null, 'Reds', jsonb_build_array(
+      tt_test.mem('nr', 1) || jsonb_build_object('profile_id', tt_test.ctx('member')),
+      tt_test.mem('nr', 2) || jsonb_build_object('profile_id', tt_test.ctx('member2')),
+      tt_test.mem('nr', 3)));
+    perform tt_test.chk((select count(*) from public.in_app_notifications
+                         where user_id = tt_test.ctx('member')::uuid and type = 'tournament_entry_added'
+                           and data ->> 'moduleId' = v_m::text) = 1,
+                        'linked member is notified when added to a team (published tournament)');
+    v_b := public.upsert_team_entry(v_m, null, 'Blues', tt_test.roster('nb', 2));
+    perform public.set_module_status(v_m, 'seeding');
+    perform public.generate_bracket(v_m);
+    perform public.set_module_status(v_m, 'in_progress');
+    select id into v_match from public.tournament_matches where module_id = v_m and entry_a_id is not null and entry_b_id is not null limit 1;
+    perform public.record_tournament_result(v_match, 3, 1, null, null, null);
+    perform tt_test.chk((select count(*) from public.in_app_notifications
+                         where user_id in (tt_test.ctx('member')::uuid, tt_test.ctx('member2')::uuid)
+                           and type = 'tournament_match_result' and data ->> 'matchId' = v_match::text) = 2,
+                        'a team of 3 with 2 linked members yields 2 result notifications');
+
+    -- draft tournament: nothing is sent
+    update public.tournaments set status = 'draft' where id = v_t;
+    v_before := (select count(*) from public.in_app_notifications where user_id = tt_test.ctx('stranger')::uuid);
+    declare v_m2 uuid; begin
+      v_m2 := tt_test.mk_team_module('QuietTeams', 'football', 2, 4, false);
+      perform public.upsert_team_entry(v_m2, null, 'Quiet', jsonb_build_array(
+        tt_test.mem('qq', 1) || jsonb_build_object('profile_id', tt_test.ctx('stranger')), tt_test.mem('qq', 2)));
+    end;
+    perform tt_test.chk((select count(*) from public.in_app_notifications where user_id = tt_test.ctx('stranger')::uuid) = v_before,
+                        'a member linked while the tournament is draft gets nothing');
+    update public.tournaments set status = 'published' where id = v_t;
+  end;
+
   -- @@END (new steps insert their test sections above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
