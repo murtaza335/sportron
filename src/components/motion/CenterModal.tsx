@@ -53,7 +53,7 @@ export function CenterModal({ visible, onClose, children }: Props) {
       <View style={styles.root}>
         <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdrop]} pointerEvents="none" />
         <Pressable style={StyleSheet.absoluteFill} onPress={request} accessibilityLabel="Close" />
-        <Animated.View style={content}>{children}</Animated.View>
+        <Animated.View style={[styles.wrap, content]}>{children}</Animated.View>
       </View>
     </Modal>
   );
@@ -61,5 +61,6 @@ export function CenterModal({ visible, onClose, children }: Props) {
 
 const styles = StyleSheet.create({
   root: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: 24 },
+  wrap: { width: '100%', alignItems: 'center' },
   backdrop: { backgroundColor: '#000' },
 });

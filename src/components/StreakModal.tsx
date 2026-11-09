@@ -1,6 +1,6 @@
 import { Sparkles, Trophy, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
 import { AnimatedFlame } from '@/components/motion/AnimatedFlame';
 import { celebrate } from '@/components/motion/Confetti';
@@ -207,12 +207,10 @@ export function StreakModal({
   );
 }
 
-const screenWidth = Dimensions.get('window').width;
-
 const styles = StyleSheet.create({
   card: {
     width: '100%',
-    maxWidth: Math.min(screenWidth - 48, 340),
+    maxWidth: 340,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     gap: Spacing.xs,
@@ -289,7 +287,7 @@ const styles = StyleSheet.create({
   },
   ruleCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 6,
     marginTop: 2,
   },
