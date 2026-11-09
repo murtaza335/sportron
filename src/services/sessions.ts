@@ -265,6 +265,16 @@ export async function fetchSessionCommitments(
   return (data ?? []).map(rowToCommitment);
 }
 
+function mapCommitmentError(error: { message?: string } | null): Error {
+  const msg = error?.message ?? '';
+  if (msg.includes('SESSION_FULL')) return new Error('This session is full.');
+  if (msg.includes('SESSION_NOT_OPEN')) return new Error('This session is no longer open.');
+  if (msg.includes('CANNOT_JOIN_OWN_SESSION')) return new Error('You cannot join your own session.');
+  if (msg.includes('FEEDBACK_NOT_ALLOWED')) return new Error('Feedback can only be given after the session has ended.');
+  if (msg.includes('NOT_ALLOWED')) return new Error('You are not allowed to do that.');
+  return error as Error;
+}
+
 export async function commitToSession(
   sessionId: string,
   userId: string,
@@ -302,7 +312,7 @@ export async function commitToSession(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapCommitmentError(error);
 
   return data;
 }
@@ -339,7 +349,7 @@ export async function approveCommitment(
     .update({ status: 'accepted' })
     .eq('id', commitmentId);
 
-  if (error) throw error;
+  if (error) throw mapCommitmentError(error);
 
   if (sessionRow?.max_participants != null) {
     const countMap = await fetchAcceptedCounts([commitment.session_id]);
@@ -697,6 +707,6 @@ export async function submitSessionFeedback(
   );
 
   for (const result of results) {
-    if (result.error) throw result.error;
+    if (result.error) throw mapCommitmentError(result.error);
   }
 }
