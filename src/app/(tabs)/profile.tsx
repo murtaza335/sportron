@@ -57,7 +57,11 @@ export default function ProfileScreen() {
   const isWeb = Platform.OS === 'web';
   const isIOSWeb = isWeb && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroidWeb = isWeb && typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
-  const showWebPrompt = isWeb && (isIOSWeb || isAndroidWeb) && !dismissedWebPrompt;
+  const isStandalone =
+    isWeb &&
+    typeof window !== 'undefined' &&
+    (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true);
+  const showWebPrompt = isWeb && (isIOSWeb || isAndroidWeb) && !isStandalone && !dismissedWebPrompt;
 
   useEffect(() => {
     AsyncStorage.getItem('notifications-enabled').then((val) => {
