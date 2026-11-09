@@ -707,6 +707,15 @@ export function SessionDetailPopup({
                         Your request is pending approval
                       </ThemedText>
                     )}
+                    {myCommitmentStatus === 'pending' && (
+                      <Button
+                        label="Cancel request"
+                        variant="secondary"
+                        onPress={handleUncommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
+                    )}
                     {myCommitmentStatus === 'left' && (
                       <View style={[styles.leftBanner, { backgroundColor: `${theme.info}15`, borderColor: `${theme.info}30` }]}>
                         <ThemedText
@@ -716,6 +725,14 @@ export function SessionDetailPopup({
                           You left this session
                         </ThemedText>
                       </View>
+                    )}
+                    {myCommitmentStatus === 'left' && !isSessionFull && (
+                      <Button
+                        label="Apply again"
+                        onPress={handleCommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
                     )}
                     {myCommitmentStatus === 'rejected' && (
                       <ThemedText
