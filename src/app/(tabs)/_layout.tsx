@@ -266,6 +266,16 @@ export default function TabLayout() {
   const { user: authUser } = useAuth();
   useChatUnreadWatcher(authUser?.id);
 
+  // Web: surface unread activity in the browser tab title, e.g. "(3) Sportron".
+  const totalUnread = unreadCount + chatUnreadCount;
+  useEffect(() => {
+    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
+    document.title = totalUnread > 0 ? `(${totalUnread > 99 ? '99+' : totalUnread}) Sportron` : 'Sportron';
+    return () => {
+      document.title = 'Sportron';
+    };
+  }, [totalUnread]);
+
   const commonHeaderStyle = {
     backgroundColor: theme.background,
     height: Platform.OS === 'ios' ? 96 : 76,
