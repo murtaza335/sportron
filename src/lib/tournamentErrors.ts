@@ -46,6 +46,9 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
         : '';
   const message = raw.trim();
 
+  if (message.includes('PGRST202') || message.includes('Could not find the function'))
+    return 'This action needs a server update. Please try again later.';
+
   // Roster errors may carry a 0-based player index: FIELD_REQUIRED:cms_id@2 → "Player 3: CMS ID is required."
   const fieldRequired = message.match(/FIELD_REQUIRED:([a-z0-9_]+)(?:@(\d+))?/);
   if (fieldRequired) {
