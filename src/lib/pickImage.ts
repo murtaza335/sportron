@@ -1,4 +1,5 @@
 import * as ImagePicker from 'expo-image-picker';
+import { Platform } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { toast } from '@/components/motion/Toast';
@@ -14,10 +15,13 @@ const wait = (ms: number) => new Promise((r) => setTimeout(r, ms));
  */
 export async function pickImage({ aspect, quality = 0.8 }: PickOptions = {}): Promise<string | null> {
   try {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return null;
+    // Web needs no permission, and awaiting anything before the file dialog can make Safari block it.
+    if (Platform.OS !== 'web') {
+      const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (!perm.granted) {
+        alert('Permission required', 'Please grant permission to access your photos.');
+        return null;
+      }
     }
     const launch = () =>
       ImagePicker.launchImageLibraryAsync({
