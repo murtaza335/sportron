@@ -563,7 +563,7 @@ export default function CommunityDetailScreen() {
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.35,
                 shadowRadius: 12,
-                elevation: 6,
+                elevation: 0,
               }}
             >
               {/* Inner Circle Container */}

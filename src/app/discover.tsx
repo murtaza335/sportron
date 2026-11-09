@@ -90,7 +90,7 @@ export default function DiscoverScreen() {
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.4,
                   shadowRadius: 4,
-                  elevation: 4,
+                  elevation: 0,
                 }}
               >
                 <Plus size={20} color={theme.chatBubbleMineText} strokeWidth={3} />

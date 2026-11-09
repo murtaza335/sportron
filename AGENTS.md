@@ -382,6 +382,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - All durations/springs/easings live in `src/lib/motion.ts` (`Duration`, `Springs`, `Easings`, `RM`) — no magic numbers in components. Animate only `transform`/`opacity` (+ colour via interpolation); use Reanimated, never mix with legacy `Animated` in one component.
 - Primitives in `src/components/motion/`: `PressableScale`, `FadeInItem` (first-load stagger only), `Skeleton*` (one shared pulse via `SkeletonProvider`), `AnimatedNumber`, `AnimatedBadge`, `Collapsible`, `ScreenFadeIn`, `Confetti` (`celebrate()` + `<ConfettiHost/>` in root layout), `Toast` (`toast(title, msg?)` + `<ToastHost/>` in root layout — non-blocking feedback only; confirmations stay `alert()`), `FadeImage` (content images).
 - Haptics via `src/lib/haptics.ts` (no-op on web): selection = tab/segment/chip change; light = like/send/FAB/refresh; medium = long-press/swipe threshold; success = approve/record/join; warning = destructive/dispute; error = failed action.
+- **Shadow rule**: in-flow surfaces (cards, stat rows, chips) are **flat on Android** (`elevation: 0`; `Shadows.*.card` already is) because Android elevation ignores parent opacity and ghosts as a dark box during fade transitions. Keep `elevation` only for floating UI that never fades with a screen (FAB, Toast, chat popovers, modal cards, tab bump).
 - Reduced motion is mandatory (`useReducedMotion()` / `.reduceMotion(RM)`): no stagger/overshoot/loops.
 
 ### Routing (expo-router v57)

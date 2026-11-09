@@ -109,7 +109,7 @@ export const Shadows = {
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.04,
         shadowRadius: 12,
-        elevation: 2,
+        elevation: 0, // in-flow surfaces are flat on Android: elevation ignores parent opacity and ghosts during fades
       },
     }),
     elevated: Platform.select<ViewStyle>({
@@ -131,7 +131,7 @@ export const Shadows = {
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.3,
         shadowRadius: 12,
-        elevation: 2,
+        elevation: 0, // in-flow surfaces are flat on Android: elevation ignores parent opacity and ghosts during fades
       },
     }),
     elevated: Platform.select<ViewStyle>({
