@@ -1,11 +1,18 @@
 {
+  "id": "/",
   "name": "Sportron",
   "short_name": "Sportron",
   "description": "Multi-sport community & match tracking app",
   "start_url": "/",
+  "scope": "/",
   "display": "standalone",
-  "background_color": "#FFFFFF",
+  "orientation": "portrait",
+  "background_color": "#000000",
   "theme_color": "#000000",
+  "categories": [
+    "sports",
+    "social"
+  ],
   "icons": [
     {
       "src": "/icon-192.png",
@@ -29,5 +36,13 @@
       "sizes": "512x512",
       "purpose": "maskable"
     }
-  ]
+  ],
+  "related_applications": [
+    {
+      "platform": "play",
+      "url": "https://play.google.com/store/apps/details?id=com.murtazabaig.T3S",
+      "id": "com.murtazabaig.T3S"
+    }
+  ],
+  "prefer_related_applications": false
 }
