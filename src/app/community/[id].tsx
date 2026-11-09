@@ -143,8 +143,16 @@ export default function CommunityDetailScreen() {
     return { label: 'Join Community', disabled: false } as const;
   })();
 
+  const loadingMoreMatchesRef = useRef(false);
+
   const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
+    if (append) {
+      // Guard against several scroll events in the same frame fetching the same page.
+      if (loadingMoreMatchesRef.current) return;
+      loadingMoreMatchesRef.current = true;
+      setLoadingMoreMatches(true);
+    }
     try {
       const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
       if (append) {
@@ -161,6 +169,7 @@ export default function CommunityDetailScreen() {
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
+      loadingMoreMatchesRef.current = false;
       setLoadingMoreMatches(false);
     }
   }, [id, user]);
@@ -842,6 +851,7 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
           const threshold = contentSize.height - layoutMeasurement.height * 1.3;
