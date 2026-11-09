@@ -6,12 +6,14 @@ import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
 import { useFirstLoad } from '@/hooks/useFirstLoad';
 import { haptics } from '@/lib/haptics';
 import { router, Stack } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, Search } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
+import { Button } from '@/components/ui/Button';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { CommunityCard } from '@/components/CommunityCard';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -171,11 +173,41 @@ export default function DiscoverScreen() {
         {loading || (!!user?.id && !membershipsLoaded) ? (
           <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : filteredCommunities.length === 0 ? (
-          <View style={styles.empty}>
-            <ThemedText variant="body" muted style={styles.emptyText}>
-              No communities found
+          <EmptyReveal
+            style={styles.empty}
+            icon={<Search size={44} color={theme.textSecondary} strokeWidth={1.5} />}>
+            <ThemedText variant="heading" style={styles.emptyText}>
+              {search.trim()
+                ? `Nothing called "${search.trim()}" yet`
+                : selectedSport
+                  ? `No ${SPORT_LABELS[selectedSport]} communities yet`
+                  : 'No communities yet'}
             </ThemedText>
-          </View>
+            <ThemedText variant="body" muted style={styles.emptyText}>
+              {selectedSport
+                ? `Be the first — start one and the ${SPORT_LABELS[selectedSport]} players around you can find and join it.`
+                : 'Start the first community in your area.'}
+            </ThemedText>
+            <Button
+              label={
+                search.trim()
+                  ? `Create "${search.trim().slice(0, 24)}"`
+                  : selectedSport
+                    ? `Create a ${SPORT_LABELS[selectedSport]} community`
+                    : 'Create a community'
+              }
+              onPress={() =>
+                router.push({
+                  pathname: '/create-community',
+                  params: {
+                    ...(selectedSport ? { sport: selectedSport } : {}),
+                    ...(search.trim() ? { name: search.trim() } : {}),
+                  },
+                })
+              }
+              buttonStyle={{ marginTop: Spacing.sm }}
+            />
+          </EmptyReveal>
         ) : (
           <View style={styles.grid}>
             {filteredCommunities.map((community, index) => (

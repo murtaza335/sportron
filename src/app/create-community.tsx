@@ -3,7 +3,7 @@ import { haptics } from '@/lib/haptics';
 import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { pickImage as pickImageUri } from '@/lib/pickImage';
-import { useRouter } from 'expo-router';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
 import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -25,12 +25,14 @@ export default function CreateCommunityScreen() {
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ sport?: string; name?: string }>();
+  const initialSport = (Object.keys(SPORT_LABELS) as Sport[]).find((x) => x === params.sport);
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(typeof params.name === 'string' ? params.name.slice(0, 60) : '');
   const [description, setDescription] = useState('');
   const [organization, setOrganization] = useState('');
   const [location, setLocation] = useState('');
-  const [sport, setSport] = useState<Sport>('table_tennis');
+  const [sport, setSport] = useState<Sport>(initialSport ?? 'table_tennis');
   const [visibility, setVisibility] = useState<CommunityVisibility>('public');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
