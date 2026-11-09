@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import * as QueryParams from 'expo-auth-session/build/QueryParams';
 import * as WebBrowser from 'expo-web-browser';
 import { makeRedirectUri } from 'expo-auth-session';
@@ -54,7 +55,29 @@ export async function signInWithGoogle() {
   }
 }
 
+/**
+ * Remove this device's FCM token from the signed-in user's profile so the next user of the
+ * device does not receive the previous user's pushes. Never blocks sign-out.
+ */
+async function removeDeviceTokenBeforeSignOut(): Promise<void> {
+  if (Platform.OS === 'web') return;
+  try {
+    const { data } = await supabase.auth.getSession();
+    const userId = data.session?.user.id;
+    if (!userId) return;
+    const messaging = (await import('@react-native-firebase/messaging')).default;
+    const token = await messaging().getToken();
+    if (token) {
+      const { removeFCMToken } = await import('@/services/profiles');
+      await removeFCMToken(userId, token);
+    }
+  } catch (e) {
+    console.warn('Could not remove FCM token on sign-out:', e);
+  }
+}
+
 export async function signOut() {
+  await removeDeviceTokenBeforeSignOut();
   const { error } = await supabase.auth.signOut();
   if (error) {
     throw error;

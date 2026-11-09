@@ -225,6 +225,9 @@ export async function pushToTokens(
   const sa = JSON.parse(Deno.env.get('FCM_SERVICE_ACCOUNT') ?? '{}');
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
+  // Tokens FCM reports as permanently invalid; removed from profiles.fcm_tokens afterwards.
+  const deadTokens: string[] = [];
+
   const results = await Promise.allSettled(
     tokenRows.map(async ({ token, body }) => {
       const res = await fetch(fcmUrl, {
@@ -237,6 +240,13 @@ export async function pushToTokens(
       });
       if (!res.ok) {
         const bodyText = await res.text();
+        if (
+          res.status === 404 ||
+          bodyText.includes('UNREGISTERED') ||
+          (res.status === 400 && bodyText.includes('registration token'))
+        ) {
+          deadTokens.push(token);
+        }
         throw new Error(`FCM responded ${res.status}: ${bodyText}`);
       }
       return res;
@@ -248,6 +258,15 @@ export async function pushToTokens(
   for (const r of results) {
     if (r.status === 'fulfilled') sent++;
     else failed++;
+  }
+
+  if (deadTokens.length > 0) {
+    try {
+      const { error } = await supabase.rpc('prune_fcm_tokens', { p_tokens: deadTokens });
+      if (error) console.warn('[fcm] prune_fcm_tokens failed:', error.message);
+    } catch (e) {
+      console.warn('[fcm] prune_fcm_tokens threw:', e);
+    }
   }
 
   return { sent, failed, total: tokenRows.length };

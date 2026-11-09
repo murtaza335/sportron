@@ -135,6 +135,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function saveFCMTokenToProfile(userId: string, fcmToken: string): Promise<void> {
+  // Preferred path (migration 108): atomically move the token to this user and drop it from
+  // every other profile, so a shared device never receives a previous user's pushes.
+  const { error: claimError } = await supabase.rpc('claim_fcm_token', { p_token: fcmToken });
+  if (!claimError) return;
+
+  // Fallback for backends where migration 108 is not applied yet.
+  console.warn('claim_fcm_token failed, falling back to profile update:', claimError.message);
   try {
     const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
