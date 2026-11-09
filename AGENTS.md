@@ -378,6 +378,12 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - **Auth**: Supabase client uses **PKCE**; `handleAuthRedirectUrl` (services/auth) only accepts an OAuth `code` while a sign-in started by this app is pending.
 - Session `full`/`open` is maintained by trigger (114); expired sessions are closed by pg_cron every 5 min (119); stats are symmetric on approve/un-approve (115/117); `completed_sessions` is symmetric (118).
 
+### Motion system (see `animations_redone_plan.md`)
+- All durations/springs/easings live in `src/lib/motion.ts` (`Duration`, `Springs`, `Easings`, `RM`) — no magic numbers in components. Animate only `transform`/`opacity` (+ colour via interpolation); use Reanimated, never mix with legacy `Animated` in one component.
+- Primitives in `src/components/motion/`: `PressableScale`, `FadeInItem` (first-load stagger only), `Skeleton*` (one shared pulse via `SkeletonProvider`), `AnimatedNumber`, `AnimatedBadge`, `Collapsible`, `ScreenFadeIn`, `Confetti` (`celebrate()` + `<ConfettiHost/>` in root layout).
+- Haptics via `src/lib/haptics.ts` (no-op on web): selection = tab/segment/chip change; light = like/send/FAB/refresh; medium = long-press/swipe threshold; success = approve/record/join; warning = destructive/dispute; error = failed action.
+- Reduced motion is mandatory (`useReducedMotion()` / `.reduceMotion(RM)`): no stagger/overshoot/loops.
+
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/tournaments` (Tournaments, centre), `/chats` (Chats), `/updates` (Activity); `/profile` is a hidden tab (`href: null`)
 - Tournament stack screens (`headerShown`): `/tournament/[id]`, `/tournament/[id]/manage`, `/tournament/[id]/fields`, `/tournament/[id]/module/[moduleId]` (+ `/manage`, `/seeding`, `/rounds`); modals: `/tournament/[id]/module-form`, `/tournament/[id]/module/[moduleId]/entry-form`. Use `tournamentRoutes` (`src/lib/tournamentRoutes.ts`) for hrefs (generated route types lag new routes)

@@ -17,6 +17,7 @@ import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { ConfettiHost } from '@/components/motion/Confetti';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -328,6 +329,7 @@ function RootNavigator() {
           }}
         />
       </Stack>
+      <ConfettiHost />
     </KeyboardInsetView>
   );
 }

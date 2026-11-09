@@ -1,8 +1,19 @@
-import { useEffect, useRef, useState } from 'react';
-import { Animated, Pressable, StyleSheet, Text, View, type LayoutChangeEvent } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Pressable, StyleSheet, View, type LayoutChangeEvent } from 'react-native';
+import Animated, {
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  type SharedValue,
+} from 'react-native-reanimated';
 
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptics } from '@/lib/haptics';
+import { Duration, Springs } from '@/lib/motion';
 
 type SegmentedControlProps<T extends string> = {
   options: { value: T; label: string }[];
@@ -13,6 +24,36 @@ type SegmentedControlProps<T extends string> = {
   unread?: Partial<Record<T, boolean>>;
 };
 
+function SegmentLabel({
+  index,
+  position,
+  compact,
+  from,
+  to,
+  children,
+}: {
+  index: number;
+  position: SharedValue<number>;
+  compact: boolean;
+  from: string;
+  to: string;
+  children: string;
+}) {
+  const style = useAnimatedStyle(() => {
+    const t = Math.max(0, 1 - Math.abs(position.value - index));
+    return { color: interpolateColor(t, [0, 1], [from, to]) };
+  });
+  return (
+    <Animated.Text
+      numberOfLines={1}
+      adjustsFontSizeToFit
+      minimumFontScale={0.7}
+      style={[styles.label, compact && styles.labelCompact, style]}>
+      {children}
+    </Animated.Text>
+  );
+}
+
 export function SegmentedControl<T extends string>({
   options,
   value,
@@ -21,50 +62,43 @@ export function SegmentedControl<T extends string>({
   unread,
 }: SegmentedControlProps<T>) {
   const theme = useTheme();
-  const selectedIndex = options.findIndex((o) => o.value === value);
-  const [slideAnim] = useState(() => new Animated.Value(0));
-  const containerWidth = useRef(0);
+  const reduced = useReducedMotion();
+  const selectedIndex = Math.max(0, options.findIndex((o) => o.value === value));
+  const [width, setWidth] = useState(0);
+  const position = useSharedValue(selectedIndex);
 
   useEffect(() => {
-    if (containerWidth.current === 0) return;
-    const target = (containerWidth.current / options.length) * selectedIndex;
-    Animated.spring(slideAnim, {
-      toValue: target,
-      useNativeDriver: true,
-      speed: 28,
-      bounciness: 0,
-    }).start();
-  }, [selectedIndex, options.length, slideAnim]);
+    position.set(
+      reduced ? withTiming(selectedIndex, { duration: Duration.fast }) : withSpring(selectedIndex, Springs.snappy),
+    );
+  }, [selectedIndex, reduced, position]);
 
-  const onContainerLayout = (e: LayoutChangeEvent) => {
-    containerWidth.current = e.nativeEvent.layout.width;
-    slideAnim.setValue((e.nativeEvent.layout.width / options.length) * selectedIndex);
-  };
+  const indicatorStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: (width / options.length) * position.value }],
+  }));
+
+  const onContainerLayout = (e: LayoutChangeEvent) => setWidth(e.nativeEvent.layout.width);
 
   return (
-    <View
-      style={[styles.container, { borderColor: theme.border }]}
-      onLayout={onContainerLayout}
-    >
-      {/* Sliding indicator */}
+    <View style={[styles.container, { borderColor: theme.border }]} onLayout={onContainerLayout}>
       <Animated.View
         style={[
           styles.indicator,
           compact && styles.indicatorCompact,
-          {
-            backgroundColor: theme.text,
-            width: `${100 / options.length}%`,
-            transform: [{ translateX: slideAnim }],
-          },
+          { backgroundColor: theme.text, width: `${100 / options.length}%` },
+          indicatorStyle,
         ]}
       />
-      {options.map((option) => {
+      {options.map((option, i) => {
         const selected = option.value === value;
         const hasUnread = !!unread?.[option.value];
         return (
           <Pressable
             key={option.value}
-            onPress={() => onChange(option.value)}
+            onPress={() => {
+              if (!selected) haptics.selection();
+              onChange(option.value);
+            }}
             style={({ pressed }) => [
               styles.segment,
               compact && styles.segmentCompact,
@@ -74,17 +108,9 @@ export function SegmentedControl<T extends string>({
             accessibilityRole="button"
             accessibilityState={{ selected }}>
             <View style={styles.segmentContent}>
-              <Text
-                numberOfLines={1}
-                adjustsFontSizeToFit
-                minimumFontScale={0.7}
-                style={[
-                  styles.label,
-                  compact && styles.labelCompact,
-                  { color: selected ? theme.background : theme.text },
-                ]}>
+              <SegmentLabel index={i} position={position} compact={compact} from={theme.text} to={theme.background}>
                 {option.label}
-              </Text>
+              </SegmentLabel>
               {hasUnread && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
             </View>
           </Pressable>
