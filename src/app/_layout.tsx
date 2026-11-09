@@ -327,15 +327,24 @@ export default function RootLayout() {
     let active = true;
 
     (async () => {
-      // Single query for both config rows
-      const { data } = await supabase
-        .from('site_config')
-        .select('key, value')
-        .in('key', ['maintenance', 'min_app_version']);
+      // Single query for both config rows. Fail open on error / timeout (5 s) so a hung request
+      // can never leave the user on the splash screen forever.
+      let rows: { key: string; value: unknown }[] = [];
+      try {
+        const result = await Promise.race([
+          supabase
+            .from('site_config')
+            .select('key, value')
+            .in('key', ['maintenance', 'min_app_version']),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
+        rows = (result?.data ?? []) as { key: string; value: unknown }[];
+      } catch {
+        rows = [];
+      }
 
       if (!active) return;
 
-      const rows = data ?? [];
       const maintenanceRow = rows.find((r) => r.key === 'maintenance');
       const maintenanceValue = (maintenanceRow?.value ?? {}) as Record<string, unknown>;
       const maintenanceEnabled = Boolean(maintenanceValue.enabled);
@@ -365,9 +374,18 @@ export default function RootLayout() {
     return () => { active = false; };
   }, []);
 
-  // While checking — render nothing (no flash of any screen)
+  // The native splash is normally hidden by RootNavigator, which is not mounted for the
+  // maintenance / forced-update screens - hide it here so those screens are actually visible.
+  const gateScreenShown = maintenanceActive === true || !versionOk;
+  useEffect(() => {
+    if (gateScreenShown) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [gateScreenShown]);
+
+  // While checking — render a splash-coloured view (no white flash, no flash of any screen)
   if (maintenanceActive === null) {
-    return <View style={styles.container} />;
+    return <View style={[styles.container, { backgroundColor: '#000000' }]} />;
   }
 
   // Maintenance on — show the screen directly, no providers needed
