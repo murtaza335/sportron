@@ -307,7 +307,23 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     <Pressable
       onPress={() => {
         markAsRead(notification.id);
-        if (notification.type.startsWith('tournament_')) {
+        const cId = notification.data?.communityId;
+        if (notification.type.startsWith('community_post_') && typeof cId === 'string') {
+          const pId = notification.data?.postId;
+          router.push({
+            pathname: '/community/[id]',
+            params: typeof pId === 'string' ? { id: cId, postId: pId } : { id: cId },
+          });
+        } else if (
+          (notification.type === 'member_joined' ||
+            notification.type === 'community_engagement' ||
+            notification.type === 'new_community') &&
+          typeof cId === 'string'
+        ) {
+          router.push({ pathname: '/community/[id]', params: { id: cId } });
+        } else if (notification.type.startsWith('streak_')) {
+          router.navigate('/');
+        } else if (notification.type.startsWith('tournament_')) {
           const tId = notification.data?.tournamentId;
           const mId = notification.data?.moduleId;
           if (typeof tId === 'string' && typeof mId === 'string') {

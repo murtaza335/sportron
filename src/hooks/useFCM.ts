@@ -28,12 +28,16 @@ async function isNotificationsEnabled(): Promise<boolean> {
   return val !== 'false';
 }
 
+// getInitialNotification() returns the launching notification only once per process.
+let initialNotificationChecked = false;
+
 export function useFCM() {
   const { user, refreshProfile } = useAuth();
   const [notificationPermission, setNotificationPermission] = useState<Notifications.PermissionStatus | null>(null);
   const [isLoading, setIsLoading] = useState(false);
 
   const handledResponseIdRef = useRef<string | null>(null);
+  const handledRemoteMessageIdRef = useRef<string | null>(null);
 
   const navigateToNotification = useCallback(
     async (data: NotificationData) => {
@@ -47,6 +51,40 @@ export function useFCM() {
           }
           return;
         }
+        case 'community_post_created':
+        case 'community_post_liked':
+        case 'community_post_commented': {
+          if (data.communityId) {
+            router.push({
+              pathname: '/community/[id]',
+              params: data.postId
+                ? { id: data.communityId, postId: data.postId }
+                : { id: data.communityId },
+            });
+          }
+          return;
+        }
+        case 'streak_reminder':
+        case 'streak_at_risk':
+        case 'streak_milestone': {
+          // The streak flame / modal lives in the Communities tab header.
+          router.navigate('/');
+          return;
+        }
+        case 'member_joined':
+        case 'community_engagement':
+        case 'new_community': {
+          if (data.communityId) {
+            router.push({
+              pathname: '/community/[id]',
+              params: { id: data.communityId },
+            });
+          }
+          return;
+        }
+        case 'match_approval_request':
+        case 'match_approved_community':
+        case 'match_disputed':
         case 'match_pending':
         case 'match_approved':
         case 'match_rejected':
@@ -239,6 +277,21 @@ export function useFCM() {
           handleNotificationResponse
         );
 
+        // Taps on pushes that the OS displayed itself (hybrid `notification` block, app in the
+        // background or killed) are delivered by RNFirebase, not always by expo-notifications.
+        const routeRemoteMessage = (remoteMessage: { messageId?: string; data?: Record<string, unknown> } | null) => {
+          if (!remoteMessage?.data?.type) return;
+          const key = remoteMessage.messageId ?? JSON.stringify(remoteMessage.data);
+          if (handledRemoteMessageIdRef.current === key) return;
+          handledRemoteMessageIdRef.current = key;
+          navigateToNotification(remoteMessage.data as unknown as NotificationData);
+        };
+        const unsubscribeOpened = messaging().onNotificationOpenedApp(routeRemoteMessage);
+        if (!initialNotificationChecked) {
+          initialNotificationChecked = true;
+          messaging().getInitialNotification().then(routeRemoteMessage).catch(() => {});
+        }
+
         const permission = await getNotificationPermissions();
         setNotificationPermission(permission);
 
@@ -273,6 +326,7 @@ export function useFCM() {
         return () => {
           unsubscribeForeground();
           unsubscribeTokenRefresh();
+          unsubscribeOpened();
           cleanupListeners();
         };
       }
@@ -281,7 +335,7 @@ export function useFCM() {
     } finally {
       setIsLoading(false);
     }
-  }, [user, handleNotificationReceived, handleNotificationResponse]);
+  }, [user, handleNotificationReceived, handleNotificationResponse, navigateToNotification]);
 
   const requestPermissions = useCallback(async () => {
     if (!user?.id) return;

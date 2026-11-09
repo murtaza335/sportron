@@ -41,7 +41,16 @@ export type NotificationType =
   | 'tournament_entry_added'
   | 'tournament_match_scheduled'
   | 'tournament_match_result'
-  | 'tournament_module_completed';
+  | 'tournament_module_completed'
+  | 'community_post_created'
+  | 'community_post_liked'
+  | 'community_post_commented'
+  | 'streak_reminder'
+  | 'streak_at_risk'
+  | 'streak_milestone'
+  | 'member_joined'
+  | 'community_engagement'
+  | 'new_community';
 
 export interface NotificationData {
   type: NotificationType;
@@ -51,6 +60,7 @@ export interface NotificationData {
   commentId?: string;
   sessionId?: string;
   communityId?: string;
+  postId?: string;
   tournamentId?: string;
   moduleId?: string;
   message?: string;

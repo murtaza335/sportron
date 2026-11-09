@@ -251,7 +251,11 @@ export type NotificationType =
   | 'tournament_entry_added'
   | 'tournament_match_scheduled'
   | 'tournament_match_result'
-  | 'tournament_module_completed';
+  | 'tournament_module_completed'
+  // DB-only types (allowed by the in_app_notifications check constraint, migrations 080/081/083)
+  | 'member_joined'
+  | 'community_engagement'
+  | 'new_community';
 
 export type InAppNotification = {
   id: string;
