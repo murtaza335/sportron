@@ -1,18 +1,23 @@
-import { useCallback, useEffect, useState, type ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
   Dimensions,
   Modal,
   Platform,
   Pressable,
+  ScrollView,
+  type ScrollViewProps,
   StyleSheet,
   View,
   type DimensionValue,
+  type NativeScrollEvent,
+  type NativeSyntheticEvent,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   interpolate,
+  type SharedValue,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -31,6 +36,41 @@ const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_FRACTION = 0.25;
 const DISMISS_VELOCITY = 800;
 const BACKDROP_MAX = 0.5;
+
+const SheetScrollContext = createContext<SharedValue<number> | null>(null);
+
+/**
+ * Spread onto a ScrollView inside a Sheet (`<ScrollView {...useSheetScroll()} />`) so the sheet knows
+ * when the list is at the top and a downward drag anywhere on the body should dismiss it.
+ */
+export function useSheetScroll() {
+  const scrollY = useContext(SheetScrollContext);
+  const onScroll = useCallback(
+    (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+      scrollY?.set(e.nativeEvent.contentOffset.y);
+    },
+    [scrollY],
+  );
+  return { onScroll, scrollEventThrottle: 16 };
+}
+
+/** ScrollView that cooperates with the Sheet's drag-anywhere-to-dismiss. Use inside a Sheet. */
+export function SheetScrollView({ ref, onScroll, ...rest }: ScrollViewProps & { ref?: React.Ref<ScrollView> }) {
+  const sheetScroll = useSheetScroll();
+  return (
+    <ScrollView
+      ref={ref}
+      {...rest}
+      scrollEventThrottle={sheetScroll.scrollEventThrottle}
+      onScroll={(e) => {
+        sheetScroll.onScroll(e);
+        onScroll?.(e);
+      }}
+    />
+  );
+}
+
+const HANDLE_ZONE = 48;
 
 export type SheetProps = {
   visible: boolean;
@@ -52,7 +92,7 @@ export type SheetProps = {
 /**
  * Unified bottom sheet: spring open, finger-tracking drag with velocity-aware dismiss, rubber-band
  * when dragged up, backdrop opacity derived from sheet position, exit animation before unmount.
- * Drag from the handle area; the content stays free to scroll.
+ * Drag down from anywhere: scroll content scrolls first (see `useSheetScroll`); the handle zone always drags.
  */
 export function Sheet({ visible, onClose, children, height, maxHeight = '85%', flush, style, avoidKeyboard = true, onClosed }: SheetProps) {
   const theme = useTheme();
@@ -62,6 +102,9 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const sheetHeight = useSharedValue(SCREEN_HEIGHT * 0.5);
   const crossed = useSharedValue(false);
+  const scrollY = useSharedValue(0);
+  const startX = useSharedValue(0);
+  const startY = useSharedValue(0);
   // Android is edge-to-edge and a <Modal> is its own window: pad by the keyboard height ourselves.
   const androidKb = useAndroidKeyboardHeight();
   const kbPad = avoidKeyboard && Platform.OS === 'android' && androidKb > 0 ? androidKb : 0;
@@ -106,6 +149,26 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
   }, [animateOut, onClose]);
 
   const pan = Gesture.Pan()
+    .manualActivation(true)
+    .onTouchesDown((e) => {
+      const t = e.allTouches[0];
+      if (!t) return;
+      startX.set(t.x);
+      startY.set(t.y);
+    })
+    .onTouchesMove((e, state) => {
+      const t = e.allTouches[0];
+      if (!t) return;
+      const dy = t.y - startY.get();
+      const dx = t.x - startX.get();
+      if (dy < -8 || (Math.abs(dx) > 12 && Math.abs(dx) > Math.abs(dy))) {
+        state.fail();
+      } else if (dy > 8) {
+        // Handle zone always drags; elsewhere only once the inner list is scrolled to the top.
+        if (startY.get() < HANDLE_ZONE || scrollY.get() <= 0) state.activate();
+        else state.fail();
+      }
+    })
     .onStart(() => {
       crossed.set(false);
     })
@@ -158,11 +221,13 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
                 style,
               ]}>
               <GestureDetector gesture={pan}>
-                <View style={[styles.handleContainer, flush && styles.handleFlush]} hitSlop={{ top: 8, bottom: 8 }}>
-                  <View style={[styles.handle, { backgroundColor: theme.textSecondary, opacity: 0.3 }]} />
+                <View style={height != null ? styles.flex : styles.shrink}>
+                  <View style={[styles.handleContainer, flush && styles.handleFlush]} hitSlop={{ top: 8, bottom: 8 }}>
+                    <View style={[styles.handle, { backgroundColor: theme.textSecondary, opacity: 0.3 }]} />
+                  </View>
+                  <SheetScrollContext.Provider value={scrollY}>{children}</SheetScrollContext.Provider>
                 </View>
               </GestureDetector>
-              {children}
             </Animated.View>
           </View>
         </KeyboardAvoider>
@@ -173,6 +238,7 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
 
 const styles = StyleSheet.create({
   flex: { flex: 1 },
+  shrink: { flexShrink: 1 },
   root: { flex: 1, justifyContent: 'flex-end' },
   backdrop: { backgroundColor: '#000' },
   sheet: {

@@ -2,7 +2,7 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
 import { LikeButton } from '@/components/motion/LikeButton';
-import { Sheet } from '@/components/motion/Sheet';
+import { Sheet, SheetScrollView } from '@/components/motion/Sheet';
 import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
@@ -286,7 +286,7 @@ export function PostDetailPopup({
                 </View>
               </View>
 
-              <ScrollView
+              <SheetScrollView
                 ref={scrollViewRef}
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -343,7 +343,7 @@ export function PostDetailPopup({
 
                   {renderCommentsSection()}
                 </View>
-              </ScrollView>
+              </SheetScrollView>
 
               <View
                 style={[styles.inputContainer, { borderTopColor: theme.border }]}
