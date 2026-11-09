@@ -8,8 +8,7 @@
     "scheme": "t3s",
     "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
