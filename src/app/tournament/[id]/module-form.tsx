@@ -22,6 +22,7 @@ import {
 } from '@/services/tournaments';
 import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, SeedingMethod, Sport, TournamentFormat } from '@/types';
 import { isRacketSport, isTeamSport, SPORT_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
 
 const FORMATS: TournamentFormat[] = ['single_elimination', 'round_robin', 'groups_knockout', 'double_elimination'];
 const FORMAT_OPTIONS = FORMATS.map((f) => ({ value: f, label: FORMAT_LABEL[f] }));
@@ -49,7 +50,7 @@ export default function ModuleFormScreen() {
     };
   }, [moduleId]);
 
-  const close = () => router.back();
+  const close = () => goBack(router, tournamentRoutes.tournament(id));
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.background }]} edges={['top']}>
@@ -63,7 +64,7 @@ export default function ModuleFormScreen() {
           initial={loaded}
           bottomInset={insets.bottom}
           onDone={(newId) => {
-            if (editing) router.back();
+            if (editing) goBack(router, tournamentRoutes.tournament(id));
             else router.replace(tournamentRoutes.moduleManage(id, newId));
           }}
         />

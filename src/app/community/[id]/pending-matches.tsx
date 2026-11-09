@@ -18,6 +18,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchCommunityMatches } from '@/services/communities';
 import type { CommunityMatch, MatchWithProfiles } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function PendingMatchesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -113,7 +115,7 @@ export default function PendingMatchesScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginLeft: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

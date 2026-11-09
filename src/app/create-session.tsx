@@ -27,6 +27,7 @@ import {
 } from '@/services/sessions';
 import type { CreateSessionInput, SessionPurpose } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
 
 function combineDateAndTime(date: Date, time: Date): Date {
   return new Date(
@@ -157,7 +158,7 @@ export default function CreateSessionScreen() {
       };
 
       await createSession(user.id, input);
-      router.back();
+      goBack(router, '/history');
     } catch (e) {
       alert('Error', 'Failed to create session. Please try again.');
       console.error('Create session error:', e);
@@ -169,7 +170,7 @@ export default function CreateSessionScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Pressable onPress={() => goBack(router, '/history')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Session</ThemedText>

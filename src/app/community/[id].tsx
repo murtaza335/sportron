@@ -63,6 +63,7 @@ import type {
   MatchWithProfiles,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
 
 export default function CommunityDetailScreen() {
   const { id, communityName, matchId: matchIdParam, postId: postIdParam } = useLocalSearchParams<{
@@ -806,7 +807,7 @@ export default function CommunityDetailScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, '/')}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

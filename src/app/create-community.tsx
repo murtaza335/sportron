@@ -19,6 +19,7 @@ import { uploadImageFromUri } from '@/lib/cloudinary';
 import { createCommunity } from '@/services/communities';
 import type { CommunityVisibility, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
 
 export default function CreateCommunityScreen() {
   const theme = useTheme();
@@ -83,7 +84,7 @@ export default function CreateCommunityScreen() {
         sport,
         image_url: uploadedUrl ?? undefined,
       });
-      router.back();
+      goBack(router, '/');
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to create community. Please try again.');
       console.error('Create community error:', e);
@@ -95,7 +96,7 @@ export default function CreateCommunityScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Community</ThemedText>

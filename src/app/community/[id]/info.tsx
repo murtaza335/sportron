@@ -43,6 +43,8 @@ import { fetchProfile } from '@/services/profiles';
 import type { CommunityMember, Profile } from '@/types';
 import { SPORT_LABELS } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function CommunityInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -242,7 +244,7 @@ export default function CommunityInfoScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

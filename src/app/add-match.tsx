@@ -26,6 +26,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { recordCommunityMatch, searchCommunityMembers } from '@/services/communities';
 import type { MatchFormat, Profile, Sport } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES, isRacketSport, isTeamSport } from '@/types';
+import { goBack } from '@/lib/nav';
 
 type SelectionState = {
   playerPartner: Profile | null;
@@ -131,7 +132,7 @@ try {
         haptics.success();
         if (playerScore > opponentScore) celebrate();
         alert('Match Recorded', 'Waiting for opponent approval.');
-        router.back();
+        goBack(router, '/');
     } catch (error) {
       haptics.error();
       alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
@@ -143,7 +144,7 @@ try {
 return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={styles.header}>
-        <Pressable onPress={() => router.back()} hitSlop={16} style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.6 }]}>
+        <Pressable onPress={() => goBack(router, '/')} hitSlop={16} style={({ pressed }) => [styles.headerAction, pressed && { opacity: 0.6 }]}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading" style={styles.title}>Record Match</ThemedText>

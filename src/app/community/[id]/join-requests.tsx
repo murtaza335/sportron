@@ -18,6 +18,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { fetchJoinRequests, respondToJoinRequest } from '@/services/communities';
 import type { CommunityJoinRequest } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function CommunityJoinRequestsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -101,7 +103,7 @@ export default function CommunityJoinRequestsScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },

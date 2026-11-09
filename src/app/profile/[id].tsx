@@ -29,6 +29,7 @@ import type {
 import { SPORT_LABELS } from '@/types';
 import { formatDate } from '@/lib/date';
 import { StreakDisplay } from '@/components/StreakDisplay';
+import { goBack } from '@/lib/nav';
 
 function formatWinRatio(value: number | null | undefined): string {
   if (value == null) return '—';
@@ -83,7 +84,7 @@ export default function PublicProfileScreen() {
           headerShown: true,
           title: profile?.username ?? 'Profile',
           headerRight: () => (
-            <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+            <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
               <X size={22} color={theme.text} strokeWidth={2} />
             </Pressable>
           ),

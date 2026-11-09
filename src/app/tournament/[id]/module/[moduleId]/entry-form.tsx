@@ -20,6 +20,8 @@ import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { validateFieldValue } from '@/lib/tournamentFormat';
 import { fetchModuleDetail, fetchModuleEntries, upsertEntry } from '@/services/tournaments';
 import type { ProfileLite, TournamentEntry, TournamentEntryField, TournamentModule } from '@/types';
+import { goBack } from '@/lib/nav';
+import { tournamentRoutes } from '@/lib/tournamentRoutes';
 
 export default function EntryFormScreen() {
   const { id, moduleId, entryId } = useLocalSearchParams<{ id: string; moduleId: string; entryId?: string }>();
@@ -61,7 +63,7 @@ export default function EntryFormScreen() {
             ? entryId ? 'Edit Team' : 'Add Team'
             : entryId ? 'Edit Entry' : 'Add Entry'
         }
-        onClose={() => router.back()}
+        onClose={() => goBack(router, tournamentRoutes.module(id, moduleId))}
       />
       {fLoading || eLoading || !module ? (
         <ActivityIndicator color={theme.text} style={{ marginTop: Spacing.xxl }} />
@@ -72,7 +74,7 @@ export default function EntryFormScreen() {
           fields={fields}
           entry={entry}
           bottomInset={insets.bottom}
-          onClose={() => router.back()}
+          onClose={() => goBack(router, tournamentRoutes.module(id, moduleId))}
         />
       ) : (
         <EntryFormBody
@@ -81,7 +83,7 @@ export default function EntryFormScreen() {
           fields={fields}
           entry={entry}
           bottomInset={insets.bottom}
-          onClose={() => router.back()}
+          onClose={() => goBack(router, tournamentRoutes.module(id, moduleId))}
         />
       )}
     </SafeAreaView>

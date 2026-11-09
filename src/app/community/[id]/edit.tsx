@@ -17,6 +17,8 @@ import { useCommunity } from '@/hooks/useCommunity';
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import { updateCommunity } from '@/services/communities';
 import type { Community, CommunityVisibility } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function EditCommunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -114,7 +116,7 @@ function EditCommunityForm({
         image_url: imageUrl,
       });
       refresh();
-      router.back();
+      goBack(router, `/community/${community.id}` as Href);
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to update.');
     } finally {
