@@ -61,6 +61,7 @@ function createSupabaseClient(): SupabaseClient {
       storage: getAuthStorage(),
       autoRefreshToken: true,
       persistSession: true,
+      flowType: 'pkce',
       detectSessionInUrl: Platform.OS === 'web' && typeof window !== 'undefined',
     },
   });

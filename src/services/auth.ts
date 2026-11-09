@@ -12,46 +12,69 @@ const redirectTo = makeRedirectUri({
   path: 'auth/callback',
 });
 
-async function createSessionFromUrl(url: string) {
-  const { params, errorCode } = QueryParams.getQueryParams(url);
+// PKCE flow (SEC-M1): the OAuth redirect carries a one-time `code`, which is exchanged for a
+// session using the code verifier stored locally by supabase-js. A forged deep link such as
+// t3s://auth/callback#access_token=<attacker> is ignored, and a code that was not initiated
+// by this client fails the verifier check.
+let signInPending = false;
+const exchangedCodes = new Map<string, Promise<void>>();
 
+export function isSignInPending(): boolean {
+  return signInPending;
+}
+
+/**
+ * Exchange the `code` found in an OAuth redirect URL for a session. Safe to call from more than
+ * one place for the same URL (e.g. openAuthSessionAsync result + deep-link callback screen):
+ * each code is exchanged at most once. Ignores URLs when no sign-in was started by this app.
+ */
+export async function handleAuthRedirectUrl(url: string): Promise<void> {
+  if (!signInPending) return;
+
+  const { params, errorCode } = QueryParams.getQueryParams(url);
   if (errorCode) {
     throw new Error(errorCode);
   }
 
-  const { access_token, refresh_token } = params;
+  const code = typeof params.code === 'string' ? params.code : undefined;
+  if (!code) return;
 
-  if (!access_token) {
-    return;
+  let exchange = exchangedCodes.get(code);
+  if (!exchange) {
+    exchange = supabase.auth.exchangeCodeForSession(code).then(({ error }) => {
+      if (error) throw error;
+    });
+    exchangedCodes.set(code, exchange);
   }
-
-  const { error } = await supabase.auth.setSession({
-    access_token,
-    refresh_token,
-  });
-
-  if (error) {
-    throw error;
-  }
+  await exchange;
 }
 
 export async function signInWithGoogle() {
-  const { data, error } = await supabase.auth.signInWithOAuth({
-    provider: 'google',
-    options: {
-      redirectTo,
-      skipBrowserRedirect: true,
-    },
-  });
+  signInPending = true;
+  try {
+    const { data, error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: {
+        redirectTo,
+        skipBrowserRedirect: true,
+      },
+    });
 
-  if (error) {
-    throw error;
-  }
+    if (error) {
+      throw error;
+    }
 
-  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+    const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
 
-  if (result.type === 'success') {
-    await createSessionFromUrl(result.url);
+    if (result.type === 'success') {
+      await handleAuthRedirectUrl(result.url);
+    }
+  } finally {
+    // Keep the flag briefly so a deep-link callback delivered right after the browser closes
+    // can still reuse the (memoized) code exchange.
+    setTimeout(() => {
+      signInPending = false;
+    }, 10_000);
   }
 }
 

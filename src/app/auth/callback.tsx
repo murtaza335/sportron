@@ -2,9 +2,8 @@ import { useEffect, useCallback } from 'react';
 import { ActivityIndicator, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 
-import { supabase } from '@/lib/supabase';
+import { handleAuthRedirectUrl } from '@/services/auth';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function AuthCallback() {
@@ -14,26 +13,8 @@ export default function AuthCallback() {
 
   const handleRedirect = useCallback(async (urlStr: string) => {
     try {
-      let normalizedUrl = urlStr;
-      if (urlStr.includes('#')) {
-        normalizedUrl = urlStr.replace('#', '?');
-      }
-
-      const { params, errorCode } = QueryParams.getQueryParams(normalizedUrl);
-      if (errorCode) {
-        throw new Error(errorCode);
-      }
-
-      const { access_token, refresh_token } = params;
-      if (access_token) {
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-        if (error) {
-          throw error;
-        }
-      }
+      // Only an OAuth `code` from a sign-in this app started is accepted (PKCE, SEC-M1).
+      await handleAuthRedirectUrl(urlStr);
     } catch (e) {
       console.error('[T3S] Error handling auth callback:', e);
     } finally {
