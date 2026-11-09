@@ -4,6 +4,7 @@ import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 
 import { handleAuthRedirectUrl } from '@/services/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function AuthCallback() {
@@ -23,6 +24,15 @@ export default function AuthCallback() {
       router.replace(Platform.OS === 'web' ? '/login' : '/');
     }
   }, [router]);
+
+  // Web: supabase-js finishes the code exchange on page load and the root auth gate then redirects.
+  // If no session shows up, don't leave the user on a spinner.
+  const { session } = useAuth();
+  useEffect(() => {
+    if (Platform.OS !== 'web' || session) return;
+    const t = setTimeout(() => router.replace('/login'), 10_000);
+    return () => clearTimeout(t);
+  }, [session, router]);
 
   useEffect(() => {
     if (url) {

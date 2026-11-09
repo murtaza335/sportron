@@ -50,6 +50,18 @@ export async function handleAuthRedirectUrl(url: string): Promise<void> {
 }
 
 export async function signInWithGoogle() {
+  if (Platform.OS === 'web') {
+    // Full-page redirect: no popup (Safari blocks popups opened after an await, and an installed
+    // iOS PWA loses the result). supabase-js (detectSessionInUrl) completes the PKCE exchange when
+    // Google sends the browser back to /auth/callback.
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: `${window.location.origin}/auth/callback` },
+    });
+    if (error) throw error;
+    return;
+  }
+
   signInPending = true;
   try {
     const { data, error } = await supabase.auth.signInWithOAuth({
