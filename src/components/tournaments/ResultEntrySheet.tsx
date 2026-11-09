@@ -1,5 +1,6 @@
 import { Minus, Plus } from 'lucide-react-native';
 import { useState } from 'react';
+import { haptics } from '@/lib/haptics';
 import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { BottomSheet } from '@/components/tournaments/BottomSheet';
@@ -141,8 +142,10 @@ function ResultBody({
         });
       }
       await onSaved();
+      haptics.success();
       onClose();
     } catch (e) {
+      haptics.error();
       alert('Something went wrong', friendlyTournamentError(e));
     } finally {
       setSaving(false);

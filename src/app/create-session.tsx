@@ -1,17 +1,14 @@
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+import { CharCounter } from '@/components/motion/CharCounter';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import {
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -217,9 +214,13 @@ export default function CreateSessionScreen() {
               {SESSION_PURPOSES.map((p) => {
                 const selected = p === purpose;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={p}
-                    onPress={() => setPurpose(p)}
+                    scaleTo={0.94}
+                    onPress={() => {
+                      if (!selected) haptics.selection();
+                      setPurpose(p);
+                    }}
                     style={[
                       styles.purposePill,
                       { borderColor: theme.border },
@@ -235,7 +236,7 @@ export default function CreateSessionScreen() {
                     >
                       {SESSION_PURPOSE_LABELS[p]}
                     </ThemedText>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
             </ScrollView>
@@ -250,7 +251,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Short Title
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={title}
               onChangeText={setTitle}
               placeholder="e.g. Evening doubles"
@@ -266,16 +267,14 @@ export default function CreateSessionScreen() {
               ]}
               autoFocus
             />
-            <ThemedText variant="caption" muted style={styles.hintText}>
-              {title.length}/{MAX_SESSION_TITLE_LENGTH} characters
-            </ThemedText>
+            <CharCounter count={title.length} max={MAX_SESSION_TITLE_LENGTH} style={styles.hintText} />
           </View>
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
               Location
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Gym Hall, Court 3"
@@ -426,7 +425,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Max Participants
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={maxParticipants}
               onChangeText={handleParticipantsChange}
               placeholder="2"
@@ -456,9 +455,13 @@ export default function CreateSessionScreen() {
               contentContainerStyle={styles.expireRow}
             >
               {EXPIRE_OPTIONS.map((opt, idx) => (
-                <Pressable
+                <PressableScale
                   key={opt.value}
-                  onPress={() => setExpireIndex(idx)}
+                  scaleTo={0.94}
+                  onPress={() => {
+                    if (idx !== expireIndex) haptics.selection();
+                    setExpireIndex(idx);
+                  }}
                   style={[
                     styles.expireChip,
                     {
@@ -477,7 +480,7 @@ export default function CreateSessionScreen() {
                   >
                     {opt.label}
                   </ThemedText>
-                </Pressable>
+                </PressableScale>
               ))}
             </ScrollView>
           </View>
@@ -486,7 +489,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Any additional info..."

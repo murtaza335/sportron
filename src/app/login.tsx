@@ -3,6 +3,9 @@ import { useState } from 'react';
 import { ActivityIndicator, Image, ImageBackground, Linking, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
+import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { Duration, RM, Springs, STAGGER_MS } from '@/lib/motion';
 import { alert } from '@/lib/alert';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -44,34 +47,41 @@ export default function LoginScreen() {
             
             {/* Main Branding Section */}
             <View style={styles.hero}>
-              <Image 
-                source={require('@/assets/images/icon.png')} 
-                style={styles.appLogo}
-                resizeMode="contain"
-              />
-              <Text style={styles.titleText}>Sportron</Text>
-              <View>
+              {/* Same entrance language as the splash so splash -> login feels continuous */}
+              <Animated.View entering={ZoomIn.springify().damping(Springs.bouncy.damping).stiffness(Springs.bouncy.stiffness).reduceMotion(RM)}>
+                <Image
+                  source={require('@/assets/images/icon.png')}
+                  style={styles.appLogo}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+              <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)}>
+                <Text style={styles.titleText}>Sportron</Text>
+              </Animated.View>
+              <Animated.View entering={FadeInDown.delay(STAGGER_MS * 4).duration(Duration.base).reduceMotion(RM)}>
                 <Text style={styles.subtitleText}>A community Driven Sports App</Text>
-              </View>
+              </Animated.View>
             </View>
 
             {/* Action Section */}
-            <View style={styles.actions}>
-              <TouchableOpacity
+            <Animated.View entering={FadeInDown.delay(Duration.base + 150).duration(Duration.base).reduceMotion(RM)} style={styles.actions}>
+              <PressableScale
                 style={styles.googleButton}
-                activeOpacity={0.85}
+                scaleTo={0.97}
                 onPress={handleGoogleSignIn}
                 disabled={loading}
               >
                 {loading ? (
-                  <ActivityIndicator color="#000" />
+                  <Animated.View entering={FadeIn.duration(Duration.fast).reduceMotion(RM)}>
+                    <ActivityIndicator color="#000" />
+                  </Animated.View>
                 ) : (
                   <>
                     <FontAwesome name="google" size={20} color="#EA4335" style={styles.googleIcon} />
                     <Text style={styles.buttonText}>Continue with Google</Text>
                   </>
                 )}
-              </TouchableOpacity>
+              </PressableScale>
               
 <View style={styles.linksRow}>
               <Text style={styles.footnoteText}>
@@ -90,7 +100,7 @@ export default function LoginScreen() {
               </TouchableOpacity>
               <Text style={styles.footnoteText}>.</Text>
             </View>
-          </View>
+          </Animated.View>
 
           </View>
         </SafeAreaView>

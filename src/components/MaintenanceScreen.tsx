@@ -1,5 +1,8 @@
 import { ActivityIndicator, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Floating } from '@/components/motion/Floating';
+import { Duration, RM, STAGGER_MS } from '@/lib/motion';
 import { Spacing } from '@/constants/theme';
 import { fetchMaintenanceMode } from '@/services/config';
 import { useCallback, useState } from 'react';
@@ -36,14 +39,16 @@ export function MaintenanceScreen() {
   return (
     <View style={styles.container}>
       {/* Large wrench icon */}
+      <Floating>
       <View style={styles.iconContainer}>
         <Text style={styles.iconWrench} selectable={false}>
           {'\u{1F527}'}
         </Text>
       </View>
+      </Floating>
 
-      <Text style={styles.title}>Under Maintenance</Text>
-      <Text style={styles.message}>{message}</Text>
+      <Animated.Text entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)} style={styles.title}>Under Maintenance</Animated.Text>
+      <Animated.Text entering={FadeInDown.delay(STAGGER_MS * 3).duration(Duration.base).reduceMotion(RM)} style={styles.message}>{message}</Animated.Text>
 
       {checking ? (
         <ActivityIndicator size="large" color={ACCENT} style={styles.loader} />

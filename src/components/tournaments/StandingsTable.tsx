@@ -1,5 +1,8 @@
 import { Trophy } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+
+import { RM, Springs } from '@/lib/motion';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -7,6 +10,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { tint } from '@/lib/tournamentFormat';
 import type { TournamentStanding } from '@/types';
 
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+const reorder = LinearTransition.springify().damping(Springs.gentle.damping).stiffness(Springs.gentle.stiffness).reduceMotion(RM);
 const ROW_H = 48;
 const RANK_W = 44;
 const ENTRY_W = 150;
@@ -55,7 +60,8 @@ export function StandingsTable({
             <Header w={ENTRY_W} align="left">Entry</Header>
           </View>
           {standings.map((s) => (
-            <Pressable
+            <AnimatedPressable
+              layout={reorder}
               key={s.entry_id}
               onPress={() => onSelect(s.entry_id)}
               style={[styles.row, { backgroundColor: rowBg(s), borderColor: theme.border }]}
@@ -75,7 +81,7 @@ export function StandingsTable({
                 </ThemedText>
                 {s.status === 'alive' && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
               </View>
-            </Pressable>
+            </AnimatedPressable>
           ))}
         </View>
 
@@ -90,7 +96,8 @@ export function StandingsTable({
               <Header w={REACHED_W} align="left">{showLosses ? 'Losses' : 'Reached'}</Header>
             </View>
             {standings.map((s) => (
-              <Pressable
+              <AnimatedPressable
+                layout={reorder}
                 key={s.entry_id}
                 onPress={() => onSelect(s.entry_id)}
                 style={[styles.row, { backgroundColor: rowBg(s), borderColor: theme.border }]}
@@ -114,7 +121,7 @@ export function StandingsTable({
                         : (s.reached_label ?? '—')}
                   </ThemedText>
                 </View>
-              </Pressable>
+              </AnimatedPressable>
             ))}
           </View>
         </ScrollView>

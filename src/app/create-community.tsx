@@ -1,17 +1,12 @@
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import * as ImagePicker from 'expo-image-picker';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
-import {
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -177,7 +172,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Name
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={name}
               onChangeText={setName}
               placeholder="e.g. Table Tennis Club"
@@ -199,7 +194,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="What's this community about?"
@@ -223,7 +218,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Organization (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={organization}
               onChangeText={setOrganization}
               placeholder="e.g. University of Lahore"
@@ -244,7 +239,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Location / City (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Lahore"
@@ -271,14 +266,17 @@ export default function CreateCommunityScreen() {
                 'other'] as Sport[]).map((s) => {
                 const selected = s === sport;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={s}
-                    onPress={() => setSport(s)}
-                    style={({ pressed }) => [
+                    onPress={() => {
+                      if (!selected) haptics.selection();
+                      setSport(s);
+                    }}
+                    scaleTo={0.94}
+                    style={[
                       styles.sportPill,
                       { borderColor: theme.border },
                       selected && { backgroundColor: theme.text, borderColor: theme.text },
-                      pressed && { opacity: 0.7 },
                     ]}
                     hitSlop={4}
                   >
@@ -291,7 +289,7 @@ export default function CreateCommunityScreen() {
                     >
                       {SPORT_LABELS[s]}
                     </ThemedText>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
             </ScrollView>

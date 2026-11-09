@@ -171,6 +171,7 @@ export function BracketView({
                   myEntryIds={myEntryIds}
                   label={n.isThird ? '3rd Place' : undefined}
                   onPress={() => onSelectMatch(match)}
+                  enterDelay={Math.max(0, match.round_number - 1) * 80}
                 />
               );
             })}

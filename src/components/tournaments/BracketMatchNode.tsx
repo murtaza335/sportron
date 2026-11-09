@@ -1,5 +1,18 @@
 import { Check } from 'lucide-react-native';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useEffect, useRef } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  FadeIn,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+  ZoomIn,
+} from 'react-native-reanimated';
+
+import { PressableScale } from '@/components/motion/PressableScale';
+import { Duration, RM } from '@/lib/motion';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius } from '@/constants/theme';
@@ -52,7 +65,11 @@ function Row({
           >
             {entry.name}
           </ThemedText>
-          {winner && !bye && <Check size={12} color={theme.success} strokeWidth={3} />}
+          {winner && !bye && (
+            <Animated.View entering={ZoomIn.springify().damping(12).reduceMotion(RM)}>
+              <Check size={12} color={theme.success} strokeWidth={3} />
+            </Animated.View>
+          )}
           {score != null && (
             <ThemedText variant="caption" style={[styles.score, winner && { fontWeight: '700' }, loser && { color: theme.textSecondary }]}>
               {score}
@@ -76,6 +93,7 @@ export function BracketMatchNode({
   myEntryIds,
   label,
   onPress,
+  enterDelay = 0,
 }: {
   match: TournamentMatch;
   x: number;
@@ -84,8 +102,21 @@ export function BracketMatchNode({
   myEntryIds: Set<string>;
   label?: string;
   onPress: () => void;
+  /** Stagger for the first render (round index × 80ms). */
+  enterDelay?: number;
 }) {
   const theme = useTheme();
+  const reduced = useReducedMotion();
+  const flash = useSharedValue(0);
+  const prevWinner = useRef(match.winner_entry_id);
+  // A realtime result arriving flashes the accent border once (never on the initial render).
+  useEffect(() => {
+    if (prevWinner.current !== match.winner_entry_id && match.winner_entry_id && !reduced) {
+      flash.set(withSequence(withTiming(1, { duration: 150 }), withTiming(0, { duration: 650 })));
+    }
+    prevWinner.current = match.winner_entry_id;
+  }, [match.winner_entry_id, reduced, flash]);
+  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
   const decided = match.status === 'completed' || match.status === 'walkover';
   const bye = match.status === 'bye';
   const wo = match.status === 'walkover';
@@ -106,23 +137,24 @@ export function BracketMatchNode({
   const scoreB = wo || bye ? null : match.score_b;
 
   return (
-    <Pressable
+    <Animated.View
+      entering={FadeIn.delay(enterDelay).duration(Duration.base).reduceMotion(RM)}
+      style={[styles.node, { left: x, top: y, opacity: cancelled ? 0.5 : 1 }]}>
+    <PressableScale
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.node,
+      scaleTo={0.97}
+      style={[
+        styles.inner,
         {
-          left: x,
-          top: y,
           backgroundColor: theme.backgroundElement,
-          opacity: cancelled ? 0.5 : 1,
           borderColor: highlighted ? theme.accent : theme.border,
           borderWidth: highlighted ? 2 : 1,
         },
-        pressed && { opacity: 0.7 },
       ]}
       accessibilityRole="button"
       accessibilityLabel={`${label ?? match.round_name} match ${match.match_number}`}
     >
+      <Animated.View pointerEvents="none" style={[styles.flash, { borderColor: theme.accent }, flashStyle]} />
       {label && (
         <ThemedText variant="caption" muted style={styles.label}>{label}</ThemedText>
       )}
@@ -152,7 +184,8 @@ export function BracketMatchNode({
           )}
         </View>
       )}
-    </Pressable>
+    </PressableScale>
+    </Animated.View>
   );
 }
 
@@ -161,10 +194,19 @@ const styles = StyleSheet.create({
     position: 'absolute',
     width: NODE_W,
     height: NODE_H,
+  },
+  inner: {
+    width: NODE_W,
+    height: NODE_H,
     borderRadius: Radius.md,
     paddingHorizontal: 8,
     paddingVertical: 4,
     justifyContent: 'center',
+  },
+  flash: {
+    ...StyleSheet.absoluteFill as object,
+    borderWidth: 3,
+    borderRadius: Radius.md,
   },
   label: { position: 'absolute', top: -18, left: 0, fontSize: 11, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 24 },

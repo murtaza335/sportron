@@ -1,18 +1,10 @@
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import * as ImagePicker from 'expo-image-picker';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -204,7 +196,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Name
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={name}
               onChangeText={setName}
               placeholder="e.g. Table Tennis Club"
@@ -226,7 +218,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="What's this community about?"
@@ -250,7 +242,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Organization (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={organization}
               onChangeText={setOrganization}
               placeholder="e.g. University of Lahore"
@@ -271,7 +263,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Location / City (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Lahore"

@@ -1,10 +1,25 @@
 import { Minus, Plus, X } from 'lucide-react-native';
-import { forwardRef, useState, type ReactNode } from 'react';
+import { forwardRef, useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Switch, TextInput, View, type TextInputProps } from 'react-native';
+import Animated, {
+  FadeInDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM } from '@/lib/motion';
+
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+
+const AnimatedTextInput = Animated.createAnimatedComponent(TextInput);
 
 /** Label + control + optional error, matching the create-community field recipe. */
 export function FormField({
@@ -19,12 +34,36 @@ export function FormField({
   children: ReactNode;
 }) {
   const theme = useTheme();
+  const reduced = useReducedMotion();
+  const shake = useSharedValue(0);
+
+  // A new error shakes the field horizontally once (±6px, ~300ms) with an error haptic.
+  useEffect(() => {
+    if (!error) return;
+    haptics.error();
+    if (reduced) return;
+    shake.set(
+      withSequence(
+        withTiming(-6, { duration: 50 }),
+        withTiming(6, { duration: 70 }),
+        withTiming(-4, { duration: 70 }),
+        withTiming(4, { duration: 60 }),
+        withTiming(0, { duration: 50 }),
+      ),
+    );
+  }, [error, reduced, shake]);
+  const shakeStyle = useAnimatedStyle(() => ({ transform: [{ translateX: shake.value }] }));
+
   return (
     <View style={styles.field}>
       <ThemedText variant="label" muted style={styles.label}>{label}</ThemedText>
-      {children}
+      <Animated.View style={shakeStyle}>{children}</Animated.View>
       {hint && !error && <ThemedText variant="caption" muted style={styles.label}>{hint}</ThemedText>}
-      {error && <ThemedText variant="caption" style={[styles.label, { color: theme.error }]}>{error}</ThemedText>}
+      {error && (
+        <Animated.View entering={FadeInDown.duration(Duration.fast).reduceMotion(RM)}>
+          <ThemedText variant="caption" style={[styles.label, { color: theme.error }]}>{error}</ThemedText>
+        </Animated.View>
+      )}
     </View>
   );
 }
@@ -35,9 +74,17 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
 ) {
   const theme = useTheme();
   const [focused, setFocused] = useState(false);
+  const borderStyle = useAnimatedStyle(
+    () => ({
+      borderColor: withTiming(invalid ? theme.error : focused ? theme.inputBorderFocus : theme.inputBorder, {
+        duration: Duration.fast,
+      }),
+    }),
+    [invalid, focused, theme.error, theme.inputBorderFocus, theme.inputBorder],
+  );
   return (
-    <TextInput
-      ref={ref}
+    <AnimatedTextInput
+      ref={ref as never}
       placeholderTextColor={theme.placeholder}
       multiline={multiline}
       onFocus={(e) => {
@@ -54,8 +101,8 @@ export const TextField = forwardRef<TextInput, TextInputProps & { invalid?: bool
         {
           color: theme.text,
           backgroundColor: theme.inputBackground,
-          borderColor: invalid ? theme.error : focused ? theme.inputBorderFocus : theme.inputBorder,
         },
+        borderStyle,
         style,
       ]}
       {...rest}
@@ -81,16 +128,19 @@ export function PillSelect<T extends string | number>({
       {options.map((o) => {
         const sel = o.value === value;
         return (
-          <Pressable
+          <PressableScale
             key={String(o.value)}
-            onPress={() => onChange(o.value)}
+            onPress={() => {
+              if (!sel) haptics.selection();
+              onChange(o.value);
+            }}
+            scaleTo={0.94}
             disabled={disabled}
-            style={({ pressed }) => [
+            style={[
               styles.pill,
               { borderColor: theme.border },
               sel && { backgroundColor: theme.text, borderColor: theme.text },
               disabled && { opacity: 0.5 },
-              pressed && { opacity: 0.7 },
             ]}
             accessibilityRole="button"
             accessibilityState={{ selected: sel, disabled: !!disabled }}
@@ -98,7 +148,7 @@ export function PillSelect<T extends string | number>({
             <ThemedText variant="caption" style={{ fontWeight: '700', color: sel ? theme.background : theme.text }}>
               {o.label}
             </ThemedText>
-          </Pressable>
+          </PressableScale>
         );
       })}
     </View>

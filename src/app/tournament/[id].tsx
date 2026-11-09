@@ -1,10 +1,11 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { SkeletonList, TournamentCardSkeleton } from '@/components/skeletons';
 import { ChampionsStrip } from '@/components/tournaments/ChampionsStrip';
 import { ModuleCard } from '@/components/tournaments/ModuleCard';
 import { StatusPill } from '@/components/tournaments/StatusPill';
@@ -48,7 +49,7 @@ export default function TournamentScreen() {
         }}
       />
       {loading && !detail ? (
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={TournamentCardSkeleton} count={2} style={{ padding: Spacing.md }} />
       ) : !t || !detail ? (
         <View style={styles.empty}>
           <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />

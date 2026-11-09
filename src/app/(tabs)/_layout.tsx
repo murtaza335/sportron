@@ -1,5 +1,5 @@
 import { router, Tabs, useIsFocused } from 'expo-router';
-import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Trophy, Users, X, User } from 'lucide-react-native';
+import { CalendarDays, Activity, History, MessageSquare, Plus, Trophy, Users, X, User } from 'lucide-react-native';
 import { ColorValue, Platform, Pressable, Text, View } from 'react-native';
 import Animated, {
   Easing,
@@ -14,6 +14,8 @@ import Animated, {
 import { useState, useSyncExternalStore, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedFlame, type FlameState } from '@/components/motion/AnimatedFlame';
+import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
 import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
 import { PressableScale } from '@/components/motion/PressableScale';
 import { StreakModal } from '@/components/StreakModal';
@@ -211,10 +213,13 @@ function CreateSessionButton() {
 
 function CommunitiesHeaderStreak() {
   const theme = useTheme();
-  const { streakCount, longestStreak, lastActivityDate } = useStreak();
+  const { streakCount, longestStreak, lastActivityDate, isAtRisk } = useStreak();
+  const focused = useIsFocused();
   const [modalVisible, setModalVisible] = useState(false);
   const hasStreak = streakCount > 0;
   const streakColor = hasStreak ? theme.error : theme.textSecondary;
+  const activeToday = lastActivityDate === new Date().toISOString().split('T')[0];
+  const flameState: FlameState = !hasStreak ? 'cold' : isAtRisk ? 'atRisk' : activeToday ? 'idle' : 'cold';
 
   return (
     <>
@@ -236,15 +241,8 @@ function CommunitiesHeaderStreak() {
         accessibilityLabel={`${streakCount} day streak`}
         accessibilityRole="button"
       >
-        <Flame
-          size={22}
-          color={streakColor}
-          fill={streakColor}
-          strokeWidth={0}
-        />
-        <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
-          {streakCount}
-        </Text>
+        <AnimatedFlame size={22} color={streakColor} state={flameState} count={streakCount} paused={!focused || modalVisible} />
+        <AnimatedNumber value={streakCount} style={{ fontSize: 15, fontWeight: '800', color: theme.text }} />
       </PressableScale>
 
       <StreakModal

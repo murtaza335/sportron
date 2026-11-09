@@ -1,4 +1,15 @@
+import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  LinearTransition,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSequence,
+  withTiming,
+} from 'react-native-reanimated';
+
+import { RM } from '@/lib/motion';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -7,6 +18,30 @@ import { tint } from '@/lib/tournamentFormat';
 import type { LeagueRow } from '@/types';
 
 const ROW_H = 48;
+const ROW_LAYOUT = LinearTransition.springify().reduceMotion(RM);
+
+/** A stat cell that flashes (FotMob/SofaScore style) when its value changes after first render. */
+function StatCell({ w, text, bold, dim: isDim }: { w: number; text: string | number; bold?: boolean; dim?: boolean }) {
+  const theme = useTheme();
+  const reduced = useReducedMotion();
+  const flash = useSharedValue(0);
+  const prev = useRef(text);
+  useEffect(() => {
+    if (prev.current !== text && !reduced) {
+      flash.set(withSequence(withTiming(1, { duration: 120 }), withTiming(0, { duration: 900 })));
+    }
+    prev.current = text;
+  }, [text, reduced, flash]);
+  const overlay = useAnimatedStyle(() => ({ opacity: flash.value * 0.35 }));
+  return (
+    <View style={{ width: w, alignItems: 'center', alignSelf: 'stretch', justifyContent: 'center' }}>
+      <Animated.View pointerEvents="none" style={[StyleSheet.absoluteFill, { backgroundColor: theme.accent }, overlay]} />
+      <ThemedText variant="caption" style={[bold && { fontWeight: '700' }, isDim && { color: theme.textSecondary }]}>
+        {text}
+      </ThemedText>
+    </View>
+  );
+}
 const RANK_W = 44;
 const ENTRY_W = 150;
 const STAT_W = 38;
@@ -57,11 +92,7 @@ export function LeagueTable({
   const sign = (n: number) => (n > 0 ? `+${n}` : String(n));
 
   const stat = (w: number, text: string | number, bold?: boolean, d?: boolean) => (
-    <View style={{ width: w, alignItems: 'center' }}>
-      <ThemedText variant="caption" style={[bold && { fontWeight: '700' }, d && { color: theme.textSecondary }]}>
-        {text}
-      </ThemedText>
-    </View>
+    <StatCell w={w} text={text} bold={bold} dim={d} />
   );
 
   return (
@@ -73,8 +104,8 @@ export function LeagueTable({
             <Header w={ENTRY_W} align="left">Team</Header>
           </View>
           {rows.map((r) => (
+            <Animated.View key={r.entry_id} layout={ROW_LAYOUT}>
             <Pressable
-              key={r.entry_id}
               onPress={() => onSelect(r.entry_id)}
               style={[styles.row, { backgroundColor: rowBg(r), borderColor: theme.border }]}
               accessibilityRole="button"
@@ -96,6 +127,7 @@ export function LeagueTable({
                 )}
               </View>
             </Pressable>
+            </Animated.View>
           ))}
         </View>
 
@@ -111,8 +143,8 @@ export function LeagueTable({
               {!compact && <Header w={FORM_W} align="left">Form</Header>}
             </View>
             {rows.map((r) => (
+              <Animated.View key={r.entry_id} layout={ROW_LAYOUT}>
               <Pressable
-                key={r.entry_id}
                 onPress={() => onSelect(r.entry_id)}
                 style={[styles.row, { backgroundColor: rowBg(r), borderColor: theme.border }]}
               >
@@ -130,6 +162,7 @@ export function LeagueTable({
                   </View>
                 )}
               </Pressable>
+              </Animated.View>
             ))}
           </View>
         </ScrollView>

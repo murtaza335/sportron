@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { Sheet } from '@/components/motion/Sheet';
 import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X, Sparkles } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -65,6 +66,7 @@ export default function ProfileScreen() {
   }, []);
 
   const handleNotificationsToggle = async (value: boolean) => {
+    haptics.selection();
     setNotificationsEnabled(value);
     await AsyncStorage.setItem('notifications-enabled', String(value));
 

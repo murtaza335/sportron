@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
@@ -255,6 +256,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     setActionLoading(true);
     try {
       await doAction('accepted');
+      haptics.success();
     } catch (err) {
       if (err instanceof AlreadyHandledError) {
         await dismissAlreadyHandled();
@@ -280,6 +282,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     setActionLoading(true);
     try {
       await doAction('declined');
+      haptics.warning();
     } catch (err) {
       if (err instanceof AlreadyHandledError) {
         await dismissAlreadyHandled();

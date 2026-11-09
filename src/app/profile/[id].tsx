@@ -1,12 +1,11 @@
+import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { CountUp } from '@/components/motion/CountUp';
+import { SkeletonProvider } from '@/components/motion/Skeleton';
+import { ProfileHeaderSkeleton } from '@/components/skeletons';
+import { Duration, RM, STAGGER_MS } from '@/lib/motion';
 import { router, Stack, useLocalSearchParams } from 'expo-router';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { X } from 'lucide-react-native';
 
@@ -91,7 +90,7 @@ export default function PublicProfileScreen() {
         }}
       />
       {loading ? (
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonProvider><ProfileHeaderSkeleton /></SkeletonProvider>
       ) : !profile ? (
         <View style={styles.loader}>
           <ThemedText muted>User not found</ThemedText>
@@ -99,20 +98,26 @@ export default function PublicProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headerSection}>
-            <UserAvatar avatarUrl={profile.avatar_url} size={96} style={styles.avatar} />
-            <ThemedText
-              variant="hero"
-              style={styles.username}
-              numberOfLines={2}
-              adjustsFontSizeToFit
-              minimumFontScale={0.5}
-            >
-              {profile.username}
-            </ThemedText>
-            {profile.display_name && (
-              <ThemedText variant="body" muted style={styles.displayName} numberOfLines={2}>
-                {profile.display_name}
+            <Animated.View entering={ZoomIn.springify().damping(14).reduceMotion(RM)}>
+              <UserAvatar avatarUrl={profile.avatar_url} size={96} style={styles.avatar} />
+            </Animated.View>
+            <Animated.View entering={FadeInDown.delay(STAGGER_MS).duration(Duration.base).reduceMotion(RM)}>
+              <ThemedText
+                variant="hero"
+                style={styles.username}
+                numberOfLines={2}
+                adjustsFontSizeToFit
+                minimumFontScale={0.5}
+              >
+                {profile.username}
               </ThemedText>
+            </Animated.View>
+            {profile.display_name && (
+              <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)}>
+                <ThemedText variant="body" muted style={styles.displayName} numberOfLines={2}>
+                  {profile.display_name}
+                </ThemedText>
+              </Animated.View>
             )}
           </View>
 
@@ -149,25 +154,19 @@ export default function PublicProfileScreen() {
 
               <View style={styles.statsGrid}>
                 <View style={styles.statItem}>
-                  <ThemedText variant="heading" style={styles.statValue}>
-                    {computedStats?.matches_played ?? 0}
-                  </ThemedText>
+                  <CountUp value={computedStats?.matches_played ?? 0} style={[styles.statValue, { color: theme.text, fontSize: 24, lineHeight: 30 }]} />
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Matches
                   </ThemedText>
                 </View>
                 <View style={styles.statItem}>
-                  <ThemedText variant="heading" style={styles.statValue}>
-                    {computedStats?.wins ?? 0}
-                  </ThemedText>
+                  <CountUp value={computedStats?.wins ?? 0} style={[styles.statValue, { color: theme.text, fontSize: 24, lineHeight: 30 }]} />
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Wins
                   </ThemedText>
                 </View>
                 <View style={styles.statItem}>
-                  <ThemedText variant="heading" style={styles.statValue}>
-                    {computedStats?.losses ?? 0}
-                  </ThemedText>
+                  <CountUp value={computedStats?.losses ?? 0} style={[styles.statValue, { color: theme.text, fontSize: 24, lineHeight: 30 }]} />
                   <ThemedText variant="caption" muted style={styles.statLabel}>
                     Losses
                   </ThemedText>

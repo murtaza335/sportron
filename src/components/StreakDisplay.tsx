@@ -1,7 +1,8 @@
 import { StyleSheet, View } from 'react-native';
 import { ThemedText } from '@/components/ui/Text';
 import { useTheme } from '@/hooks/use-theme';
-import { Flame } from 'lucide-react-native';
+import { AnimatedFlame } from '@/components/motion/AnimatedFlame';
+import { CountUp } from '@/components/motion/CountUp';
 import { Radius, Spacing } from '@/constants/theme';
 import type { Profile } from '@/types';
 
@@ -23,7 +24,7 @@ export function StreakDisplay({ profile, compact = false }: StreakDisplayProps) 
     <View style={[styles.container, { backgroundColor: theme.backgroundElement }]}>
       <View style={styles.header}>
         <View style={styles.iconWrapper}>
-          <Flame size={20} color={theme.tabBarActive} strokeWidth={2} fill={theme.tabBarActive} />
+          <AnimatedFlame size={20} color={theme.tabBarActive} state={hasStreak ? 'idle' : 'cold'} paused={!hasStreak} />
         </View>
         <ThemedText variant="label" style={styles.title}>
           Streak
@@ -32,15 +33,14 @@ export function StreakDisplay({ profile, compact = false }: StreakDisplayProps) 
 
       <View style={compact ? styles.compactRow : styles.mainRow}>
         <View style={styles.statColumn}>
-          <ThemedText
-            variant="hero"
+          <CountUp
+            value={streakCount}
             style={[
               styles.streakNumber,
+              { color: theme.text, fontWeight: '800' },
               compact ? { fontSize: 28, lineHeight: 34 } : { fontSize: 48, lineHeight: 56 },
             ]}
-          >
-            {streakCount}
-          </ThemedText>
+          />
           <ThemedText variant="caption" muted style={styles.streakLabel}>
             {streakCount === 1 ? 'Day' : 'Days'}
           </ThemedText>

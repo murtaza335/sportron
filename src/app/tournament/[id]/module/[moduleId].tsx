@@ -1,7 +1,7 @@
 import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +17,9 @@ import { ModuleMatchesTab } from '@/components/tournaments/ModuleMatchesTab';
 import { TournamentMatchSheet } from '@/components/tournaments/TournamentMatchSheet';
 import { ModuleInfoTab } from '@/components/tournaments/ModuleInfoTab';
 import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { SkeletonList, TournamentCardSkeleton } from '@/components/skeletons';
+import { Duration, RM } from '@/lib/motion';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
@@ -241,7 +244,7 @@ export default function ModuleScreen() {
         }}
       />
       {m.loading && !mod ? (
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={TournamentCardSkeleton} count={2} style={{ padding: Spacing.md }} />
       ) : !mod ? (
         <View style={styles.empty}>
           <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
@@ -283,6 +286,7 @@ export default function ModuleScreen() {
             </View>
           </ScrollView>
 
+          <Animated.View key={tab} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
           {tab === 'entries' && (
             <ModuleEntriesTab
               module={mod}
@@ -366,6 +370,7 @@ export default function ModuleScreen() {
           {tab === 'matches' && (
             <ModuleMatchesTab matches={m.matches} viewerId={user?.id} onSelect={(match) => setSelectedMatchId(match.id)} />
           )}
+          </Animated.View>
         </ScrollView>
       )}
 

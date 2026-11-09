@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { Sheet } from '@/components/motion/Sheet';
 import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -148,6 +149,7 @@ export function SessionDetailPopup({
     try {
       // Time-conflict check lives in commitToSession (single source of truth).
       await commitToSession(sessionId, currentUserId);
+      haptics.success();
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();
     } catch (e: any) {
@@ -180,6 +182,7 @@ export function SessionDetailPopup({
     setApprovingId(commitmentId);
     try {
       await approveCommitment(commitmentId, uid);
+      haptics.success();
       setReloadKey((k) => k + 1);
       const sessionData = await fetchSessionById(id, uid);
       setSession(sessionData);
@@ -199,6 +202,7 @@ export function SessionDetailPopup({
     setApprovingId(commitmentId);
     try {
       await rejectCommitment(commitmentId, uid);
+      haptics.warning();
       setReloadKey((k) => k + 1);
       onRefreshFeed?.();
     } catch (e) {

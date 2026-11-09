@@ -1,3 +1,8 @@
+import Animated, { FadeIn, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -78,8 +83,11 @@ export default function CommunityJoinRequestsScreen() {
     setProcessingId(request.id);
     try {
       await respondToJoinRequest(request.id, status);
+      if (status === 'approved') haptics.success();
+      else haptics.warning();
       setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to respond.');
     } finally {
       setProcessingId(null);
@@ -117,20 +125,24 @@ export default function CommunityJoinRequestsScreen() {
         }
       >
         {loading ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={NotificationRowSkeleton} count={4} style={{ padding: Spacing.md }} />
         ) : joinRequests.length === 0 ? (
-          <View style={styles.empty}>
-            <UserPlus size={40} color={theme.textSecondary} strokeWidth={1.5} />
+          <EmptyReveal style={styles.empty} icon={<UserPlus size={40} color={theme.textSecondary} strokeWidth={1.5} />}>
             <ThemedText variant="body" muted style={{ fontWeight: '600' }}>
               No pending requests
             </ThemedText>
             <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
               When someone requests to join this community, they&apos;ll show up here
             </ThemedText>
-          </View>
+          </EmptyReveal>
         ) : (
           joinRequests.map((req) => (
-            <Card key={req.id} style={styles.requestCard}>
+            <Animated.View
+              key={req.id}
+              layout={LinearTransition.springify().reduceMotion(RM)}
+              entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
+              exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
+            <Card style={styles.requestCard}>
               <View style={styles.requestInfo}>
                 <UserAvatar avatarUrl={req.profile?.avatar_url} size={36} />
                 <View style={styles.memberInfo}>
@@ -179,6 +191,7 @@ export default function CommunityJoinRequestsScreen() {
                 )}
               </View>
             </Card>
+            </Animated.View>
           ))
         )}
       </ScrollView>

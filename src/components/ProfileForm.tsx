@@ -1,6 +1,7 @@
 import * as ImagePicker from 'expo-image-picker';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { alert } from '@/lib/alert';
@@ -202,7 +203,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         <ThemedText variant="label" muted>
           Username
         </ThemedText>
-        <TextInput
+        <FocusTextInput
           value={username}
           onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
           maxLength={20}
@@ -237,7 +238,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         <ThemedText variant="label" muted>
           Bio (optional)
         </ThemedText>
-        <TextInput
+        <FocusTextInput
           value={bio}
           onChangeText={setBio}
           placeholder="A short bio"

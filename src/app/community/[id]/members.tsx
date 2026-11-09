@@ -1,3 +1,8 @@
+import Animated, { FadeOutLeft, ZoomIn } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { ChatRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM } from '@/lib/motion';
 import { Sheet } from '@/components/motion/Sheet';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
@@ -185,7 +190,7 @@ export default function CommunityMembersScreen() {
         }}
       />
       {loading ? (
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={ChatRowSkeleton} count={8} gap={0} style={{ marginTop: Spacing.md }} />
       ) : (
         <>
           <FlatList
@@ -240,7 +245,9 @@ export default function CommunityMembersScreen() {
               </>
             ) : null}
             renderItem={({ item }) => (
-              <Pressable
+              <Animated.View exiting={FadeOutLeft.duration(Duration.base).reduceMotion(RM)}>
+              <PressableScale
+                scaleTo={0.98}
                 onPress={() =>
                   router.push({
                     pathname: '/profile/[id]',
@@ -249,14 +256,11 @@ export default function CommunityMembersScreen() {
                 }
                 onLongPress={() => {
                   if (isAdmin && item.profile_id !== userId) {
+                    haptics.medium();
                     setContextMember(item);
                   }
                 }}
-                style={({ pressed }) => [
-                  styles.memberRow,
-                  { borderBottomColor: theme.border },
-                  pressed && { opacity: 0.6 },
-                ]}
+                style={[styles.memberRow, { borderBottomColor: theme.border }]}
               >
                 <UserAvatar avatarUrl={item.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
@@ -272,13 +276,16 @@ export default function CommunityMembersScreen() {
                   )}
                 </View>
                 {item.role === 'admin' && (
-                  <View style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
+                  <Animated.View
+                    entering={ZoomIn.springify().damping(12).reduceMotion(RM)}
+                    style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
                     <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin
                     </ThemedText>
-                  </View>
+                  </Animated.View>
                 )}
-              </Pressable>
+              </PressableScale>
+              </Animated.View>
             )}
             ListEmptyComponent={
               <ThemedText variant="caption" muted style={styles.empty}>

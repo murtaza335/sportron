@@ -3,6 +3,9 @@ import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import Animated, { LinearTransition } from 'react-native-reanimated';
+import { haptics } from '@/lib/haptics';
+import { Springs, RM } from '@/lib/motion';
 
 import { BottomSheet } from '@/components/tournaments/BottomSheet';
 import { PillSelect } from '@/components/tournaments/form';
@@ -71,6 +74,7 @@ export default function SeedingScreen() {
     [next[idx], next[j]] = [next[j], next[idx]];
     setOrder(next);
     setDirty(true);
+    haptics.selection();
   };
 
   const shuffleUnseeded = () => {
@@ -181,7 +185,7 @@ export default function SeedingScreen() {
 
       <View style={[styles.list, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         {order.map((o, i) => (
-          <View key={o.id} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
+          <Animated.View key={o.id} layout={LinearTransition.springify().damping(Springs.snappy.damping).stiffness(Springs.snappy.stiffness).reduceMotion(RM)} style={[styles.row, i > 0 && { borderTopWidth: 1, borderTopColor: theme.border }]}>
             <View style={[styles.seed, { backgroundColor: theme.backgroundSelected }]}>
               <ThemedText variant="caption" style={{ fontWeight: '700' }}>{i + 1}</ThemedText>
             </View>
@@ -197,7 +201,7 @@ export default function SeedingScreen() {
                 </Pressable>
               </View>
             )}
-          </View>
+          </Animated.View>
         ))}
       </View>
 
