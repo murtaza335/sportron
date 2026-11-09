@@ -118,6 +118,7 @@ export default function CommunityDetailScreen() {
   const [matchesPage, setMatchesPage] = useState(1);
   const [hasMoreMatches, setHasMoreMatches] = useState(false);
   const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [matchPopupVisible, setMatchPopupVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
@@ -851,8 +852,17 @@ export default function CommunityDetailScreen() {
         }}
         refreshControl={
           <RefreshControl
-            refreshing={loading}
-            onRefresh={() => { refresh(); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
+            refreshing={pullRefreshing}
+            onRefresh={async () => {
+              setPullRefreshing(true);
+              setMatchesPage(1);
+              setHasMoreMatches(false);
+              try {
+                await Promise.all([refresh(), refreshPosts(), loadMatches(1)]);
+              } finally {
+                setPullRefreshing(false);
+              }
+            }}
             tintColor={theme.text}
           />
         }

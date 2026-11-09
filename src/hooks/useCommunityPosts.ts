@@ -51,11 +51,11 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
     }
   }, [communityId, userId]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setPage(1);
     setHasMore(false);
     setRefreshing(true);
-    loadPosts(1);
+    await loadPosts(1);
   }, [loadPosts]);
 
   const loadMore = useCallback(async () => {
