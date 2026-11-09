@@ -113,15 +113,21 @@ export default function SettingsScreen() {
             <View style={styles.settingContent}>
               <ThemedText variant="body">Push Notifications</ThemedText>
               <ThemedText variant="caption" muted>
-                {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                {Platform.OS === 'web'
+                  ? 'Alerts are delivered to the Sportron Android app'
+                  : notificationsEnabled
+                    ? 'Enabled'
+                    : 'Disabled'}
               </ThemedText>
             </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleMasterToggle}
-              trackColor={{ false: theme.borderMuted, true: theme.accent }}
-              thumbColor={theme.background}
-            />
+            {Platform.OS !== 'web' && (
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={handleMasterToggle}
+                trackColor={{ false: theme.borderMuted, true: theme.accent }}
+                thumbColor={theme.background}
+              />
+            )}
           </View>
         </Card>
 
