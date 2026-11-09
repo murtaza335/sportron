@@ -2,7 +2,7 @@ import { LikeButton } from '@/components/motion/LikeButton';
 import { useRouter } from 'expo-router';
 import { MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
@@ -13,6 +13,7 @@ import { alert } from '@/lib/alert';
 import { formatRelativeTime } from '@/lib/date';
 import { deleteCommunityPost, toggleCommunityPostLike } from '@/services/communities';
 import type { CommunityPost } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 type PostCardProps = {
   post: CommunityPost;
@@ -116,7 +117,7 @@ export function PostCard({
         <View style={styles.mediaAndTextWrapper}>
           <View style={styles.photoContainer}>
             {!imageLoaded && !imageError && <View style={styles.imagePlaceholder} />}
-            <Image
+            <FadeImage
               source={{ uri: post.image_url }}
               style={styles.postImage}
               onLoad={() => setImageLoaded(true)}

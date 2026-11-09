@@ -8,7 +8,7 @@ import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-nat
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Image } from 'react-native';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -22,6 +22,7 @@ import {
   deleteCommunityPost,
 } from '@/services/communities';
 import type { CommunityPost, CommunityPostComment } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 type PostDetailPopupProps = {
   post: CommunityPost | null;
@@ -161,7 +162,7 @@ export function PostDetailPopup({
         <View style={styles.photoContainer}>
           {!imageLoaded && !imageError && <View style={styles.imagePlaceholder} />}
           <DoubleTapLike liked={liked} onLike={handleLike}>
-            <Image
+            <FadeImage
               source={{ uri: post.image_url }}
               style={styles.postImage}
               onLoad={() => setImageLoaded(true)}

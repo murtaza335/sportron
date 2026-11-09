@@ -1,7 +1,7 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -17,6 +17,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
 import { formatDateRange, tournamentStatusTone } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 export default function TournamentScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -71,7 +72,7 @@ export default function TournamentScreen() {
 
           <View style={[styles.cover, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
             {t.image_url ? (
-              <Image source={{ uri: t.image_url }} style={styles.coverImage} resizeMode="cover" />
+              <FadeImage source={{ uri: t.image_url }} style={styles.coverImage} resizeMode="cover" />
             ) : (
               <Trophy size={40} color={theme.textSecondary} strokeWidth={1.5} />
             )}

@@ -16,7 +16,7 @@ import {
   User,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { Button } from '@/components/ui/Button';
@@ -28,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import {
   deleteCommunity,
   fetchCommunityMembers,
@@ -41,6 +42,7 @@ import {
 import { fetchProfile } from '@/services/profiles';
 import type { CommunityMember, Profile } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 export default function CommunityInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -128,7 +130,7 @@ export default function CommunityInfoScreen() {
     try {
       if (isRestricted) {
         await requestToJoinCommunity(id, user.id);
-        alert('Request Sent', 'The admin will review your request.');
+        toast('Request sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
         setMembership({
@@ -287,7 +289,7 @@ export default function CommunityInfoScreen() {
         {/* Cover Image */}
         {community.image_url ? (
           <View style={styles.coverContainer}>
-            <Image source={{ uri: community.image_url }} style={styles.coverImage} resizeMode="cover" />
+            <FadeImage source={{ uri: community.image_url }} style={styles.coverImage} resizeMode="cover" />
             <View style={[styles.coverOverlay, { backgroundColor: theme.background }]} />
           </View>
         ) : (

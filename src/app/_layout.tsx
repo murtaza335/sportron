@@ -19,6 +19,7 @@ import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
+import { ToastHost } from '@/components/motion/Toast';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -151,6 +152,7 @@ function RootNavigator() {
         <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
       <ConfettiHost />
+      <ToastHost />
     </KeyboardInsetView>
     );
   }

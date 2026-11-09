@@ -12,6 +12,7 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { bestOfLabel, formatMatchTime } from '@/lib/tournamentFormat';
 import { updateRound } from '@/services/tournaments';
@@ -101,7 +102,7 @@ function RoundRow({
         scheduled_start: start ? start.toISOString() : null,
       });
       await onSaved();
-      alert('Saved', `${name.trim()} updated.`);
+      toast('Saved', `${name.trim()} updated.`);
     } catch (e) {
       alert('Something went wrong', friendlyTournamentError(e));
     } finally {

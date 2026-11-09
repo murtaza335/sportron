@@ -1,5 +1,17 @@
-import { useCallback, useRef } from 'react';
-import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback } from 'react';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  interpolateColor,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { Duration, Springs } from '@/lib/motion';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -23,74 +35,44 @@ export default function CommunitiesScreen() {
   const { communities, loading, refreshing, refresh } = useMyCommunities(user?.id);
   const firstLoad = useFirstLoad(loading);
 
-  const rotateAnim = useRef(new Animated.Value(0));
-  const colorAnim = useRef(new Animated.Value(0));
-  const iconScaleAnim = useRef(new Animated.Value(1));
+  const rotate = useSharedValue(0);
+  const colorStep = useSharedValue(0);
+  const iconScale = useSharedValue(1);
+  const reduced = useReducedMotion();
 
+  // One-time attention intro on focus: spin + colour cycle, then the plus compresses and releases.
   useFocusEffect(
     useCallback(() => {
-      rotateAnim.current.setValue(0);
-      colorAnim.current.setValue(0);
-      iconScaleAnim.current.setValue(1);
-
+      rotate.set(0);
+      colorStep.set(0);
+      iconScale.set(1);
+      if (reduced) return;
       const timer = setTimeout(() => {
-        Animated.parallel([
-          Animated.timing(rotateAnim.current, {
-            toValue: 1,
-            duration: 1000,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: false,
-          }),
-          Animated.sequence([
-            Animated.timing(colorAnim.current, {
-              toValue: 1, // #3B82F6 Electric Blue
-              duration: 250,
-              useNativeDriver: false,
-            }),
-            Animated.timing(colorAnim.current, {
-              toValue: 2, // #06B6D4 Neon Cyan
-              duration: 250,
-              useNativeDriver: false,
-            }),
-            Animated.timing(colorAnim.current, {
-              toValue: 3, // #10B981 Bright Green
-              duration: 250,
-              useNativeDriver: false,
-            }),
-            Animated.timing(colorAnim.current, {
-              toValue: 4, // Back to base theme.text
-              duration: 250,
-              useNativeDriver: false,
-            }),
-          ]),
-        ]).start(() => {
-          // Compress & release effect on Plus icon after 1 round cycle finishes
-          Animated.sequence([
-            Animated.timing(iconScaleAnim.current, {
-              toValue: 0.75, // Compress
-              duration: 120,
-              easing: Easing.inOut(Easing.quad),
-              useNativeDriver: false,
-            }),
-            Animated.timing(iconScaleAnim.current, {
-              toValue: 1.15, // Release bounce
-              duration: 150,
-              easing: Easing.out(Easing.back(1.5)),
-              useNativeDriver: false,
-            }),
-            Animated.timing(iconScaleAnim.current, {
-              toValue: 1.0, // Settle
-              duration: 100,
-              easing: Easing.out(Easing.quad),
-              useNativeDriver: false,
-            }),
-          ]).start();
-        });
+        rotate.set(withTiming(1, { duration: Duration.celebrate + 100, easing: Easing.out(Easing.cubic) }));
+        colorStep.set(withTiming(4, { duration: Duration.celebrate + 100, easing: Easing.linear }));
+        iconScale.set(
+          withDelay(
+            Duration.celebrate + 100,
+            withSequence(
+              withTiming(0.75, { duration: Duration.instant }),
+              withSpring(1, Springs.bouncy),
+            ),
+          ),
+        );
       }, 600);
-
       return () => clearTimeout(timer);
-    }, [])
+    }, [rotate, colorStep, iconScale, reduced]),
   );
+
+  const fabStyle = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(
+      colorStep.value,
+      [0, 1, 2, 3, 4],
+      [theme.text, theme.accent, theme.info, theme.success, theme.text],
+    ),
+    transform: [{ rotate: `${rotate.value * 360}deg` }],
+  }));
+  const iconStyle = useAnimatedStyle(() => ({ transform: [{ scale: iconScale.value }] }));
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -126,27 +108,7 @@ export default function CommunitiesScreen() {
       </ScrollView>
 
       {/* Animated floating action button without glow */}
-      <Animated.View
-        style={[
-          styles.fab,
-          {
-            // eslint-disable-next-line react-hooks/refs
-            backgroundColor: colorAnim.current.interpolate({
-              inputRange: [0, 1, 2, 3, 4],
-              outputRange: [theme.text, theme.accent, theme.info, theme.success, theme.text],
-            }),
-            transform: [
-              {
-                // eslint-disable-next-line react-hooks/refs
-                rotate: rotateAnim.current.interpolate({
-                  inputRange: [0, 1],
-                  outputRange: ['0deg', '360deg'],
-                }),
-              },
-            ],
-          },
-        ]}
-      >
+      <Animated.View style={[styles.fab, fabStyle]}>
         <Pressable
           onPress={() => router.push('/discover')}
           style={({ pressed }) => [styles.fabPressable, pressed && { opacity: 0.7, transform: [{ scale: 0.92 }] }]}
@@ -154,8 +116,7 @@ export default function CommunitiesScreen() {
           accessibilityLabel="Discover communities"
           accessibilityRole="button"
         >
-          {/* eslint-disable-next-line react-hooks/refs */}
-          <Animated.View style={{ transform: [{ scale: iconScaleAnim.current }] }}>
+          <Animated.View style={iconStyle}>
             <Plus size={34} color={theme.background} strokeWidth={3} />
           </Animated.View>
         </Pressable>

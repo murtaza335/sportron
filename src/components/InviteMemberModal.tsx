@@ -5,7 +5,7 @@ import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 're
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, UserCheck, UserPlus, X } from 'lucide-react-native';
 
-import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -128,7 +128,7 @@ export function InviteMemberModal({
     try {
       await inviteMemberByUsername(communityId, adminId, profile.username);
       setInvitedIds((prev) => new Set(prev).add(profile.id));
-      alert('Invite Sent', `Invitation sent to @${profile.username}`);
+      toast('Invite sent', `Invitation sent to @${profile.username}`);
       onSuccess();
       onClose();
     } catch (err) {

@@ -44,6 +44,7 @@ import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
 import { useCommunityPosts } from '@/hooks/useCommunityPosts';
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { supabase } from '@/lib/supabase';
 import {
   fetchCommunityMatchById,
@@ -717,7 +718,7 @@ export default function CommunityDetailScreen() {
       setPingMessage('');
       setShowPingModal(false);
       haptics.success();
-      alert('Ping Sent', 'Notification sent to all members.');
+      toast('Ping sent', 'Notification sent to all members.');
     } catch (e: any) {
       haptics.error();
       alert('Error', e?.message ?? 'Failed to send ping.');
@@ -735,7 +736,7 @@ export default function CommunityDetailScreen() {
       if (community?.visibility === 'restricted') {
         await requestToJoinCommunity(id, user.id);
         haptics.success();
-        alert('Request Sent', 'The admin will review your request.');
+        toast('Request sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
         haptics.success();

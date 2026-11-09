@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, Image, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, Users } from 'lucide-react-native';
@@ -24,6 +24,7 @@ import { useChats } from '@/hooks/useChats';
 import { useTheme } from '@/hooks/use-theme';
 import type { Community, Session } from '@/types';
 import { formatSessionPurpose, SPORT_LABELS } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 type ChatTab = 'communities' | 'sessions';
 
@@ -76,7 +77,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
     >
       {isCommunity && row.community.image_url ? (
         <View style={styles.avatarWrap}>
-          <Image source={{ uri: row.community.image_url }} style={styles.avatar} resizeMode="cover" />
+          <FadeImage source={{ uri: row.community.image_url }} style={styles.avatar} resizeMode="cover" />
         </View>
       ) : (
         <View
