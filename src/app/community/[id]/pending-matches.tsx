@@ -1,4 +1,6 @@
-import Animated, { FadeIn, FadeOutRight } from 'react-native-reanimated';
+import Animated, { FadeOutRight } from 'react-native-reanimated';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
@@ -23,6 +25,7 @@ export default function PendingMatchesScreen() {
   const { user } = useAuth();
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useFirstLoad(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [matchPopupVisible, setMatchPopupVisible] = useState(false);
@@ -165,12 +168,12 @@ export default function PendingMatchesScreen() {
           </EmptyReveal>
         ) : (
           <View style={styles.list}>
-            {matches.map((match) => (
+            {matches.map((match, index) => (
               <Animated.View
                 key={match.id}
                 layout={LayoutShift}
-                entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
                 exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
+                <FadeInItem index={index} animate={firstLoad}>
                 <MatchCard
                   match={toMatchWithProfiles(match)}
                   currentUserId={user?.id}
@@ -178,6 +181,7 @@ export default function PendingMatchesScreen() {
                   communityId={id}
                   onPress={() => handleMatchPress(match)}
                 />
+                </FadeInItem>
               </Animated.View>
             ))}
           </View>
