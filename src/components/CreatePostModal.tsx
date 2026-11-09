@@ -3,7 +3,6 @@ import { useRouter } from 'expo-router';
 import { Image as ImageIcon, Trophy, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
 import {
-  Alert,
   Image,
   Modal,
   Platform,
@@ -16,6 +15,7 @@ import {
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/ui/Card';
+import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -78,13 +78,13 @@ export function CreatePostModal({
     if (initialTab === 'write') {
       content = textContent.trim();
       if (!content) {
-        Alert.alert('Empty Post', 'Please write something before posting.');
+        alert('Empty Post', 'Please write something before posting.');
         return;
       }
       postType = 'text';
     } else if (initialTab === 'photo') {
       if (!selectedImage) {
-        Alert.alert('No Photo', 'Please select a photo first.');
+        alert('No Photo', 'Please select a photo first.');
         return;
       }
       content = textContent.trim();
@@ -103,7 +103,7 @@ export function CreatePostModal({
         imageUrl = url;
       } catch (error) {
         console.error('Image upload failed:', error);
-        Alert.alert('Upload Failed', 'Failed to upload image. Please try again.');
+        alert('Upload Failed', 'Failed to upload image. Please try again.');
         setUploading(false);
         return;
       }
@@ -127,7 +127,7 @@ export function CreatePostModal({
       onRefreshFeed?.();
     } catch (error) {
       console.error('Failed to create post:', error);
-      Alert.alert('Error', 'Failed to create post. Please try again.');
+      alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setSubmitting(false);
     }
@@ -136,7 +136,7 @@ export function CreatePostModal({
   const pickImage = async () => {
     const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'We need access to your photos to upload images.');
+      alert('Permission Required', 'We need access to your photos to upload images.');
       return;
     }
 

@@ -1,13 +1,14 @@
 import { useRouter } from 'expo-router';
 import { Heart, MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { alert } from '@/lib/alert';
 import { formatRelativeTime } from '@/lib/date';
 import { deleteCommunityPost, toggleCommunityPostLike } from '@/services/communities';
 import type { CommunityPost } from '@/types';
@@ -78,7 +79,7 @@ export function PostCard({
 
   const handleDelete = async () => {
     if (!currentUserId) return;
-    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+    alert('Delete Post', 'Are you sure you want to delete this post?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -88,7 +89,7 @@ export function PostCard({
             await deleteCommunityPost(post.id, currentUserId);
           } catch (error) {
             console.error('Failed to delete post:', error);
-            Alert.alert('Error', 'Failed to delete post');
+            alert('Error', 'Failed to delete post');
           }
         },
       },

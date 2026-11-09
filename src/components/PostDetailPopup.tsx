@@ -1,7 +1,7 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { X, Edit, Camera, Trophy, Megaphone, Plus, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
+import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   Keyboard,
@@ -187,7 +187,7 @@ export function PostDetailPopup({
     } catch (error) {
       console.error('Failed to add comment:', error);
       setCommentText(content);
-      Alert.alert('Error', 'Failed to post comment');
+      alert('Error', 'Failed to post comment');
     } finally {
       setSendingComment(false);
     }
@@ -195,7 +195,7 @@ export function PostDetailPopup({
 
   const handleDelete = async () => {
     if (!currentUserId || !post) return;
-    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+    alert('Delete Post', 'Are you sure you want to delete this post?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -207,7 +207,7 @@ export function PostDetailPopup({
             onRefreshFeed?.();
           } catch (error) {
             console.error('Failed to delete post:', error);
-            Alert.alert('Error', 'Failed to delete post');
+            alert('Error', 'Failed to delete post');
           }
         },
       },
