@@ -11,6 +11,8 @@ import Constants from 'expo-constants';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/Button';
+import { ThemedText } from '@/components/ui/Text';
 import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
@@ -24,7 +26,7 @@ function RootNavigator() {
   const theme = useTheme();
   const router = useRouter();
   const segments = useSegments();
-  const { session, profile, loading, profileLoading } = useAuth();
+  const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
 
@@ -58,7 +60,9 @@ function RootNavigator() {
       return;
     }
 
-    if (session && !profile && segments[0] !== 'onboarding') {
+    // Only a SUCCESSFUL fetch that returned no profile means "new user". A failed fetch
+    // (offline / 5xx) shows a retry screen below instead of sending the user to onboarding.
+    if (session && !profile && !profileError && segments[0] !== 'onboarding') {
       router.replace('/onboarding');
       return;
     }
@@ -66,11 +70,22 @@ function RootNavigator() {
     if (session && profile && inAuthGroup) {
       router.replace('/');
     }
-  }, [session, profile, loading, profileLoading, segments, router]);
+  }, [session, profile, loading, profileLoading, profileError, segments, router]);
 
   if (!fontsLoaded || loading || showSplash) {
     return (
       <AnimatedSplashScreen onComplete={() => setShowSplash(false)} />
+    );
+  }
+
+  if (session && !profile && profileError) {
+    return (
+      <View style={[styles.container, styles.retryContainer, { backgroundColor: theme.background }]}>
+        <ThemedText variant="body" style={{ textAlign: 'center', marginBottom: 16 }}>
+          Could not load your profile. Check your connection and try again.
+        </ThemedText>
+        <Button label="Retry" onPress={() => { refreshProfile(); }} loading={profileLoading} />
+      </View>
     );
   }
 
@@ -423,6 +438,11 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  retryContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
   loader: {
     flex: 1,
