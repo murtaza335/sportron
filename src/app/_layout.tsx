@@ -18,6 +18,7 @@ import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
 import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { Duration } from '@/lib/motion';
@@ -187,6 +188,7 @@ function RootNavigator() {
       </Stack>
       <ConfettiHost />
       <ToastHost />
+      {Platform.OS === 'web' && session && profile && <InstallPrompt />}
     </KeyboardInsetView>
     );
   }

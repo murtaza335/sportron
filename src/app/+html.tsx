@@ -28,6 +28,14 @@ export default function Root({ children }: PropsWithChildren) {
         <meta property="og:description" content="Organise pick-up sports, track matches and join tournaments with your communities." />
         <meta property="og:image" content="/icon-512.png" />
 
+        {/* beforeinstallprompt fires before React mounts: stash it for <InstallPrompt /> */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "window.addEventListener('beforeinstallprompt',function(e){e.preventDefault();window.__bip=e;window.dispatchEvent(new Event('bip-ready'));});",
+          }}
+        />
+
         <ScrollViewStyleReset />
       </head>
       <body>{children}</body>

@@ -1,6 +1,6 @@
 import { haptics } from '@/lib/haptics';
 import { Sheet } from '@/components/motion/Sheet';
-import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X, Sparkles } from 'lucide-react-native';
+import { Bell, Check, Cog, Moon, Palette, Pencil, Sun, X, Sparkles } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -44,7 +44,6 @@ export default function ProfileScreen() {
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
-  const [dismissedWebPrompt, setDismissedWebPrompt] = useState(false);
 
   // Mark profile dot as viewed when screen is focused
   useFocusEffect(
@@ -53,15 +52,6 @@ export default function ProfileScreen() {
     }, [])
   );
 
-  // Detect web platform and OS
-  const isWeb = Platform.OS === 'web';
-  const isIOSWeb = isWeb && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
-  const isAndroidWeb = isWeb && typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
-  const isStandalone =
-    isWeb &&
-    typeof window !== 'undefined' &&
-    (window.matchMedia?.('(display-mode: standalone)').matches || (navigator as any).standalone === true);
-  const showWebPrompt = isWeb && (isIOSWeb || isAndroidWeb) && !isStandalone && !dismissedWebPrompt;
 
   useEffect(() => {
     AsyncStorage.getItem('notifications-enabled').then((val) => {
@@ -150,53 +140,6 @@ export default function ProfileScreen() {
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Spacing.xxl + Math.max(insets.bottom, 56) }]}>
-        {showWebPrompt && (
-          <View style={[styles.webPrompt, { backgroundColor: isIOSWeb ? theme.text : '#3B82F6' }]}>
-            <View style={styles.webPromptContent}>
-              {isIOSWeb ? (
-                <>
-                  <Globe size={24} color={theme.background} />
-                  <View style={styles.webPromptText}>
-                    <ThemedText variant="body" style={{ color: theme.background, fontWeight: '600' }}>
-                      Add to Home Screen for the best experience
-                    </ThemedText>
-                    <ThemedText variant="caption" style={{ color: theme.background, opacity: 0.9 }}>
-                      Tap the share button and select &ldquo;Add to Home Screen&rdquo; to install Sportron like an app. Then enable notifications in Settings to never miss a match or ping.
-                    </ThemedText>
-                  </View>
-                </>
-              ) : (
-                <>
-                  <Download size={24} color={theme.background} />
-                  <View style={styles.webPromptText}>
-                    <ThemedText variant="body" style={{ color: theme.background, fontWeight: '600' }}>
-                      Download the app for the full experience
-                    </ThemedText>
-                    <ThemedText variant="caption" style={{ color: theme.background, opacity: 0.9 }}>
-                      Get push notifications, offline access, and native performance with our mobile app.
-                    </ThemedText>
-                    <Pressable
-                      onPress={() => { if (typeof window !== 'undefined') window.location.href = '/android'; }}
-                      style={({ pressed }) => [styles.webPromptLink, pressed && { opacity: 0.7 }]}
-                      hitSlop={8}
-                    >
-                      <ThemedText variant="caption" style={{ color: theme.background, textDecorationLine: 'underline' }}>
-                        Get it on Google Play
-                      </ThemedText>
-                    </Pressable>
-                  </View>
-                </>
-              )}
-              <Pressable
-                onPress={() => setDismissedWebPrompt(true)}
-                style={({ pressed }) => [styles.webPromptDismiss, pressed && { opacity: 0.6 }]}
-                hitSlop={8}
-              >
-                <X size={18} color={theme.background} />
-              </Pressable>
-            </View>
-          </View>
-        )}
         {!editing ? (
           <View style={styles.summary}>
             <View style={styles.avatarContainer}>
@@ -497,33 +440,6 @@ const styles = StyleSheet.create({
   modalOptionContent: {
     flexDirection: 'row',
     alignItems: 'center',
-  },
-  webPrompt: {
-    borderRadius: Radius.lg,
-    padding: Spacing.md,
-    marginBottom: Spacing.sm,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 0,
-  },
-  webPromptContent: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    gap: Spacing.md,
-  },
-  webPromptText: {
-    flex: 1,
-    gap: Spacing.xs,
-  },
-  webPromptDismiss: {
-    marginTop: 2,
-    padding: Spacing.xs,
-  },
-  webPromptLink: {
-    marginTop: Spacing.xs,
-    paddingTop: Spacing.xs,
   },
   whatsNewSection: {
     borderRadius: Radius.lg,
