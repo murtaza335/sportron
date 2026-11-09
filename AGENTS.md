@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 119 (next = 120) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 121 (next = 122) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -368,7 +368,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **120**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **122**
 
 ### Server-side hardening (migrations 098–119 — see `bugreport.md`)
 - **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.
@@ -383,6 +383,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Primitives in `src/components/motion/`: `PressableScale`, `FadeInItem` (first-load stagger only), `Skeleton*` (one shared pulse via `SkeletonProvider`), `AnimatedNumber`, `AnimatedBadge`, `Collapsible`, `ScreenFadeIn`, `Confetti` (`celebrate()` + `<ConfettiHost/>` in root layout), `Toast` (`toast(title, msg?)` + `<ToastHost/>` in root layout — non-blocking feedback only; confirmations stay `alert()`), `FadeImage` (content images).
 - Haptics via `src/lib/haptics.ts` (no-op on web): selection = tab/segment/chip change; light = like/send/FAB/refresh; medium = long-press/swipe threshold; success = approve/record/join; warning = destructive/dispute; error = failed action.
 - **Shadow rule**: in-flow surfaces (cards, stat rows, chips) are **flat on Android** (`elevation: 0`; `Shadows.*.card` already is) because Android elevation ignores parent opacity and ghosts as a dark box during fade transitions. Keep `elevation` only for floating UI that never fades with a screen (FAB, Toast, chat popovers, modal cards, tab bump).
+- **Sheets** (`motion/Sheet.tsx`): handle Android keyboard padding themselves; drag down anywhere dismisses (use `SheetScrollView` for scrollable bodies so the list scrolls first). **Image pickers** go through `lib/pickImage.ts`. **Chats tab badge** is refreshed by `useChatUnreadWatcher` + `lib/chatUnreadRefresh.ts`. **Tips** live in `lib/tips.ts` + `<TipCard id=…/>`.
 - Reduced motion is mandatory (`useReducedMotion()` / `.reduceMotion(RM)`): no stagger/overshoot/loops.
 
 ### Routing (expo-router v57)
