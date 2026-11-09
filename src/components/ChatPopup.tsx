@@ -17,6 +17,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
+  AppState,
   FlatList,
   GestureResponderEvent,
   Modal,
@@ -128,6 +129,13 @@ export function ChatPopup<T extends ChatMessageBase>({
   } = chat;
 
   const [draft, setDraft] = useState('');
+  // App foreground state: presence must stop while the app is backgrounded (Android keeps JS
+  // timers alive), otherwise the server believes the user is reading and suppresses pushes.
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => setAppActive(next === 'active'));
+    return () => sub.remove();
+  }, []);
   const draftRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [inputHeight, setInputHeight] = useState(40);
@@ -195,7 +203,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   // and skips pushing them. Cleaned up (row deleted) on close or on signing
   // out; if the app dies abruptly the row goes stale and the TTL kicks in.
   useEffect(() => {
-    if (!visible || hasLeft || !chatType || !chatId) return;
+    if (!visible || !appActive || hasLeft || !chatType || !chatId) return;
     const userId = profile?.id;
     if (!userId) return;
 
@@ -213,7 +221,7 @@ export function ChatPopup<T extends ChatMessageBase>({
         console.error('Failed to clear chat presence:', e),
       );
     };
-  }, [visible, hasLeft, chatType, chatId, profile?.id]);
+  }, [visible, appActive, hasLeft, chatType, chatId, profile?.id]);
 
   // Positions the list exactly once on open. Inverted list → offset 0 IS the
   // bottom, and the list starts there by default, so the "caught up" case needs
