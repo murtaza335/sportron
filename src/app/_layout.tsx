@@ -20,6 +20,7 @@ import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
+import { WebRefreshButton } from '@/components/WebRefreshButton';
 import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
@@ -188,6 +189,7 @@ function RootNavigator() {
       </Stack>
       <ConfettiHost />
       <ToastHost />
+      {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
       {Platform.OS === 'web' && session && profile && <InstallPrompt />}
     </KeyboardInsetView>
     );

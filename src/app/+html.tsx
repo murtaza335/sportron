@@ -37,6 +37,8 @@ export default function Root({ children }: PropsWithChildren) {
         />
 
         <ScrollViewStyleReset />
+        {/* Stop the phone browser's pull-down gesture from reloading the whole app */}
+        <style dangerouslySetInnerHTML={{ __html: 'html,body{overscroll-behavior-y:contain}' }} />
       </head>
       <body>{children}</body>
     </html>
