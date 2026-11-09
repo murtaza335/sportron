@@ -45,6 +45,7 @@ import { SPORT_LABELS } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
 import { goBack } from '@/lib/nav';
 import type { Href } from 'expo-router';
+import { webContextMenuProps } from '@/lib/webMenu';
 
 export default function CommunityInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -274,6 +275,15 @@ export default function CommunityInfoScreen() {
     );
   }
 
+  const openMemberMenu = (member: (typeof displayMembers)[number]) => {
+    if (!isAdmin || member.profile_id === user?.id) return;
+    alert(member.profile?.username || 'Member', undefined, [
+      { text: 'Make Admin', onPress: () => handleMakeAdmin(member) },
+      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(member) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <Stack.Screen options={{ title: '', ...themedHeader }} />
@@ -413,26 +423,8 @@ export default function CommunityInfoScreen() {
                 }
                 style={({ pressed }) => [styles.memberRow, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
                 hitSlop={8}
-                onLongPress={() => {
-                  if (isAdmin && member.profile_id !== user?.id) {
-                    alert(
-                      member.profile?.username || 'Member',
-                      undefined,
-                      [
-                        {
-                          text: 'Make Admin',
-                          onPress: () => handleMakeAdmin(member),
-                        },
-                        {
-                          text: 'Remove',
-                          style: 'destructive',
-                          onPress: () => handleRemove(member),
-                        },
-                        { text: 'Cancel', style: 'cancel' },
-                      ],
-                    );
-                  }
-                }}
+                {...webContextMenuProps(() => openMemberMenu(member))}
+                onLongPress={() => openMemberMenu(member)}
               >
                 <UserAvatar avatarUrl={member.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>

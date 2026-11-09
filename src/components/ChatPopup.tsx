@@ -19,6 +19,7 @@ import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal'
 import { SwipeToReply } from '@/components/motion/SwipeToReply';
 import { haptics } from '@/lib/haptics';
 import { enterToSend, isFinePointer } from '@/lib/webKeys';
+import { webContextMenuProps } from '@/lib/webMenu';
 import { Duration, RM, Springs, LayoutShift } from '@/lib/motion';
 import { BlurView } from 'expo-blur';
 import {
@@ -721,6 +722,9 @@ const contextLayout = useMemo(() => {
         <Pressable
           onLongPress={(e) => handleLongPress(item, e)}
           onPress={(e) => handleMessagePress(item, e)}
+          {...webContextMenuProps((e) => {
+            setContextMenu({ message: item, x: e.pageX, y: e.pageY });
+          })}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -1065,7 +1069,8 @@ const contextLayout = useMemo(() => {
                   placeholder={isFinePointer() && canSend ? `${placeholder} · Enter to send, Shift+Enter for new line` : placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
-                  onKeyPress={enterToSend(handleSend, () => {
+                  onKeyPress={(e) =>
+                    enterToSend(handleSend, () => {
                     if (editingMessage) {
                       cancelEditing();
                       return true;
@@ -1075,7 +1080,8 @@ const contextLayout = useMemo(() => {
                       return true;
                     }
                     return false;
-                  })}
+                  })(e)
+                  }
                   multiline
                   maxLength={1000}
                   style={[

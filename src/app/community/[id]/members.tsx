@@ -5,7 +5,7 @@ import { haptics } from '@/lib/haptics';
 import { Duration, RM } from '@/lib/motion';
 import { Sheet } from '@/components/motion/Sheet';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Ellipsis } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
@@ -27,6 +27,7 @@ import {
 import type { CommunityInvite, CommunityMember } from '@/types';
 import { goBack } from '@/lib/nav';
 import type { Href } from 'expo-router';
+import { webContextMenuProps } from '@/lib/webMenu';
 
 export default function CommunityMembersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -262,6 +263,9 @@ export default function CommunityMembersScreen() {
                     setContextMember(item);
                   }
                 }}
+                {...webContextMenuProps(() => {
+                  if (isAdmin && item.profile_id !== userId) setContextMember(item);
+                })}
                 style={[styles.memberRow, { borderBottomColor: theme.border }]}
               >
                 <UserAvatar avatarUrl={item.profile?.avatar_url} size={40} />
@@ -285,6 +289,15 @@ export default function CommunityMembersScreen() {
                       Admin
                     </ThemedText>
                   </Animated.View>
+                )}
+                {Platform.OS === 'web' && isAdmin && item.profile_id !== userId && (
+                  <Pressable
+                    onPress={() => setContextMember(item)}
+                    hitSlop={8}
+                    accessibilityLabel="Member actions"
+                    style={({ pressed }) => [{ padding: Spacing.xs, marginLeft: Spacing.xs }, pressed && { opacity: 0.6 }]}>
+                    <Ellipsis size={20} color={theme.textSecondary} />
+                  </Pressable>
                 )}
               </PressableScale>
               </Animated.View>
