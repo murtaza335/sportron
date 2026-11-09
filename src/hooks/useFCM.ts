@@ -22,7 +22,7 @@ import {
   NotificationData,
 } from '@/services/fcm';
 import { scheduleChatUnreadRefresh } from '@/lib/chatUnreadRefresh';
-import { requestPushPermissionAndGetToken, setupWebForegroundHandler, setupWebTokenRefreshListener } from '@/utils/pushNotifications';
+import { setupWebForegroundHandler, setupWebTokenRefreshListener } from '@/utils/pushNotifications';
 
 async function isNotificationsEnabled(): Promise<boolean> {
   const val = await AsyncStorage.getItem('notifications-enabled');
@@ -216,8 +216,8 @@ export function useFCM() {
 
     try {
       if (Platform.OS === 'web') {
-        // Web: set up foreground handler and token refresh listener
-        const pushEnabled = await isNotificationsEnabled();
+        // Web push is turned off (W5): nothing is requested, saved or listened for on web.
+        const pushEnabled = false as boolean;
         if (pushEnabled) {
           // On iOS Safari, permission might be 'default' - we need to request it
           if (Notification.permission === 'default') {
@@ -345,11 +345,8 @@ export function useFCM() {
     setIsLoading(true);
     try {
       if (Platform.OS === 'web') {
-        const token = await requestPushPermissionAndGetToken();
-        if (token) {
-          await saveFCMTokenToProfile(user.id, token);
-          await refreshProfile();
-        }
+        // Web push is turned off: alerts are delivered to the Android app (see docs/WEB-PARITY-PLAN.md, W5).
+        return;
       } else {
         const fcmToken = await registerForPushNotificationsAsync();
         if (fcmToken) {

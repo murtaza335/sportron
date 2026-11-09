@@ -22,6 +22,8 @@ import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
 import { WebRefreshButton } from '@/components/WebRefreshButton';
 import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
+import { removeFCMToken } from '@/services/profiles';
+import { removeWebPushToken } from '@/utils/pushNotifications';
 import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
@@ -133,6 +135,29 @@ function RootNavigator() {
       router.replace(consumeReturnTo() ?? '/');
     }
   }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
+
+  // Web push is turned off (W5): once per browser, remove any push token saved by an earlier version
+  // so a shared computer never keeps receiving a previous user's notifications.
+  const userId = session?.user?.id;
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (window.localStorage.getItem('web-push-cleaned') === '1') return;
+        const found = await removeWebPushToken();
+        if (cancelled) return;
+        if (found?.token) await removeFCMToken(userId, found.token);
+        await found?.finish();
+        window.localStorage.setItem('web-push-cleaned', '1');
+      } catch {
+        // best-effort; retried on the next load
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
 
   const appReady = fontsLoaded && !loading;
   const splash = showSplash ? <AnimatedSplashScreen ready={appReady} onComplete={handleSplashComplete} /> : null;
