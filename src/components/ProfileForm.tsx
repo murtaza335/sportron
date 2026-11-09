@@ -26,6 +26,8 @@ type ProfileFormProps = {
 const RING_RADIUS = 52;
 const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
+const USERNAME_PATTERN = /^[a-z0-9._-]{3,20}$/;
+
 export function ProfileForm({
   initialName = '',
   initialBio = '',
@@ -46,17 +48,20 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const value = username.trim().toLowerCase();
   const isOwnUsername = !!excludeUsername && value === excludeUsername.trim().toLowerCase();
 
-  const checking = value.length > 0 && !isOwnUsername && checked?.value !== value;
+  // 3-20 chars of a-z 0-9 . _ - ; the user's existing (legacy) username is always accepted.
+  const formatValid = isOwnUsername || USERNAME_PATTERN.test(value);
+
+  const checking = value.length > 0 && formatValid && !isOwnUsername && checked?.value !== value;
   const taken = checked?.value === value && checked.status === 'taken';
   const available = isOwnUsername || (checked?.value === value && checked.status === 'available');
-  const canSubmit = value.length > 0 && available && !uploadingAvatar;
+  const canSubmit = value.length > 0 && formatValid && available && !uploadingAvatar;
 
   useEffect(() => {
     const currentValue = username.trim().toLowerCase();
     const isOwn = !!excludeUsername && currentValue === excludeUsername.trim().toLowerCase();
 
     const timer = setTimeout(async () => {
-      if (!currentValue || isOwn) {
+      if (!currentValue || isOwn || !USERNAME_PATTERN.test(currentValue)) {
         setChecked(null);
         return;
       }
@@ -199,7 +204,8 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         </ThemedText>
         <TextInput
           value={username}
-          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+          maxLength={20}
           placeholder="Your username"
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text, borderColor: theme.border }]}
@@ -208,7 +214,11 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           autoComplete="off"
           accessibilityLabel="Username"
         />
-        {checking ? (
+        {value.length > 0 && !formatValid ? (
+          <ThemedText variant="caption" style={{ color: theme.error }}>
+            Use 3-20 characters: lowercase letters, numbers, dots, dashes or underscores.
+          </ThemedText>
+        ) : checking ? (
           <ThemedText variant="caption" muted>
             Checking availability…
           </ThemedText>
@@ -231,6 +241,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           value={bio}
           onChangeText={setBio}
           placeholder="A short bio"
+          maxLength={300}
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.border }]}
           multiline
