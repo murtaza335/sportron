@@ -97,7 +97,7 @@ We retain your information only as long as necessary to:
 - Preserve your community memberships, session and match history, and statistics that you wish to keep.
 - Comply with legal, regulatory, tax, accounting, or security requirements.
 
-**If you delete your account:** You may delete your account at any time from Profile → Settings → **"Delete Account"**. On deletion, we will erase your account credentials, stored content you contributed, and personal profile data under our control, subject to any legal obligations or backup retention. Content you posted in shared spaces (such as comments or matches) may be retained where other members rely on it or where legally required.
+**If you delete your account:** You may delete your account at any time from Profile → Settings → **"Delete Account"**. This deactivates your account and removes your profile photo, bio, notification settings and device push tokens. Your username and content you contributed to shared spaces (such as matches, posts, comments and chat messages) remain visible to other members, and signing in again reactivates your account. To request complete erasure of your account and personal data, contact us using the details in Section 1; we will process it subject to any legal obligations or backup retention.
 
 ---
 

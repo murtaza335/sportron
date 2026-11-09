@@ -62,7 +62,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = () => {
     alert(
       'Delete Account',
-      'This will permanently erase all your data except your name on existing matches. You can sign in again to re-activate your account.',
+      'Your profile photo, bio and notification settings will be removed and your account will be deactivated. Your username, messages, posts and match history remain visible to other members. Signing in again reactivates your account. To request full erasure of your data, email zorozlabs@gmail.com.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
