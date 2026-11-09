@@ -1,5 +1,5 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
-import { X, Edit, Camera, Trophy, Megaphone, Plus, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { X, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -20,9 +20,7 @@ import Animated, {
   useAnimatedStyle,
   withSpring,
   withTiming,
-  interpolate,
   runOnJS,
-  Extrapolate,
 } from 'react-native-reanimated';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -105,19 +103,19 @@ export function PostDetailPopup({
     setLiked(post.is_liked_by_user ?? false);
     setLikesCount(post.likes_count ?? 0);
     loadComments();
-    translateY.value = 0;
-  }, [visible, post, loadComments]);
+    translateY.set(0);
+  }, [visible, post, loadComments, translateY]);
 
   const animateClose = () => {
-    translateY.value = withTiming(400, { duration: 200 }, (finished) => {
+    translateY.set(withTiming(400, { duration: 200 }, (finished) => {
       if (finished) {
         runOnJS(onClose)();
       }
-    });
+    }));
   };
 
   const animateOpen = () => {
-    translateY.value = withSpring(0, { damping: 20, stiffness: 150 });
+    translateY.set(withSpring(0, { damping: 20, stiffness: 150 }));
   };
 
   const scrollToComments = () => {
@@ -144,7 +142,7 @@ export function PostDetailPopup({
       if (!isDragging.value) return;
       const translationY = e.translationY;
       if (translationY > 0) {
-        translateY.value = translationY;
+        translateY.set(translationY);
       }
     })
     .onEnd((e) => {

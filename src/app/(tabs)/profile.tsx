@@ -2,7 +2,7 @@ import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X, Spark
 import { useEffect, useMemo, useState } from 'react';
 import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { useFocusEffect } from 'expo-router';
+import { router, useFocusEffect } from 'expo-router';
 
 import { alert } from '@/lib/alert';
 import { ProfileForm } from '@/components/ProfileForm';
@@ -19,7 +19,6 @@ import { removeFCMToken, updateNotificationPreferences, updateProfile } from '@/
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
-import { router } from 'expo-router';
 import { WHATS_NEW_CONTENT } from '@/lib/whatsNew';
 
 const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
