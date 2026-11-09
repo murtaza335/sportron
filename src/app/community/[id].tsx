@@ -115,6 +115,10 @@ export default function CommunityDetailScreen() {
   const [matchesPage, setMatchesPage] = useState(1);
   const [hasMoreMatches, setHasMoreMatches] = useState(false);
   const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
+  // First page of matches still in flight. Posts and matches load separately, so the feed waits for both
+  // before the first reveal (otherwise matches pop in and reshuffle already-rendered posts).
+  const [matchesInitialLoading, setMatchesInitialLoading] = useState(true);
+  const [feedReady, setFeedReady] = useState(false);
   const [pullRefreshing, setPullRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [matchPopupVisible, setMatchPopupVisible] = useState(false);
@@ -168,6 +172,7 @@ export default function CommunityDetailScreen() {
     } finally {
       loadingMoreMatchesRef.current = false;
       setLoadingMoreMatches(false);
+      if (!append && page === 1) setMatchesInitialLoading(false);
     }
   }, [id, user]);
 
@@ -360,13 +365,14 @@ export default function CommunityDetailScreen() {
 
   // Not memoised by hand: the React Compiler is enabled, and a manual useMemo here previously
   // went stale because it omitted theme / id / user / handlers from its dependencies (BUG-M4).
-  const firstFeedLoad = useFirstLoad(postsLoading);
+  if (!feedReady && !postsLoading && !matchesInitialLoading) setFeedReady(true);
+  const firstFeedLoad = useFirstLoad(!feedReady);
   const [fabHidden, setFabHidden] = useState(false);
   const fabHiddenRef = useRef(false);
   const lastScrollY = useRef(0);
 
   const feedContent = (() => {
-    if (postsLoading && combinedFeed.length === 0) {
+    if (!feedReady) {
       return <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />;
     }
     if (combinedFeed.length > 0) {

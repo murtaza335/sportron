@@ -25,9 +25,10 @@ type Props = {
 export function AnimatedBadge({ count, visible = true, color, size, style }: Props) {
   const theme = useTheme();
   const reduced = useReducedMotion();
-  const scale = useSharedValue(visible ? 1 : 0);
-  const lastCount = useRef(count);
   const shown = visible && (count === undefined || count > 0);
+  // start hidden when there is nothing to show, so zero-count badges never flash on mount
+  const scale = useSharedValue(shown ? 1 : 0);
+  const lastCount = useRef(count);
 
   useEffect(() => {
     if (reduced) {
