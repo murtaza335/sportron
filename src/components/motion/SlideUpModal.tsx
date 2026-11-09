@@ -1,5 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
-import { Dimensions, Modal, StyleSheet, View } from 'react-native';
+import { Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
@@ -13,7 +13,6 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { haptics } from '@/lib/haptics';
 import { Duration, Springs } from '@/lib/motion';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DragContext = createContext<GestureType | null>(null);
 
 /** Wrap a header (or any region) so dragging it down dismisses the surrounding SlideUpModal. */
@@ -27,6 +26,7 @@ type Props = { visible: boolean; onClose: () => void; children: ReactNode };
 
 /** Full-screen modal that springs up from the bottom and can be swiped down from a `SlideUpDragZone`. */
 export function SlideUpModal({ visible, onClose, children }: Props) {
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const reduced = useReducedMotion();
   const [mounted, setMounted] = useState(visible);
   if (visible && !mounted) setMounted(true);
@@ -57,7 +57,7 @@ export function SlideUpModal({ visible, onClose, children }: Props) {
         }
       }),
     );
-  }, [finish, onClose, translateY]);
+  }, [finish, onClose, translateY, SCREEN_HEIGHT]);
 
   const pan = Gesture.Pan()
     .activeOffsetY(10)

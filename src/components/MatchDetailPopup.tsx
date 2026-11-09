@@ -6,7 +6,7 @@ import { Sheet } from '@/components/motion/Sheet';
 import { AlertTriangle, Calendar, Check, Clock, Globe, Lock, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { Divider } from '@/components/ui/Card';
@@ -25,7 +25,6 @@ import {
 import type { CommunityMatchComment, MatchWithProfiles, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type MatchDetailPopupProps = {
   match: MatchWithProfiles | null;
@@ -64,6 +63,7 @@ export function MatchDetailPopup({
   communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
 
   const [comments, setComments] = useState<CommunityMatchComment[]>([]);
@@ -280,7 +280,7 @@ export function MatchDetailPopup({
             </View>
 
             <ScrollView
-              style={styles.scroll}
+              style={[styles.scroll, { maxHeight: windowHeight * 0.5 }]}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -517,7 +517,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexShrink: 1,
-    maxHeight: SCREEN_HEIGHT * 0.5,
   },
   scrollContent: {
     paddingVertical: Spacing.xs,

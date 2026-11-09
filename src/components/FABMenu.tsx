@@ -1,6 +1,6 @@
 import { Camera, Edit, Megaphone, Plus, Trophy } from 'lucide-react-native';
 import { useCallback, useEffect, useState, type ComponentType } from 'react';
-import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -41,7 +41,6 @@ const FAB_SIZE = 56;
 const FAB_RADIUS = 28;
 const ITEM_STAGGER = 40;
 
-const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 type ItemDef = {
   icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
@@ -217,8 +216,6 @@ export function FABMenu({
 const styles = StyleSheet.create({
   fabBackdrop: {
     ...StyleSheet.absoluteFill,
-    width: SCREEN_WIDTH,
-    height: SCREEN_HEIGHT,
     zIndex: 199,
   },
   dim: {

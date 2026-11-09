@@ -2,7 +2,7 @@ import { haptics } from '@/lib/haptics';
 import { Sheet } from '@/components/motion/Sheet';
 import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Dimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, useWindowDimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
@@ -25,7 +25,6 @@ import {
 } from '@/services/sessions';
 import type { Commitment, Session } from '@/types';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type SessionDetailPopupProps = {
   sessionId: string | null;
@@ -62,6 +61,7 @@ export function SessionDetailPopup({
   onRefreshFeed,
 }: SessionDetailPopupProps) {
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
 
   const [session, setSession] = useState<Session | null>(() => initialSession as Session | null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -324,7 +324,7 @@ export function SessionDetailPopup({
           </View>
 
           <ScrollView
-            style={styles.scroll}
+            style={[styles.scroll, { maxHeight: windowHeight * 0.5 }]}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
@@ -760,7 +760,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 0,
-    maxHeight: SCREEN_HEIGHT * 0.5,
   },
   scrollContent: {
     paddingBottom: Spacing.md,

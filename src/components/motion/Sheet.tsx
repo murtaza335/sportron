@@ -1,9 +1,9 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
 import {
-  Dimensions,
   Modal,
   Platform,
   Pressable,
+  useWindowDimensions,
   ScrollView,
   type ScrollViewProps,
   StyleSheet,
@@ -32,7 +32,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
 import { Duration, Springs } from '@/lib/motion';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 const DISMISS_FRACTION = 0.25;
 const DISMISS_VELOCITY = 800;
 const BACKDROP_MAX = 0.5;
@@ -96,6 +95,7 @@ export type SheetProps = {
  */
 export function Sheet({ visible, onClose, children, height, maxHeight = '85%', flush, style, avoidKeyboard = true, onClosed }: SheetProps) {
   const theme = useTheme();
+  const { height: SCREEN_HEIGHT } = useWindowDimensions();
   const reduced = useReducedMotion();
   const [mounted, setMounted] = useState(visible);
   if (visible && !mounted) setMounted(true);
@@ -129,7 +129,7 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
         translateY.set(withSpring(SCREEN_HEIGHT, Springs.sheet, done));
       }
     },
-    [finishClose, reduced, translateY],
+    [finishClose, reduced, translateY, SCREEN_HEIGHT],
   );
 
   // Open / programmatic close driven by `visible`.
