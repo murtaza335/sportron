@@ -456,28 +456,6 @@ export async function removeMember(
   }
 }
 
-export async function transferAdmin(
-  communityId: string,
-  currentUserId: string,
-  newAdminId: string,
-): Promise<void> {
-  const { error: demoteError } = await supabase
-    .from('community_members')
-    .update({ role: 'member' })
-    .eq('community_id', communityId)
-    .eq('profile_id', currentUserId);
-
-  if (demoteError) throw demoteError;
-
-  const { error: promoteError } = await supabase
-    .from('community_members')
-    .update({ role: 'admin' })
-    .eq('community_id', communityId)
-    .eq('profile_id', newAdminId);
-
-  if (promoteError) throw promoteError;
-}
-
 export async function fetchJoinRequests(
   communityId: string,
 ): Promise<CommunityJoinRequest[]> {
@@ -603,21 +581,6 @@ export async function sendPing(
   }
 
   return ping.id;
-}
-
-export async function fetchPings(communityId: string): Promise<Ping[]> {
-  const { data, error } = await supabase
-    .from('pings')
-    .select(`
-      *,
-      sender:sender_id(id, username)
-    `)
-    .eq('community_id', communityId)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (error) throw error;
-  return data ?? [];
 }
 
 export async function recordCommunityMatch(input: {

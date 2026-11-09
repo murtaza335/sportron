@@ -24,7 +24,6 @@ import { useSessionChat } from '@/hooks/useSessionChat';
 import { supabase } from '@/lib/supabase';
 import {
   approveCommitment,
-  checkTimeConflicts,
   commitToSession,
   deleteSession,
   fetchSessionById,
@@ -206,17 +205,7 @@ export function SessionDetailPopup({
     if (!currentUserId || !sessionId) return;
     setJoining(true);
     try {
-      const conflicts = await checkTimeConflicts(currentUserId, session!.date_time);
-      const otherConflicts = conflicts.filter((c) => c.id !== sessionId);
-      if (otherConflicts.length > 0) {
-        alert(
-          'Time Conflict',
-          `You have a conflicting session within ±30 minutes:\n\n${otherConflicts
-            .map((c) => `• ${c.purpose} at ${new Date(c.date_time).toLocaleString()}`)
-            .join('\n')}`,
-        );
-        return;
-      }
+      // Time-conflict check lives in commitToSession (single source of truth).
       await commitToSession(sessionId, currentUserId);
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();

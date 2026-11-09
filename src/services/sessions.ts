@@ -416,52 +416,6 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
   }
 }
 
-export async function fetchUserSessions(
-  userId: string,
-): Promise<Session[]> {
-  await closeExpiredSessions(userId);
-
-  const { data: committedRows, error: committedError } = await supabase
-    .from('commitments')
-    .select('session_id')
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
-
-  if (committedError) throw committedError;
-
-  const committedIds = (committedRows ?? []).map((c) => c.session_id);
-
-  let query = supabase
-    .from('sessions')
-    .select(`
-      *,
-      commitments:commitments (id, user_id, status)
-    `);
-
-  if (committedIds.length > 0) {
-    query = query.or(
-      `created_by.eq.${userId},and(status.in.(open,full),id.in.(${committedIds.join(',')}))`,
-    );
-  } else {
-    query = query.eq('created_by', userId);
-  }
-
-  const { data, error } = await query.order('date_time', { ascending: true });
-
-  if (error) throw error;
-
-  const sessions = data ?? [];
-  const [countMap, creatorMap] = await Promise.all([
-    fetchAcceptedCounts(sessions.map((s) => s.id)),
-    resolveCreatorProfiles(sessions),
-  ]);
-
-  return sessions.map((row) => {
-    const enriched = { ...row, creator: creatorMap.get(row.created_by) ?? null };
-    return normalizeSession(enriched as SessionRow, userId, countMap[row.id] ?? 0);
-  });
-}
-
 export async function deleteSession(sessionId: string, userId: string): Promise<void> {
   // Check if any accepted commitments exist
   const { count, error: countError } = await supabase
