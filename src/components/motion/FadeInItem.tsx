@@ -1,6 +1,6 @@
 import type { ReactNode } from 'react';
 import type { StyleProp, ViewStyle } from 'react-native';
-import Animated, { FadeIn, FadeInDown } from 'react-native-reanimated';
+import Animated, { FadeIn } from 'react-native-reanimated';
 
 import { Duration, RM, STAGGER_MAX_ITEMS, STAGGER_MS, LayoutShift } from '@/lib/motion';
 
@@ -31,7 +31,7 @@ export function FadeInItem({ index, animate, lateFade, style, children }: Props)
   return (
     <Animated.View
       style={style}
-      entering={FadeInDown.delay(index * STAGGER_MS).duration(Duration.base).withInitialValues({ opacity: 0, transform: [{ translateY: 8 }] }).reduceMotion(RM)}>
+      entering={FadeIn.delay(index * STAGGER_MS).duration(Duration.base).reduceMotion(RM)}>
       {children}
     </Animated.View>
   );
