@@ -28,6 +28,7 @@ import {
 import type { CreateSessionInput, SessionPurpose } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 import { goBack } from '@/lib/nav';
+import { HScrollView } from '@/components/HScrollView';
 
 function combineDateAndTime(date: Date, time: Date): Date {
   return new Date(
@@ -211,7 +212,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Purpose
             </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purposePicker}>
+            <HScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purposePicker}>
               {SESSION_PURPOSES.map((p) => {
                 const selected = p === purpose;
                 return (
@@ -240,7 +241,7 @@ export default function CreateSessionScreen() {
                   </PressableScale>
                 );
               })}
-            </ScrollView>
+            </HScrollView>
             {purpose === null && (
               <ThemedText variant="caption" muted style={styles.hintText}>
                 Select a purpose
@@ -450,7 +451,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Duration
             </ThemedText>
-            <ScrollView
+            <HScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.expireRow}
@@ -483,7 +484,7 @@ export default function CreateSessionScreen() {
                   </ThemedText>
                 </PressableScale>
               ))}
-            </ScrollView>
+            </HScrollView>
           </View>
 
           <View style={styles.field}>

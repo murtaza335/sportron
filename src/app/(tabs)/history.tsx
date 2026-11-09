@@ -27,6 +27,7 @@ import type { Session, SessionStatus } from '@/types';
 import { formatSessionPurpose, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 import { fetchPendingFeedbackSessions, getRemainingTime } from '@/services/sessions';
 import type { PendingFeedbackSession } from '@/services/sessions';
+import { HScrollView } from '@/components/HScrollView';
 
 function formatSessionDate(dateString: string) {
   const date = new Date(dateString);
@@ -292,7 +293,7 @@ export default function SessionsScreen() {
       <View style={styles.container}>
         {!isHistory && (
           <View style={styles.filterBar}>
-            <ScrollView
+            <HScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsRow}
@@ -331,7 +332,7 @@ export default function SessionsScreen() {
                   strokeWidth={2.5}
                 />
               </Pressable>
-            </ScrollView>
+            </HScrollView>
           </View>
         )}
 

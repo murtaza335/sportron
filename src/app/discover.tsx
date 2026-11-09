@@ -22,6 +22,7 @@ import { useCommunities } from '@/hooks/useCommunities';
 import { fetchMyCommunityMemberships } from '@/services/communities';
 import type { CommunityMemberRole, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 const ALL_SPORTS = Object.keys(SPORT_LABELS) as Sport[];
 
@@ -133,7 +134,7 @@ export default function DiscoverScreen() {
             autoCorrect={false}
           />
         </Animated.View>
-        <ScrollView
+        <HScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
@@ -199,7 +200,7 @@ export default function DiscoverScreen() {
               </ThemedText>
             </PressableScale>
           ))}
-        </ScrollView>
+        </HScrollView>
       </View>
 
       <ScrollView

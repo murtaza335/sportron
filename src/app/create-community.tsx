@@ -20,6 +20,7 @@ import { createCommunity } from '@/services/communities';
 import type { CommunityVisibility, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 import { goBack } from '@/lib/nav';
+import { HScrollView } from '@/components/HScrollView';
 
 export default function CreateCommunityScreen() {
   const theme = useTheme();
@@ -250,7 +251,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Sport
             </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
+            <HScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
               {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
                 'football', 'cricket', 'volleyball', 'handball', 'basketball',
                 'other'] as Sport[]).map((s) => {
@@ -282,7 +283,7 @@ export default function CreateCommunityScreen() {
                   </PressableScale>
                 );
               })}
-            </ScrollView>
+            </HScrollView>
           </View>
 
           <View style={styles.field}>

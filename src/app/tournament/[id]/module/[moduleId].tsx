@@ -36,6 +36,7 @@ import { Button } from '@/components/ui/Button';
 import { entryNoun, formatLine, formatMatchTime, moduleStatusTone, pointsHint, sportLabel } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import type { TournamentEntry, TournamentFormat, TournamentMatch } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 type Tab = 'bracket' | 'standings' | 'matches' | 'entries' | 'info' | 'table' | 'groups';
 
@@ -302,11 +303,11 @@ export default function ModuleScreen() {
             )}
           </View>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
+          <HScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ width: tabsWidth }}>
               <SegmentedControl options={tabsFor(mod.format)} value={tab} onChange={setUserTab} compact />
             </View>
-          </ScrollView>
+          </HScrollView>
 
           <Animated.View key={tab} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
           {tab === 'entries' && (

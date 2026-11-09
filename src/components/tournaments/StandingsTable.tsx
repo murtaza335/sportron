@@ -1,5 +1,5 @@
 import { Trophy } from 'lucide-react-native';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 
 import { LayoutShift } from '@/lib/motion';
@@ -9,6 +9,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tint } from '@/lib/tournamentFormat';
 import type { TournamentStanding } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const reorder = LayoutShift;
@@ -86,7 +87,7 @@ export function StandingsTable({
         </View>
 
         {/* scrollable stats */}
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+        <HScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
           <View>
             <View style={[styles.headRow, { borderColor: theme.border }]}>
               <Header w={STAT_W}>P</Header>
@@ -124,7 +125,7 @@ export function StandingsTable({
               </AnimatedPressable>
             ))}
           </View>
-        </ScrollView>
+        </HScrollView>
       </View>
       <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
         P played · W won · L lost · +/- score difference

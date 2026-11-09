@@ -1,6 +1,6 @@
 import { Swords } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { TournamentMatchRow } from '@/components/tournaments/TournamentMatchRow';
 import { ThemedText } from '@/components/ui/Text';
@@ -8,6 +8,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { matchSectionKey, matchSectionOrder, matchSectionTitle } from '@/lib/tournamentFormat';
 import type { TournamentMatch } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 type Filter = 'all' | 'upcoming' | 'results';
 
@@ -86,7 +87,7 @@ export function ModuleMatchesTab({
       </View>
 
       {groupLetters.length > 1 && (
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+        <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
           {['all', ...groupLetters].map((l) => {
             const sel = l === groupFilter;
             return (
@@ -107,7 +108,7 @@ export function ModuleMatchesTab({
               </Pressable>
             );
           })}
-        </ScrollView>
+        </HScrollView>
       )}
 
       {sections.length === 0 ? (

@@ -1,5 +1,5 @@
 import { useEffect, useRef } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
   useReducedMotion,
@@ -15,6 +15,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { tint } from '@/lib/tournamentFormat';
 import type { LeagueRow } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 const ROW_H = 48;
 const ROW_LAYOUT = LayoutShift;
@@ -130,7 +131,7 @@ export function LeagueTable({
           ))}
         </View>
 
-        <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
+        <HScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flex: 1 }}>
           <View>
             <View style={[styles.headRow, { borderColor: theme.border }]}>
               <Header w={STAT_W}>P</Header>
@@ -164,7 +165,7 @@ export function LeagueTable({
               </Animated.View>
             ))}
           </View>
-        </ScrollView>
+        </HScrollView>
       </View>
       <ThemedText variant="caption" muted style={{ marginTop: Spacing.xs }}>
         P played · {hideDraws ? 'W won · L lost' : 'W won · D drawn · L lost'} · Pts points{pointsHint ? ` (${pointsHint})` : ''}

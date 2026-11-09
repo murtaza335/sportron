@@ -11,6 +11,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { HEADER_H, layoutTree, NODE_W } from '@/lib/bracketLayout';
 import { roundHeader, tint } from '@/lib/tournamentFormat';
 import type { ModuleStatus, TournamentMatch } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 export function BracketView({
   matches,
@@ -119,7 +120,7 @@ export function BracketView({
         </ThemedText>
       )}
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
+      <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.pills}>
         {layout.columns.map((c) => {
           const info = roundInfo.get(c.round);
           return (
@@ -133,9 +134,9 @@ export function BracketView({
             </Pressable>
           );
         })}
-      </ScrollView>
+      </HScrollView>
 
-      <ScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator>
+      <HScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator>
         <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
           <View style={{ width: layout.width, height: layout.height, marginRight: Spacing.md }}>
             {layout.columns.map((c) => {
@@ -177,7 +178,7 @@ export function BracketView({
             })}
           </View>
         </ScrollView>
-      </ScrollView>
+      </HScrollView>
     </View>
   );
 }

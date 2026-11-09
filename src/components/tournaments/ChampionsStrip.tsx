@@ -1,6 +1,6 @@
 import { Trophy } from 'lucide-react-native';
 import { useEffect } from 'react';
-import { ScrollView, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 import Animated, { Easing, useAnimatedStyle, useReducedMotion, useSharedValue, withDelay, withTiming } from 'react-native-reanimated';
 
 import { celebrate } from '@/components/motion/Confetti';
@@ -14,6 +14,7 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { sportLabel } from '@/lib/tournamentFormat';
 import type { TournamentChampion } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 /** One-shot gold sweep across a champion card. */
 function GoldSweep({ delay }: { delay: number }) {
@@ -61,7 +62,7 @@ export function ChampionsStrip({
   if (champions.length === 0) return null;
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
+    <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.row}>
       {champions.map((c, i) => (
         <PressableScale
           key={c.module_id}
@@ -94,7 +95,7 @@ export function ChampionsStrip({
           )}
         </PressableScale>
       ))}
-    </ScrollView>
+    </HScrollView>
   );
 }
 
