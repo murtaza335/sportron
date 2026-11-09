@@ -211,6 +211,31 @@ function buildMessage(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Notification preferences (profiles.notification_preferences)
+// ---------------------------------------------------------------------------
+// Mirrors DEFAULT_NOTIFICATION_PREFERENCES in src/types/index.ts. A missing key means
+// "enabled" so older stored preference blobs keep working. The in-app master toggle writes
+// every key to false; that is treated as "push off" for ALL pushes, including chat (chat has
+// no per-type key).
+export type NotificationPrefs = Record<string, unknown> | null | undefined;
+
+export function pushPrefKeyFor(type: string): string {
+  return type.startsWith('tournament_') ? 'tournament_updates' : type;
+}
+
+export function isMasterPushOff(prefs: NotificationPrefs): boolean {
+  if (!prefs || typeof prefs !== 'object') return false;
+  const values = Object.values(prefs).filter((v) => typeof v === 'boolean');
+  return values.length > 0 && values.every((v) => v === false);
+}
+
+export function isPushAllowed(prefs: NotificationPrefs, type: string): boolean {
+  if (!prefs || typeof prefs !== 'object') return true;
+  if (isMasterPushOff(prefs)) return false;
+  return (prefs as Record<string, unknown>)[pushPrefKeyFor(type)] !== false;
+}
+
 // Sends to many tokens in one fan-out. `tokenRows` carries a per-token body
 // (chat pushes have a per-recipient accumulated-unread body); it is used for
 // both the Android/`notification` payload and the iOS `aps.alert` payload.
