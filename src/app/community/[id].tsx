@@ -707,9 +707,15 @@ export default function CommunityDetailScreen() {
 
   useEffect(() => {
     if (!pingCooldownUntil) return;
-    const interval = setInterval(() => setNowTs(Date.now()), 1000);
+    const until = pingCooldownUntil.getTime();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setNowTs(now);
+      // Stop ticking once the cooldown is over.
+      if (now >= until) clearInterval(interval);
+    }, 1000);
     return () => clearInterval(interval);
-  }, [pingCooldownUntil, nowTs]);
+  }, [pingCooldownUntil]);
 
   const cooldownRemainingMs = pingCooldownUntil
     ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
