@@ -103,6 +103,7 @@ export default function CommunityInfoScreen() {
 
   const isMember = !!membership;
   const isAdmin = membership?.role === 'admin';
+  const isCreator = !!user && community?.created_by === user.id;
   const isRestricted = community?.visibility === 'restricted';
 
   const sortedMembers = useMemo(
@@ -533,19 +534,21 @@ export default function CommunityInfoScreen() {
                   </ThemedText>
                   <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
                 </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
-                  onPress={handleDelete}
-                  hitSlop={8}
-                >
-                  <Trash2 size={20} color={theme.error} strokeWidth={2} />
-                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
-                    Delete Community
-                  </ThemedText>
-                </Pressable>
+                {isCreator && (
+                  <Pressable
+                    style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
+                    onPress={handleDelete}
+                    hitSlop={8}
+                  >
+                    <Trash2 size={20} color={theme.error} strokeWidth={2} />
+                    <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
+                      Delete Community
+                    </ThemedText>
+                  </Pressable>
+                )}
               </>
             )}
-            {!isAdmin && (
+            {!isCreator && (
               <Pressable
                 style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                 onPress={handleLeave}

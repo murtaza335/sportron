@@ -245,10 +245,11 @@ export async function updateCommunity(
   if (input.image_url !== undefined) updates.image_url = input.image_url;
   if (input.pings_enabled !== undefined) updates.pings_enabled = input.pings_enabled;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .update(updates)
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) {
     if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
@@ -256,28 +257,41 @@ export async function updateCommunity(
     }
     throw error;
   }
+  // RLS filters blocked updates silently (0 rows, no error) - surface that.
+  if (!data || data.length === 0) {
+    throw new Error('You do not have permission to edit this community.');
+  }
 }
 
 export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
   await requireCommunityAdmin(communityId);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .update({ pings_enabled: enabled })
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('You do not have permission to change this setting.');
+  }
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
   await requireCommunityAdmin(communityId);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .delete()
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) throw error;
+  // Only the creator can delete (RLS); a blocked delete returns 0 rows without an error.
+  if (!data || data.length === 0) {
+    throw new Error('Only the creator can delete this community.');
+  }
 }
 
 export async function fetchCommunityMembers(communityId: string): Promise<CommunityMember[]> {
@@ -412,26 +426,34 @@ export async function cancelJoinRequest(communityId: string, userId: string): Pr
 }
 
 export async function leaveCommunity(communityId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .delete()
     .eq('community_id', communityId)
-    .eq('profile_id', userId);
+    .eq('profile_id', userId)
+    .select('profile_id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('You are not a member of this community.');
+  }
 }
 
 export async function removeMember(
   communityId: string,
   profileId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .delete()
     .eq('community_id', communityId)
-    .eq('profile_id', profileId);
+    .eq('profile_id', profileId)
+    .select('profile_id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Could not remove this member. You may not have permission.');
+  }
 }
 
 export async function transferAdmin(
@@ -778,13 +800,17 @@ export async function promoteToAdmin(
   targetUserId: string,
   actorId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .update({ role: 'admin' })
     .eq('community_id', communityId)
-    .eq('profile_id', targetUserId);
+    .eq('profile_id', targetUserId)
+    .select('profile_id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Could not promote this member. You may not have permission.');
+  }
 }
 
 export async function inviteMemberByUsername(
