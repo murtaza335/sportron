@@ -251,7 +251,6 @@ export default function CommunityDetailScreen() {
     };
   }, [id, user]);
 
-  const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
   const pendingFromFeed = matches.filter(
     (m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id),
   );
@@ -303,7 +302,7 @@ export default function CommunityDetailScreen() {
   );
 
   const combinedFeed = useMemo(() => {
-    const feedItems: Array<{ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles }> = [];
+    const feedItems: ({ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles })[] = [];
     const approvedMatches = matches.filter((m) => m.approval_status !== 'pending');
 
     // Posts and matches paginate independently. While a source still has older pages, items
@@ -344,26 +343,24 @@ export default function CommunityDetailScreen() {
       .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime());
   }, [posts, matches, hasMorePosts, hasMoreMatches, toMatchWithProfiles]);
 
-  const feedContent = useMemo(() => {
+  const handlePostPress = (post: CommunityPost) => {
+    setSelectedPost(post);
+    setPostPopupVisible(true);
+  };
+
+  const handleMatchPress = (match: MatchWithProfiles) => {
+    setSelectedMatch(match);
+    setMatchPopupVisible(true);
+  };
+
+  // Not memoised by hand: the React Compiler is enabled, and a manual useMemo here previously
+  // went stale because it omitted theme / id / user / handlers from its dependencies (BUG-M4).
+  const feedContent = (() => {
     // Inline styles for skeleton loader
     const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
     const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
     const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
     const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
-
-    // Caught up card styles
-    const caughtUpCardStyle = {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-      gap: Spacing.sm,
-      padding: Spacing.lg,
-      marginTop: Spacing.md,
-      borderRadius: Radius.lg,
-      backgroundColor: theme.success + '15',
-      borderWidth: 1,
-      borderColor: theme.success,
-    };
 
     if (postsLoading && combinedFeed.length === 0) {
       return (
@@ -640,7 +637,7 @@ export default function CommunityDetailScreen() {
       );
     }
     return null;
-  }, [combinedFeed, postsLoading, loadingMorePosts, loadingMoreMatches, hasMorePosts, hasMoreMatches]);
+  })();
 
   // Auto-open match detail when navigating from a notification tap
   useEffect(() => {
@@ -765,16 +762,6 @@ export default function CommunityDetailScreen() {
 
   const handleCreatePostClose = () => {
     setCreatePostModalVisible(false);
-  };
-
-  const handlePostPress = (post: CommunityPost) => {
-    setSelectedPost(post);
-    setPostPopupVisible(true);
-  };
-
-  const handleMatchPress = (match: MatchWithProfiles) => {
-    setSelectedMatch(match);
-    setMatchPopupVisible(true);
   };
 
   const headerRight = () => null;
