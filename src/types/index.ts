@@ -285,6 +285,10 @@ export type Community = {
   pings_enabled: boolean;
   member_count?: number;
   creator?: Pick<Profile, 'id' | 'username'> | null;
+  /** Discover only (migration 120): caller's role, recent activity and ranking score. */
+  my_role?: CommunityMemberRole | null;
+  activity_14d?: number;
+  popularity?: number;
 };
 
 export type CommunityMemberRole = 'admin' | 'member';

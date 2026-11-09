@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
-import { fetchMyCommunities, fetchPublicCommunities } from '@/services/communities';
+import { fetchDiscoverCommunities, fetchMyCommunities } from '@/services/communities';
 import type { Community } from '@/types';
 
 export function useCommunities() {
@@ -11,7 +11,7 @@ export function useCommunities() {
 
   const load = useCallback(async () => {
     try {
-      const data = await fetchPublicCommunities();
+      const data = await fetchDiscoverCommunities();
       setCommunities(data);
     } catch (e) {
       console.error('Failed to load communities:', e);

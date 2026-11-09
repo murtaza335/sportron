@@ -111,6 +111,12 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
               </ThemedText>
             </View>
 
+            {!!community.activity_14d && (
+              <ThemedText variant="caption" style={[styles.metaText, { color: theme.textSecondary }]}>
+                🔥 {community.activity_14d} recent
+              </ThemedText>
+            )}
+
             {/* Visibility pill — capsule */}
             <View
               style={[

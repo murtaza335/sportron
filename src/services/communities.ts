@@ -29,6 +29,7 @@ type CommunityRpcRow = {
   location: string | null; image_url: string | null; visibility: string; sport: string;
   created_by: string; created_at: string; updated_at: string; pings_enabled: boolean;
   member_count: number; creator_username: string | null; creator_avatar_url: string | null;
+  my_role?: string | null; activity_14d?: number | string; popularity?: number | string;
 };
 
 function rowToCommunity(r: CommunityRpcRow): Community {
@@ -41,6 +42,13 @@ function rowToCommunity(r: CommunityRpcRow): Community {
     creator: r.creator_username
       ? { id: r.created_by, username: r.creator_username }
       : null,
+    ...(r.popularity !== undefined
+      ? {
+          my_role: (r.my_role as CommunityMemberRole | null) ?? null,
+          activity_14d: Number(r.activity_14d ?? 0),
+          popularity: Number(r.popularity),
+        }
+      : {}),
   };
 }
 
@@ -146,6 +154,16 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
   const { data, error } = await supabase.rpc('get_public_communities');
   if (error) throw error;
   return (data ?? []).map(rowToCommunity);
+}
+
+/**
+ * Discover list: popularity-ranked with the caller's role inlined (migration 120).
+ * Falls back to the legacy RPC when the server hasn't been migrated yet.
+ */
+export async function fetchDiscoverCommunities(): Promise<Community[]> {
+  const { data, error } = await supabase.rpc('get_discover_communities');
+  if (!error) return (data ?? []).map(rowToCommunity);
+  return fetchPublicCommunities();
 }
 
 export async function fetchMyCommunities(userId: string): Promise<Community[]> {

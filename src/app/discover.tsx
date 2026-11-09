@@ -31,10 +31,20 @@ export default function DiscoverScreen() {
   const { user } = useAuth();
   const { communities, loading, refreshing, refresh } = useCommunities();
   const [membershipsLoaded, setMembershipsLoaded] = useState(false);
-  const firstLoad = useFirstLoad(loading || (!!user?.id && !membershipsLoaded));
   const [search, setSearch] = useState('');
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
-  const [membershipMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
+  const [sortBy, setSortBy] = useState<'popular' | 'new'>('popular');
+  // New RPC (migration 120) inlines the caller's role; legacy servers need the extra memberships request.
+  const hasInlineRole = communities.some((c) => c.popularity !== undefined);
+  const [fetchedMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
+  const membershipMap = useMemo(() => {
+    if (!hasInlineRole) return fetchedMap;
+    const map: Record<string, CommunityMemberRole> = {};
+    for (const c of communities) if (c.my_role) map[c.id] = c.my_role;
+    return map;
+  }, [hasInlineRole, fetchedMap, communities]);
+  const membersReady = hasInlineRole || membershipsLoaded;
+  const firstLoad = useFirstLoad(loading || (!!user?.id && !membersReady));
 
   useEffect(() => {
     if (!user?.id) return;
@@ -59,8 +69,15 @@ export default function DiscoverScreen() {
     if (selectedSport) {
       list = list.filter((c) => c.sport === selectedSport);
     }
-    return list;
-  }, [communities, search, selectedSport]);
+    const rank = (c: (typeof list)[number]) => c.popularity ?? c.member_count ?? 0;
+    return [...list].sort((a, b) => {
+      if (sortBy === 'new') return b.created_at.localeCompare(a.created_at);
+      // Popular: keep non-members first (Discover is for finding new ones), then by score.
+      const am = membershipMap[a.id] ? 1 : 0;
+      const bm = membershipMap[b.id] ? 1 : 0;
+      return am - bm || rank(b) - rank(a);
+    });
+  }, [communities, search, selectedSport, sortBy, membershipMap]);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -121,6 +138,28 @@ export default function DiscoverScreen() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
+          {(['popular', 'new'] as const).map((k) => (
+            <PressableScale
+              key={k}
+              scaleTo={0.94}
+              onPress={() => {
+                if (sortBy !== k) haptics.selection();
+                setSortBy(k);
+              }}
+              style={[
+                styles.filterChip,
+                { backgroundColor: sortBy === k ? theme.accent : theme.backgroundElement },
+              ]}
+            >
+              <ThemedText
+                variant="caption"
+                style={{ color: sortBy === k ? theme.chatBubbleMineText : theme.textSecondary, fontWeight: '700' }}
+              >
+                {k === 'popular' ? '🔥 Popular' : '✨ New'}
+              </ThemedText>
+            </PressableScale>
+          ))}
+          <View style={{ width: 1, backgroundColor: theme.border, marginHorizontal: 2 }} />
           <PressableScale
             scaleTo={0.94}
             onPress={() => {
@@ -170,7 +209,7 @@ export default function DiscoverScreen() {
           <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
-        {loading || (!!user?.id && !membershipsLoaded) ? (
+        {loading || (!!user?.id && !membersReady) ? (
           <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : filteredCommunities.length === 0 ? (
           <EmptyReveal
