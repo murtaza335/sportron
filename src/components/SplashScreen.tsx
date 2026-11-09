@@ -1,67 +1,108 @@
 import { useTheme } from '@/contexts/ThemeContext';
-import { useEffect, useRef } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { Animated, Easing, StyleSheet, View } from 'react-native';
 
-/* eslint-disable react-hooks/refs */
+const APP_NAME = 'Sportron';
+const LETTER_STAGGER = 70;
+const HOLD_MS = 500;
 
 export function SplashScreen({ onComplete }: { onComplete: () => void }) {
   const theme = useTheme();
-  const logoOpacity = useRef(new Animated.Value(0));
-  const logoTranslateY = useRef(new Animated.Value(30));
-  const textOpacity = useRef(new Animated.Value(0));
-  const textTranslateY = useRef(new Animated.Value(20));
+  const onCompleteRef = useRef(onComplete);
+  onCompleteRef.current = onComplete;
+
+  const logoScale = useRef(new Animated.Value(0.6)).current;
+  const logoOpacity = useRef(new Animated.Value(0)).current;
+  const letters = useMemo(
+    () => APP_NAME.split('').map(() => new Animated.Value(0)),
+    []
+  );
+  const underline = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
-    const animation = async () => {
-      await Animated.sequence([
-        Animated.parallel([
-          Animated.timing(logoOpacity.current, {
+    const animation = Animated.sequence([
+      Animated.parallel([
+        Animated.timing(logoOpacity, {
+          toValue: 1,
+          duration: 350,
+          easing: Easing.out(Easing.cubic),
+          useNativeDriver: true,
+        }),
+        Animated.spring(logoScale, {
+          toValue: 1,
+          friction: 5,
+          tension: 80,
+          useNativeDriver: true,
+        }),
+      ]),
+      Animated.stagger(
+        LETTER_STAGGER,
+        letters.map((v) =>
+          Animated.timing(v, {
             toValue: 1,
-            duration: 400,
-            easing: Easing.out(Easing.cubic),
+            duration: 320,
+            easing: Easing.out(Easing.back(1.8)),
             useNativeDriver: true,
-          }),
-          Animated.timing(logoTranslateY.current, {
-            toValue: 0,
-            duration: 500,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-        Animated.delay(100),
-        Animated.parallel([
-          Animated.timing(textOpacity.current, {
-            toValue: 1,
-            duration: 350,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-          Animated.timing(textTranslateY.current, {
-            toValue: 0,
-            duration: 400,
-            easing: Easing.out(Easing.cubic),
-            useNativeDriver: true,
-          }),
-        ]),
-      ]).start();
+          })
+        )
+      ),
+      Animated.timing(underline, {
+        toValue: 1,
+        duration: 350,
+        easing: Easing.out(Easing.cubic),
+        useNativeDriver: true,
+      }),
+      Animated.delay(HOLD_MS),
+    ]);
 
-      setTimeout(onComplete, 400);
-    };
+    animation.start(({ finished }) => {
+      if (finished) onCompleteRef.current();
+    });
 
-    animation();
-  }, [onComplete]);
-
-  const logoStyle = { opacity: logoOpacity.current, transform: [{ translateY: logoTranslateY.current }] };
-  const textStyle = { opacity: textOpacity.current, transform: [{ translateY: textTranslateY.current }] };
+    return () => animation.stop();
+  }, [letters, logoOpacity, logoScale, underline]);
 
   return (
     <View style={[styles.container, { backgroundColor: theme.background }]}>
       <Animated.Image
         source={require('@/assets/images/icon-512.png')}
-        style={[styles.logo, logoStyle]}
+        style={[styles.logo, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
         resizeMode="contain"
       />
-      <Animated.Text style={[styles.text, textStyle]}>SPORTRON</Animated.Text>
+      <View style={styles.nameRow}>
+        {APP_NAME.split('').map((char, i) => (
+          <Animated.Text
+            key={i}
+            style={[
+              styles.letter,
+              {
+                color: theme.text,
+                opacity: letters[i],
+                transform: [
+                  {
+                    translateY: letters[i].interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [18, 0],
+                    }),
+                  },
+                ],
+              },
+            ]}
+          >
+            {char}
+          </Animated.Text>
+        ))}
+      </View>
+      <Animated.View
+        style={[
+          styles.underline,
+          {
+            backgroundColor: theme.tabBarActive ?? theme.text,
+            opacity: underline,
+            transform: [{ scaleX: underline }],
+          },
+        ]}
+      />
     </View>
   );
 }
@@ -73,15 +114,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   logo: {
-    width: 100,
-    height: 100,
-    marginBottom: 16,
+    width: 110,
+    height: 110,
+    marginBottom: 20,
   },
-  text: {
-    fontSize: 28,
-    fontWeight: '700',
-    letterSpacing: 4,
-    color: '#FFFFFF',
-    textTransform: 'uppercase',
+  nameRow: {
+    flexDirection: 'row',
+  },
+  letter: {
+    fontSize: 34,
+    fontWeight: '800',
+    letterSpacing: 2,
+  },
+  underline: {
+    marginTop: 10,
+    width: 80,
+    height: 3,
+    borderRadius: 2,
   },
 });
