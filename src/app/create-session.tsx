@@ -24,7 +24,7 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   checkTimeConflicts,
   createSession,
-  MAX_SESSION_FUTURE_DATE,
+  getMaxSessionFutureDate,
   MAX_SESSION_PARTICIPANTS,
   MIN_SESSION_PARTICIPANTS,
 } from '@/services/sessions';
@@ -61,7 +61,7 @@ export default function CreateSessionScreen() {
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<{ purpose: string; date_time: string; location: string }[]>([]);
 
-  const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
+  const MAX_DATE = getMaxSessionFutureDate();
 
   const EXPIRE_OPTIONS = [
     { label: '30 min', value: 30 },
@@ -117,9 +117,11 @@ export default function CreateSessionScreen() {
       selectedTime.getMinutes(),
     ).toISOString();
 
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
-    if (new Date(dateTime) > maxDate) {
+    if (new Date(dateTime).getTime() < Date.now() - 60 * 1000) {
+      alert('Invalid time', 'Pick a time in the future.');
+      return;
+    }
+    if (new Date(dateTime) > getMaxSessionFutureDate()) {
       alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
       return;
     }

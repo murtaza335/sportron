@@ -191,12 +191,16 @@ export const MAX_SESSION_DURATION_MINUTES = 7 * 24 * 60; // 10080 minutes
 export const MIN_SESSION_PARTICIPANTS = 1;
 export const MAX_SESSION_PARTICIPANTS = 50;
 
-// Maximum future date for session: end of day, 7 days from now (inclusive)
-const now = new Date();
-const maxDate = new Date(now);
-maxDate.setDate(maxDate.getDate() + 7);
-maxDate.setHours(23, 59, 59, 999);
-export const MAX_SESSION_FUTURE_DATE = maxDate.toISOString();
+/**
+ * Latest allowed session start: end of the day 7 days from NOW (inclusive). Computed on every
+ * call - a module-level constant went stale when the app stayed open for days.
+ */
+export function getMaxSessionFutureDate(): Date {
+  const max = new Date();
+  max.setDate(max.getDate() + 7);
+  max.setHours(23, 59, 59, 999);
+  return max;
+}
 
 export async function createSession(
   userId: string,
@@ -219,7 +223,10 @@ export async function createSession(
   }
 
   const sessionDate = new Date(input.date_time);
-  const maxFutureDate = new Date(MAX_SESSION_FUTURE_DATE);
+  const maxFutureDate = getMaxSessionFutureDate();
+  if (sessionDate.getTime() < Date.now() - 60 * 1000) {
+    throw new Error('Pick a time in the future.');
+  }
   if (sessionDate > maxFutureDate) {
     throw new Error('Session cannot be scheduled more than 1 week in the future');
   }
