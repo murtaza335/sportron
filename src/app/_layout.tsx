@@ -1,5 +1,5 @@
 import * as Font from 'expo-font';
-import { Stack, ThemeProvider as NavThemeProvider, useRouter, useSegments } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, usePathname, useRouter, useSegments } from 'expo-router';
 import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
@@ -19,6 +19,7 @@ import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { WebFrame } from '@/components/WebFrame';
+import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
@@ -31,6 +32,7 @@ function RootNavigator() {
   const theme = useTheme();
   const router = useRouter();
   const segments = useSegments();
+  const pathname = usePathname();
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
@@ -112,6 +114,8 @@ function RootNavigator() {
     const inAuthGroup = firstSegment === 'login' || firstSegment === 'onboarding' || firstSegment === 'auth';
 
     if (!session && !inAuthGroup) {
+      const search = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
+      saveReturnTo(pathname + search);
       router.replace('/login');
       return;
     }
@@ -124,9 +128,9 @@ function RootNavigator() {
     }
 
     if (session && profile && inAuthGroup) {
-      router.replace('/');
+      router.replace(consumeReturnTo() ?? '/');
     }
-  }, [session, profile, loading, profileLoading, profileError, segments, router]);
+  }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
 
   const appReady = fontsLoaded && !loading;
   const splash = showSplash ? <AnimatedSplashScreen ready={appReady} onComplete={handleSplashComplete} /> : null;
