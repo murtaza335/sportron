@@ -59,10 +59,12 @@ begin
     raise exception 'INVALID_MAX_PARTICIPANTS';
   end if;
 
-  if new.title is not null and char_length(new.title) > 40 then
+  if (tg_op = 'INSERT' or new.title is distinct from old.title)
+     and new.title is not null and char_length(new.title) > 40 then
     raise exception 'TITLE_TOO_LONG';
   end if;
-  if new.description is not null and char_length(new.description) > 1000 then
+  if (tg_op = 'INSERT' or new.description is distinct from old.description)
+     and new.description is not null and char_length(new.description) > 1000 then
     raise exception 'DESCRIPTION_TOO_LONG';
   end if;
 
@@ -77,10 +79,7 @@ create trigger trg_guard_session_write
   before insert or update or delete on public.sessions
   for each row execute function public.guard_session_write();
 
--- Check constraints (NOT VALID: legacy rows are not rechecked, new writes are).
-alter table public.sessions drop constraint if exists sessions_max_participants_range;
-alter table public.sessions
-  add constraint sessions_max_participants_range check (max_participants between 1 and 50) not valid;
-alter table public.sessions drop constraint if exists sessions_description_length;
-alter table public.sessions
-  add constraint sessions_description_length check (char_length(description) <= 1000) not valid;
+-- NOTE: no CHECK constraints on legacy-capable columns. A CHECK (even NOT VALID) is evaluated on
+-- every UPDATE of the row, so a legacy session with e.g. 100 participants would make every
+-- later update (status changes by close_expired_sessions, capacity sync) fail. The guard above
+-- validates only when the value is written.
