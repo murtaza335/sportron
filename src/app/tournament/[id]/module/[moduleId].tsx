@@ -1,6 +1,8 @@
 import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { celebrate } from '@/components/motion/Confetti';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -99,6 +101,27 @@ export default function ModuleScreen() {
       if (e.profile?.id === user.id || e.members.some((x) => x.profile?.id === user.id)) ownEntryIds.add(e.id);
     }
   }
+
+  // Champion opens their completed module → confetti once (per module, per device).
+  const championId = mod?.champion_entry_id ?? null;
+  const isChampion = !!championId && ownEntryIds.has(championId);
+  const celebrateKey = mod ? `module-won-${mod.id}` : null;
+  useEffect(() => {
+    if (!isChampion || mod?.status !== 'completed' || !celebrateKey) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (await AsyncStorage.getItem(celebrateKey)) return;
+        await AsyncStorage.setItem(celebrateKey, '1');
+        if (!cancelled) celebrate();
+      } catch {
+        // storage unavailable — skip the flourish
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [isChampion, mod?.status, celebrateKey]);
 
   const matchActions = (match: TournamentMatch) => {
     if (!m.isModuleAdmin || !mod) return null;
