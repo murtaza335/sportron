@@ -2,13 +2,12 @@ import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
 import { LikeButton } from '@/components/motion/LikeButton';
-import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { Sheet } from '@/components/motion/Sheet';
 import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -264,7 +263,6 @@ export function PostDetailPopup({
       visible={visible}
       onClose={onClose}
       flush
-      avoidKeyboard={false}
       height="85%"
       maxHeight="95%"
       style={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, paddingBottom: 0 }}
@@ -347,9 +345,7 @@ export function PostDetailPopup({
                 </View>
               </ScrollView>
 
-              <KeyboardAvoider modal
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={0}
+              <View
                 style={[styles.inputContainer, { borderTopColor: theme.border }]}
               >
                 <View ref={inputWrapperRef} style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
@@ -381,7 +377,7 @@ export function PostDetailPopup({
                     <Send size={20} color={commentText.trim() && !sendingComment ? theme.accent : theme.textSecondary} strokeWidth={2} />
                   </Pressable>
                 </View>
-              </KeyboardAvoider>
+              </View>
 
               {showMenu && (
                 <View style={styles.menuOverlay}>

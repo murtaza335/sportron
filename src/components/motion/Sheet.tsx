@@ -21,7 +21,7 @@ import Animated, {
 } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 
-import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { KeyboardAvoider, useAndroidKeyboardHeight } from '@/components/KeyboardAvoider';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
@@ -62,6 +62,9 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
   const translateY = useSharedValue(SCREEN_HEIGHT);
   const sheetHeight = useSharedValue(SCREEN_HEIGHT * 0.5);
   const crossed = useSharedValue(false);
+  // Android is edge-to-edge and a <Modal> is its own window: pad by the keyboard height ourselves.
+  const androidKb = useAndroidKeyboardHeight();
+  const kbPad = avoidKeyboard && Platform.OS === 'android' && androidKb > 0 ? androidKb : 0;
 
   const finishClose = useCallback(() => {
     setMounted(false);
@@ -141,8 +144,8 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
   return (
     <Modal transparent visible={mounted || visible} animationType="none" onRequestClose={requestClose} statusBarTranslucent>
       <GestureHandlerRootView style={styles.flex}>
-        <KeyboardAvoider modal enabled={avoidKeyboard} style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
-          <View style={styles.root}>
+        <KeyboardAvoider modal enabled={avoidKeyboard && Platform.OS === 'ios'} style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+          <View style={[styles.root, kbPad > 0 && { paddingBottom: kbPad }]}>
             <Animated.View style={[StyleSheet.absoluteFill, styles.backdrop, backdropStyle]} pointerEvents="none" />
             <Pressable style={StyleSheet.absoluteFill} onPress={requestClose} accessibilityLabel="Close" />
             <Animated.View
