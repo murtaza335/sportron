@@ -1,9 +1,17 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, Text, View } from 'react-native';
+import { StyleSheet, Image, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, Users } from 'lucide-react-native';
 
+import Animated, { LinearTransition } from 'react-native-reanimated';
+import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { ChatRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { RM } from '@/lib/motion';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { SessionChatPopup } from '@/components/SessionChatPopup';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -58,8 +66,9 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
     : `Session · ${formatSessionDate(row.session.date_time)} ${formatSessionTime(row.session.date_time)}`;
 
   return (
-    <Pressable
+    <PressableScale
       onPress={onPress}
+      scaleTo={0.98}
       style={({ pressed }) => [
         styles.tile,
         { backgroundColor: pressed ? theme.backgroundElement : 'transparent' },
@@ -96,12 +105,13 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
           {subtitle}
         </ThemedText>
       </View>
-      {row.unread > 0 ? (
-        <View style={[styles.unreadBadge, { backgroundColor: theme.success }]}>
-          <Text style={styles.unreadBadgeText}>{row.unread > 99 ? '99+' : row.unread}</Text>
-        </View>
-      ) : null}
-    </Pressable>
+      <AnimatedBadge
+        count={row.unread}
+        size={20}
+        color={theme.success}
+        style={row.unread > 0 ? undefined : { position: 'absolute' }}
+      />
+    </PressableScale>
   );
 }
 
@@ -121,6 +131,7 @@ export default function ChatsScreen() {
     setChatUnread,
   } = useChats(user?.id);
 
+  const firstLoad = useFirstLoad(loading);
   const [tab, setTab] = useState<ChatTab>('communities');
   const [openChat, setOpenChat] = useState<ChatRow | null>(null);
 
@@ -217,9 +228,10 @@ export default function ChatsScreen() {
         />
 
         {loading && !refreshing ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={ChatRowSkeleton} count={6} gap={0} style={{ marginTop: Spacing.md }} />
         ) : (
-          <FlatList
+          <Animated.FlatList
+            itemLayoutAnimation={LinearTransition.springify().reduceMotion(RM)}
             data={listData}
             keyExtractor={(item) =>
               item.kind === 'community' ? `community-${item.community.id}` : `session-${item.session.id}`
@@ -237,14 +249,17 @@ export default function ChatsScreen() {
             )}
             ListEmptyComponent={
               !refreshing ? (
-                <View style={styles.empty}>
-                  <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundElement }]}>
-                    {isSessionTab ? (
-                      <MessageSquare size={40} color={theme.textSecondary} strokeWidth={1.5} />
-                    ) : (
-                      <Users size={40} color={theme.textSecondary} strokeWidth={1.5} />
-                    )}
-                  </View>
+                <EmptyReveal
+                  style={styles.empty}
+                  icon={
+                    <View style={[styles.emptyIcon, { backgroundColor: theme.backgroundElement }]}>
+                      {isSessionTab ? (
+                        <MessageSquare size={40} color={theme.textSecondary} strokeWidth={1.5} />
+                      ) : (
+                        <Users size={40} color={theme.textSecondary} strokeWidth={1.5} />
+                      )}
+                    </View>
+                  }>
                   <ThemedText variant="body" muted style={styles.emptyText}>
                     {isSessionTab ? 'No session chats yet' : 'No community chats yet'}
                   </ThemedText>
@@ -253,10 +268,14 @@ export default function ChatsScreen() {
                       ? 'Join or create a session to chat with the group'
                       : 'Join a community to talk with its members'}
                   </ThemedText>
-                </View>
+                </EmptyReveal>
               ) : null
             }
-            renderItem={({ item }) => <ChatRowCard row={item} onPress={() => setOpenChat(item)} />}
+            renderItem={({ item, index }) => (
+              <FadeInItem index={index} animate={firstLoad}>
+                <ChatRowCard row={item} onPress={() => setOpenChat(item)} />
+              </FadeInItem>
+            )}
           />
         )}
       </View>

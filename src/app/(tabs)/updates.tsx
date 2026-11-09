@@ -3,6 +3,12 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { CheckCheck } from 'lucide-react-native';
 
+import Animated, { FadeIn, FadeInDown, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
+import { TabUnderline, type TabLayout } from '@/components/motion/TabUnderline';
+import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM } from '@/lib/motion';
 import { ActivityCard } from '@/components/ActivityCard';
 import { InviteCard } from '@/components/InviteCard';
 import { ThemedText } from '@/components/ui/Text';
@@ -21,11 +27,16 @@ const INVITE_TYPES: NotificationType[] = [
   'community_invite',
 ];
 
+const ROW_LAYOUT = LinearTransition.springify().reduceMotion(RM);
+const ROW_ENTER = FadeInDown.duration(Duration.base).reduceMotion(RM);
+const ROW_EXIT = FadeOutRight.duration(Duration.base).reduceMotion(RM);
+
 export default function UpdatesScreen() {
   const theme = useTheme();
   const { notifications, fetchNotifications, loading, markAllAsRead, unreadCount } = useNotifications();
   const [activeTab, setActiveTab] = useState<'action' | 'invites' | 'past'>('action');
   const [markingAll, setMarkingAll] = useState(false);
+  const [tabLayouts, setTabLayouts] = useState<(TabLayout | undefined)[]>([]);
 
   const actionRequired = notifications.filter((n) => ACTION_REQUIRED_TYPES.includes(n.type));
   const invites = notifications.filter((n) => INVITE_TYPES.includes(n.type));
@@ -34,6 +45,11 @@ export default function UpdatesScreen() {
   );
   
   const pastUnreadCount = pastActivity.filter((n) => !n.read).length;
+  const tabs = [
+    { key: 'action' as const, label: 'Action Required', count: actionRequired.length, color: theme.error, dot: false },
+    { key: 'invites' as const, label: 'Invites', count: invites.length, color: theme.info, dot: false },
+    { key: 'past' as const, label: 'Past Activity', count: pastUnreadCount, color: theme.info, dot: true },
+  ];
 
   const handleActionComplete = useCallback(
     () => {
@@ -67,83 +83,41 @@ export default function UpdatesScreen() {
         </Pressable>
       )}
       <View style={[styles.tabRow, { borderBottomColor: theme.border }]}>
-        <Pressable
-          onPress={() => setActiveTab('action')}
-          style={({ pressed }) => [
-            styles.tab,
-            activeTab === 'action' && { borderBottomColor: theme.text },
-            pressed && { opacity: 0.7 },
-          ]}
-          hitSlop={8}
-        >
-          <ThemedText
-            variant="label"
-            numberOfLines={1}
-            style={[
-              styles.tabLabel,
-              { color: activeTab === 'action' ? theme.text : theme.textSecondary },
-            ]}
+        {tabs.map((t, i) => (
+          <Pressable
+            key={t.key}
+            onPress={() => {
+              if (activeTab !== t.key) haptics.selection();
+              setActiveTab(t.key);
+            }}
+            onLayout={(e) => {
+              const { x, width } = e.nativeEvent.layout;
+              setTabLayouts((prev) => {
+                const cur = prev[i];
+                if (cur && cur.x === x && cur.width === width) return prev;
+                const next = [...prev];
+                next[i] = { x, width };
+                return next;
+              });
+            }}
+            style={({ pressed }) => [styles.tab, pressed && { opacity: 0.7 }]}
+            hitSlop={8}
           >
-            Action Required
-          </ThemedText>
-          {actionRequired.length > 0 && (
-            <View style={[styles.badge, { backgroundColor: theme.error }]}>
-              <ThemedText style={styles.badgeText}>
-                {actionRequired.length > 99 ? '99+' : actionRequired.length}
-              </ThemedText>
-            </View>
-          )}
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab('invites')}
-          style={({ pressed }) => [
-            styles.tab,
-            activeTab === 'invites' && { borderBottomColor: theme.text },
-            pressed && { opacity: 0.7 },
-          ]}
-          hitSlop={8}
-        >
-          <ThemedText
-            variant="label"
-            numberOfLines={1}
-            style={[
-              styles.tabLabel,
-              { color: activeTab === 'invites' ? theme.text : theme.textSecondary },
-            ]}
-          >
-            Invites
-          </ThemedText>
-          {invites.length > 0 && (
-            <View style={[styles.badge, { backgroundColor: theme.info }]}>
-              <ThemedText style={styles.badgeText}>
-                {invites.length > 99 ? '99+' : invites.length}
-              </ThemedText>
-            </View>
-          )}
-        </Pressable>
-        <Pressable
-          onPress={() => setActiveTab('past')}
-          style={({ pressed }) => [
-            styles.tab,
-            activeTab === 'past' && { borderBottomColor: theme.text },
-            pressed && { opacity: 0.7 },
-          ]}
-          hitSlop={8}
-        >
-          <ThemedText
-            variant="label"
-            numberOfLines={1}
-            style={[
-              styles.tabLabel,
-              { color: activeTab === 'past' ? theme.text : theme.textSecondary },
-            ]}
-          >
-            Past Activity
-          </ThemedText>
-          {pastUnreadCount > 0 && (
-            <View style={[styles.badgeDot, { backgroundColor: theme.info }]} />
-          )}
-        </Pressable>
+            <ThemedText
+              variant="label"
+              numberOfLines={1}
+              style={[styles.tabLabel, { color: activeTab === t.key ? theme.text : theme.textSecondary }]}
+            >
+              {t.label}
+            </ThemedText>
+            {t.dot ? (
+              <AnimatedBadge visible={t.count > 0} size={8} color={theme.info} />
+            ) : (
+              <AnimatedBadge count={t.count} color={t.color} />
+            )}
+          </Pressable>
+        ))}
+        <TabUnderline layouts={tabLayouts} index={Math.max(0, tabs.findIndex((t) => t.key === activeTab))} color={theme.text} />
       </View>
 
       <ScrollView
@@ -153,6 +127,10 @@ export default function UpdatesScreen() {
           <ThemedRefreshControl refreshing={loading} onRefresh={fetchNotifications} />
         }
       >
+        {loading && notifications.length === 0 ? (
+          <SkeletonList Item={NotificationRowSkeleton} count={5} style={{ padding: Spacing.md }} />
+        ) : (
+        <Animated.View key={activeTab} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
         {activeTab === 'action' ? (
           actionRequired.length === 0 ? (
             <View style={styles.empty}>
@@ -165,7 +143,9 @@ export default function UpdatesScreen() {
             </View>
           ) : (
             actionRequired.map((n) => (
-              <ActivityCard key={n.id} notification={n} onComplete={handleActionComplete} />
+              <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
+                <ActivityCard notification={n} onComplete={handleActionComplete} />
+              </Animated.View>
             ))
           )
         ) : activeTab === 'invites' ? (
@@ -187,8 +167,8 @@ export default function UpdatesScreen() {
               const communityName = idx !== -1 ? body.slice(idx + separator.length) : 'Community';
               const inviteId = (n.data?.inviteId as string) || '';
               return (
+                <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
                 <InviteCard
-                  key={n.id}
                   notificationId={n.id}
                   inviteId={inviteId}
                   communityName={communityName}
@@ -196,6 +176,7 @@ export default function UpdatesScreen() {
                   createdAt={n.created_at}
                   onComplete={handleActionComplete}
                 />
+                </Animated.View>
               );
             })
           )
@@ -211,9 +192,13 @@ export default function UpdatesScreen() {
             </View>
           ) : (
             pastActivity.map((n) => (
-              <ActivityCard key={n.id} notification={n} onComplete={handleActionComplete} />
+              <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
+                <ActivityCard notification={n} onComplete={handleActionComplete} />
+              </Animated.View>
             ))
           )
+        )}
+        </Animated.View>
         )}
       </ScrollView>
     </View>

@@ -1,7 +1,14 @@
+import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { useFocusBorder } from '@/components/motion/useFocusBorder';
+import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM, STAGGER_MAX_ITEMS, STAGGER_MS } from '@/lib/motion';
 import { router, Stack } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -18,8 +25,10 @@ const ALL_SPORTS = Object.keys(SPORT_LABELS) as Sport[];
 
 export default function DiscoverScreen() {
   const theme = useTheme();
+  const searchBorder = useFocusBorder(theme.border, theme.inputBorderFocus);
   const { user } = useAuth();
   const { communities, loading, refreshing, refresh } = useCommunities();
+  const firstLoad = useFirstLoad(loading);
   const [search, setSearch] = useState('');
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
   const [membershipMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
@@ -91,8 +100,9 @@ export default function DiscoverScreen() {
         }}
       />
       <View style={[styles.searchContainer, { borderBottomColor: theme.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <Animated.View style={[styles.searchBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, searchBorder.style]}>
           <TextInput
+            {...searchBorder.handlers}
             style={[styles.searchInput, { color: theme.text }]}
             placeholder="Search communities..."
             placeholderTextColor={theme.textSecondary}
@@ -101,14 +111,18 @@ export default function DiscoverScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-        </View>
+        </Animated.View>
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          <Pressable
-            onPress={() => setSelectedSport(null)}
+          <PressableScale
+            scaleTo={0.94}
+            onPress={() => {
+              if (selectedSport) haptics.selection();
+              setSelectedSport(null);
+            }}
             style={[
               styles.filterChip,
               { backgroundColor: !selectedSport ? theme.text : theme.backgroundElement },
@@ -120,11 +134,15 @@ export default function DiscoverScreen() {
             >
               All
             </ThemedText>
-          </Pressable>
+          </PressableScale>
           {ALL_SPORTS.map((sport) => (
-            <Pressable
+            <PressableScale
               key={sport}
-              onPress={() => setSelectedSport(sport === selectedSport ? null : sport)}
+              scaleTo={0.94}
+              onPress={() => {
+                haptics.selection();
+                setSelectedSport(sport === selectedSport ? null : sport);
+              }}
               style={[
                 styles.filterChip,
                 { backgroundColor: selectedSport === sport ? theme.text : theme.backgroundElement },
@@ -136,7 +154,7 @@ export default function DiscoverScreen() {
               >
                 {SPORT_LABELS[sport]}
               </ThemedText>
-            </Pressable>
+            </PressableScale>
           ))}
         </ScrollView>
       </View>
@@ -149,7 +167,7 @@ export default function DiscoverScreen() {
         }
       >
         {loading ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : filteredCommunities.length === 0 ? (
           <View style={styles.empty}>
             <ThemedText variant="body" muted style={styles.emptyText}>
@@ -158,12 +176,14 @@ export default function DiscoverScreen() {
           </View>
         ) : (
           <View style={styles.grid}>
-            {filteredCommunities.map((community) => (
-              <CommunityCard
+            {filteredCommunities.map((community, index) => (
+              <Animated.View
                 key={community.id}
-                community={community}
-                membershipRole={membershipMap[community.id] ?? null}
-              />
+                layout={LinearTransition.springify().reduceMotion(RM)}
+                entering={firstLoad ? FadeInDown.delay(Math.min(index, STAGGER_MAX_ITEMS) * STAGGER_MS).springify().damping(18).reduceMotion(RM) : FadeIn.duration(Duration.base).reduceMotion(RM)}
+                exiting={FadeOut.duration(Duration.fast).reduceMotion(RM)}>
+                <CommunityCard community={community} membershipRole={membershipMap[community.id] ?? null} />
+              </Animated.View>
             ))}
           </View>
         )}

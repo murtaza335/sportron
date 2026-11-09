@@ -1,6 +1,8 @@
 import { useRouter } from 'expo-router';
 import { Building2, CalendarDays, MapPin, Trophy } from 'lucide-react-native';
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { FadeImage } from '@/components/motion/FadeImage';
+import { PressableScale } from '@/components/motion/PressableScale';
 
 import { InfoPill, RoleTag, StatusPill } from '@/components/tournaments/StatusPill';
 import { ThemedText } from '@/components/ui/Text';
@@ -23,16 +25,16 @@ export function TournamentCard({ tournament }: { tournament: TournamentListItem 
   const extra = tournament.sports.length - shown.length;
 
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={0.98}
       onPress={() => router.push(tournamentRoutes.tournament(tournament.id))}
-      style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
       accessibilityRole="button"
       accessibilityLabel={`Open tournament ${tournament.name}`}
     >
       <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         <View style={styles.imageContainer}>
           {tournament.image_url ? (
-            <Image
+            <FadeImage
               source={{ uri: tournament.image_url }}
               style={[styles.image, { backgroundColor: theme.border }]}
               resizeMode="cover"
@@ -99,7 +101,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentListItem 
           )}
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 

@@ -1,6 +1,12 @@
 import { Trophy } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, StyleSheet, View } from 'react-native';
+import Animated, { FadeIn } from 'react-native-reanimated';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { SkeletonList, TournamentCardSkeleton } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { Duration, RM } from '@/lib/motion';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
@@ -33,22 +39,28 @@ export default function TournamentsScreen() {
   const [scope, setScope] = useState<TournamentScope>('live');
   const { tournaments, loading, refreshing, error, refresh } = useTournaments(scope);
   const empty = EMPTY[scope];
+  const firstLoad = useFirstLoad(loading);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
         <SegmentedControl options={SCOPES} value={scope} onChange={setScope} compact />
       </View>
+      <Animated.View key={scope} style={{ flex: 1 }} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
       <FlatList
         data={tournaments}
         keyExtractor={(t) => t.id}
-        renderItem={({ item }) => <TournamentCard tournament={item} />}
+        renderItem={({ item, index }) => (
+          <FadeInItem index={index} animate={firstLoad}>
+            <TournamentCard tournament={item} />
+          </FadeInItem>
+        )}
         contentContainerStyle={[styles.list, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         ListEmptyComponent={
           loading ? (
-            <ActivityIndicator color={theme.text} style={styles.loader} />
+            <SkeletonList Item={TournamentCardSkeleton} count={3} />
           ) : error ? (
             <View style={styles.empty}>
               <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
@@ -56,18 +68,20 @@ export default function TournamentsScreen() {
               <ThemedText muted style={styles.emptySub}>Pull down to try again.</ThemedText>
             </View>
           ) : (
-            <View style={styles.empty}>
-              <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
+            <EmptyReveal
+              style={styles.empty}
+              icon={<Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />}>
               <ThemedText variant="heading">{empty.title}</ThemedText>
               {empty.sub && (
                 <ThemedText muted style={styles.emptySub}>
                   {empty.sub}
                 </ThemedText>
               )}
-            </View>
+            </EmptyReveal>
           )
         }
       />
+      </Animated.View>
     </View>
   );
 }

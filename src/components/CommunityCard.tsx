@@ -1,4 +1,6 @@
-import { Image, Pressable, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { FadeImage } from '@/components/motion/FadeImage';
 import { Building2, ShieldCheck, Users } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 
@@ -21,14 +23,14 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
   const isDark = theme.resolvedColorScheme === 'dark';
 
   return (
-    <Pressable
+    <PressableScale
+      scaleTo={0.98}
       onPress={() => router.push(`/community/${community.id}?communityName=${encodeURIComponent(community.name)}`)}
-      style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
     >
       <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
         <View style={styles.imageContainer}>
           {community.image_url ? (
-            <Image
+            <FadeImage
               source={{ uri: community.image_url }}
               style={[styles.image, { backgroundColor: theme.border }]}
               resizeMode="cover"
@@ -160,7 +162,7 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
           </View>
         </View>
       </View>
-    </Pressable>
+    </PressableScale>
   );
 }
 

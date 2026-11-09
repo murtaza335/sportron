@@ -1,8 +1,12 @@
 import { useCallback, useRef } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -17,6 +21,7 @@ export default function CommunitiesScreen() {
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
   const { communities, loading, refreshing, refresh } = useMyCommunities(user?.id);
+  const firstLoad = useFirstLoad(loading);
 
   const rotateAnim = useRef(new Animated.Value(0));
   const colorAnim = useRef(new Animated.Value(0));
@@ -97,24 +102,24 @@ export default function CommunitiesScreen() {
         }
       >
         {loading ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : communities.length === 0 ? (
-          <View style={styles.empty}>
-            <Users size={48} color={theme.textSecondary} strokeWidth={1.5} />
+          <EmptyReveal
+            style={styles.empty}
+            icon={<Users size={48} color={theme.textSecondary} strokeWidth={1.5} />}>
             <ThemedText variant="body" muted style={styles.emptyText}>
               You haven&apos;t joined any communities yet
             </ThemedText>
             <ThemedText variant="caption" muted>
               Tap the plus icon to discover communities
             </ThemedText>
-          </View>
+          </EmptyReveal>
         ) : (
           <View style={styles.grid}>
-            {communities.map((community) => (
-              <CommunityCard
-                key={community.id}
-                community={community}
-              />
+            {communities.map((community, index) => (
+              <FadeInItem key={community.id} index={index} animate={firstLoad}>
+                <CommunityCard community={community} />
+              </FadeInItem>
             ))}
           </View>
         )}
