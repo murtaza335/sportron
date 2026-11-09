@@ -57,84 +57,36 @@ function computeActualStreak(
   return { streakCount: 0, isAtRisk, hoursSinceLastActivity: hoursSince };
 }
 
-export async function computeStreak(
-  profile: Pick<Profile, 'streak_count' | 'longest_streak' | 'last_activity_date' | 'streak_updated_at'>,
-  activityDate: string = getTodayUTC()
-): Promise<StreakResult> {
-  const today = getTodayUTC();
-  const yesterday = getYesterdayUTC();
-  const lastActive = profile.last_activity_date;
-
-  let streakCount = profile.streak_count ?? 0;
-  let longestStreak = profile.longest_streak ?? 0;
-  let streakContinued = false;
-  let streakBroken = false;
-  let isNewRecord = false;
-
-  if (!lastActive) {
-    streakCount = 1;
-    streakContinued = true;
-  } else if (lastActive === today) {
-    streakContinued = true;
-  } else if (lastActive === yesterday) {
-    streakCount += 1;
-    streakContinued = true;
-  } else {
-    streakBroken = true;
-    streakCount = 1;
-  }
-
-  if (streakCount > longestStreak) {
-    longestStreak = streakCount;
-    isNewRecord = true;
-  }
-
-  return {
-    streakCount,
-    longestStreak,
-    lastActivityDate: activityDate,
-    streakContinued,
-    streakBroken,
-    isNewRecord,
-  };
-}
-
+/**
+ * Streaks are owned by the database (migration 105): triggers update them when a match is
+ * recorded, a session is created or a commitment is accepted. This helper only asks the
+ * server to (idempotently) record activity for the signed-in user and returns the result.
+ * `userId` must be the signed-in user; it is kept for backwards compatibility.
+ */
 export async function updateStreak(
-  userId: string,
+  _userId: string,
   activityType: StreakActivityType,
-  activityDate: string = getTodayUTC()
 ): Promise<StreakResult | { error: string }> {
   if (!STREAK_ACTIVITY_TYPES.includes(activityType)) {
     return { error: 'Invalid activity type' };
   }
 
-  const { data: profile, error: fetchError } = await supabase
-    .from('profiles')
-    .select('streak_count, longest_streak, last_activity_date, streak_updated_at')
-    .eq('id', userId)
-    .single();
+  const { data, error } = await supabase.rpc('record_streak_activity', {
+    p_activity: activityType,
+  });
+  if (error) return { error: error.message };
 
-  if (fetchError) {
-    return { error: fetchError.message };
-  }
+  const row = Array.isArray(data) ? data[0] : data;
+  if (!row) return { error: 'No streak data returned' };
 
-  const result = await computeStreak(profile, activityDate);
-
-  const { error: updateError } = await supabase
-    .from('profiles')
-    .update({
-      streak_count: result.streakCount,
-      longest_streak: result.longestStreak,
-      last_activity_date: result.lastActivityDate,
-      streak_updated_at: new Date().toISOString(),
-    })
-    .eq('id', userId);
-
-  if (updateError) {
-    return { error: updateError.message };
-  }
-
-  return result;
+  return {
+    streakCount: row.streak_count ?? 0,
+    longestStreak: row.longest_streak ?? 0,
+    lastActivityDate: row.last_activity_date ?? null,
+    streakContinued: true,
+    streakBroken: false,
+    isNewRecord: false,
+  };
 }
 
 export async function getStreakStatus(userId: string): Promise<{

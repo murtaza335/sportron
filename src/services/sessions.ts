@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput, FeedbackStatus } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH } from '@/types';
-import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
 // RPC row types — matches the column aliases returned by the SECURITY DEFINER
@@ -245,12 +244,7 @@ export async function createSession(
 
   if (error) throw error;
 
-  // Update streak for the session creator
-  try {
-    await updateStreak(userId, 'session_created');
-  } catch (e) {
-    console.error('Failed to update streak for session creation:', e);
-  }
+  // Streak for the creator is updated server-side (migration 105 trigger).
 
   return { ...data, commitment_count: 0 };
 }
@@ -362,12 +356,7 @@ export async function approveCommitment(
     }
   }
 
-  // Update streak for the user whose commitment was accepted (they're attending)
-  try {
-    await updateStreak(commitment.user_id, 'session_joined');
-  } catch (e) {
-    console.error('Failed to update streak for session join:', e);
-  }
+  // The participant's streak is updated server-side when the commitment is accepted (migration 105).
 }
 
 export async function rejectCommitment(

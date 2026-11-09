@@ -17,7 +17,6 @@ import type {
   UpdateCommunityInput,
 } from '@/types';
 import { fetchProfile } from './profiles';
-import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
 // RPC row types — matches the column aliases returned by the SECURITY DEFINER
@@ -634,12 +633,7 @@ export async function recordCommunityMatch(input: {
 
   if (error) throw error;
 
-  // Update streak for the person recording the match
-  try {
-    await updateStreak(input.recorded_by, 'match_recorded');
-  } catch (e) {
-    console.error('Failed to update streak for match recording:', e);
-  }
+  // Streak for the recorder is updated server-side (migration 105 trigger).
 
   return data;
 }
