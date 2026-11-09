@@ -1,4 +1,4 @@
-import { Easing, ReduceMotion } from 'react-native-reanimated';
+import { Easing, LinearTransition, ReduceMotion } from 'react-native-reanimated';
 
 /** Single source of truth for motion. Change values only here. */
 export const Duration = {
@@ -12,13 +12,13 @@ export const Duration = {
 
 export const Springs = {
   /** snappy, no visible overshoot: buttons, toggles, segment indicator */
-  snappy: { damping: 26, stiffness: 420, mass: 1 },
+  snappy: { damping: 40, stiffness: 420, mass: 1 },
   /** default UI spring: cards, sheets settling, tab icons */
-  gentle: { damping: 24, stiffness: 300, mass: 1 },
+  gentle: { damping: 34, stiffness: 300, mass: 1 },
   /** subtle overshoot (kept small on purpose): like pop, badge pop, streak increment, send bubble */
-  bouncy: { damping: 20, stiffness: 380, mass: 0.8 },
+  bouncy: { damping: 36, stiffness: 380, mass: 0.8 },
   /** sheet open/close */
-  sheet: { damping: 30, stiffness: 340, mass: 1 },
+  sheet: { damping: 38, stiffness: 340, mass: 1 },
 } as const;
 
 export const Easings = {
@@ -32,3 +32,6 @@ export const PRESS_SCALE_SMALL = 0.92; // icon buttons
 export const STAGGER_MS = 45;
 export const STAGGER_MAX_ITEMS = 8;
 export const RM = ReduceMotion.System;
+
+/** Non-bouncy layout shift for list reorder / insert / remove. */
+export const LayoutShift = LinearTransition.duration(Duration.base).easing(Easings.standard).reduceMotion(RM);

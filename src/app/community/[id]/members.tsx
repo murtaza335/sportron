@@ -277,7 +277,7 @@ export default function CommunityMembersScreen() {
                 </View>
                 {item.role === 'admin' && (
                   <Animated.View
-                    entering={ZoomIn.springify().damping(12).reduceMotion(RM)}
+                    entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
                     style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
                     <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin

@@ -4,14 +4,14 @@ import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, Users } from 'lucide-react-native';
 
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
 import { ChatRowSkeleton, SkeletonList } from '@/components/skeletons';
 import { useFirstLoad } from '@/hooks/useFirstLoad';
-import { RM } from '@/lib/motion';
+import { LayoutShift } from '@/lib/motion';
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { SessionChatPopup } from '@/components/SessionChatPopup';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -232,7 +232,7 @@ export default function ChatsScreen() {
           <SkeletonList Item={ChatRowSkeleton} count={6} gap={0} style={{ marginTop: Spacing.md }} />
         ) : (
           <Animated.FlatList
-            itemLayoutAnimation={LinearTransition.springify().reduceMotion(RM)}
+            itemLayoutAnimation={LayoutShift}
             data={listData}
             keyExtractor={(item) =>
               item.kind === 'community' ? `community-${item.community.id}` : `session-${item.session.id}`

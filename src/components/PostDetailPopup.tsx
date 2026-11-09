@@ -1,5 +1,5 @@
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { Duration, RM } from '@/lib/motion';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
 import { LikeButton } from '@/components/motion/LikeButton';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
@@ -216,7 +216,7 @@ export function PostDetailPopup({
     }
     if (comments.length > 0) {
       return comments.map((comment) => (
-        <Animated.View key={comment.id} layout={LinearTransition.springify().reduceMotion(RM)} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.comment}>
+        <Animated.View key={comment.id} layout={LayoutShift} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.comment}>
           <Pressable
             disabled={!comment.profile?.id}
             onPress={() => {

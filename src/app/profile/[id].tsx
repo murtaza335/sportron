@@ -98,7 +98,7 @@ export default function PublicProfileScreen() {
       ) : (
         <ScrollView contentContainerStyle={styles.content}>
           <View style={styles.headerSection}>
-            <Animated.View entering={ZoomIn.springify().damping(14).reduceMotion(RM)}>
+            <Animated.View entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>
               <UserAvatar avatarUrl={profile.avatar_url} size={96} style={styles.avatar} />
             </Animated.View>
             <Animated.View entering={FadeInDown.delay(STAGGER_MS).duration(Duration.base).reduceMotion(RM)}>

@@ -1,6 +1,6 @@
 import { haptics } from '@/lib/haptics';
-import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
-import { Duration, RM } from '@/lib/motion';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { LikeButton } from '@/components/motion/LikeButton';
 import { Sheet } from '@/components/motion/Sheet';
 import { AlertTriangle, Calendar, Check, Clock, Globe, Lock, User, X } from 'lucide-react-native';
@@ -421,7 +421,7 @@ export function MatchDetailPopup({
               ) : (
                 <View style={styles.commentsContainer}>
 {comments.map((comment) => (
-                      <Animated.View key={comment.id} layout={LinearTransition.springify().reduceMotion(RM)} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.commentRow}>
+                      <Animated.View key={comment.id} layout={LayoutShift} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.commentRow}>
                         <Pressable
                           disabled={!comment.profile?.id}
                           onPress={() => {

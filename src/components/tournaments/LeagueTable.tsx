@@ -1,7 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
-  LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -9,7 +8,7 @@ import Animated, {
   withTiming,
 } from 'react-native-reanimated';
 
-import { RM } from '@/lib/motion';
+import { LayoutShift } from '@/lib/motion';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -18,7 +17,7 @@ import { tint } from '@/lib/tournamentFormat';
 import type { LeagueRow } from '@/types';
 
 const ROW_H = 48;
-const ROW_LAYOUT = LinearTransition.springify().reduceMotion(RM);
+const ROW_LAYOUT = LayoutShift;
 
 /** A stat cell that flashes (FotMob/SofaScore style) when its value changes after first render. */
 function StatCell({ w, text, bold, dim: isDim }: { w: number; text: string | number; bold?: boolean; dim?: boolean }) {

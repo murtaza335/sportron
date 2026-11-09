@@ -58,7 +58,7 @@ function SlotCard({
   const content = profile ? (
     <Animated.View
       key={profile.id}
-      entering={ZoomIn.springify().damping(14).reduceMotion(RM)}
+      entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
       style={{ alignItems: 'center', gap: Spacing.xs }}>
       <UserAvatar avatarUrl={profile.avatar_url} size={64} />
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>

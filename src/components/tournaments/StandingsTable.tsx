@@ -1,8 +1,8 @@
 import { Trophy } from 'lucide-react-native';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
-import Animated, { LinearTransition } from 'react-native-reanimated';
+import Animated from 'react-native-reanimated';
 
-import { RM, Springs } from '@/lib/motion';
+import { LayoutShift } from '@/lib/motion';
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -11,7 +11,7 @@ import { tint } from '@/lib/tournamentFormat';
 import type { TournamentStanding } from '@/types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
-const reorder = LinearTransition.springify().damping(Springs.gentle.damping).stiffness(Springs.gentle.stiffness).reduceMotion(RM);
+const reorder = LayoutShift;
 const ROW_H = 48;
 const RANK_W = 44;
 const ENTRY_W = 150;

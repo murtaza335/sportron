@@ -8,7 +8,7 @@ import { Duration, RM } from '@/lib/motion';
 export function EmptyReveal({ icon, style, children }: { icon: ReactNode; style?: StyleProp<ViewStyle>; children: ReactNode }) {
   return (
     <View style={style}>
-      <Animated.View entering={ZoomIn.springify().damping(14).reduceMotion(RM)}>{icon}</Animated.View>
+      <Animated.View entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>{icon}</Animated.View>
       <Animated.View
         entering={FadeIn.delay(80).duration(Duration.base).reduceMotion(RM)}
         style={{ alignItems: 'center', gap: 8 }}>

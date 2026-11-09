@@ -1,10 +1,10 @@
-import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOut } from 'react-native-reanimated';
 import { PressableScale } from '@/components/motion/PressableScale';
 import { useFocusBorder } from '@/components/motion/useFocusBorder';
 import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
 import { useFirstLoad } from '@/hooks/useFirstLoad';
 import { haptics } from '@/lib/haptics';
-import { Duration, RM, STAGGER_MAX_ITEMS, STAGGER_MS } from '@/lib/motion';
+import { Duration, RM, STAGGER_MAX_ITEMS, STAGGER_MS, LayoutShift } from '@/lib/motion';
 import { router, Stack } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
@@ -179,8 +179,8 @@ export default function DiscoverScreen() {
             {filteredCommunities.map((community, index) => (
               <Animated.View
                 key={community.id}
-                layout={LinearTransition.springify().reduceMotion(RM)}
-                entering={firstLoad ? FadeInDown.delay(Math.min(index, STAGGER_MAX_ITEMS) * STAGGER_MS).springify().damping(18).reduceMotion(RM) : FadeIn.duration(Duration.base).reduceMotion(RM)}
+                layout={LayoutShift}
+                entering={firstLoad ? FadeInDown.delay(Math.min(index, STAGGER_MAX_ITEMS) * STAGGER_MS).duration(Duration.base).reduceMotion(RM) : FadeIn.duration(Duration.base).reduceMotion(RM)}
                 exiting={FadeOut.duration(Duration.fast).reduceMotion(RM)}>
                 <CommunityCard community={community} membershipRole={membershipMap[community.id] ?? null} />
               </Animated.View>

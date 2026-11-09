@@ -4,7 +4,6 @@ import Animated, {
   FadeInDown,
   FadeOut,
   FadeOutDown,
-  LinearTransition,
   useAnimatedStyle,
   useReducedMotion,
   useSharedValue,
@@ -19,7 +18,7 @@ import { FlashHighlight } from '@/components/motion/FlashHighlight';
 import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal';
 import { SwipeToReply } from '@/components/motion/SwipeToReply';
 import { haptics } from '@/lib/haptics';
-import { Duration, RM, Springs } from '@/lib/motion';
+import { Duration, RM, Springs, LayoutShift } from '@/lib/motion';
 import { BlurView } from 'expo-blur';
 import {
   AlertTriangle,
@@ -72,7 +71,7 @@ const MINE_ENTER = (values: { targetOriginY: number }) => {
   'worklet';
   void values;
   return {
-    initialValues: { opacity: 0, transform: [{ translateY: 24 }, { scale: 0.9 }] },
+    initialValues: { opacity: 0, transform: [{ translateY: 12 }, { scale: 0.96 }] },
     animations: {
       opacity: withTiming(1, { duration: Duration.fast }),
       transform: [{ translateY: withSpring(0, Springs.bouncy) }, { scale: withSpring(1, Springs.bouncy) }],
@@ -775,7 +774,7 @@ const contextLayout = useMemo(() => {
                         <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
                       </Animated.View>
                     ) : (
-                      <Animated.View key="sent" entering={ZoomIn.springify().damping(12).reduceMotion(RM)}>
+                      <Animated.View key="sent" entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>
                         <Check size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
                       </Animated.View>
                     )}
@@ -953,7 +952,7 @@ const contextLayout = useMemo(() => {
                   the bottom (scrolled up / parked at the "New messages" divider). */}
               {!atBottom && (
                 <Animated.View
-                  entering={ZoomIn.springify().damping(14).reduceMotion(RM)}
+                  entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
                   exiting={ZoomOut.duration(Duration.fast).reduceMotion(RM)}
                   style={styles.jumpWrap}>
                   <Pressable
@@ -982,7 +981,7 @@ const contextLayout = useMemo(() => {
             </View>
 
             <Animated.View
-              layout={LinearTransition.springify().reduceMotion(RM)}
+              layout={LayoutShift}
               style={[
                 styles.inputBar,
                 {
@@ -1119,7 +1118,7 @@ const contextLayout = useMemo(() => {
               </Pressable>
               </Animated.View>
               <Animated.View
-                entering={ZoomIn.springify().damping(16).reduceMotion(RM)}
+                entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
                 style={[
                   styles.contextCard,
                   {

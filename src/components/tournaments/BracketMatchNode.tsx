@@ -66,7 +66,7 @@ function Row({
             {entry.name}
           </ThemedText>
           {winner && !bye && (
-            <Animated.View entering={ZoomIn.springify().damping(12).reduceMotion(RM)}>
+            <Animated.View entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>
               <Check size={12} color={theme.success} strokeWidth={3} />
             </Animated.View>
           )}

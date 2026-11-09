@@ -3,12 +3,12 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { CheckCheck } from 'lucide-react-native';
 
-import Animated, { FadeIn, FadeInDown, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeInDown, FadeOutRight } from 'react-native-reanimated';
 import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
 import { TabUnderline, type TabLayout } from '@/components/motion/TabUnderline';
 import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
 import { haptics } from '@/lib/haptics';
-import { Duration, RM } from '@/lib/motion';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { ActivityCard } from '@/components/ActivityCard';
 import { InviteCard } from '@/components/InviteCard';
 import { ThemedText } from '@/components/ui/Text';
@@ -27,7 +27,7 @@ const INVITE_TYPES: NotificationType[] = [
   'community_invite',
 ];
 
-const ROW_LAYOUT = LinearTransition.springify().reduceMotion(RM);
+const ROW_LAYOUT = LayoutShift;
 const ROW_ENTER = FadeInDown.duration(Duration.base).reduceMotion(RM);
 const ROW_EXIT = FadeOutRight.duration(Duration.base).reduceMotion(RM);
 

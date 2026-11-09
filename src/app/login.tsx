@@ -5,7 +5,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 
 import Animated, { FadeIn, FadeInDown, ZoomIn } from 'react-native-reanimated';
 import { PressableScale } from '@/components/motion/PressableScale';
-import { Duration, RM, Springs, STAGGER_MS } from '@/lib/motion';
+import { Duration, RM, STAGGER_MS } from '@/lib/motion';
 import { alert } from '@/lib/alert';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/supabase';
@@ -48,7 +48,7 @@ export default function LoginScreen() {
             {/* Main Branding Section */}
             <View style={styles.hero}>
               {/* Same entrance language as the splash so splash -> login feels continuous */}
-              <Animated.View entering={ZoomIn.springify().damping(Springs.bouncy.damping).stiffness(Springs.bouncy.stiffness).reduceMotion(RM)}>
+              <Animated.View entering={ZoomIn.duration(Duration.base).reduceMotion(RM)}>
                 <Image
                   source={require('@/assets/images/icon.png')}
                   style={styles.appLogo}

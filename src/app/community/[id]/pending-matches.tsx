@@ -1,7 +1,7 @@
-import Animated, { FadeIn, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOutRight } from 'react-native-reanimated';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
-import { Duration, RM } from '@/lib/motion';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
@@ -168,7 +168,7 @@ export default function PendingMatchesScreen() {
             {matches.map((match) => (
               <Animated.View
                 key={match.id}
-                layout={LinearTransition.springify().reduceMotion(RM)}
+                layout={LayoutShift}
                 entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
                 exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
                 <MatchCard

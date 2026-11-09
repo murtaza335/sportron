@@ -1,8 +1,8 @@
-import Animated, { FadeIn, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOutRight } from 'react-native-reanimated';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
 import { haptics } from '@/lib/haptics';
-import { Duration, RM } from '@/lib/motion';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -139,7 +139,7 @@ export default function CommunityJoinRequestsScreen() {
           joinRequests.map((req) => (
             <Animated.View
               key={req.id}
-              layout={LinearTransition.springify().reduceMotion(RM)}
+              layout={LayoutShift}
               entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
               exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
             <Card style={styles.requestCard}>
