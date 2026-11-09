@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { webColumnStyle } from '@/components/WebFrame';
 import { Modal, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView, type GestureType } from 'react-native-gesture-handler';
 import Animated, {
@@ -88,7 +89,7 @@ export function SlideUpModal({ visible, onClose, children }: Props) {
     <Modal transparent visible animationType="none" onRequestClose={dismiss} statusBarTranslucent>
       <GestureHandlerRootView style={styles.flex}>
         <DragContext.Provider value={pan}>
-          <Animated.View style={[styles.flex, style]}>
+          <Animated.View style={[styles.flex, webColumnStyle, style]}>
             <View style={styles.flex}>{children}</View>
           </Animated.View>
         </DragContext.Provider>

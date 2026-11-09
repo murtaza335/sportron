@@ -1,4 +1,5 @@
 import { createContext, useCallback, useContext, useEffect, useState, type ReactNode } from 'react';
+import { webColumnStyle } from '@/components/WebFrame';
 import {
   Modal,
   Platform,
@@ -218,6 +219,7 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
               style={[
                 styles.sheet,
                 flush ? null : styles.padded,
+                webColumnStyle,
                 { backgroundColor: theme.backgroundElement, maxHeight, ...(height != null ? { height } : null) },
                 sheetStyle,
                 style,

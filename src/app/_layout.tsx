@@ -18,6 +18,7 @@ import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { WebFrame } from '@/components/WebFrame';
 import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
@@ -292,7 +293,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <NotificationsProvider>
-            <RootNavigator />
+            <WebFrame>
+              <RootNavigator />
+            </WebFrame>
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
