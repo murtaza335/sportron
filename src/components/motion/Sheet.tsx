@@ -70,6 +70,8 @@ export function SheetScrollView({ ref, onScroll, ...rest }: ScrollViewProps & { 
 }
 
 const HANDLE_ZONE = 48;
+/** On web a mouse drag inside the body (e.g. selecting text) must not drag the sheet: handle only. */
+const HANDLE_ONLY = Platform.OS === 'web';
 
 export type SheetProps = {
   visible: boolean;
@@ -165,7 +167,7 @@ export function Sheet({ visible, onClose, children, height, maxHeight = '85%', f
         state.fail();
       } else if (dy > 8) {
         // Handle zone always drags; elsewhere only once the inner list is scrolled to the top.
-        if (startY.get() < HANDLE_ZONE || scrollY.get() <= 0) state.activate();
+        if (startY.get() < HANDLE_ZONE || (!HANDLE_ONLY && scrollY.get() <= 0)) state.activate();
         else state.fail();
       }
     })
