@@ -84,7 +84,7 @@ function TabIcon({ focused, children }: { focused: boolean; children: React.Reac
       scale.set(1);
       return;
     }
-    scale.set(withSequence(withTiming(1.12, { duration: Duration.instant }), withSpring(1, Springs.bouncy)));
+    scale.set(withSequence(withTiming(1.06, { duration: Duration.instant }), withSpring(1, Springs.bouncy)));
   }, [focused, reduced, scale]);
   const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return <Animated.View style={style}>{children}</Animated.View>;

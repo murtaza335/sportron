@@ -58,7 +58,7 @@ export function LikeButton({ liked, count, onPress, disabled, iconSize = 16, fon
     const next = !liked;
     if (!reduced) {
       if (next) {
-        scale.set(withSequence(withTiming(1.3, { duration: 110 }), withSpring(1, Springs.bouncy)));
+        scale.set(withSequence(withTiming(1.15, { duration: 80 }), withSpring(1, Springs.bouncy)));
         ring.set(0);
         ring.set(withTiming(1, { duration: 400, easing: Easing.out(Easing.quad) }));
         burst.set(0);

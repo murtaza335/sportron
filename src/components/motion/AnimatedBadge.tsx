@@ -39,7 +39,7 @@ export function AnimatedBadge({ count, visible = true, color, size, style }: Pro
 
   useEffect(() => {
     if (!reduced && shown && lastCount.current !== count && lastCount.current !== undefined) {
-      scale.set(withSequence(withTiming(1.2, { duration: 90 }), withSpring(1, Springs.bouncy)));
+      scale.set(withSequence(withTiming(1.1, { duration: 70 }), withSpring(1, Springs.bouncy)));
     }
     lastCount.current = count;
   }, [count, shown, reduced, scale]);

@@ -56,7 +56,7 @@ export function AnimatedFlame({ size, color, state, count, paused, dropIn }: Pro
   useEffect(() => {
     if (prev.current !== undefined && count !== undefined && count > prev.current) {
       if (!reduced) {
-        pop.set(withSequence(withTiming(1.4, { duration: 140 }), withSpring(1, Springs.bouncy)));
+        pop.set(withSequence(withTiming(1.2, { duration: 100 }), withSpring(1, Springs.bouncy)));
       }
       haptics.success();
     }

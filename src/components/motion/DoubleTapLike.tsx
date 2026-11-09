@@ -42,7 +42,7 @@ export function DoubleTapLike({ liked, onLike, children }: { liked: boolean; onL
       }
       scale.set(0);
       opacity.set(1);
-      scale.set(withSequence(withSpring(1.2, Springs.bouncy), withSpring(1, Springs.snappy), withDelay(250, withTiming(1.4, { duration: 250 }))));
+      scale.set(withSequence(withSpring(1.1, Springs.bouncy), withSpring(1, Springs.snappy), withDelay(250, withTiming(1.4, { duration: 250 }))));
       opacity.set(withDelay(450, withTiming(0, { duration: 250 })));
     });
 

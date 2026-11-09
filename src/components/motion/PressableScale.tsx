@@ -1,4 +1,4 @@
-import { forwardRef } from 'react';
+import { forwardRef, useState } from 'react';
 import { Pressable, type PressableProps, type PressableStateCallbackType, type View } from 'react-native';
 import Animated, {
   useAnimatedStyle,
@@ -26,6 +26,8 @@ export const PressableScale = forwardRef<View, PressableScaleProps>(function Pre
   const reduced = useReducedMotion();
   const scale = useSharedValue(1);
   const dip = useSharedValue(1);
+  // Reanimated drops function-valued `style`, so resolve it here with our own pressed state.
+  const [pressed, setPressed] = useState(false);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ scale: scale.value }],
@@ -37,11 +39,13 @@ export const PressableScale = forwardRef<View, PressableScaleProps>(function Pre
       ref={ref}
       disabled={disabled}
       onPressIn={(e) => {
+        setPressed(true);
         if (!reduced) scale.set(withTiming(scaleTo, { duration: Duration.instant }));
         dip.set(withTiming(0.9, { duration: Duration.instant }));
         onPressIn?.(e);
       }}
       onPressOut={(e) => {
+        setPressed(false);
         scale.set(withSpring(1, Springs.snappy));
         dip.set(withTiming(1, { duration: Duration.fast }));
         onPressOut?.(e);
@@ -50,7 +54,7 @@ export const PressableScale = forwardRef<View, PressableScaleProps>(function Pre
         if (haptic) haptics[haptic]();
         onPress?.(e);
       }}
-      style={(state: PressableStateCallbackType) => [typeof style === 'function' ? style(state) : style, animatedStyle] as never}
+      style={[typeof style === 'function' ? style({ pressed } as PressableStateCallbackType) : style, animatedStyle] as never}
       {...rest}
     />
   );

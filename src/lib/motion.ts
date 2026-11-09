@@ -12,13 +12,13 @@ export const Duration = {
 
 export const Springs = {
   /** snappy, no visible overshoot: buttons, toggles, segment indicator */
-  snappy: { damping: 22, stiffness: 320, mass: 1 },
+  snappy: { damping: 26, stiffness: 420, mass: 1 },
   /** default UI spring: cards, sheets settling, tab icons */
-  gentle: { damping: 18, stiffness: 180, mass: 1 },
-  /** playful overshoot: like pop, badge pop, streak increment, send bubble */
-  bouncy: { damping: 12, stiffness: 220, mass: 0.9 },
+  gentle: { damping: 24, stiffness: 300, mass: 1 },
+  /** subtle overshoot (kept small on purpose): like pop, badge pop, streak increment, send bubble */
+  bouncy: { damping: 20, stiffness: 380, mass: 0.8 },
   /** sheet open/close */
-  sheet: { damping: 26, stiffness: 260, mass: 1 },
+  sheet: { damping: 30, stiffness: 340, mass: 1 },
 } as const;
 
 export const Easings = {
