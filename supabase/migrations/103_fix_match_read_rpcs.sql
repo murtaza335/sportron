@@ -9,9 +9,19 @@
 -- invoked with auth.uid() instead of p_user_id. Return columns are identical, so installed
 -- builds keep working.
 
-alter function public.get_community_matches(uuid, int, int, uuid) rename to get_community_matches_impl;
-alter function public.get_community_match_by_id(uuid, uuid) rename to get_community_match_by_id_impl;
-alter function public.get_match_comments(uuid) rename to get_match_comments_impl;
+-- Idempotent: only rename while the original (unguarded) function is still in place.
+do $$
+begin
+  if to_regprocedure('public.get_community_matches_impl(uuid,int,int,uuid)') is null then
+    alter function public.get_community_matches(uuid, int, int, uuid) rename to get_community_matches_impl;
+  end if;
+  if to_regprocedure('public.get_community_match_by_id_impl(uuid,uuid)') is null then
+    alter function public.get_community_match_by_id(uuid, uuid) rename to get_community_match_by_id_impl;
+  end if;
+  if to_regprocedure('public.get_match_comments_impl(uuid)') is null then
+    alter function public.get_match_comments(uuid) rename to get_match_comments_impl;
+  end if;
+end $$;
 
 revoke all on function public.get_community_matches_impl(uuid, int, int, uuid) from public, anon, authenticated;
 revoke all on function public.get_community_match_by_id_impl(uuid, uuid) from public, anon, authenticated;

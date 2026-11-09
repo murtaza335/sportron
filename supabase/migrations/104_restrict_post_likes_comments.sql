@@ -25,6 +25,7 @@ grant execute on function public.is_post_community_member(uuid) to authenticated
 
 -- Likes
 drop policy if exists "Likes are viewable by authenticated users" on public.community_post_likes;
+drop policy if exists "Likes are viewable by community members" on public.community_post_likes;
 create policy "Likes are viewable by community members"
   on public.community_post_likes for select
   to authenticated
@@ -38,6 +39,7 @@ create policy "Users can insert their own likes"
 
 -- Comments
 drop policy if exists "Comments are viewable by authenticated users" on public.community_post_comments;
+drop policy if exists "Comments are viewable by community members" on public.community_post_comments;
 create policy "Comments are viewable by community members"
   on public.community_post_comments for select
   to authenticated
