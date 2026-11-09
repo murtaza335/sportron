@@ -2,7 +2,7 @@ import { PressableScale } from '@/components/motion/PressableScale';
 import { haptics } from '@/lib/haptics';
 import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
@@ -39,21 +39,8 @@ export default function CreateCommunityScreen() {
   const canSave = name.trim().length > 0 && !saving && !uploadingImage;
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-    }
+    const uri = await pickImageUri();
+    if (uri) setImageUri(uri);
   };
 
   const removeImage = () => {

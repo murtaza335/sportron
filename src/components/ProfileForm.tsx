@@ -1,4 +1,4 @@
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { useEffect, useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
@@ -79,21 +79,9 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   }, [username, excludeUsername]);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
+    const uri = await pickImageUri({ aspect: [1, 1] });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
+    if (uri) {
       const previousAvatarUrl = avatarUrl;
       
       // Optimistic UI: Show the local image immediately so the progress ring has a truthy condition to render over

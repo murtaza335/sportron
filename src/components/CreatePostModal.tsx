@@ -14,7 +14,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import { createCommunityPost } from '@/services/communities';
 import type { CommunityPostType } from '@/types';
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 
 type PostTab = 'write' | 'photo' | 'match';
 
@@ -126,22 +126,8 @@ export function CreatePostModal({
   };
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission Required', 'We need access to your photos to upload images.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImage(result.assets[0].uri);
-    }
+    const uri = await pickImageUri({ aspect: [4, 3] });
+    if (uri) setSelectedImage(uri);
   };
 
   const removeImage = () => {

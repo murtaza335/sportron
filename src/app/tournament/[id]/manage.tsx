@@ -1,4 +1,4 @@
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 import { ChevronRight, FileText, Image as ImageIcon, X } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
@@ -84,13 +84,8 @@ export default function TournamentManageScreen() {
   const canSave = dirty && nameOk && datesOk && !saving;
 
   const pickImage = async () => {
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ['images'], allowsEditing: false, quality: 0.8 });
-    if (!result.canceled && result.assets[0]) setImageUri(result.assets[0].uri);
+    const uri = await pickImageUri();
+    if (uri) setImageUri(uri);
   };
 
   const save = async () => {
