@@ -1,5 +1,6 @@
+import { LikeButton } from '@/components/motion/LikeButton';
 import { useRouter } from 'expo-router';
-import { Heart, MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Image, Pressable, StyleSheet, View } from 'react-native';
 
@@ -226,12 +227,7 @@ export function PostCard({
       </Pressable>
 
       <View style={styles.socialRow}>
-        <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-          <Heart size={16} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-          <ThemedText variant="caption" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-          </ThemedText>
-        </Pressable>
+        <LikeButton liked={liked} count={likesCount} onPress={handleLike} style={styles.socialAction} />
 
         <Pressable onPress={handleCommentPress} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
           <MessageSquare size={16} color={theme.textSecondary} />

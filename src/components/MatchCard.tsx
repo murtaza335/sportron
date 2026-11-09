@@ -1,4 +1,5 @@
-import { Heart, MessageSquare } from 'lucide-react-native';
+import { LikeButton } from '@/components/motion/LikeButton';
+import { MessageSquare } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -330,20 +331,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
          {/* Social Row Footer */}
          <View style={styles.socialRow}>
-            <Pressable
-              onPress={handleLike}
-              hitSlop={8}
-              style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}
-            >
-              <Heart
-                size={16}
-                color={liked ? theme.error : theme.textSecondary}
-                fill={liked ? theme.error : 'none'}
-              />
-              <ThemedText variant="caption" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-               {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-             </ThemedText>
-           </Pressable>
+            <LikeButton liked={liked} count={likesCount} onPress={handleLike} style={styles.socialAction} />
 
             <Pressable
               onPress={onPress}

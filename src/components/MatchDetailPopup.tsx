@@ -1,5 +1,9 @@
+import { haptics } from '@/lib/haptics';
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { Duration, RM } from '@/lib/motion';
+import { LikeButton } from '@/components/motion/LikeButton';
 import { Sheet } from '@/components/motion/Sheet';
-import { AlertTriangle, Calendar, Check, Clock, Globe, Heart, Lock, User, X } from 'lucide-react-native';
+import { AlertTriangle, Calendar, Check, Clock, Globe, Lock, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Dimensions, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
@@ -234,9 +238,12 @@ export function MatchDetailPopup({
     try {
       if (status === 'verified') await approveCommunityMatch(match.id, currentUserId);
       else await disputeCommunityMatch(match.id, currentUserId);
+      if (status === 'verified') haptics.success();
+      else haptics.warning();
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch {
+      haptics.error();
       alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);
@@ -401,17 +408,7 @@ export function MatchDetailPopup({
                 <ThemedText variant="body" style={styles.sectionTitle}>
                   Comments ({comments.length})
                 </ThemedText>
-                <Pressable
-                  onPress={handleLike}
-                  disabled={liking}
-                  style={({ pressed }) => [styles.likeActionBtn, pressed && { opacity: 0.6 }]}
-                  hitSlop={8}
-                >
-                  <Heart size={15} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-                  <ThemedText variant="caption" style={[styles.likeText, { color: liked ? theme.error : theme.textSecondary }]}>
-                    {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                  </ThemedText>
-                </Pressable>
+                <LikeButton liked={liked} count={likesCount} onPress={handleLike} disabled={liking} iconSize={15} style={styles.likeActionBtn} />
               </View>
 
               {/* Comments List */}
@@ -424,7 +421,7 @@ export function MatchDetailPopup({
               ) : (
                 <View style={styles.commentsContainer}>
 {comments.map((comment) => (
-                      <View key={comment.id} style={styles.commentRow}>
+                      <Animated.View key={comment.id} layout={LinearTransition.springify().reduceMotion(RM)} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.commentRow}>
                         <Pressable
                           disabled={!comment.profile?.id}
                           onPress={() => {
@@ -453,7 +450,7 @@ export function MatchDetailPopup({
                            {comment.content}
                          </ThemedText>
                        </View>
-                     </View>
+                     </Animated.View>
                    ))}
                 </View>
               )}

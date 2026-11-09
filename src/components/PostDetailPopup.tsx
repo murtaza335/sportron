@@ -1,6 +1,10 @@
+import Animated, { FadeInDown, LinearTransition } from 'react-native-reanimated';
+import { Duration, RM } from '@/lib/motion';
+import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
+import { LikeButton } from '@/components/motion/LikeButton';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { Sheet } from '@/components/motion/Sheet';
-import { X, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -156,13 +160,15 @@ export function PostDetailPopup({
       return (
         <View style={styles.photoContainer}>
           {!imageLoaded && !imageError && <View style={styles.imagePlaceholder} />}
-          <Image
-            source={{ uri: post.image_url }}
-            style={styles.postImage}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-            resizeMode="cover"
-          />
+          <DoubleTapLike liked={liked} onLike={handleLike}>
+            <Image
+              source={{ uri: post.image_url }}
+              style={styles.postImage}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              resizeMode="cover"
+            />
+          </DoubleTapLike>
           {imageError && (
             <View style={styles.imageError}>
               <ThemedText variant="caption" muted>Failed to load image</ThemedText>
@@ -196,7 +202,8 @@ export function PostDetailPopup({
     }
 
     return null;
-  }, [post, imageLoaded, imageError, theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post, imageLoaded, imageError, theme, liked]);
 
   const renderCommentsSection = () => {
     if (commentsLoading) {
@@ -208,7 +215,7 @@ export function PostDetailPopup({
     }
     if (comments.length > 0) {
       return comments.map((comment) => (
-        <View key={comment.id} style={styles.comment}>
+        <Animated.View key={comment.id} layout={LinearTransition.springify().reduceMotion(RM)} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.comment}>
           <Pressable
             disabled={!comment.profile?.id}
             onPress={() => {
@@ -239,7 +246,7 @@ export function PostDetailPopup({
               {comment.content}
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
       ));
     }
     return (
@@ -319,12 +326,7 @@ export function PostDetailPopup({
                   {renderPostContent()}
 
                   <View style={styles.postSocialRow}>
-                    <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-                      <Heart size={20} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-                      <ThemedText variant="label" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-                        {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                      </ThemedText>
-                    </Pressable>
+                    <LikeButton liked={liked} count={likesCount} onPress={handleLike} iconSize={20} fontSize={14} style={styles.socialAction} />
 
                     <Pressable onPress={scrollToComments} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
                       <MessageSquare size={20} color={theme.textSecondary} />

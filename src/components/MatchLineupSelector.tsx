@@ -1,3 +1,6 @@
+import Animated, { useAnimatedStyle, withTiming, ZoomIn } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { Duration, RM } from '@/lib/motion';
 import { Sheet } from '@/components/motion/Sheet';
 import { Check, Search, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -47,13 +50,21 @@ function SlotCard({
 }: SlotCardProps) {
   const theme = useTheme();
 
+  const borderStyle = useAnimatedStyle(
+    () => ({ borderColor: withTiming(profile ? theme.accent : theme.border, { duration: Duration.base }) }),
+    [profile, theme.accent, theme.border],
+  );
+
   const content = profile ? (
-    <>
+    <Animated.View
+      key={profile.id}
+      entering={ZoomIn.springify().damping(14).reduceMotion(RM)}
+      style={{ alignItems: 'center', gap: Spacing.xs }}>
       <UserAvatar avatarUrl={profile.avatar_url} size={64} />
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
         {profile.username}
       </ThemedText>
-    </>
+    </Animated.View>
   ) : (
     <>
       <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
@@ -71,13 +82,13 @@ function SlotCard({
   );
 
   const card = (
-    <View
+    <Animated.View
       style={[
         styles.slotCard,
         {
-          borderColor: theme.border,
           backgroundColor: locked ? theme.backgroundElement : theme.background,
         },
+        borderStyle,
       ]}>
       <ThemedText variant="caption" muted style={styles.slotLabel}>
         {label}
@@ -95,7 +106,7 @@ function SlotCard({
       <ThemedText variant="caption" muted style={styles.helperText}>
         {helperText}
       </ThemedText>
-    </View>
+    </Animated.View>
   );
 
   if (!onPress) {
@@ -103,9 +114,9 @@ function SlotCard({
   }
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.slotPressable, pressed && styles.pressed]}>
+    <PressableScale onPress={onPress} scaleTo={0.96} style={styles.slotPressable}>
       {card}
-    </Pressable>
+    </PressableScale>
   );
 }
 

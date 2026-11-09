@@ -1,21 +1,22 @@
 import { Camera, Edit, Megaphone, Plus, Trophy } from 'lucide-react-native';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useState, type ComponentType } from 'react';
 import { Dimensions, Pressable, StyleSheet, View } from 'react-native';
 import Animated, {
-  Easing,
-  Extrapolation,
-  interpolate,
-  runOnJS,
   useAnimatedStyle,
+  useReducedMotion,
   useSharedValue,
+  withDelay,
   withSpring,
   withTiming,
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { PressableScale } from '@/components/motion/PressableScale';
 import { ThemedText } from '@/components/ui/Text';
 import { Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { haptics } from '@/lib/haptics';
+import { Duration, Springs } from '@/lib/motion';
 
 type FABMenuProps = {
   isMember: boolean;
@@ -30,49 +31,103 @@ type FABMenuProps = {
   setCreatePostModalVisible: (visible: boolean) => void;
   router: any;
   onFabMenuClose: () => void;
+  /** Hide the FAB (slide down + fade), e.g. while the feed scrolls down. */
+  hidden?: boolean;
 };
 
 const GAP = 12;
 const NUM_ITEMS = 4;
 const FAB_SIZE = 56;
 const FAB_RADIUS = 28;
+const ITEM_STAGGER = 40;
 
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
+
+type ItemDef = {
+  icon: ComponentType<{ size?: number; color?: string; strokeWidth?: number }>;
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+};
+
+/** One speed-dial entry. Items stagger bottom-up on open and top-down on close. */
+function FabItem({ item, index, open }: { item: ItemDef; index: number; open: boolean }) {
+  const theme = useTheme();
+  const reduced = useReducedMotion();
+  const p = useSharedValue(0);
+  // index 0 is the topmost item; the item closest to the FAB (last) appears first.
+  const offset = (NUM_ITEMS - index) * (FAB_SIZE + GAP);
+
+  useEffect(() => {
+    if (reduced) {
+      p.set(withTiming(open ? 1 : 0, { duration: Duration.fast }));
+      return;
+    }
+    p.set(
+      open
+        ? withDelay((NUM_ITEMS - 1 - index) * ITEM_STAGGER, withSpring(1, Springs.bouncy))
+        : withDelay(index * 20, withTiming(0, { duration: Duration.fast })),
+    );
+  }, [open, index, reduced, p]);
+
+  const style = useAnimatedStyle(() => ({
+    opacity: Math.min(1, Math.max(0, p.value)),
+    transform: [
+      { translateY: -offset * p.value },
+      { scale: 0.6 + 0.4 * p.value },
+    ],
+  }));
+
+  return (
+    <Animated.View style={[styles.menuItemWrapper, style]} pointerEvents={open ? 'auto' : 'none'}>
+      <PressableScale
+        onPress={item.onPress}
+        disabled={item.disabled}
+        scaleTo={0.92}
+        style={[item.disabled && styles.itemDisabled]}
+      >
+        <View style={[styles.iconButton, { backgroundColor: theme.accent }]}>
+          <item.icon size={22} color={theme.background} strokeWidth={2.5} />
+          <ThemedText style={[styles.innerLabel, { color: theme.background }]}>{item.label}</ThemedText>
+        </View>
+      </PressableScale>
+    </Animated.View>
+  );
+}
 
 export function FABMenu({
   isMember,
   communityId,
-  userId,
+  userId: _userId,
   communitySport,
   inCooldown,
-  cooldownRemainingMs,
-  formatCooldown,
+  cooldownRemainingMs: _cooldownRemainingMs,
+  formatCooldown: _formatCooldown,
   openPing,
   setCreatePostInitialTab,
   setCreatePostModalVisible,
   router,
   onFabMenuClose,
+  hidden = false,
 }: FABMenuProps) {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const reduced = useReducedMotion();
   const [fabMenuOpen, setFabMenuOpen] = useState(false);
 
-  const rotation = useSharedValue<number>(0);
+  const rotation = useSharedValue(0);
+  const backdrop = useSharedValue(0);
+  const visible = useSharedValue(1);
 
-  const progress0 = useSharedValue(0);
-  const progress1 = useSharedValue(0);
-  const progress2 = useSharedValue(0);
-  const progress3 = useSharedValue(0);
+  useEffect(() => {
+    rotation.set(reduced ? 0 : withSpring(fabMenuOpen ? 45 : 0, Springs.snappy));
+    backdrop.set(withTiming(fabMenuOpen ? 0.4 : 0, { duration: Duration.base }));
+  }, [fabMenuOpen, reduced, rotation, backdrop]);
 
-  const itemProgress = useMemo(
-    () => [progress0, progress1, progress2, progress3],
-    [progress0, progress1, progress2, progress3]
-  );
-
-  const springConfig = useMemo(
-    () => ({ damping: 16, stiffness: 180, mass: 0.8, overshootClamping: true }),
-    []
-  );
+  // Collapse the menu when hiding the FAB.
+  useEffect(() => {
+    visible.set(withTiming(hidden && !fabMenuOpen ? 0 : 1, { duration: Duration.base }));
+  }, [hidden, fabMenuOpen, visible]);
 
   const fabContainerStyle = {
     position: 'absolute' as const,
@@ -84,166 +139,77 @@ export function FABMenu({
     justifyContent: 'flex-end' as const,
   };
 
-  const closeMenu = useCallback(() => {
-    setFabMenuOpen(false);
-    runOnJS(() => { rotation.value = withSpring(0); })();
-
-    itemProgress.forEach((item, index) => {
-      const delay = index * 20;
-      setTimeout(() => {
-        item.value = withTiming(0, { duration: 100, easing: Easing.in(Easing.cubic) });
-      }, delay);
-    });
-  }, [rotation, itemProgress]);
+  const closeMenu = useCallback(() => setFabMenuOpen(false), []);
 
   const toggleMenu = useCallback(() => {
-    const nextState = !fabMenuOpen;
-    setFabMenuOpen(nextState);
-
-    if (nextState) {
-      runOnJS(() => { rotation.value = withSpring(45, springConfig); })();
-
-      itemProgress.forEach((item, index) => {
-        const delay = (NUM_ITEMS - 1 - index) * 30;
-        setTimeout(() => {
-          item.value = withSpring(1, springConfig);
-        }, delay);
-      });
-    } else {
-      closeMenu();
-    }
+    haptics.light();
+    setFabMenuOpen((o) => !o);
     onFabMenuClose();
-  }, [fabMenuOpen, onFabMenuClose, closeMenu, rotation, itemProgress, springConfig]);
+  }, [onFabMenuClose]);
 
   const handlePing = useCallback(() => {
     openPing();
-    setTimeout(closeMenu, 50);
+    closeMenu();
   }, [openPing, closeMenu]);
 
   const handleWrite = useCallback(() => {
     setCreatePostInitialTab('write');
     setCreatePostModalVisible(true);
-    setTimeout(closeMenu, 50);
+    closeMenu();
   }, [setCreatePostInitialTab, setCreatePostModalVisible, closeMenu]);
 
   const handlePhoto = useCallback(() => {
     setCreatePostInitialTab('photo');
     setCreatePostModalVisible(true);
-    setTimeout(closeMenu, 50);
+    closeMenu();
   }, [setCreatePostInitialTab, setCreatePostModalVisible, closeMenu]);
 
   const handleMatch = useCallback(() => {
     if (communityId && communitySport) {
       router.push(`/add-match?communityId=${communityId}&sport=${communitySport}`);
     }
-    setTimeout(closeMenu, 50);
+    closeMenu();
   }, [communityId, communitySport, router, closeMenu]);
 
   const animatedFAB = useAnimatedStyle(() => ({
     transform: [{ rotate: `${rotation.value}deg` }],
   }));
-
-  const animatedStyle0 = useAnimatedStyle(() => {
-    const itemOffset = (NUM_ITEMS - 0) * (FAB_SIZE + GAP);
-    return {
-      transform: [
-        { translateY: interpolate(progress0.value, [0, 1], [0, -itemOffset], Extrapolation.CLAMP) },
-        { scale: interpolate(progress0.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
-      ],
-      opacity: interpolate(progress0.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    };
-  });
-
-  const animatedStyle1 = useAnimatedStyle(() => {
-    const itemOffset = (NUM_ITEMS - 1) * (FAB_SIZE + GAP);
-    return {
-      transform: [
-        { translateY: interpolate(progress1.value, [0, 1], [0, -itemOffset], Extrapolation.CLAMP) },
-        { scale: interpolate(progress1.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
-      ],
-      opacity: interpolate(progress1.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    };
-  });
-
-  const animatedStyle2 = useAnimatedStyle(() => {
-    const itemOffset = (NUM_ITEMS - 2) * (FAB_SIZE + GAP);
-    return {
-      transform: [
-        { translateY: interpolate(progress2.value, [0, 1], [0, -itemOffset], Extrapolation.CLAMP) },
-        { scale: interpolate(progress2.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
-      ],
-      opacity: interpolate(progress2.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    };
-  });
-
-  const animatedStyle3 = useAnimatedStyle(() => {
-    const itemOffset = (NUM_ITEMS - 3) * (FAB_SIZE + GAP);
-    return {
-      transform: [
-        { translateY: interpolate(progress3.value, [0, 1], [0, -itemOffset], Extrapolation.CLAMP) },
-        { scale: interpolate(progress3.value, [0, 1], [0.5, 1], Extrapolation.CLAMP) },
-      ],
-      opacity: interpolate(progress3.value, [0, 1], [0, 1], Extrapolation.CLAMP),
-    };
-  });
-
-  const animatedStyles = [animatedStyle0, animatedStyle1, animatedStyle2, animatedStyle3];
+  const backdropStyle = useAnimatedStyle(() => ({ opacity: backdrop.value }));
+  const containerVisibility = useAnimatedStyle(() => ({
+    opacity: visible.value,
+    transform: [{ translateY: (1 - visible.value) * 90 }],
+  }));
 
   if (!isMember) return null;
 
+  const items: ItemDef[] = [
+    { icon: Megaphone, label: 'PING', disabled: inCooldown, onPress: handlePing },
+    { icon: Edit, label: 'WRITE', disabled: false, onPress: handleWrite },
+    { icon: Camera, label: 'PHOTO', disabled: false, onPress: handlePhoto },
+    { icon: Trophy, label: 'MATCH', disabled: false, onPress: handleMatch },
+  ];
+
   return (
     <>
-      {/* Invisible overlay for tap-outside dismiss */}
-      {fabMenuOpen && (
-        <View style={styles.fabBackdrop}>
-          <Pressable onPress={closeMenu} style={StyleSheet.absoluteFill} />
-        </View>
-      )}
+      {/* Dim backdrop; tap outside dismisses. Stays mounted so it can fade out. */}
+      <View style={styles.fabBackdrop} pointerEvents={fabMenuOpen ? 'auto' : 'none'}>
+        <Animated.View style={[StyleSheet.absoluteFill, styles.dim, backdropStyle]} />
+        <Pressable onPress={closeMenu} style={StyleSheet.absoluteFill} />
+      </View>
 
-      <View style={fabContainerStyle} pointerEvents="box-none">
-        {/* Action items container */}
+      <Animated.View style={[fabContainerStyle, containerVisibility]} pointerEvents={hidden && !fabMenuOpen ? 'none' : 'box-none'}>
         <View style={styles.menuItemsContainer} pointerEvents="box-none">
-          {[
-            { icon: Megaphone, label: 'PING', disabled: inCooldown, onPress: handlePing },
-            { icon: Edit, label: 'WRITE', disabled: false, onPress: handleWrite },
-            { icon: Camera, label: 'PHOTO', disabled: false, onPress: handlePhoto },
-            { icon: Trophy, label: 'MATCH', disabled: false, onPress: handleMatch },
-          ].map((item, index) => (
-            <Animated.View
-              key={item.label}
-              style={[styles.menuItemWrapper, animatedStyles[index]]}
-              pointerEvents={fabMenuOpen ? 'auto' : 'none'}
-            >
-              <Pressable
-                onPress={item.onPress}
-                disabled={item.disabled}
-                style={[item.disabled && styles.itemDisabled]}
-              >
-                <View style={[styles.iconButton, { backgroundColor: theme.accent }]}>
-                  <item.icon size={22} color={theme.background} strokeWidth={2.5} />
-                  <ThemedText style={[styles.innerLabel, { color: theme.background }]}>
-                    {item.label}
-                  </ThemedText>
-                </View>
-              </Pressable>
-            </Animated.View>
+          {items.map((item, index) => (
+            <FabItem key={item.label} item={item} index={index} open={fabMenuOpen} />
           ))}
         </View>
 
-        {/* Main Floating Action Button */}
-        <Pressable
-          onPress={toggleMenu}
-          style={({ pressed }) => [
-            styles.fabMain,
-            { backgroundColor: theme.accent },
-            pressed && { opacity: 0.8 },
-          ]}
-        >
+        <PressableScale onPress={toggleMenu} scaleTo={0.92} style={[styles.fabMain, { backgroundColor: theme.accent }]}>
           <Animated.View style={animatedFAB}>
             <Plus size={28} color={theme.background} strokeWidth={2.5} />
           </Animated.View>
-        </Pressable>
-      </View>
+        </PressableScale>
+      </Animated.View>
     </>
   );
 }
@@ -253,8 +219,10 @@ const styles = StyleSheet.create({
     ...StyleSheet.absoluteFill,
     width: SCREEN_WIDTH,
     height: SCREEN_HEIGHT,
-    backgroundColor: 'transparent',
     zIndex: 199,
+  },
+  dim: {
+    backgroundColor: '#000',
   },
   menuItemsContainer: {
     position: 'absolute',

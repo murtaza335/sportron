@@ -14,6 +14,8 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { alert } from '@/lib/alert';
 import { MatchLineupSelector } from '@/components/MatchLineupSelector';
+import { celebrate } from '@/components/motion/Confetti';
+import { haptics } from '@/lib/haptics';
 import { ScoreCounter } from '@/components/ScoreCounter';
 import { Button } from '@/components/ui/Button';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -126,9 +128,12 @@ try {
           player_score: playerScore,
           opponent_score: opponentScore,
         });
+        haptics.success();
+        if (playerScore > opponentScore) celebrate();
         alert('Match Recorded', 'Waiting for opponent approval.');
         router.back();
     } catch (error) {
+      haptics.error();
       alert('Save failed', error instanceof Error ? error.message : 'Could not save match');
     } finally {
       setSaving(false);

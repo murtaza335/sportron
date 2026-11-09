@@ -1,7 +1,11 @@
+import Animated, { FadeIn, FadeOutRight, LinearTransition } from 'react-native-reanimated';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
+import { Duration, RM } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -122,7 +126,7 @@ export default function PendingMatchesScreen() {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
         <Stack.Screen options={{ ...themedHeader, headerTitle: () => <ThemedText style={{ fontSize: 18, fontWeight: '700', color: theme.text }}>{'Pending Matches'}</ThemedText> }} />
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />
       </View>
     );
   }
@@ -151,26 +155,30 @@ export default function PendingMatchesScreen() {
         }
       >
         {matches.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Clock size={48} color={theme.textSecondary} strokeWidth={1.5} />
+          <EmptyReveal style={styles.emptyState} icon={<Clock size={48} color={theme.textSecondary} strokeWidth={1.5} />}>
             <ThemedText variant="heading" style={{ marginTop: Spacing.md, color: theme.textSecondary }}>
               {'No Pending Matches'}
             </ThemedText>
             <ThemedText variant="body" muted style={{ marginTop: Spacing.xs, textAlign: 'center', paddingHorizontal: Spacing.lg, color: theme.textSecondary }}>
               {'You have no pending matches to review.'}
             </ThemedText>
-          </View>
+          </EmptyReveal>
         ) : (
           <View style={styles.list}>
             {matches.map((match) => (
-              <MatchCard
+              <Animated.View
                 key={match.id}
-                match={toMatchWithProfiles(match)}
-                currentUserId={user?.id}
-                showYoursBadge={false}
-                communityId={id}
-                onPress={() => handleMatchPress(match)}
-              />
+                layout={LinearTransition.springify().reduceMotion(RM)}
+                entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
+                exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
+                <MatchCard
+                  match={toMatchWithProfiles(match)}
+                  currentUserId={user?.id}
+                  showYoursBadge={false}
+                  communityId={id}
+                  onPress={() => handleMatchPress(match)}
+                />
+              </Animated.View>
             ))}
           </View>
         )}

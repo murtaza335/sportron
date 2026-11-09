@@ -1,3 +1,8 @@
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { haptics } from '@/lib/haptics';
 import { Sheet } from '@/components/motion/Sheet';
 import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
@@ -20,7 +25,7 @@ import {
   X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
@@ -354,32 +359,22 @@ export default function CommunityDetailScreen() {
 
   // Not memoised by hand: the React Compiler is enabled, and a manual useMemo here previously
   // went stale because it omitted theme / id / user / handlers from its dependencies (BUG-M4).
-  const feedContent = (() => {
-    // Inline styles for skeleton loader
-    const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
-    const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
-    const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
-    const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
+  const firstFeedLoad = useFirstLoad(postsLoading);
+  const [fabHidden, setFabHidden] = useState(false);
+  const fabHiddenRef = useRef(false);
+  const lastScrollY = useRef(0);
 
+  const feedContent = (() => {
     if (postsLoading && combinedFeed.length === 0) {
-      return (
-        <View style={skeletonContainerStyle}>
-          {[...Array(3)].map((_, i) => (
-            <View key={i} style={skeletonCardStyle}>
-              <View style={skeletonLineStyle} />
-              <View style={skeletonLineShortStyle} />
-              <View style={skeletonLineStyle} />
-            </View>
-          ))}
-        </View>
-      );
+      return <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />;
     }
     if (combinedFeed.length > 0) {
       return (
         <>
           {combinedFeed.map((item, index) => (
-            <Pressable
-              key={`${item.type}-${item.data.id}`}
+            <FadeInItem key={`${item.type}-${item.data.id}`} index={index} animate={firstFeedLoad} lateFade>
+            <PressableScale
+              scaleTo={0.985}
               onPress={() => {
                 if (item.type === 'post') {
                   handlePostPress(item.data);
@@ -387,7 +382,7 @@ export default function CommunityDetailScreen() {
                   handleMatchPress(item.data);
                 }
               }}
-              style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
+              style={styles.feedItem}
               hitSlop={8}
             >
               {item.type === 'post' ? (
@@ -406,18 +401,11 @@ export default function CommunityDetailScreen() {
                   showYoursBadge={false}
                 />
               )}
-            </Pressable>
+            </PressableScale>
+            </FadeInItem>
           ))}
           {(loadingMorePosts || loadingMoreMatches) && (
-            <View style={skeletonContainerStyle}>
-              {[...Array(3)].map((_, i) => (
-                <View key={i} style={skeletonCardStyle}>
-                  <View style={skeletonLineStyle} />
-                  <View style={skeletonLineShortStyle} />
-                  <View style={skeletonLineStyle} />
-                </View>
-              ))}
-            </View>
+            <SkeletonList Item={FeedItemSkeleton} count={2} style={{ padding: Spacing.lg }} />
           )}
           {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
             <View
@@ -728,8 +716,10 @@ export default function CommunityDetailScreen() {
       await sendPing(id, user.id, pingMessage.trim());
       setPingMessage('');
       setShowPingModal(false);
+      haptics.success();
       alert('Ping Sent', 'Notification sent to all members.');
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to send ping.');
     } finally {
       setSendingPing(false);
@@ -744,9 +734,11 @@ export default function CommunityDetailScreen() {
     try {
       if (community?.visibility === 'restricted') {
         await requestToJoinCommunity(id, user.id);
+        haptics.success();
         alert('Request Sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
+        haptics.success();
         setMembership({
           community_id: id,
           profile_id: user.id,
@@ -761,6 +753,7 @@ export default function CommunityDetailScreen() {
       }
       refresh();
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to join.');
     }
   };
@@ -801,7 +794,7 @@ export default function CommunityDetailScreen() {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
         <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />
       </View>
     );
   }
@@ -861,6 +854,15 @@ export default function CommunityDetailScreen() {
         scrollEventThrottle={16}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const dy = contentOffset.y - lastScrollY.current;
+          if (Math.abs(dy) > 8) {
+            const goingDown = dy > 0 && contentOffset.y > 80;
+            if (goingDown !== fabHiddenRef.current) {
+              fabHiddenRef.current = goingDown;
+              setFabHidden(goingDown);
+            }
+            lastScrollY.current = contentOffset.y;
+          }
           const threshold = contentSize.height - layoutMeasurement.height * 1.3;
           if (contentOffset.y >= threshold) {
             if (!loadingMorePosts && hasMorePosts) loadMorePosts();
@@ -1074,6 +1076,7 @@ export default function CommunityDetailScreen() {
         setCreatePostModalVisible={setCreatePostModalVisible}
         router={router}
         onFabMenuClose={() => { }}
+        hidden={fabHidden}
       />
 
       {/* Ping Input Modal (shown when Ping selected from FAB) */}
