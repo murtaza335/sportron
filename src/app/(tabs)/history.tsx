@@ -1,15 +1,7 @@
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
 
@@ -345,7 +337,7 @@ export default function SessionsScreen() {
             ]}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={listRefreshing} onRefresh={onRefresh} tintColor={theme.text} />
+              <ThemedRefreshControl refreshing={listRefreshing} onRefresh={onRefresh} />
             }
             ListHeaderComponent={
               (isHistory || scope === 'all') ? (

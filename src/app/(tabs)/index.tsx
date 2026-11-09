@@ -1,5 +1,6 @@
 import { useCallback, useRef } from 'react';
-import { ActivityIndicator, Animated, Easing, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -92,7 +93,7 @@ export default function CommunitiesScreen() {
         style={styles.flex}
         contentContainerStyle={[styles.container, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
         {loading ? (

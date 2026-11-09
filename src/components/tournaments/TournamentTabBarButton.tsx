@@ -1,9 +1,12 @@
 import { Trophy } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
-import { Animated, Pressable, StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import { useEffect } from 'react';
+import { StyleSheet, View, type GestureResponderEvent } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 
+import { PressableScale } from '@/components/motion/PressableScale';
 import { Shadows } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { Springs } from '@/lib/motion';
 
 type TabBarButtonProps = {
   onPress?: ((e: GestureResponderEvent) => void) | null;
@@ -19,26 +22,21 @@ const RAISE = 20;
 export function TournamentTabBarButton(props: TabBarButtonProps) {
   const theme = useTheme();
   const focused = !!props.accessibilityState?.selected;
-  const [press] = useState(() => new Animated.Value(1));
-  const [focus] = useState(() => new Animated.Value(focused ? 1 : 0));
+  const focus = useSharedValue(focused ? 1 : 0);
 
   useEffect(() => {
-    Animated.spring(focus, { toValue: focused ? 1 : 0, useNativeDriver: true, speed: 20, bounciness: 8 }).start();
+    focus.set(withSpring(focused ? 1 : 0, Springs.bouncy));
   }, [focused, focus]);
 
+  const focusStyle = useAnimatedStyle(() => ({ transform: [{ scale: 1 + focus.value * 0.06 }] }));
   const shadow = theme.resolvedColorScheme === 'dark' ? Shadows.dark.elevated : Shadows.light.elevated;
-  const scale = Animated.multiply(
-    press,
-    focus.interpolate({ inputRange: [0, 1], outputRange: [1, 1.06] }),
-  );
 
   return (
     <View style={styles.wrap} pointerEvents="box-none">
-      <Pressable
+      <PressableScale
         onPress={props.onPress ?? undefined}
         onLongPress={props.onLongPress ?? undefined}
-        onPressIn={() => Animated.spring(press, { toValue: 0.96, useNativeDriver: true, speed: 50, bounciness: 4 }).start()}
-        onPressOut={() => Animated.spring(press, { toValue: 1, useNativeDriver: true, speed: 20, bounciness: 8 }).start()}
+        scaleTo={0.9}
         accessibilityRole="button"
         accessibilityLabel="Tournaments"
         accessibilityState={props.accessibilityState ?? undefined}
@@ -53,13 +51,13 @@ export function TournamentTabBarButton(props: TabBarButtonProps) {
               backgroundColor: theme.accent,
               borderColor: theme.background,
               borderWidth: focused ? 3 : 0,
-              transform: [{ scale }],
             },
+            focusStyle,
           ]}
         >
           <Trophy size={26} color="#fff" strokeWidth={2.2} />
         </Animated.View>
-      </Pressable>
+      </PressableScale>
     </View>
   );
 }

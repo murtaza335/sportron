@@ -1,13 +1,7 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { Check, ChevronLeft, UserPlus, X } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
@@ -119,7 +113,7 @@ export default function CommunityJoinRequestsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
         {loading ? (

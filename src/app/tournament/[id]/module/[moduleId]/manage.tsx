@@ -1,7 +1,8 @@
 import { Check, ChevronRight, Circle } from 'lucide-react-native';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { SectionLabel } from '@/components/tournaments/form';
@@ -161,7 +162,7 @@ export default function ModuleManageScreen() {
     <ScrollView
       style={{ backgroundColor: theme.background }}
       contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
-      refreshControl={<RefreshControl refreshing={m.refreshing} onRefresh={m.refresh} tintColor={theme.text} />}
+      refreshControl={<ThemedRefreshControl refreshing={m.refreshing} onRefresh={m.refresh} />}
     >
       <View style={{ gap: Spacing.sm }}>
         <View style={styles.statusRow}>

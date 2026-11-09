@@ -1,16 +1,8 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
@@ -200,10 +192,9 @@ export default function CommunityMembersScreen() {
             keyExtractor={(item) => item.profile_id}
             contentContainerStyle={styles.list}
             refreshControl={
-              <RefreshControl
+              <ThemedRefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor={theme.text}
               />
             }
             ListHeaderComponent={isAdmin ? (

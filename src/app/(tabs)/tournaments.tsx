@@ -1,6 +1,7 @@
 import { Trophy } from 'lucide-react-native';
 import { useState } from 'react';
-import { ActivityIndicator, FlatList, RefreshControl, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TournamentCard } from '@/components/tournaments/TournamentCard';
@@ -44,7 +45,7 @@ export default function TournamentsScreen() {
         renderItem={({ item }) => <TournamentCard tournament={item} />}
         contentContainerStyle={[styles.list, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
-        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />}
+        refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         ListEmptyComponent={
           loading ? (
             <ActivityIndicator color={theme.text} style={styles.loader} />

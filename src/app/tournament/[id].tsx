@@ -1,7 +1,8 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
-import { ActivityIndicator, Image, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ChampionsStrip } from '@/components/tournaments/ChampionsStrip';
@@ -57,7 +58,7 @@ export default function TournamentScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />}
+          refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}
         >
           {t.status === 'cancelled' && (
             <View style={[styles.banner, { backgroundColor: `${theme.error}26` }]}>

@@ -1,14 +1,8 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
 import { MatchCard } from '@/components/MatchCard';
@@ -150,10 +144,9 @@ export default function PendingMatchesScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
+          <ThemedRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={theme.text}
           />
         }
       >

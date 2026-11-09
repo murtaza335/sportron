@@ -1,117 +1,110 @@
+import { useEffect, useState } from 'react';
+import { StyleSheet, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withDelay,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+
 import { useTheme } from '@/contexts/ThemeContext';
-import { useEffect, useMemo, useRef } from 'react';
-import { Animated, Easing, StyleSheet, View } from 'react-native';
+import { Duration, Easings, Springs } from '@/lib/motion';
 
 const APP_NAME = 'Sportron';
 const LETTER_STAGGER = 70;
+const LOGO_MS = 350;
+const LETTER_MS = 320;
+const UNDERLINE_MS = 350;
 const HOLD_MS = 500;
+const LETTERS_START = LOGO_MS;
+const UNDERLINE_START = LETTERS_START + (APP_NAME.length - 1) * LETTER_STAGGER + LETTER_MS;
+const INTRO_TOTAL = UNDERLINE_START + UNDERLINE_MS + HOLD_MS;
 
-export function SplashScreen({ onComplete }: { onComplete: () => void }) {
+function Letter({ char, index, reduced, color }: { char: string; index: number; reduced: boolean; color: string }) {
+  const p = useSharedValue(reduced ? 1 : 0);
+  useEffect(() => {
+    if (reduced) return;
+    p.set(withDelay(LETTERS_START + index * LETTER_STAGGER, withTiming(1, { duration: LETTER_MS, easing: Easing.out(Easing.back(1.8)) })));
+  }, [p, index, reduced]);
+  const style = useAnimatedStyle(() => ({
+    opacity: Math.min(1, p.value),
+    transform: [{ translateY: (1 - p.value) * 18 }],
+  }));
+  return <Animated.Text style={[styles.letter, { color }, style]}>{char}</Animated.Text>;
+}
+
+/**
+ * Animated splash. Rendered as an overlay above the app. It plays its intro, then — once `ready`
+ * (fonts + auth resolved) — scales the logo up and fades out, calling `onComplete` when gone.
+ */
+export function SplashScreen({ ready, onComplete }: { ready: boolean; onComplete: () => void }) {
   const theme = useTheme();
-  const onCompleteRef = useRef(onComplete);
-  onCompleteRef.current = onComplete;
+  const reduced = useReducedMotion();
+  const [introDone, setIntroDone] = useState(false);
 
-  const logoScale = useRef(new Animated.Value(0.6)).current;
-  const logoOpacity = useRef(new Animated.Value(0)).current;
-  const letters = useMemo(
-    () => APP_NAME.split('').map(() => new Animated.Value(0)),
-    []
-  );
-  const underline = useRef(new Animated.Value(0)).current;
+  const logo = useSharedValue(reduced ? 1 : 0);
+  const logoScale = useSharedValue(reduced ? 1 : 0.6);
+  const underline = useSharedValue(reduced ? 1 : 0);
+  const exit = useSharedValue(1);
+  const exitScale = useSharedValue(1);
 
   useEffect(() => {
-    const animation = Animated.sequence([
-      Animated.parallel([
-        Animated.timing(logoOpacity, {
-          toValue: 1,
-          duration: 350,
-          easing: Easing.out(Easing.cubic),
-          useNativeDriver: true,
-        }),
-        Animated.spring(logoScale, {
-          toValue: 1,
-          friction: 5,
-          tension: 80,
-          useNativeDriver: true,
-        }),
-      ]),
-      Animated.stagger(
-        LETTER_STAGGER,
-        letters.map((v) =>
-          Animated.timing(v, {
-            toValue: 1,
-            duration: 320,
-            easing: Easing.out(Easing.back(1.8)),
-            useNativeDriver: true,
-          })
-        )
-      ),
-      Animated.timing(underline, {
-        toValue: 1,
-        duration: 350,
-        easing: Easing.out(Easing.cubic),
-        useNativeDriver: true,
-      }),
-      Animated.delay(HOLD_MS),
-    ]);
+    if (reduced) {
+      const id = setTimeout(() => setIntroDone(true), 300);
+      return () => clearTimeout(id);
+    }
+    logo.set(withTiming(1, { duration: LOGO_MS, easing: Easings.standard }));
+    logoScale.set(withSpring(1, Springs.bouncy));
+    underline.set(withDelay(UNDERLINE_START, withTiming(1, { duration: UNDERLINE_MS, easing: Easings.standard })));
+    const id = setTimeout(() => setIntroDone(true), INTRO_TOTAL);
+    return () => clearTimeout(id);
+  }, [reduced, logo, logoScale, underline]);
 
-    animation.start(({ finished }) => {
-      if (finished) onCompleteRef.current();
-    });
+  useEffect(() => {
+    if (!(introDone && ready)) return;
+    exit.set(withTiming(0, { duration: Duration.base, easing: Easings.standard }));
+    if (!reduced) exitScale.set(withTiming(1.08, { duration: Duration.base, easing: Easings.standard }));
+    const id = setTimeout(onComplete, Duration.base + 20);
+    return () => clearTimeout(id);
+  }, [introDone, ready, reduced, exit, exitScale, onComplete]);
 
-    return () => animation.stop();
-  }, [letters, logoOpacity, logoScale, underline]);
+  const rootStyle = useAnimatedStyle(() => ({ opacity: exit.value }));
+  const logoStyle = useAnimatedStyle(() => ({
+    opacity: logo.value,
+    transform: [{ scale: logoScale.value * exitScale.value }],
+  }));
+  const underlineStyle = useAnimatedStyle(() => ({
+    opacity: underline.value,
+    transform: [{ scaleX: underline.value }],
+  }));
 
   return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+    <Animated.View
+      pointerEvents={introDone && ready ? 'none' : 'auto'}
+      style={[StyleSheet.absoluteFill, styles.container, { backgroundColor: theme.background }, rootStyle]}>
       <Animated.Image
         source={require('@/assets/images/icon-512.png')}
-        style={[styles.logo, { opacity: logoOpacity, transform: [{ scale: logoScale }] }]}
+        style={[styles.logo, logoStyle]}
         resizeMode="contain"
       />
       <View style={styles.nameRow}>
         {APP_NAME.split('').map((char, i) => (
-          <Animated.Text
-            key={i}
-            style={[
-              styles.letter,
-              {
-                color: theme.text,
-                opacity: letters[i],
-                transform: [
-                  {
-                    translateY: letters[i].interpolate({
-                      inputRange: [0, 1],
-                      outputRange: [18, 0],
-                    }),
-                  },
-                ],
-              },
-            ]}
-          >
-            {char}
-          </Animated.Text>
+          <Letter key={i} char={char} index={i} reduced={reduced} color={theme.text} />
         ))}
       </View>
-      <Animated.View
-        style={[
-          styles.underline,
-          {
-            backgroundColor: theme.tabBarActive ?? theme.text,
-            opacity: underline,
-            transform: [{ scaleX: underline }],
-          },
-        ]}
-      />
-    </View>
+      <Animated.View style={[styles.underline, { backgroundColor: theme.tabBarActive ?? theme.text }, underlineStyle]} />
+    </Animated.View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
-    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
+    zIndex: 100,
   },
   logo: {
     width: 110,

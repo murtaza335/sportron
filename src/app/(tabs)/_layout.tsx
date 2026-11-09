@@ -1,9 +1,21 @@
-import { router, Tabs } from 'expo-router';
+import { router, Tabs, useIsFocused } from 'expo-router';
 import { CalendarDays, Activity, Flame, History, MessageSquare, Plus, Trophy, Users, X, User } from 'lucide-react-native';
-import { Animated, ColorValue, Easing, Platform, Pressable, Text, View } from 'react-native';
-import { useRef, useState, useSyncExternalStore, useEffect } from 'react';
+import { ColorValue, Platform, Pressable, Text, View } from 'react-native';
+import Animated, {
+  Easing,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withRepeat,
+  withSequence,
+  withSpring,
+  withTiming,
+} from 'react-native-reanimated';
+import { useState, useSyncExternalStore, useEffect } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
+import { PressableScale } from '@/components/motion/PressableScale';
 import { StreakModal } from '@/components/StreakModal';
 import { TabBarBumpBackground } from '@/components/tournaments/TabBarBumpBackground';
 import { TournamentTabBarButton } from '@/components/tournaments/TournamentTabBarButton';
@@ -22,6 +34,8 @@ import {
   setSessionsView,
   subscribeSessionsView,
 } from '@/lib/sessionsView';
+import { haptics } from '@/lib/haptics';
+import { Duration, Springs } from '@/lib/motion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
@@ -50,23 +64,28 @@ function ProfileTabIcon({ color, size }: { color: ColorValue; size: number }) {
   return (
     <View style={{ position: 'relative' }}>
       <User size={size} color={color} strokeWidth={2.2} />
-      {showDot && (
-        <View
-          style={{
-            position: 'absolute',
-            top: -2,
-            right: -2,
-            width: 10,
-            height: 10,
-            borderRadius: 5,
-            backgroundColor: theme.error,
-            borderWidth: 2,
-            borderColor: theme.background,
-          }}
-        />
-      )}
+      <AnimatedBadge
+        visible={showDot}
+        size={10}
+        style={{ position: 'absolute', top: -2, right: -2, borderWidth: 2, borderColor: theme.background }}
+      />
     </View>
   );
+}
+
+/** Active tab icon springs up a touch when it becomes focused. */
+function TabIcon({ focused, children }: { focused: boolean; children: React.ReactNode }) {
+  const reduced = useReducedMotion();
+  const scale = useSharedValue(1);
+  useEffect(() => {
+    if (reduced || !focused) {
+      scale.set(1);
+      return;
+    }
+    scale.set(withSequence(withTiming(1.12, { duration: Duration.instant }), withSpring(1, Springs.bouncy)));
+  }, [focused, reduced, scale]);
+  const style = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
+  return <Animated.View style={style}>{children}</Animated.View>;
 }
 
 function DefaultHeaderTitle({ title }: { title: string }) {
@@ -113,168 +132,78 @@ function SessionsHeaderRight() {
 
 function CommunitiesHeaderProfile() {
   const { profile } = useAuth();
-  const scaleAnim = useRef(new Animated.Value(1));
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim.current, {
-      toValue: 0.9,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim.current, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 20,
-      bounciness: 8,
-    }).start();
-  };
 
   return (
-    <Pressable
-      onPressIn={handlePressIn}
-      onPressOut={handlePressOut}
+    <PressableScale
+      scaleTo={0.9}
       onPress={() => router.navigate('/profile')}
       style={{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 4 : 0 }}
       hitSlop={12}
       accessibilityLabel="Open profile"
       accessibilityRole="button"
     >
-      {/* eslint-disable-next-line react-hooks/refs */}
-      <Animated.View style={{ transform: [{ scale: scaleAnim.current }] }}>
-        <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
-      </Animated.View>
-    </Pressable>
+      <UserAvatar avatarUrl={profile?.avatar_url} size={34} />
+    </PressableScale>
   );
 }
 
 function CreateSessionButton() {
-  const pulseAnim = useRef(new Animated.Value(0));
-  const glowAnim = useRef(new Animated.Value(0));
-  const scaleAnim = useRef(new Animated.Value(1));
+  const reduced = useReducedMotion();
+  const focused = useIsFocused();
+  const breathe = useSharedValue(0);
 
+  // Calm 2.4s breathing loop; paused when the Sessions tab isn't focused and when reduced motion is on.
   useEffect(() => {
-    const pulse = Animated.loop(
-      Animated.sequence([
-        Animated.timing(pulseAnim.current, {
-          toValue: 1,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(pulseAnim.current, {
-          toValue: 0,
-          duration: 1500,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
+    if (reduced || !focused) {
+      breathe.set(withTiming(0, { duration: Duration.fast }));
+      return;
+    }
+    breathe.set(
+      withRepeat(withTiming(1, { duration: 1200, easing: Easing.inOut(Easing.sin) }), -1, true),
     );
-    pulse.start();
+    return () => breathe.set(0);
+  }, [reduced, focused, breathe]);
 
-    const glow = Animated.loop(
-      Animated.sequence([
-        Animated.timing(glowAnim.current, {
-          toValue: 1,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-        Animated.timing(glowAnim.current, {
-          toValue: 0,
-          duration: 2000,
-          easing: Easing.inOut(Easing.ease),
-          useNativeDriver: true,
-        }),
-      ])
-    );
-    glow.start();
-
-    return () => {
-      pulse.stop();
-      glow.stop();
-    };
-  }, []);
-
-  const handlePressIn = () => {
-    Animated.spring(scaleAnim.current, {
-      toValue: 0.88,
-      useNativeDriver: true,
-      speed: 50,
-      bounciness: 4,
-    }).start();
-  };
-
-  const handlePressOut = () => {
-    Animated.spring(scaleAnim.current, {
-      toValue: 1,
-      useNativeDriver: true,
-      speed: 20,
-      bounciness: 8,
-    }).start();
-  };
+  const glow = useAnimatedStyle(() => ({
+    shadowOpacity: 0.3 + breathe.value * 0.3,
+    shadowRadius: 8 + breathe.value * 8,
+  }));
+  const icon = useAnimatedStyle(() => ({ transform: [{ scale: 1 + breathe.value * 0.08 }] }));
 
   return (
     <View>
       <Animated.View
-        style={{
-          shadowColor: '#10B981',
-          shadowOffset: { width: 0, height: 0 },
-          // eslint-disable-next-line react-hooks/refs
-          shadowOpacity: glowAnim.current.interpolate({
-            inputRange: [0, 1],
-            outputRange: [0.3, 0.6],
-          }),
-          // eslint-disable-next-line react-hooks/refs
-          shadowRadius: glowAnim.current.interpolate({
-            inputRange: [0, 1],
-            outputRange: [8, 16],
-          }),
-          elevation: 8,
-        }}
+        style={[
+          {
+            shadowColor: '#10B981',
+            shadowOffset: { width: 0, height: 0 },
+            elevation: 8,
+          },
+          glow,
+        ]}
       >
-        <Pressable
+        <PressableScale
           onPress={() => router.navigate('/create-session')}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          style={({ pressed }) => [
-            {
-              marginLeft: Spacing.md,
-              paddingTop: Platform.OS === 'ios' ? 4 : 0,
-              width: 44,
-              height: 44,
-              borderRadius: 22,
-              backgroundColor: '#10B981',
-              alignItems: 'center',
-              justifyContent: 'center',
-            },
-            pressed && { opacity: 0.9 },
-          ]}
+          scaleTo={0.88}
+          haptic="light"
+          style={{
+            marginLeft: Spacing.md,
+            paddingTop: Platform.OS === 'ios' ? 4 : 0,
+            width: 44,
+            height: 44,
+            borderRadius: 22,
+            backgroundColor: '#10B981',
+            alignItems: 'center',
+            justifyContent: 'center',
+          }}
           hitSlop={16}
           accessibilityLabel="Create session"
           accessibilityRole="button"
         >
-          <Animated.View
-            style={{
-              transform: [
-                // eslint-disable-next-line react-hooks/refs
-                { scale: scaleAnim.current },
-                {
-                  // eslint-disable-next-line react-hooks/refs
-                  scale: pulseAnim.current.interpolate({
-                    inputRange: [0, 1],
-                    outputRange: [1, 1.08],
-                  }),
-                },
-              ],
-            }}
-          >
+          <Animated.View style={icon}>
             <Plus size={28} color="#fff" strokeWidth={3.5} />
           </Animated.View>
-        </Pressable>
+        </PressableScale>
       </Animated.View>
     </View>
   );
@@ -289,8 +218,9 @@ function CommunitiesHeaderStreak() {
 
   return (
     <>
-      <Pressable
+      <PressableScale
         onPress={() => setModalVisible(true)}
+        scaleTo={0.94}
         style={({ pressed }) => ({
           flexDirection: 'row',
           alignItems: 'center',
@@ -301,7 +231,6 @@ function CommunitiesHeaderStreak() {
           paddingHorizontal: 10,
           paddingVertical: 5,
           borderRadius: Radius.full,
-          transform: pressed ? [{ scale: 0.96 }] : [],
         })}
         hitSlop={12}
         accessibilityLabel={`${streakCount} day streak`}
@@ -316,7 +245,7 @@ function CommunitiesHeaderStreak() {
         <Text style={{ fontSize: 15, fontWeight: '800', color: theme.text }}>
           {streakCount}
         </Text>
-      </Pressable>
+      </PressableScale>
 
       <StreakModal
         visible={modalVisible}
@@ -344,7 +273,9 @@ export default function TabLayout() {
 
   return (
     <Tabs
+      screenListeners={{ tabPress: () => haptics.selection() }}
       screenOptions={{
+        animation: 'shift',
         headerShown: true,
         headerShadowVisible: false,
         headerStyle: commonHeaderStyle,
@@ -381,7 +312,7 @@ export default function TabLayout() {
           headerTitle: () => <DefaultHeaderTitle title="Communities" />,
           headerLeft: () => <CommunitiesHeaderStreak />,
           headerRight: () => <CommunitiesHeaderProfile />,
-          tabBarIcon: ({ color, size }) => <Users size={size} color={color} strokeWidth={2.2} />,
+          tabBarIcon: ({ color, size, focused }) => <TabIcon focused={focused}><Users size={size} color={color} strokeWidth={2.2} /></TabIcon>,
         }}
       />
       <Tabs.Screen
@@ -392,7 +323,7 @@ export default function TabLayout() {
           headerTitle: () => <DefaultHeaderTitle title="Sessions" />,
           headerRight: () => <SessionsHeaderRight />,
           headerLeft: () => <CreateSessionButton />,
-          tabBarIcon: ({ color, size }) => <CalendarDays size={size} color={color} strokeWidth={2.2} />,
+          tabBarIcon: ({ color, size, focused }) => <TabIcon focused={focused}><CalendarDays size={size} color={color} strokeWidth={2.2} /></TabIcon>,
         }}
       />
       <Tabs.Screen
@@ -412,28 +343,18 @@ export default function TabLayout() {
           title: 'Chats',
           tabBarLabel: 'Chats',
           headerTitle: () => <DefaultHeaderTitle title="Chats" />,
-          tabBarIcon: ({ color, size }) => (
-            <View style={{ position: 'relative', paddingBottom: 2 }}>
-              <MessageSquare size={size} color={color} strokeWidth={2.2} />
-              {chatUnreadCount > 0 && (
-                <View style={{
-                  position: 'absolute',
-                  top: -4,
-                  right: -6,
-                  minWidth: 16,
-                  height: 16,
-                  borderRadius: 8,
-                  paddingHorizontal: 4,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                   backgroundColor: theme.success,
-                }}>
-                  <Text style={{ color: '#fff', fontSize: 9, fontWeight: '800' }}>
-                    {chatUnreadCount > 99 ? '99+' : chatUnreadCount}
-                  </Text>
-                </View>
-              )}
-            </View>
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon focused={focused}>
+              <View style={{ position: 'relative', paddingBottom: 2 }}>
+                <MessageSquare size={size} color={color} strokeWidth={2.2} />
+                <AnimatedBadge
+                  count={chatUnreadCount}
+                  size={16}
+                  color={theme.success}
+                  style={{ position: 'absolute', top: -4, right: -6 }}
+                />
+              </View>
+            </TabIcon>
           ),
         }}
       />
@@ -443,21 +364,17 @@ export default function TabLayout() {
           title: 'Activity',
           tabBarLabel: 'Updates',
           headerTitle: () => <DefaultHeaderTitle title="Activity" />,
-          tabBarIcon: ({ color, size }) => (
-            <View style={{ position: 'relative', paddingBottom: 2 }}>
-              <Activity size={size} color={color} strokeWidth={2.2} />
-              {unreadCount > 0 && (
-                <View style={{
-                  position: 'absolute',
-                  top: -4,
-                  right: -6,
-                  width: 10,
-                  height: 10,
-                  borderRadius: 5,
-                   backgroundColor: theme.error,
-                }} />
-              )}
-            </View>
+          tabBarIcon: ({ color, size, focused }) => (
+            <TabIcon focused={focused}>
+              <View style={{ position: 'relative', paddingBottom: 2 }}>
+                <Activity size={size} color={color} strokeWidth={2.2} />
+                <AnimatedBadge
+                  visible={unreadCount > 0}
+                  size={10}
+                  style={{ position: 'absolute', top: -4, right: -6 }}
+                />
+              </View>
+            </TabIcon>
           ),
         }}
       />

@@ -1,7 +1,8 @@
 import { router, Stack } from 'expo-router';
 import { Plus } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
@@ -144,7 +145,7 @@ export default function DiscoverScreen() {
         style={styles.flex}
         contentContainerStyle={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
         {loading ? (

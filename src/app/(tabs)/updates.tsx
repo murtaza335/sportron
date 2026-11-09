@@ -1,5 +1,6 @@
 import { useCallback, useState } from 'react';
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { CheckCheck } from 'lucide-react-native';
 
 import { ActivityCard } from '@/components/ActivityCard';
@@ -149,7 +150,7 @@ export default function UpdatesScreen() {
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={loading} onRefresh={fetchNotifications} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={loading} onRefresh={fetchNotifications} />
         }
       >
         {activeTab === 'action' ? (

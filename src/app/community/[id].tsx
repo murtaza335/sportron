@@ -20,17 +20,8 @@ import {
   X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { CreatePostModal } from '@/components/CreatePostModal';
@@ -877,7 +868,7 @@ export default function CommunityDetailScreen() {
           }
         }}
         refreshControl={
-          <RefreshControl
+          <ThemedRefreshControl
             refreshing={pullRefreshing}
             onRefresh={async () => {
               setPullRefreshing(true);
@@ -889,7 +880,6 @@ export default function CommunityDetailScreen() {
                 setPullRefreshing(false);
               }
             }}
-            tintColor={theme.text}
           />
         }
       >

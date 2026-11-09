@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
-import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, RefreshControl, Text, View } from 'react-native';
+import { StyleSheet, ActivityIndicator, FlatList, Image, Pressable, Text, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { MessageSquare, Users } from 'lucide-react-native';
 
@@ -229,7 +230,7 @@ export default function ChatsScreen() {
             ]}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
+              <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
             }
             ItemSeparatorComponent={() => (
               <View style={[styles.separator, { backgroundColor: theme.border }]} />

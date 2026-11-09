@@ -1,15 +1,8 @@
 import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  useWindowDimensions,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LeagueTable } from '@/components/tournaments/LeagueTable';
@@ -258,7 +251,7 @@ export default function ModuleScreen() {
       ) : (
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
-          refreshControl={<RefreshControl refreshing={m.refreshing} onRefresh={m.refresh} tintColor={theme.text} />}
+          refreshControl={<ThemedRefreshControl refreshing={m.refreshing} onRefresh={m.refresh} />}
         >
           <View style={styles.header}>
             <View style={styles.pills}>

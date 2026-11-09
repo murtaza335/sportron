@@ -2,7 +2,7 @@ import * as Font from 'expo-font';
 import { Stack, useRouter, useSegments } from 'expo-router';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SplashScreen as AnimatedSplashScreen } from '@/components/SplashScreen';
@@ -17,6 +17,7 @@ import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { Duration } from '@/lib/motion';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
@@ -29,7 +30,30 @@ function RootNavigator() {
   const segments = useSegments();
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  // Shared screen option sets (durations live in lib/motion). NOTE: these replace the previous
+  // near-instant `animationDuration: 50`; revert by setting `animation: 'none'` if the old feel is preferred.
+  const web = Platform.OS === 'web';
+  const pushOptions = {
+    headerShown: true,
+    animation: web ? ('none' as const) : ('ios_from_right' as const),
+    animationDuration: Duration.screen,
+    gestureEnabled: true,
+    fullScreenGestureEnabled: true,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: theme.background },
+  };
+  const modalOptions = {
+    presentation: 'fullScreenModal' as const,
+    animation: web ? ('none' as const) : ('slide_from_bottom' as const),
+    animationDuration: Duration.screen,
+  };
+  const fadeOptions = {
+    animation: web ? ('none' as const) : ('fade' as const),
+    animationDuration: Duration.base,
+  };
   const [showSplash, setShowSplash] = useState(true);
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
 
   useEffect(() => {
     const loadFonts = async () => {
@@ -73,14 +97,14 @@ function RootNavigator() {
     }
   }, [session, profile, loading, profileLoading, profileError, segments, router]);
 
-  if (!fontsLoaded || loading || showSplash) {
-    return (
-      <AnimatedSplashScreen onComplete={() => setShowSplash(false)} />
-    );
-  }
+  const appReady = fontsLoaded && !loading;
+  const splash = showSplash ? <AnimatedSplashScreen ready={appReady} onComplete={handleSplashComplete} /> : null;
 
-  if (session && !profile && profileError) {
-    return (
+  let content: React.ReactNode;
+  if (!appReady) {
+    content = <View style={[styles.container, { backgroundColor: theme.background }]} />;
+  } else if (session && !profile && profileError) {
+    content = (
       <View style={[styles.container, styles.retryContainer, { backgroundColor: theme.background }]}>
         <ThemedText variant="body" style={{ textAlign: 'center', marginBottom: 16 }}>
           Could not load your profile. Check your connection and try again.
@@ -88,249 +112,55 @@ function RootNavigator() {
         <Button label="Retry" onPress={() => { refreshProfile(); }} loading={profileLoading} />
       </View>
     );
-  }
-
-  return (
+  } else {
+    content = (
     <KeyboardInsetView style={[styles.container, { backgroundColor: theme.background }]}>
       {Platform.OS !== 'web' && <FCMInitializer />}
       <StatusBar style={theme.resolvedColorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{
         headerShown: false,
-        animationDuration: 50,
         contentStyle: { backgroundColor: theme.background },
         headerStyle: { backgroundColor: theme.background },
         headerTintColor: theme.text,
         headerTitleStyle: { color: theme.text, fontWeight: '600' },
       }}>
-        <Stack.Screen name="login" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="add-match"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="settings"
-          options={{
-            headerShown: true,
-            title: 'Settings',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]"
-          options={{
-            headerShown: true,
-            title: 'Community',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/members"
-          options={{
-            headerShown: true,
-            title: 'Members',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/info"
-          options={{
-            headerShown: true,
-            title: 'Community Info',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/pending-matches"
-          options={{
-            headerShown: true,
-            title: 'Pending Matches',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/edit"
-          options={{
-            headerShown: true,
-            title: 'Edit Community',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="create-community"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="discover"
-          options={{
-            headerShown: true,
-            title: 'Discover',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="create-session"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="chat"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]"
-          options={{
-            headerShown: true,
-            title: 'Tournament',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/manage"
-          options={{
-            headerShown: true,
-            title: 'Manage tournament',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/fields"
-          options={{
-            headerShown: true,
-            title: 'Entry form',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module-form"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]"
-          options={{
-            headerShown: true,
-            title: 'Module',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]/manage"
-          options={{
-            headerShown: true,
-            title: 'Manage module',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]/entry-form"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]/seeding"
-          options={{
-            headerShown: true,
-            title: 'Seeding & bracket',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]/knockout"
-          options={{
-            headerShown: true,
-            title: 'Build knockout',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="tournament/[id]/module/[moduleId]/rounds"
-          options={{
-            headerShown: true,
-            title: 'Rounds',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="profile/[id]"
-          options={{
-            headerShown: true,
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
+        <Stack.Screen name="login" options={fadeOptions} />
+        <Stack.Screen name="onboarding" options={fadeOptions} />
+        <Stack.Screen name="(tabs)" options={fadeOptions} />
+        <Stack.Screen name="add-match" options={modalOptions} />
+        <Stack.Screen name="create-community" options={modalOptions} />
+        <Stack.Screen name="create-session" options={modalOptions} />
+        <Stack.Screen name="chat" options={modalOptions} />
+        <Stack.Screen name="settings" options={{ ...pushOptions, title: 'Settings' }} />
+        <Stack.Screen name="community/[id]" options={{ ...pushOptions, title: 'Community' }} />
+        <Stack.Screen name="community/[id]/members" options={{ ...pushOptions, title: 'Members' }} />
+        <Stack.Screen name="community/[id]/info" options={{ ...pushOptions, title: 'Community Info' }} />
+        <Stack.Screen name="community/[id]/pending-matches" options={{ ...pushOptions, title: 'Pending Matches' }} />
+        <Stack.Screen name="community/[id]/edit" options={{ ...pushOptions, title: 'Edit Community' }} />
+        <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
+        <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
+        <Stack.Screen name="tournament/[id]/manage" options={{ ...pushOptions, title: 'Manage tournament' }} />
+        <Stack.Screen name="tournament/[id]/fields" options={{ ...pushOptions, title: 'Entry form' }} />
+        <Stack.Screen name="tournament/[id]/module-form" options={modalOptions} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Module' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/manage" options={{ ...pushOptions, title: 'Manage module' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/entry-form" options={modalOptions} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/seeding" options={{ ...pushOptions, title: 'Seeding & bracket' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/knockout" options={{ ...pushOptions, title: 'Build knockout' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
+        <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
       <ConfettiHost />
     </KeyboardInsetView>
+    );
+  }
+
+  // The splash stays at a stable position so its intro never restarts when the app mounts beneath it.
+  return (
+    <View style={styles.container}>
+      {content}
+      {splash}
+    </View>
   );
 }
 
