@@ -1,8 +1,9 @@
 import * as Font from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, useRouter, useSegments } from 'expo-router';
+import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SplashScreen as AnimatedSplashScreen } from '@/components/SplashScreen';
@@ -32,26 +33,54 @@ function RootNavigator() {
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
 
+  // Navigation + native window backgrounds must match the theme, otherwise the default (white) shows
+  // through during screen/tab transitions in dark mode.
+  const navTheme = useMemo(
+    () => ({
+      dark: theme.resolvedColorScheme === 'dark',
+      colors: {
+        primary: theme.tabBarActive,
+        background: theme.background,
+        card: theme.background,
+        text: theme.text,
+        border: theme.border,
+        notification: theme.error,
+      },
+      fonts: {
+        regular: { fontFamily: 'System', fontWeight: '400' as const },
+        medium: { fontFamily: 'System', fontWeight: '500' as const },
+        bold: { fontFamily: 'System', fontWeight: '700' as const },
+        heavy: { fontFamily: 'System', fontWeight: '800' as const },
+      },
+    }),
+    [theme.resolvedColorScheme, theme.tabBarActive, theme.background, theme.text, theme.border, theme.error],
+  );
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
+  }, [theme.background]);
+
   // Shared screen option sets (durations live in lib/motion). NOTE: these replace the previous
   // near-instant `animationDuration: 50`; revert by setting `animation: 'none'` if the old feel is preferred.
   const web = Platform.OS === 'web';
   const pushOptions = {
     headerShown: true,
     animation: web ? ('none' as const) : ('ios_from_right' as const),
-    animationDuration: Duration.screen,
+    animationDuration: Duration.slow,
     gestureEnabled: true,
     fullScreenGestureEnabled: true,
     headerShadowVisible: false,
     headerStyle: { backgroundColor: theme.background },
+    contentStyle: { backgroundColor: theme.background },
   };
   const modalOptions = {
     presentation: 'fullScreenModal' as const,
+    contentStyle: { backgroundColor: theme.background },
     animation: web ? ('none' as const) : ('slide_from_bottom' as const),
-    animationDuration: Duration.screen,
+    animationDuration: Duration.slow,
   };
   const fadeOptions = {
     animation: web ? ('none' as const) : ('fade' as const),
-    animationDuration: Duration.base,
+    animationDuration: Duration.fast,
   };
   const [showSplash, setShowSplash] = useState(true);
   const handleSplashComplete = useCallback(() => setShowSplash(false), []);
@@ -159,10 +188,12 @@ function RootNavigator() {
 
   // The splash stays at a stable position so its intro never restarts when the app mounts beneath it.
   return (
-    <View style={styles.container}>
-      {content}
-      {splash}
-    </View>
+    <NavThemeProvider value={navTheme}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {content}
+        {splash}
+      </View>
+    </NavThemeProvider>
   );
 }
 

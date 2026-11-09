@@ -273,7 +273,8 @@ export default function TabLayout() {
     <Tabs
       screenListeners={{ tabPress: () => haptics.selection() }}
       screenOptions={{
-        animation: 'shift',
+        animation: 'fade',
+        sceneStyle: { backgroundColor: theme.background },
         headerShown: true,
         headerShadowVisible: false,
         headerStyle: commonHeaderStyle,
