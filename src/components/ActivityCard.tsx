@@ -28,6 +28,14 @@ const DECLINED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   community_match_pending: 'community_match_disputed',
 };
 
+/** The request this notification points at was already approved/rejected (or no longer exists). */
+class AlreadyHandledError extends Error {
+  constructor() {
+    super('Already handled');
+    this.name = 'AlreadyHandledError';
+  }
+}
+
 interface ActivityCardProps {
   notification: InAppNotification;
   onComplete: () => void;
@@ -198,7 +206,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         }
         const { data: commitments, error: ce } = await query;
         if (ce) throw ce;
-        if (!commitments?.length) throw new Error('No pending requests');
+        if (!commitments?.length) throw new AlreadyHandledError();
         if (action === 'accepted') {
           await approveCommitment(commitments[0].id, userId);
         } else {
@@ -222,11 +230,24 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           .order('created_at', { ascending: true })
           .limit(1);
         if (re) throw re;
-        if (!requests?.length) throw new Error('No pending requests');
+        if (!requests?.length) throw new AlreadyHandledError();
         await respondToJoinRequest(requests[0].id, action === 'accepted' ? 'approved' : 'rejected');
         return;
       }
     }
+  };
+
+  // The request was resolved elsewhere: the actionable card has no purpose anymore, so remove
+  // it from the inbox (instead of leaving it stuck in "Action Required" with an error).
+  const dismissAlreadyHandled = async () => {
+    try {
+      await supabase.from('in_app_notifications').delete().eq('id', notification.id);
+    } catch {
+      // best-effort
+    }
+    alert('Already handled', 'This request was already handled.');
+    setActionLoading(false);
+    onComplete();
   };
 
   const handleAccept = async () => {
@@ -235,6 +256,10 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     try {
       await doAction('accepted');
     } catch (err) {
+      if (err instanceof AlreadyHandledError) {
+        await dismissAlreadyHandled();
+        return;
+      }
       console.error('Accept action failed:', err);
       alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
@@ -256,6 +281,10 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     try {
       await doAction('declined');
     } catch (err) {
+      if (err instanceof AlreadyHandledError) {
+        await dismissAlreadyHandled();
+        return;
+      }
       console.error('Decline action failed:', err);
       alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
