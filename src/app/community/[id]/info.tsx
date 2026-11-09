@@ -171,8 +171,8 @@ export default function CommunityInfoScreen() {
             try {
               await leaveCommunity(id, user.id);
               setMembership(null);
-              refresh();
-              router.back();
+              // router.back() would land on the stale community screen: go to the list.
+              router.dismissTo('/');
             } catch (e: any) {
               alert('Error', e?.message ?? 'Failed to leave.');
             }
@@ -195,7 +195,8 @@ export default function CommunityInfoScreen() {
           onPress: async () => {
             try {
               await deleteCommunity(id);
-              router.back();
+              // The community no longer exists: back() would land on "Community not found".
+              router.dismissTo('/');
             } catch (e: any) {
               alert('Error', e?.message ?? 'Failed to delete community.');
             }
