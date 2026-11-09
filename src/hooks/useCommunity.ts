@@ -46,7 +46,8 @@ export function useCommunity(id: string, userId?: string) {
         uid ? fetchCommunityMember(id, uid) : Promise.resolve(null),
       ]);
       setCommunity(communityData);
-      setMembership(memberData);
+      // Only an approved row counts as membership (legacy 'pending' rows grant nothing).
+      setMembership(memberData?.approval_status === 'approved' ? memberData : null);
 
       if (memberData) {
         setMyPendingInvite(null);
