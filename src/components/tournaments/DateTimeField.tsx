@@ -27,11 +27,16 @@ export function DateTimeField({
   onChange,
   placeholder = 'Select date & time',
   clearable = true,
+  min,
+  max,
 }: {
   value: Date | null;
   onChange: (d: Date | null) => void;
   placeholder?: string;
   clearable?: boolean;
+  /** Web only: earliest / latest selectable moment. */
+  min?: Date;
+  max?: Date;
 }) {
   const theme = useTheme();
   const [step, setStep] = useState<'date' | 'time' | null>(null);
@@ -43,6 +48,8 @@ export function DateTimeField({
         {createElement('input', {
           type: 'datetime-local',
           value: value ? toLocalInput(value) : '',
+          ...(min ? { min: toLocalInput(min) } : {}),
+          ...(max ? { max: toLocalInput(max) } : {}),
           onChange: (e: { target: { value: string } }) => {
             const v = e.target.value;
             onChange(v ? new Date(v) : null);

@@ -1,5 +1,6 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
@@ -29,6 +30,16 @@ import {
 } from '@/services/sessions';
 import type { CreateSessionInput, SessionPurpose } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
+
+function combineDateAndTime(date: Date, time: Date): Date {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.getHours(),
+    time.getMinutes(),
+  );
+}
 
 export default function CreateSessionScreen() {
   const theme = useTheme();
@@ -278,101 +289,122 @@ export default function CreateSessionScreen() {
             />
           </View>
 
+          {Platform.OS === 'web' ? (
+            // @react-native-community/datetimepicker has no web implementation: use a native
+            // datetime-local input (BUG-H7).
+            <View style={styles.field}>
+              <ThemedText variant="label" muted style={styles.label}>
+                Date & time
+              </ThemedText>
+              <DateTimeField
+                value={combineDateAndTime(selectedDate, selectedTime)}
+                onChange={(d) => {
+                  if (!d) return;
+                  setSelectedDate(d);
+                  setSelectedTime(d);
+                }}
+                clearable={false}
+                min={new Date()}
+                max={MAX_DATE}
+              />
+            </View>
+          ) : (
           <View style={styles.row}>
-            <View style={[styles.field, { flex: 1 }]}>
-              <ThemedText variant="label" muted style={styles.label}>
-                Date
-              </ThemedText>
-              <Pressable
-                onPress={() => {
-                  if (Date.now() - datePickerDismissedAt.current < 600) return;
-                  setShowDatePicker(true);
-                }}
-                style={[
-                  styles.input,
-                  styles.pickerButton,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <CalendarDays size={18} color={theme.textSecondary} />
-                <ThemedText variant="body">
-                  {selectedDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+              <View style={[styles.field, { flex: 1 }]}>
+                <ThemedText variant="label" muted style={styles.label}>
+                  Date
                 </ThemedText>
-              </Pressable>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  minimumDate={new Date()}
-                  maximumDate={MAX_DATE}
-                  onChange={(event: DateTimePickerEvent, date?: Date) => {
-                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
-                    if (Platform.OS === 'android') {
-                      setShowDatePicker(false);
-                      datePickerDismissedAt.current = Date.now();
-                    }
-
-                    if (event.type === 'dismissed') return;
-
-                    if (date) setSelectedDate(date);
+                <Pressable
+                  onPress={() => {
+                    if (Date.now() - datePickerDismissedAt.current < 600) return;
+                    setShowDatePicker(true);
                   }}
-                />
-              )}
-            </View>
-            <View style={[styles.field, { flex: 1 }]}>
-              <ThemedText variant="label" muted style={styles.label}>
-                Time
-              </ThemedText>
-              <Pressable
-                onPress={() => {
-                  if (Date.now() - timePickerDismissedAt.current < 600) return;
-                  setShowTimePicker(true);
-                }}
-                style={[
-                  styles.input,
-                  styles.pickerButton,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Clock size={18} color={theme.textSecondary} />
-                <ThemedText variant="body">
-                  {selectedTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  style={[
+                    styles.input,
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <CalendarDays size={18} color={theme.textSecondary} />
+                  <ThemedText variant="body">
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </ThemedText>
+                </Pressable>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    minimumDate={new Date()}
+                    maximumDate={MAX_DATE}
+                    onChange={(event: DateTimePickerEvent, date?: Date) => {
+                      // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                      if (Platform.OS === 'android') {
+                        setShowDatePicker(false);
+                        datePickerDismissedAt.current = Date.now();
+                      }
+  
+                      if (event.type === 'dismissed') return;
+  
+                      if (date) setSelectedDate(date);
+                    }}
+                  />
+                )}
+              </View>
+              <View style={[styles.field, { flex: 1 }]}>
+                <ThemedText variant="label" muted style={styles.label}>
+                  Time
                 </ThemedText>
-              </Pressable>
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event: DateTimePickerEvent, date?: Date) => {
-                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
-                    if (Platform.OS === 'android') {
-                      setShowTimePicker(false);
-                      timePickerDismissedAt.current = Date.now();
-                    }
-
-                    if (event.type === 'dismissed') return;
-
-                    if (date) setSelectedTime(date);
+                <Pressable
+                  onPress={() => {
+                    if (Date.now() - timePickerDismissedAt.current < 600) return;
+                    setShowTimePicker(true);
                   }}
-                />
-              )}
+                  style={[
+                    styles.input,
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Clock size={18} color={theme.textSecondary} />
+                  <ThemedText variant="body">
+                    {selectedTime.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </ThemedText>
+                </Pressable>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, date?: Date) => {
+                      // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                      if (Platform.OS === 'android') {
+                        setShowTimePicker(false);
+                        timePickerDismissedAt.current = Date.now();
+                      }
+  
+                      if (event.type === 'dismissed') return;
+  
+                      if (date) setSelectedTime(date);
+                    }}
+                  />
+                )}
+              </View>
             </View>
-          </View>
+          )}
           {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
             <Pressable
               onPress={() => {
