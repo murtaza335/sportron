@@ -3,7 +3,8 @@
 -- touches only sessions past their expires_at. The client-side calls stay as a harmless
 -- fast path.
 
-create extension if not exists pg_cron;
+-- pg_cron is already enabled (migrations 042/072/081). Do NOT re-run CREATE EXTENSION here:
+-- Supabase's extension event trigger re-applies grants and fails with "dependent privileges exist".
 
 -- Idempotent: drop a previous schedule of the same name, if any.
 do $$
