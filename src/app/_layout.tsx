@@ -203,6 +203,12 @@ function RootNavigator() {
 }
 
 export default function RootLayout() {
+  // Web: one site-wide service worker (offline page + bundle cache) so the app is installable.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || __DEV__ || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('Service worker registration failed:', e));
+  }, []);
+
   const [maintenanceActive, setMaintenanceActive] = useState<boolean | null>(null);
   const [versionOk, setVersionOk] = useState(true);
   const [storeUrl, setStoreUrl] = useState('');
