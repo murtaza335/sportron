@@ -1,15 +1,8 @@
 import { Flame, Sparkles, Trophy, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Dimensions,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Dimensions, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { CenterModal } from '@/components/motion/CenterModal';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -92,8 +85,6 @@ export function StreakModal({
     return `${hours}h ${minutes}m`;
   }, [streakCount, lastActivityDate, nowTs]);
 
-  if (!visible) return null;
-
   const hasStreak = streakCount > 0;
   const streakColor = hasStreak ? theme.error : theme.textSecondary;
 
@@ -103,16 +94,7 @@ export function StreakModal({
   const buttonTextColor = theme.background;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <BlurView
-          tint="dark"
-          intensity={50}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[StyleSheet.absoluteFill, styles.darkenOverlay]} />
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close modal backdrop" />
-
+    <CenterModal visible={visible} onClose={onClose}>
         <View
           style={[
             styles.card,
@@ -199,23 +181,13 @@ export function StreakModal({
             <Text style={[styles.blackButtonText, { color: buttonTextColor }]}>Close</Text>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </CenterModal>
   );
 }
 
 const screenWidth = Dimensions.get('window').width;
 
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-  },
-  darkenOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
   card: {
     width: '100%',
     maxWidth: Math.min(screenWidth - 48, 340),

@@ -1,6 +1,7 @@
+import { Sheet } from '@/components/motion/Sheet';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { ActivityIndicator, FlatList, Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
@@ -453,23 +454,18 @@ export default function SessionsScreen() {
         }}
       />
 
-      <Modal
-        transparent
+      <Sheet
         visible={showPurposeModal}
-        animationType="fade"
-        onRequestClose={() => setShowPurposeModal(false)}
+        onClose={() => setShowPurposeModal(false)}
+        maxHeight="70%"
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderTopWidth: 1,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.xl,
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setShowPurposeModal(false)}
-          />
-          <View
-            style={[
-              styles.pickerSheet,
-              { backgroundColor: theme.background, borderColor: theme.border },
-            ]}
-          >
             <ThemedText variant="label" style={styles.pickerTitle}>
               Filter by purpose
             </ThemedText>
@@ -522,9 +518,7 @@ export default function SessionsScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -577,20 +571,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  pickerSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    paddingTop: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    maxHeight: '70%',
   },
   pickerTitle: {
     marginBottom: Spacing.sm,

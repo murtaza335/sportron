@@ -1,4 +1,5 @@
-import { Modal, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { Sheet } from '@/components/motion/Sheet';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { alert } from '@/lib/alert';
 import { Check, ClipboardCheck, X, Clock, MapPin } from 'lucide-react-native';
 import { useState } from 'react';
@@ -93,20 +94,18 @@ export function SessionFeedbackPopup({
   };
 
   return (
-    <Modal transparent visible={visible} animationType="slide" onRequestClose={onClose}>
-      <View style={styles.backdrop}>
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-        <View
-          style={[
-            styles.sheet,
-            { backgroundColor: theme.background, borderColor: theme.border, paddingBottom: Spacing.lg + Math.max(insets.bottom, 12) },
-          ]}
-        >
-          <View style={styles.handleContainer}>
-            <View style={[styles.handle, { backgroundColor: theme.border }]} />
-          </View>
-
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      maxHeight="92%"
+      style={{
+        backgroundColor: theme.background,
+        borderColor: theme.border,
+        borderTopWidth: 1,
+        paddingHorizontal: Spacing.lg,
+        paddingBottom: Spacing.lg + Math.max(insets.bottom, 12),
+      }}
+    >
           <View style={styles.header}>
             <View style={styles.headerTitleWrap}>
               <View style={[styles.headerIcon, { backgroundColor: `${theme.success}20` }]}>
@@ -208,38 +207,11 @@ export function SessionFeedbackPopup({
               buttonStyle={styles.footerButton}
             />
           </View>
-        </View>
-      </View>
-    </Modal>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.lg,
-    maxHeight: '92%',
-    overflow: 'hidden',
-  },
-  handleContainer: {
-    alignItems: 'center',
-    paddingTop: Spacing.sm,
-    paddingBottom: Spacing.sm,
-  },
-  handle: {
-    width: 40,
-    height: 4,
-    borderRadius: 2,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

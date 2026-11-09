@@ -1,4 +1,5 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal';
 import { BlurView } from 'expo-blur';
 import {
   AlertTriangle,
@@ -15,21 +16,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  AppState,
-  FlatList,
-  GestureResponderEvent,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-  Dimensions,
-} from 'react-native';
+import { ActivityIndicator, AppState, FlatList, GestureResponderEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, StyleSheet, TextInput, View, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -680,13 +667,9 @@ const contextLayout = useMemo(() => {
 
   return (
     <>
-      <Modal
-        visible={visible}
-        animationType="none"
-        presentationStyle="fullScreen"
-        onRequestClose={onClose}
-      >
+      <SlideUpModal visible={visible} onClose={onClose}>
         <View style={[styles.root, { backgroundColor: theme.background }]}>
+          <SlideUpDragZone>
           <View
             style={[
               styles.header,
@@ -714,6 +697,7 @@ const contextLayout = useMemo(() => {
               <X size={18} color={theme.text} strokeWidth={2.5} />
             </Pressable>
           </View>
+          </SlideUpDragZone>
 
           <KeyboardAvoider modal
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -1146,7 +1130,7 @@ const contextLayout = useMemo(() => {
             </View>
           )}
         </View>
-      </Modal>
+      </SlideUpModal>
     </>
   );
 }

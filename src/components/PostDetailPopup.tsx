@@ -1,27 +1,10 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { X, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Keyboard,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-  Image,
-} from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  runOnJS,
-} from 'react-native-reanimated';
+import { Keyboard, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Image } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -44,8 +27,6 @@ type PostDetailPopupProps = {
   communityId?: string;
   onRefreshFeed?: () => void;
 };
-
-const SWIPE_THRESHOLD = 100;
 
 export function PostDetailPopup({
   post,
@@ -72,15 +53,7 @@ export function PostDetailPopup({
   const inputWrapperRef = useRef<View>(null);
   const lastPostIdRef = useRef<string | null>(null);
 
-  const translateY = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const dragStartY = useSharedValue(0);
-
   const isMine = currentUserId === post?.author_id;
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
 
   const loadComments = useCallback(async () => {
     if (!post) return;
@@ -103,20 +76,7 @@ export function PostDetailPopup({
     setLiked(post.is_liked_by_user ?? false);
     setLikesCount(post.likes_count ?? 0);
     loadComments();
-    translateY.set(0);
-  }, [visible, post, loadComments, translateY]);
-
-  const animateClose = () => {
-    translateY.set(withTiming(400, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(onClose)();
-      }
-    }));
-  };
-
-  const animateOpen = () => {
-    translateY.set(withSpring(0, { damping: 20, stiffness: 150 }));
-  };
+  }, [visible, post, loadComments]);
 
   const scrollToComments = () => {
     if (commentsSectionRef.current) {
@@ -132,30 +92,6 @@ export function PostDetailPopup({
       }
     }, 150);
   };
-
-  const handlePanGesture = Gesture.Pan()
-    .onBegin((e) => {
-      isDragging.value = true;
-      dragStartY.value = e.y;
-    })
-    .onUpdate((e) => {
-      if (!isDragging.value) return;
-      const translationY = e.translationY;
-      if (translationY > 0) {
-        translateY.set(translationY);
-      }
-    })
-    .onEnd((e) => {
-      isDragging.value = false;
-      const velocityY = e.velocityY;
-      const currentY = translateY.value;
-
-      if (currentY > SWIPE_THRESHOLD || velocityY > 500) {
-        animateClose();
-      } else {
-        animateOpen();
-      }
-    });
 
   const handleLike = async () => {
     if (!currentUserId || !post) return;
@@ -316,21 +252,16 @@ export function PostDetailPopup({
   if (!visible || !post) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Animated.View style={[styles.modalContainer, animatedStyle]}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View
-          style={[
-            styles.modalContent,
-            { backgroundColor: theme.background, borderColor: theme.border },
-          ]}
-        >
-          <GestureDetector gesture={handlePanGesture}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      flush
+      avoidKeyboard={false}
+      height="85%"
+      maxHeight="95%"
+      style={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, paddingBottom: 0 }}
+    >
             <View style={{ flex: 1 }}>
-              <Pressable onPress={animateOpen} style={styles.dragHandleContainer} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
-              </Pressable>
-
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
                 <ThemedText variant="heading">Post</ThemedText>
                 <View style={styles.headerRight}>
@@ -468,41 +399,10 @@ export function PostDetailPopup({
                 </View>
               )}
             </View>
-          </GestureDetector>
-        </View>
-      </Animated.View>
-    </Modal>
+    </Sheet>
   );
 }
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: '65%',
-    maxHeight: '95%',
-  },
-  dragHandleContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  dragHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',

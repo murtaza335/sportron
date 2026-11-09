@@ -1,17 +1,9 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, Trophy, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  Image,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/ui/Card';
@@ -169,21 +161,16 @@ export function CreatePostModal({
   };
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onClose}
+      onClose={onClose}
+      flush
+      avoidKeyboard={false}
+      height="94%"
+      maxHeight="94%"
+      style={{ backgroundColor: theme.background, paddingBottom: 0 }}
     >
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.background,
-            paddingTop: insets.top,
-          },
-        ]}
-      >
+      <View style={styles.container}>
         <KeyboardAvoider modal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.contentWrapper}
@@ -329,7 +316,7 @@ export function CreatePostModal({
           </ScrollView>
         </KeyboardAvoider>
       </View>
-    </Modal>
+    </Sheet>
   );
 }
 

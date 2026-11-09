@@ -1,20 +1,8 @@
-import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { AlertTriangle, Calendar, Check, Clock, Globe, Heart, Lock, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, Dimensions, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { Divider } from '@/components/ui/Card';
@@ -73,7 +61,6 @@ export function MatchDetailPopup({
 }: MatchDetailPopupProps) {
   const theme = useTheme();
   const router = useRouter();
-  const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
   const [comments, setComments] = useState<CommunityMatchComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -84,38 +71,6 @@ export function MatchDetailPopup({
   const [liking, setLiking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
-  const [panHandlers, setPanHandlers] = useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
-
-  useEffect(() => {
-    if (!panResponder.current) {
-      panResponder.current = PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dy > 0) translateY.setValue(gestureState.dy);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy > 120 || gestureState.vy > 0.4) {
-            Animated.timing(translateY, {
-              toValue: SCREEN_HEIGHT,
-              duration: 220,
-              useNativeDriver: true,
-            }).start(onClose);
-          } else {
-            Animated.spring(translateY, {
-              toValue: 0,
-              tension: 50,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-      });
-      setPanHandlers(panResponder.current.panHandlers);
-    }
-  }, [translateY, onClose]);
 
   useEffect(() => {
     if (visible && match) {
@@ -211,19 +166,6 @@ export function MatchDetailPopup({
     };
   }, [visible, match]);
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      translateY.setValue(SCREEN_HEIGHT);
-    }
-  }, [visible, translateY]);
-
   if (!match) return null;
 
   // Player Names
@@ -310,26 +252,7 @@ export function MatchDetailPopup({
   const StatusIcon = statusStyle.Icon;
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoider modal
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-          <Animated.View
-            style={[
-              styles.sheet,
-              { backgroundColor: theme.backgroundElement, transform: [{ translateY }] },
-            ]}
-          >
-            {/* Handle Bar */}
-            <View style={styles.handleContainer} {...panHandlers}>
-              <View style={[styles.handle, { backgroundColor: theme.textSecondary, opacity: 0.3 }]} />
-            </View>
-
+    <Sheet visible={visible} onClose={onClose}>
             {/* Modal Header */}
             <View style={styles.header}>
               <View style={styles.headerInfo}>
@@ -562,40 +485,11 @@ export function MatchDetailPopup({
                 </Pressable>
               </View>
             )}
-          </Animated.View>
-        </View>
-      </KeyboardAvoider>
-    </Modal>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoid: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.lg + 10 : Spacing.md,
-    maxHeight: '85%',
-    gap: Spacing.xs,
-  },
-  handleContainer: {
-    width: '100%',
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-  },
-  handle: {
-    width: 32,
-    height: 4,
-    borderRadius: Radius.full,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,7 +1,8 @@
+import { Sheet } from '@/components/motion/Sheet';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, FlatList, Modal, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { alert } from '@/lib/alert';
@@ -289,15 +290,18 @@ export default function CommunityMembersScreen() {
       )}
 
       {/* Context Menu Modal */}
-      <Modal
-        transparent
+      <Sheet
         visible={!!contextMember}
-        animationType="fade"
-        onRequestClose={() => setContextMember(null)}
+        onClose={() => setContextMember(null)}
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderTopWidth: 1,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
+          gap: Spacing.sm,
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setContextMember(null)}>
-          <Pressable style={[styles.contextSheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.contextHandle} />
             <ThemedText variant="heading" style={styles.contextTitle}>
               {contextMember?.profile?.username ?? 'Member'}
             </ThemedText>
@@ -340,9 +344,7 @@ export default function CommunityMembersScreen() {
                 Cancel
               </ThemedText>
             </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </Sheet>
 
       {/* Invite Member Modal */}
       <InviteMemberModal
@@ -411,30 +413,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   empty: { textAlign: 'center', paddingVertical: Spacing.xxl },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  contextSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
-    gap: Spacing.sm,
-  },
-  contextHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(128,128,128,0.3)',
-    alignSelf: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
   contextTitle: {
     marginBottom: Spacing.sm,
   },

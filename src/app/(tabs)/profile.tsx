@@ -1,6 +1,7 @@
+import { Sheet } from '@/components/motion/Sheet';
 import { Bell, Check, Cog, Download, Globe, Moon, Palette, Pencil, Sun, X, Sparkles } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { Animated, Modal, Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { router, useFocusEffect } from 'expo-router';
 
@@ -43,7 +44,6 @@ export default function ProfileScreen() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
   const [dismissedWebPrompt, setDismissedWebPrompt] = useState(false);
-  const slideAnim = useMemo(() => new Animated.Value(0), []);
 
   // Mark profile dot as viewed when screen is focused
   useFocusEffect(
@@ -57,16 +57,6 @@ export default function ProfileScreen() {
   const isIOSWeb = isWeb && typeof navigator !== 'undefined' && /iPad|iPhone|iPod/.test(navigator.userAgent);
   const isAndroidWeb = isWeb && typeof navigator !== 'undefined' && /Android/.test(navigator.userAgent);
   const showWebPrompt = isWeb && (isIOSWeb || isAndroidWeb) && !dismissedWebPrompt;
-
-  useEffect(() => {
-    if (showThemeModal) {
-      slideAnim.setValue(0);
-      Animated.spring(slideAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
-    }
-    }, [showThemeModal, slideAnim]);
 
   useEffect(() => {
     AsyncStorage.getItem('notifications-enabled').then((val) => {
@@ -253,32 +243,17 @@ export default function ProfileScreen() {
         </View>
 
         {/* Theme Modal - Slide from Bottom */}
-        {showThemeModal && (
-          <Modal
-            animationType="none"
-            transparent
-            visible={showThemeModal}
-            onRequestClose={() => setShowThemeModal(false)}
-          >
-            <View style={styles.modalBackdrop}>
-              <Pressable style={StyleSheet.absoluteFill} onPress={() => setShowThemeModal(false)} />
-              <Animated.View
-                style={[
-                  styles.modalCard,
-                  {
-                    backgroundColor: theme.background,
-                    borderColor: theme.border,
-                    transform: [
-                      {
-                        translateY: slideAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [400, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
+        <Sheet
+          visible={showThemeModal}
+          onClose={() => setShowThemeModal(false)}
+          style={{
+            backgroundColor: theme.background,
+            borderColor: theme.border,
+            borderTopWidth: 1,
+            paddingHorizontal: Spacing.lg,
+            paddingBottom: Spacing.lg + 10,
+          }}
+        >
                 <View style={styles.modalHeader}>
                   <ThemedText variant="label">Choose Theme</ThemedText>
                    <Pressable onPress={() => setShowThemeModal(false)} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
@@ -308,10 +283,7 @@ export default function ProfileScreen() {
                     </Pressable>
                   ))}
                 </View>
-              </Animated.View>
-            </View>
-          </Modal>
-        )}
+        </Sheet>
 
         <Divider spacing={Spacing.md} />
 
@@ -490,19 +462,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.full,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(0,0,0,0.4)',
-  },
-  modalCard: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg + 10,
-    paddingTop: Spacing.md,
   },
   modalHeader: {
     flexDirection: 'row',

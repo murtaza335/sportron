@@ -1,6 +1,7 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Modal } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, UserCheck, UserPlus, X } from 'lucide-react-native';
 
@@ -141,8 +142,16 @@ export function InviteMemberModal({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background, flex: 1 }]}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      flush
+      avoidKeyboard={false}
+      height="92%"
+      maxHeight="92%"
+      style={{ backgroundColor: theme.background, paddingBottom: 0 }}
+    >
+      <SafeAreaView edges={['bottom']} style={[styles.safe, { backgroundColor: theme.background, flex: 1 }]}>
         <KeyboardAvoider modal
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
@@ -270,7 +279,7 @@ export function InviteMemberModal({
           </ScrollView>
         </KeyboardAvoider>
       </SafeAreaView>
-    </Modal>
+    </Sheet>
   );
 }
 

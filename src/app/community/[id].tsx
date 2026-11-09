@@ -1,4 +1,4 @@
-import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -20,7 +20,7 @@ import {
   X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
@@ -1077,20 +1077,17 @@ export default function CommunityDetailScreen() {
       />
 
       {/* Ping Input Modal (shown when Ping selected from FAB) */}
-      {showPingModal && (
-        <Modal
-          transparent
-          visible={true}
-          animationType="fade"
-          onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
-        >
-          <KeyboardAvoider modal
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-            style={styles.pingModalKeyboardAvoiding}
-          >
-            <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
-              <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+      <Sheet
+        visible={showPingModal}
+        onClose={() => { setShowPingModal(false); setPingMessage(''); }}
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderWidth: 1,
+          padding: Spacing.lg,
+          gap: Spacing.md,
+        }}
+      >
                 <View style={styles.pingModalHeader}>
                   <ThemedText variant="heading">Ping Everyone</ThemedText>
                   <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
@@ -1142,11 +1139,7 @@ export default function CommunityDetailScreen() {
                     />
                   </View>
                 )}
-              </Pressable>
-            </Pressable>
-          </KeyboardAvoider>
-        </Modal>
-      )}
+      </Sheet>
 
       <MatchDetailPopup
         match={selectedMatch}
@@ -1494,22 +1487,6 @@ const styles = StyleSheet.create({
   },
 
   // Ping Modal Styles (inline from FAB)
-  pingModalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  pingModalKeyboardAvoiding: {
-    flex: 1,
-  },
-  pingModalContent: {
-    width: '100%',
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
   pingModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',
