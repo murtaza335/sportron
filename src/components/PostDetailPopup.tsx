@@ -1,3 +1,4 @@
+import { enterToSend } from '@/lib/webKeys';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
@@ -361,6 +362,9 @@ export function PostDetailPopup({
                     multiline
                     maxLength={1000}
                     onSubmitEditing={handleSendComment}
+                    onKeyPress={enterToSend(() => {
+                      if (commentText.trim() && !sendingComment) handleSendComment();
+                    })}
                     returnKeyType="send"
                     blurOnSubmit={false}
                   />

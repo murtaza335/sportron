@@ -18,6 +18,7 @@ import { FlashHighlight } from '@/components/motion/FlashHighlight';
 import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal';
 import { SwipeToReply } from '@/components/motion/SwipeToReply';
 import { haptics } from '@/lib/haptics';
+import { enterToSend, isFinePointer } from '@/lib/webKeys';
 import { Duration, RM, Springs, LayoutShift } from '@/lib/motion';
 import { BlurView } from 'expo-blur';
 import {
@@ -1061,9 +1062,20 @@ const contextLayout = useMemo(() => {
                     const h = e.nativeEvent.layout.height;
                     setInputHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
                   }}
-                  placeholder={placeholder}
+                  placeholder={isFinePointer() && canSend ? `${placeholder} · Enter to send, Shift+Enter for new line` : placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
+                  onKeyPress={enterToSend(handleSend, () => {
+                    if (editingMessage) {
+                      cancelEditing();
+                      return true;
+                    }
+                    if (replyTo) {
+                      setReplyTo(null);
+                      return true;
+                    }
+                    return false;
+                  })}
                   multiline
                   maxLength={1000}
                   style={[
