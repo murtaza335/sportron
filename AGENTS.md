@@ -33,7 +33,7 @@ src/
 │   ├── auth/callback.tsx       # OAuth deep-link handler (t3s://auth/callback)
 │   ├── community/[id].tsx      # Community home: unified posts+matches feed, FAB menu, chat, join
 │   ├── community/[id]/info.tsx          # Community info + leave/delete
-│   ├── community/[id]/edit.tsx          # Admin edit (name/desc/org/location/cover/visibility/transfer admin)
+│   ├── community/[id]/edit.tsx          # Admin edit (name/desc/org/location/cover/visibility)
 │   ├── community/[id]/members.tsx       # Member list + admin actions + invite
 │   ├── community/[id]/join-requests.tsx # Admin review of join requests
 │   ├── community/[id]/pending-matches.tsx # Pending community matches awaiting approval
@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 097 (next = 098) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 119 (next = 120) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -124,7 +124,7 @@ supabase/
 - **Discover**: browse all public communities with name search + horizontal sport filter chips; shows admin/member role tags
 - **Cards** (My Communities + Discover): show sport/visibility/member count, **"Created by <username>"** and **organization (if present)**
 - **Join**: public → `joinCommunity()` (instant); restricted → `requestToJoinCommunity()` (admin approves)
-- **Leave** / **Edit** (admin: name, description, organization, location, cover, visibility, transfer admin by username) / **Delete**
+- **Leave** / **Edit** (admin: name, description, organization, location, cover, visibility) / **Delete** (creator only; any non-creator member incl. promoted admins can **Leave**)
 - **Details** (`community/[id]/info.tsx` + home card): description, organization, location, creator info shown to non-members before joining
 - **Members**: sorted me → admins → members; admin long-press for Make Admin / Remove; pending-invite section
 - **Invite Members**: admin can invite by typing username (public or restricted); invitees accept/reject via Invite tab
@@ -145,7 +145,7 @@ supabase/
 - **Win/Loss/Draw**: badges on match cards when user participated
 
 ### 5. Sessions (Find a Match)
-- **Create**: purpose (sport), **title (required short name ≤ 40 chars)**, location, date/time, max participants, "expire after" chips (15m/30m/1hr), description
+- **Create**: purpose (sport), **title (required short name ≤ 40 chars)**, location, date/time, max participants, "expire after" chips (30 min … 6 hr), description
 - Constraints: max 7 days in the future; time-conflict check (±30 min on created + committed sessions)
 - **Statuses**: open / full / closed / completed / cancelled; expired sessions auto-closed
 - **Commitments**: apply (pending) → creator approves (accepted) or rejects; can leave and re-apply
@@ -368,7 +368,15 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **098**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **120**
+
+### Server-side hardening (migrations 098–119 — see `bugreport.md`)
+- **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.
+- **Membership checks use `auth.uid()` and `approval_status = 'approved'`** (107; read RPCs 102/103; post likes/comments 104). `get_community_matches` & co. are thin wrappers over `*_impl` functions (revoked from clients).
+- **Privileges**: `anon` has no access to views/functions in `public` (109); internal functions (`get_chat_push_data`, `prune_fcm_tokens`, `_apply_streak_activity`, …) are `service_role` only. New `SECURITY DEFINER` functions must `revoke … from public, anon` and grant explicitly.
+- **FCM tokens**: `claim_fcm_token` (108) moves a token to the caller and removes it from other profiles; sign-out removes the device token; push edge functions prune `UNREGISTERED` tokens and honour `notification_preferences` (master-off ⇒ no push at all, chat included) — **redeploy `send-notification` and `send-chat-notification` after these changes**.
+- **Auth**: Supabase client uses **PKCE**; `handleAuthRedirectUrl` (services/auth) only accepts an OAuth `code` while a sign-in started by this app is pending.
+- Session `full`/`open` is maintained by trigger (114); expired sessions are closed by pg_cron every 5 min (119); stats are symmetric on approve/un-approve (115/117); `completed_sessions` is symmetric (118).
 
 ### Routing (expo-router v57)
 - Tabs: `/` (Communities), `/history` (Sessions), `/tournaments` (Tournaments, centre), `/chats` (Chats), `/updates` (Activity); `/profile` is a hidden tab (`href: null`)
