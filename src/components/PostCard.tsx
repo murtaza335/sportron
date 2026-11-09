@@ -33,6 +33,28 @@ export function PostCard({
   const router = useRouter();
   const [liked, setLiked] = useState(post.is_liked_by_user ?? false);
   const [likesCount, setLikesCount] = useState(post.likes_count ?? 0);
+
+  // Re-sync when the post changes under us (realtime like/comment events update the parent
+  // list, refetches replace it); local state only drives the optimistic tap. Uses the
+  // "adjust state while rendering" pattern instead of an effect.
+  const [syncedFrom, setSyncedFrom] = useState({
+    id: post.id,
+    likes: post.likes_count ?? 0,
+    liked: post.is_liked_by_user ?? false,
+  });
+  if (
+    syncedFrom.id !== post.id ||
+    syncedFrom.likes !== (post.likes_count ?? 0) ||
+    syncedFrom.liked !== (post.is_liked_by_user ?? false)
+  ) {
+    setSyncedFrom({
+      id: post.id,
+      likes: post.likes_count ?? 0,
+      liked: post.is_liked_by_user ?? false,
+    });
+    setLiked(post.is_liked_by_user ?? false);
+    setLikesCount(post.likes_count ?? 0);
+  }
   const [showMenu, setShowMenu] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
