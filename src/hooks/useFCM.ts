@@ -21,6 +21,7 @@ import {
   parseRemoteMessageForLocal,
   NotificationData,
 } from '@/services/fcm';
+import { scheduleChatUnreadRefresh } from '@/lib/chatUnreadRefresh';
 import { requestPushPermissionAndGetToken, setupWebForegroundHandler, setupWebTokenRefreshListener } from '@/utils/pushNotifications';
 
 async function isNotificationsEnabled(): Promise<boolean> {
@@ -259,6 +260,7 @@ export function useFCM() {
         await setupBackgroundMessageHandler();
 
         const unsubscribeForeground = setupForegroundMessageHandler(async (remoteMessage) => {
+          if (String(remoteMessage?.data?.type ?? '').includes('_chat_')) scheduleChatUnreadRefresh();
           if (!(await isNotificationsEnabled())) return;
           const parsed = parseRemoteMessageForLocal(remoteMessage);
           if (parsed) {

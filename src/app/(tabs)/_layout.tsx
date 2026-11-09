@@ -27,6 +27,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { useStreak } from '@/hooks/useStreak';
+import { useChatUnreadWatcher } from '@/hooks/useChatUnreadWatcher';
+import { refreshChatUnreadCounts } from '@/lib/chatUnreadRefresh';
 import {
   getChatUnreadCount,
   subscribeChatUnreadCount,
@@ -261,6 +263,8 @@ export default function TabLayout() {
   const { unreadCount } = useNotifications();
   const chatUnreadCount = useSyncExternalStore(subscribeChatUnreadCount, getChatUnreadCount);
   const insets = useSafeAreaInsets();
+  const { user: authUser } = useAuth();
+  useChatUnreadWatcher(authUser?.id);
 
   const commonHeaderStyle = {
     backgroundColor: theme.background,
@@ -271,7 +275,10 @@ export default function TabLayout() {
 
   return (
     <Tabs
-      screenListeners={{ tabPress: () => haptics.selection() }}
+      screenListeners={{
+        tabPress: () => haptics.selection(),
+        focus: () => void refreshChatUnreadCounts(),
+      }}
       screenOptions={{
         animation: 'fade',
         sceneStyle: { backgroundColor: theme.background },
