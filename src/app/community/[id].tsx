@@ -224,18 +224,26 @@ export default function CommunityDetailScreen() {
         },
         (payload) => {
           if (!mountedRef.current) return;
-          const match = payload.new as CommunityMatch;
-          if (match.approval_status === 'pending' && (match.opponent_id === user.id || match.recorded_by === user.id)) {
-            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-              setPendingMatches((prev) => {
-                if (prev.some((m) => m.id === match.id)) {
-                  return prev.map((m) => (m.id === match.id ? match : m));
-                }
-                return [match, ...prev];
-              });
-            } else if (payload.eventType === 'DELETE') {
-              setPendingMatches((prev) => prev.filter((m) => m.id !== (payload.old as { id: string }).id));
+          // DELETE payloads carry only the old row (payload.new is empty): handle them first.
+          if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id?: string }).id;
+            if (deletedId) {
+              setPendingMatches((prev) => prev.filter((m) => m.id !== deletedId));
             }
+            return;
+          }
+          const match = payload.new as CommunityMatch;
+          const involvesMe = match.opponent_id === user.id || match.recorded_by === user.id;
+          if (match.approval_status === 'pending' && involvesMe) {
+            setPendingMatches((prev) => {
+              if (prev.some((m) => m.id === match.id)) {
+                return prev.map((m) => (m.id === match.id ? match : m));
+              }
+              return [match, ...prev];
+            });
+          } else {
+            // Approved / disputed (or no longer mine): drop any stale pending entry.
+            setPendingMatches((prev) => prev.filter((m) => m.id !== match.id));
           }
         },
       )
