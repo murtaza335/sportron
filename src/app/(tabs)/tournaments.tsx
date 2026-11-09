@@ -12,6 +12,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { TournamentCard } from '@/components/tournaments/TournamentCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
+import { TipCard } from '@/components/TipCard';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -55,6 +56,7 @@ export default function TournamentsScreen() {
             <TournamentCard tournament={item} />
           </FadeInItem>
         )}
+        ListHeaderComponent={<TipCard id="tournaments" />}
         contentContainerStyle={[styles.list, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}

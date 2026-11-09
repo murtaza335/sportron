@@ -1,3 +1,4 @@
+import { TipCard } from '@/components/TipCard';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
@@ -241,6 +242,7 @@ export default function ChatsScreen() {
               styles.list,
               { paddingBottom: Spacing.xxxl + Math.max(insets.bottom, 56) },
             ]}
+            ListHeaderComponent={<TipCard id="chats" />}
             showsVerticalScrollIndicator={false}
             refreshControl={
               <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />

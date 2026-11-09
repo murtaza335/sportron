@@ -1,3 +1,4 @@
+import { TipCard } from '@/components/TipCard';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
@@ -349,7 +350,9 @@ export default function SessionsScreen() {
               <ThemedRefreshControl refreshing={listRefreshing} onRefresh={onRefresh} />
             }
             ListHeaderComponent={
-              (isHistory || scope === 'all') ? (
+              <>
+              <TipCard id="sessions" />
+              {(isHistory || scope === 'all') ? (
                 <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                   <View style={styles.statItem}>
                     <ThemedText variant="heading" style={{ fontWeight: '700' }}>
@@ -365,7 +368,8 @@ export default function SessionsScreen() {
                     <ThemedText variant="caption" muted>Completed</ThemedText>
                   </View>
                 </View>
-              ) : null
+              ) : null}
+              </>
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={

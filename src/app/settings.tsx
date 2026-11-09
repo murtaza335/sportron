@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { resetTips } from '@/lib/tips';
+import { toast } from '@/components/motion/Toast';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
@@ -121,6 +123,24 @@ export default function SettingsScreen() {
               thumbColor={theme.background}
             />
           </View>
+        </Card>
+
+        <Card style={styles.settingCard}>
+          <Pressable
+            style={styles.settingRow}
+            onPress={async () => {
+              await resetTips(user?.id);
+              toast('Tips reset', "You'll see the how-to tips again.");
+            }}
+            accessibilityRole="button">
+            <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]}>
+              <Info size={22} color={theme.text} />
+            </View>
+            <View style={styles.settingContent}>
+              <ThemedText variant="body">Show tips again</ThemedText>
+              <ThemedText variant="caption" muted>Replay the first-run how-to cards</ThemedText>
+            </View>
+          </Pressable>
         </Card>
 
         <Divider spacing={Spacing.xl} />

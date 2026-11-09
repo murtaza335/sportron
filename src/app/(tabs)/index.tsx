@@ -19,6 +19,7 @@ import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
 import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { TipCard } from '@/components/TipCard';
 import { ThemedText } from '@/components/ui/Text';
 import { CommunityCard } from '@/components/CommunityCard';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
@@ -83,6 +84,7 @@ export default function CommunitiesScreen() {
           <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
+        <TipCard id="communities" />
         {loading ? (
           <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : communities.length === 0 ? (

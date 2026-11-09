@@ -1,3 +1,4 @@
+import { TipCard } from '@/components/TipCard';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
 import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
@@ -912,6 +913,7 @@ export default function CommunityDetailScreen() {
           />
         }
       >
+        {isMember ? <TipCard id="community_home" /> : null}
         {/* Pending Matches Banner - solid, full-width, at top of feed */}
         {isMember && allPendingMatches.length > 0 && (
           <Pressable

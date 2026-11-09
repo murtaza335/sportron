@@ -11,6 +11,7 @@ import { haptics } from '@/lib/haptics';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { ActivityCard } from '@/components/ActivityCard';
 import { InviteCard } from '@/components/InviteCard';
+import { TipCard } from '@/components/TipCard';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -128,6 +129,7 @@ export default function UpdatesScreen() {
           <ThemedRefreshControl refreshing={loading} onRefresh={fetchNotifications} />
         }
       >
+        <TipCard id="activity" />
         {loading && notifications.length === 0 ? (
           <SkeletonList Item={NotificationRowSkeleton} count={5} style={{ padding: Spacing.md }} />
         ) : (
