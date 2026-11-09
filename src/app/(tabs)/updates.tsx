@@ -1,9 +1,9 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useDeferredValue, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { CheckCheck } from 'lucide-react-native';
 
-import Animated, { FadeIn, FadeInDown, FadeOutRight } from 'react-native-reanimated';
+import Animated, { FadeIn, FadeOutRight } from 'react-native-reanimated';
 import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
 import { TabUnderline, type TabLayout } from '@/components/motion/TabUnderline';
 import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
@@ -28,14 +28,15 @@ const INVITE_TYPES: NotificationType[] = [
 ];
 
 const ROW_LAYOUT = LayoutShift;
-const ROW_ENTER = FadeInDown.duration(Duration.base).reduceMotion(RM);
 const ROW_EXIT = FadeOutRight.duration(Duration.base).reduceMotion(RM);
 
 export default function UpdatesScreen() {
   const theme = useTheme();
   const { notifications, fetchNotifications, loading, markAllAsRead, unreadCount } = useNotifications();
   const [activeTab, setActiveTab] = useState<'action' | 'invites' | 'past'>('action');
+  // Header/underline follow `activeTab` immediately; the (heavy) list follows the deferred value so the tap paints first.
   const [markingAll, setMarkingAll] = useState(false);
+  const listTab = useDeferredValue(activeTab);
   const [tabLayouts, setTabLayouts] = useState<(TabLayout | undefined)[]>([]);
 
   const actionRequired = notifications.filter((n) => ACTION_REQUIRED_TYPES.includes(n.type));
@@ -130,8 +131,8 @@ export default function UpdatesScreen() {
         {loading && notifications.length === 0 ? (
           <SkeletonList Item={NotificationRowSkeleton} count={5} style={{ padding: Spacing.md }} />
         ) : (
-        <Animated.View key={activeTab} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
-        {activeTab === 'action' ? (
+        <Animated.View key={listTab} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
+        {listTab === 'action' ? (
           actionRequired.length === 0 ? (
             <View style={styles.empty}>
               <ThemedText variant="body" muted style={{ fontWeight: '600' }}>
@@ -143,12 +144,12 @@ export default function UpdatesScreen() {
             </View>
           ) : (
             actionRequired.map((n) => (
-              <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
+              <Animated.View key={n.id} layout={ROW_LAYOUT} exiting={ROW_EXIT}>
                 <ActivityCard notification={n} onComplete={handleActionComplete} />
               </Animated.View>
             ))
           )
-        ) : activeTab === 'invites' ? (
+        ) : listTab === 'invites' ? (
           invites.length === 0 ? (
             <View style={styles.empty}>
               <ThemedText variant="body" muted style={{ fontWeight: '600' }}>
@@ -167,7 +168,7 @@ export default function UpdatesScreen() {
               const communityName = idx !== -1 ? body.slice(idx + separator.length) : 'Community';
               const inviteId = (n.data?.inviteId as string) || '';
               return (
-                <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
+                <Animated.View key={n.id} layout={ROW_LAYOUT} exiting={ROW_EXIT}>
                 <InviteCard
                   notificationId={n.id}
                   inviteId={inviteId}
@@ -192,7 +193,7 @@ export default function UpdatesScreen() {
             </View>
           ) : (
             pastActivity.map((n) => (
-              <Animated.View key={n.id} layout={ROW_LAYOUT} entering={ROW_ENTER} exiting={ROW_EXIT}>
+              <Animated.View key={n.id} layout={ROW_LAYOUT} exiting={ROW_EXIT}>
                 <ActivityCard notification={n} onComplete={handleActionComplete} />
               </Animated.View>
             ))
