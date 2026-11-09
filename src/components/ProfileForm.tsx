@@ -49,7 +49,7 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const checking = value.length > 0 && !isOwnUsername && checked?.value !== value;
   const taken = checked?.value === value && checked.status === 'taken';
   const available = isOwnUsername || (checked?.value === value && checked.status === 'available');
-  const canSubmit = value.length > 0 && available;
+  const canSubmit = value.length > 0 && available && !uploadingAvatar;
 
   useEffect(() => {
     const currentValue = username.trim().toLowerCase();
@@ -248,7 +248,9 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           onSubmit({
             username: username.trim().toLowerCase(),
             bio: bio.trim(),
-            avatarUrl,
+            // Never submit a local file:// URI (e.g. an upload still pending/failed): keep the
+            // previous remote avatar instead.
+            avatarUrl: avatarUrl === null || avatarUrl.startsWith('http') ? avatarUrl : initialAvatar,
           })
         }
       />
