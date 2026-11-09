@@ -6,6 +6,25 @@ This file is a work queue for an implementing agent. Every item has an ID, sever
 
 ---
 
+## Status (updated after the fix pass)
+
+All items below were fixed in order, one commit each (`git log --oneline` shows `fix(<ID>): …`), except where noted.
+SQL fixes are migrations **098–119** (next = 120), each verified against a local Postgres replay of the whole migration history with role-based tests (anon / authenticated / service_role). Client fixes pass `npx tsc --noEmit` and `npm run lint` (0 errors, 0 warnings); the web bundle exports.
+
+- [x] SEC-C1 (098) · SEC-C2 (099) · SEC-C3 + SEC-H4 (100) · SEC-C4 (101) · SEC-C5 (102)
+- [x] SEC-H1 (103) · SEC-H2 (104) · SEC-H3 + BUG-H6 (105) · SEC-H5 (106) · SEC-H6 (107) · SEC-H7 (108 + client + edge fn) · SEC-H8 (109)
+- [x] SEC-M1 (PKCE) · SEC-M2 (edge fns) · SEC-M3 (110) · SEC-M4 (111) · SEC-M5 (112)
+- [x] SEC-L1 (113, trigger instead of CHECK) · SEC-L2 (vercel.json)
+- [ ] SEC-L3 - **owner action only** (restrict the Firebase/Google API keys in Google Cloud Console; no code change)
+- [x] BUG-H1 … H10 (H5=114, H10=115) · BUG-M1 … M19 (M11=116, M15=117, M16=118) · BUG-L1 … L8 (L7=119) · QA-01 … QA-03
+
+**Needs the owner (cannot be done from the repo):**
+1. Apply migrations 098-119 to Supabase (in order), then run the smoke test in section 10.
+2. `supabase functions deploy send-notification` and `supabase functions deploy send-chat-notification` (SEC-H7 pruning, SEC-M2 preferences), then live-test pushes (chat + in-app, with notifications on and master-off).
+3. New **native build** required for BUG-H2 (`userInterfaceStyle`), BUG-L5 (notification icon), BUG-L6 (iOS plist key removed) and SEC-M1 (PKCE sign-in must be tested on a real Android device + web before release).
+4. Cloudinary console: restrict the unsigned preset (SEC-L1). Run the audit query in migration 099 and review restricted-community members.
+5. Not done (release chores, not bugs): bump `version` + What's New in the 3 places listed in AGENTS.md.
+
 ## 0. Ground rules for whoever fixes these (read first)
 
 1. **Backward compatibility is mandatory** (see `AGENTS.md` → "Backward Compatibility"). Installed Play Store builds (v1.0.1 and older) keep calling the same tables/RPCs. Never drop/rename a column or RPC they use. Never change an RPC's signature in place. Add new RPCs instead, and keep the old ones working (possibly with tighter checks).
