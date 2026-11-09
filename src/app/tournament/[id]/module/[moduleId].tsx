@@ -1,6 +1,6 @@
 import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,31 +68,30 @@ export default function ModuleScreen() {
   const m = useTournamentModule(moduleId);
   const { fields } = useTournamentFields(id);
 
-  const [tab, setTab] = useState<Tab>('entries');
+  const [userTab, setUserTab] = useState<Tab | null>(null);
   const [selected, setSelected] = useState<TournamentEntry | null>(null);
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
-  const defaulted = useRef(false);
 
-  // Default tab: Bracket if a bracket exists, else Entries (once, after first load).
-  useEffect(() => {
-    if (m.loading || defaulted.current || !m.module) return;
-    defaulted.current = true;
-    const available = tabsFor(m.module.format);
-    const requested = available.find((t) => t.value === tabParam)?.value;
+
+  const mod = m.module;
+  // Default tab is derived during render (no effect → no wrong-tab first frame):
+  // the requested ?tab=, else the format's main view if fixtures exist, else Entries.
+  let defaultTab: Tab = 'entries';
+  if (mod) {
+    const requested = tabsFor(mod.format).find((t) => t.value === tabParam)?.value;
     const hasFixtures = m.matches.length > 0;
     const fallback: Tab = !hasFixtures
       ? 'entries'
-      : m.module.format === 'round_robin'
+      : mod.format === 'round_robin'
         ? 'table'
-        : m.module.format === 'groups_knockout'
-          ? m.module.current_stage === 2 ? 'bracket' : 'groups'
+        : mod.format === 'groups_knockout'
+          ? mod.current_stage === 2 ? 'bracket' : 'groups'
           : 'bracket';
-    setTab(requested ?? fallback);
-  }, [m.loading, m.module, m.matches.length, tabParam]);
-
-  const mod = m.module;
+    defaultTab = requested ?? fallback;
+  }
+  const tab: Tab = userTab ?? defaultTab;
   // Entries the viewer plays in — their own entry or a team they are a member of.
   const ownEntryIds = new Set<string>();
   if (user?.id) {
@@ -282,7 +281,7 @@ export default function ModuleScreen() {
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false}>
             <View style={{ width: tabsWidth }}>
-              <SegmentedControl options={tabsFor(mod.format)} value={tab} onChange={setTab} compact />
+              <SegmentedControl options={tabsFor(mod.format)} value={tab} onChange={setUserTab} compact />
             </View>
           </ScrollView>
 
