@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 import { supabase } from '@/lib/supabase';
 import { setChatUnreadCountFor } from '@/lib/chatUnreadStore';
@@ -315,6 +316,19 @@ export function useChat<T extends ChatMessageBase>(
       }
     }, [load, sourceId, subscribe, subscribeToChannel]),
   );
+
+  // Messages sent while the app was backgrounded never arrived over the (suspended) socket:
+  // refetch the latest page and restore the live subscription on resume.
+  useAppForeground(() => {
+    if (!sourceId) return;
+    load();
+    if (
+      subscribe &&
+      (!channelRef.current || !supabase.getChannels().includes(channelRef.current))
+    ) {
+      subscribeToChannel();
+    }
+  }, !!sourceId);
 
   const send = useCallback(
     async (

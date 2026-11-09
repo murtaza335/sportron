@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { InAppNotification } from '@/types';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 type NotificationsContextValue = {
   notifications: InAppNotification[];
@@ -158,6 +159,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       supabase.removeChannel(channel);
     };
   }, [profileId, fetchNotifications]);
+
+  // Refetch on resume: realtime events are missed while the app is backgrounded.
+  useAppForeground(() => {
+    fetchNotifications();
+  }, !!profileId);
 
   // Derived from the shared list so every read/insert/delete stays in sync
   const unreadCount = notifications.filter((n) => !n.read).length;
