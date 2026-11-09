@@ -304,30 +304,45 @@ export default function CommunityDetailScreen() {
 
   const combinedFeed = useMemo(() => {
     const feedItems: Array<{ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles }> = [];
+    const approvedMatches = matches.filter((m) => m.approval_status !== 'pending');
 
-    // Add posts
+    // Posts and matches paginate independently. While a source still has older pages, items
+    // older than that source's oldest loaded item could be missing from the merged list, so
+    // only show items at least as new as the newest "oldest loaded" boundary of the sources
+    // that still have more (otherwise older items from the other source would be rendered
+    // before the gap is filled and appear out of order).
+    let cutoff = -Infinity;
+    if (hasMorePosts && posts.length > 0) {
+      cutoff = Math.max(cutoff, new Date(posts[posts.length - 1].created_at).getTime());
+    }
+    if (hasMoreMatches && matches.length > 0) {
+      cutoff = Math.max(
+        cutoff,
+        Math.min(...matches.map((m) => new Date(m.created_at).getTime())),
+      );
+    }
+
+    // Add posts (deduplicated by id)
+    const seenPostIds = new Set<string>();
     (posts ?? []).forEach((post) => {
+      if (seenPostIds.has(post.id)) return;
+      seenPostIds.add(post.id);
       feedItems.push({ type: 'post', data: post });
     });
 
     // Add approved matches (deduplicated by id)
     const seenMatchIds = new Set<string>();
-    (feedMatches ?? []).forEach((match) => {
+    approvedMatches.forEach((match) => {
       if (!seenMatchIds.has(match.id)) {
         seenMatchIds.add(match.id);
         feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
       }
     });
 
-    // Sort by created_at descending
-    feedItems.sort((a, b) => {
-      const dateA = new Date(a.type === 'post' ? a.data.created_at : a.data.created_at).getTime();
-      const dateB = new Date(b.type === 'post' ? b.data.created_at : b.data.created_at).getTime();
-      return dateB - dateA;
-    });
-
-    return feedItems;
-  }, [posts, matches, toMatchWithProfiles]);
+    return feedItems
+      .filter((item) => new Date(item.data.created_at).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime());
+  }, [posts, matches, hasMorePosts, hasMoreMatches, toMatchWithProfiles]);
 
   const feedContent = useMemo(() => {
     // Inline styles for skeleton loader

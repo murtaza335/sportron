@@ -36,7 +36,11 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
     try {
       const { data, hasMore: more } = await fetchCommunityPosts(communityId, userId ?? undefined, pageNum, 20);
       if (append) {
-        setPosts((prev) => [...prev, ...data]);
+        // Realtime inserts shift offsets, so a later page can repeat rows: dedupe by id.
+        setPosts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...data.filter((p) => !seen.has(p.id))];
+        });
       } else {
         setPosts(data);
       }
