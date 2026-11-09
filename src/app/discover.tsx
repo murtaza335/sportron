@@ -282,5 +282,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontWeight: '600',
+    textAlign: 'center',
   },
 });

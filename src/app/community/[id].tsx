@@ -625,8 +625,28 @@ export default function CommunityDetailScreen() {
               fontSize: 13,
             }}
           >
-            Be the first to Post! Click Plus icon below!
+            {isMember
+              ? 'Be the first to post — share a thought, a photo, or record a match.'
+              : 'Join this community to share posts and matches.'}
           </ThemedText>
+          {isMember ? (
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md }}>
+              <Button
+                label="Write a post"
+                onPress={() => {
+                  setCreatePostInitialTab('write');
+                  setCreatePostModalVisible(true);
+                }}
+              />
+              {community?.sport ? (
+                <Button
+                  label="Record a match"
+                  variant="secondary"
+                  onPress={() => router.push(`/add-match?communityId=${id}&sport=${community.sport}`)}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </View>
       );
     }
