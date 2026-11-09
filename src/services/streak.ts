@@ -44,7 +44,9 @@ function computeActualStreak(
   }
 
   if (lastActive === yesterday) {
-    return { streakCount: profile.streak_count ?? 0, isAtRisk: false, hoursSinceLastActivity: 24 };
+    // Active yesterday but not yet today: the streak ends at UTC midnight => at risk.
+    const count = profile.streak_count ?? 0;
+    return { streakCount: count, isAtRisk: count > 0, hoursSinceLastActivity: 24 };
   }
 
   // Streak is broken - last activity was before yesterday
@@ -52,9 +54,9 @@ function computeActualStreak(
   const now = new Date();
   const diffMs = now.getTime() - lastActiveDate.getTime();
   const hoursSince = Math.floor(diffMs / (1000 * 60 * 60));
-  const isAtRisk = hoursSince >= 22 && (profile.streak_count ?? 0) > 0;
 
-  return { streakCount: 0, isAtRisk, hoursSinceLastActivity: hoursSince };
+  // Already broken (not "at risk" anymore).
+  return { streakCount: 0, isAtRisk: false, hoursSinceLastActivity: hoursSince };
 }
 
 /**
