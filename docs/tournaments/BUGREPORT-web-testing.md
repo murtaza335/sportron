@@ -13,7 +13,7 @@ of each section; change **Status** as they get fixed.
 | ID | Severity | Title | Status |
 |----|----------|-------|--------|
 | TB-01 | High | Direct/reloaded tournament URLs return Vercel 404 | open (reproduced 2nd pass) |
-| TB-02 | Medium | Web validation errors use blocking `window.alert` | open |
+| TB-02 | Medium | Web validation errors use blocking `window.alert` | fixed (re-verified 5th pass) |
 | TB-03 | Low | Result form layout jumps after entering a score | open |
 | TB-04 | Low | Schedule sheet silently drops an incomplete/invalid date | open |
 | TB-05 | Low | Tournament stays "Upcoming" while its modules are Live/Completed | fixed/by design (see below) |
@@ -21,7 +21,13 @@ of each section; change **Status** as they get fixed.
 | TB-11 | Low | Team form title "Add Team" vs "Add pair" wording | open |
 | TB-12 | Medium | Groups+knockout form accepts a setup the server rejects (4 entries, 2 groups, top 2) | open |
 | TB-13 | Low | Result sheet: first typed score shifts layout; and sheet needs ~2s before inputs accept typing | open |
-| TB-06 | Medium | "Generate bracket/fixtures" uses a native `confirm` that freezes the page | open |
+| TB-06 | Medium | "Generate bracket/fixtures" uses a native `confirm` that freezes the page | fixed for Build knockout; re-check Generate/Draw |
+| TB-14 | Low | Counts show "1 pairs" (no singular) in module header | open |
+| TB-15 | Low | Module form has no "allow draws" / draw-points option for leagues | needs-confirm |
+| TB-16 | Low | Saving tournament details (Manage tournament) shows no success toast | open |
+| TB-17 | Low | Tournament label/status never reaches "Past"/"Completed" by itself after all modules finish | needs-confirm |
+| TB-18 | Low | First tap on "Enter result" right after a match sheet opens is ignored (needs a 2nd tap) | needs-confirm |
+| TB-19 | Low | After the knockout is built, group matches still show Edit/Reset; the save then fails with a generic "Something went wrong" title | open |
 | TB-07 | Low | "Save & add another" keeps the form's scroll position | open |
 | TB-08 | Low | League seeding screen still titled "Seeding & bracket" | open |
 | TB-09 | Low | No Edit/Reset on matches once the module is Completed | needs-confirm |
@@ -149,9 +155,80 @@ of each section; change **Status** as they get fixed.
   (TB-03). Also, inputs typed in the first ~1 s after the sheet opens are dropped (scores stayed 0–0,
   Save then showed the native "enter a score" alert).
 
+## 5th pass — after the in-app alert helper was deployed
+- Validation alerts are now in-app themed dialogs ("Enter a score", "Check the games — A game can't
+  end level"), each with an OK button; Delete entry shows an in-app "Delete entry?" confirm with a
+  red Delete and Cancel (Cancel keeps the pair); Cancel module shows "Cancel this module?" with
+  Keep / Cancel module. No browser dialogs seen, no page freezes.
+- **Build knockout** (groups+KO) completed with no native confirm. Still to re-check: *Generate
+  bracket*, *Generate fixtures*, *Draw groups* and *Close entries* error (TB-12 message) now that the
+  helper is live.
+
+## 6th pass notes
+- **TB-15:** League/Groups forms only offer Win and Loss points; docs/engine mention optional draws
+  + draw points. A level game is rejected ("A game can't end level"), so draws can't be tested from
+  the web UI. Confirm whether draws should be exposed.
+- **TB-16:** *Save changes* on Manage tournament persisted (description change visible on the
+  tournament page) but no toast/confirmation was shown, unlike module/round saves.
+- **TB-17:** The tournament tab/status follows module state: it showed Live while a module was
+  live and fell back to Upcoming once none were; with every module Completed it still sits in
+  Upcoming (status "Published"; set to Completed manually). Confirm if that is intended.
+
+## TB-18 — Tap right after the match sheet opens is ignored
+- Low, needs-confirm (may be an automation timing artifact, but it was consistent in this pass).
+- On the Matches list, tapping a match opens the bottom sheet; the first tap on *Enter result*
+  within ~3 s did nothing (sheet stayed on the match summary) and a second tap worked. Typing into
+  score boxes in the first ~1–3 s of the result sheet was also dropped (see TB-13). Suggests the
+  sheet ignores input during its open animation or a long settle time; check on a real browser/device.
+
+## TB-19 — Group results lock is enforced, but the UI still offers Edit/Reset
+- Low, open. After *Build knockout bracket*, opening a played group match still shows **Edit result**
+  and **Reset**. Saving an edit is rejected by the server with an in-app dialog titled "Something went
+  wrong" and the text "The knockout has been built — group results are locked. Undo the knockout
+  first." The message is good; the title is generic and the buttons could be hidden or disabled with
+  a hint, as the manage screen already explains ("Group results are locked… possible until the first
+  knockout match is decided").
+
 ---
 
 ## Verified working (no bug)
+- 8th pass: **Group-results lock (STAGE_LOCKED)**: 6 entries (2 groups of 3, top 2) are accepted;
+  *Build knockout bracket* shows in-app "Build the knockout? Group results will be locked until you
+  undo the knockout."; after building, the server rejects group edits (TB-19); manage shows
+  "Knockout (undo)"; the screen explains the lock; *Undo knockout* shows an in-app confirm ("The
+  bracket is removed and group results become editable again.") and returns to the builder
+- 8th pass: Seeding page for groups also lists the drawn groups with per-player **Move** links
+  (not exercised)
+- 8th pass: **Tournament status**: setting *Completed* moves the tournament to the Past tab with a
+  COMPLETED label and hides "Add module" (read-only); *Cancelled* shows a red CANCELLED label in
+  Past; switching back to *Published* returns it to Upcoming. Draft was not tried (would hide a
+  public tournament). This answers TB-17: Past/Completed is set manually.
+- 7th pass: **Home & away league** played out (6 matches, 3 entries): module Completed, champion
+  HA One. All three teams ended level on points (6), game diff and points scored, so the seed
+  decided — consistent with the documented tiebreaker order (points → head-to-head → diff → score for
+  → wins → seed)
+- 6th pass: **Doubles knockout** full run (4 pairs, 3rd-place on): "Bracket generated — 4 matches
+  created" in-app dialog (Later / Preview), semis, final, 3rd place, module Completed, champion
+  Dbl A1 / Dbl A2
+- 6th pass: **Edit result** on a live match (prefilled form; changing 11–0 to 3–11 flipped the
+  winner) and **Reset** (in-app "Reset this result?" confirm; match cleared and replayable)
+- 6th pass: **Entry-form editor**: core fields locked; Add field (label/type/placeholder/required/
+  visible-to-everyone) saved; Remove shows in-app "Remove field? existing answers are kept but hidden"
+- 6th pass: **Manage tournament** save persists (description) ; status buttons Draft/Published/
+  Completed/Cancelled present
+- 6th pass: **Module admins**: user search, assigning (self, @murtazabaig) lists the admin with a
+  Remove link and a notification arrives; Remove shows in-app "Remove admin?" confirm and works
+- 6th pass: **Home & away league** (3 entries): form shows Legs once/home & away; seeding screen says
+  "3 players · 6 matchdays · 6 matches — with an odd number one rests each matchday"; fixtures
+  generated, leg 2 mirrors leg 1 (home/away swapped)
+- 5th pass: **Groups + knockout** full run (2 groups of 4, top 2): drawn groups A/B with qualifier
+  bars, 12 group matches, "Build knockout: Ready" only after all 12 results, qualifiers listed with
+  group labels (A1/B1/A2/B2), reorder seeds, bracket SF/Final, champion GK Seven, module Completed
+- 5th pass: **League** finished (6 matches) — champion decided on head-to-head tiebreak (C and D
+  level on 6 pts, C beat D → C champion); "A game can't end level" guard for tied scores; module
+  auto-completes
+- 5th pass: Add module admin sheet — user search ("mu" lists matching usernames); not assigned
+  (would notify a real user)
 - 4th pass: **Double elimination** full run (4 entries): winners bracket, losers bracket, Grand Final
   and Grand Final — Reset sections render; losers drop into the right slots (W1 losers → L1-1, WB
   final loser → LB final); GF won by the losers-bracket team populated the reset match (GF2);
@@ -201,10 +278,12 @@ of each section; change **Status** as they get fixed.
 ## Not yet tested (browser extension disconnected mid-run)
 - Edit result on a *live* module's finished match (Completed modules show no Edit — TB-09)
 - Entry-form field editor (custom fields); delete entry (native confirm, see TB-06)
-- Doubles knockout played to the end (QA Doubles has 1 pair; needs ≥2 more) and doubles result flow
-- Remaining league matches (5 of 6 unplayed), draws setting, tiebreakers, module auto-complete
-- Groups + knockout: draw groups, group results, stage-2 knockout builder (QA Groups KO has 8
-  entries, in Seeding, draw pending the native confirm)
+- League draws (no UI option, TB-15); tiebreaker edge cases beyond head-to-head
+- Delete module confirm — the click was blocked as an irreversible action, so it stayed untested
+  (the Cancel module confirm was verified)
+- Draft tournament status (not tried), group "Move" links on the seeding page, match Schedule save,
+  self-linked entry notification, rebuilding the knockout after the undo (QA Groups Lock is left
+  with its group results unlocked)
 - Saving changes on Manage tournament; status changes; admin assignment
 - Tournaments list tabs after status change (Live / Past)
 
@@ -222,4 +301,13 @@ of each section; change **Status** as they get fixed.
 - New module "QA Double Elim" (Badminton, double elimination, GF reset on): DE One–Four, played to
   completion, champion DE One.
 - New module "QA Groups KO" (Table Tennis, Groups + knockout, 2 groups, top 2): 8 entries GK One–Eight
-  (CMS 940001–940008), in Seeding. (Initially created with 4 entries; see TB-12.)
+  (CMS 940001–940008), played to completion, champion GK Seven. (Initially created with 4 entries;
+  see TB-12.)
+- QA League is now COMPLETED, champion Squash C.
+- QA Doubles now has 4 pairs (Dbl A–D, CMS 920001–920032), COMPLETED, champion Dbl A1 / Dbl A2.
+- New module "QA League HA" (Table Tennis, League, home & away): HA One–Three (CMS 950001–950003),
+  fixtures generated, all 6 matches played, COMPLETED, champion HA One.
+- Tournament description now ends with " (QA edit)".
+- Custom field "T-shirt size" was added then removed (archived) on the tournament entry form.
+- @murtazabaig was added then removed as admin of "Table Tennis Doubles (Males)" (a notification
+  was sent to the same account).
