@@ -6,6 +6,9 @@ import { AuthCallback } from './pages/AuthCallback';
 import { NotAuthorized } from './pages/NotAuthorized';
 import { Overview } from './pages/Overview';
 import { Settings } from './pages/Settings';
+import { Tournaments } from './pages/Tournaments';
+import { TournamentNew } from './pages/TournamentNew';
+import { TournamentDetail } from './pages/TournamentDetail';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -28,7 +31,10 @@ export const router = createBrowserRouter([
           </RequireRole>
         ),
       },
-      // Pages for tournaments and staff are added in the next steps.
+      { path: 'tournaments', element: <Tournaments /> },
+      { path: 'tournaments/new', element: <TournamentNew /> },
+      { path: 'tournaments/:id', element: <TournamentDetail /> },
+      // The staff page is added in the next step.
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
