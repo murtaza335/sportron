@@ -5,7 +5,7 @@ const expoConfig = require("eslint-config-expo/flat");
 module.exports = defineConfig([
   expoConfig,
   {
-    ignores: ["dist/*"],
+    ignores: ["dist/*", "admin/*"],
   },
   {
     // Alert.alert is a no-op on react-native-web: use `alert` from '@/lib/alert' instead.
