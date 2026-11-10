@@ -1,3 +1,4 @@
+import { haptics } from '@/lib/haptics';
 import { useState } from 'react';
 import { Pressable, View } from 'react-native';
 import { CheckCircle, UserPlus, XCircle } from 'lucide-react-native';
@@ -47,6 +48,7 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
     setActionLoading(true);
     try {
       await respondToCommunityInvite(inviteId, user.id, true);
+      haptics.success();
       await resolveNotification(true);
       setActionResult('accepted');
       onComplete();
@@ -63,6 +65,7 @@ export function InviteCard({ notificationId, inviteId, communityName, inviterNam
     setActionLoading(true);
     try {
       await respondToCommunityInvite(inviteId, user.id, false);
+      haptics.warning();
       await resolveNotification(false);
       setActionResult('rejected');
       onComplete();

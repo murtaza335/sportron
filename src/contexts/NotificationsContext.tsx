@@ -3,6 +3,7 @@ import { createContext, useCallback, useContext, useEffect, useState, type React
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
 import type { InAppNotification } from '@/types';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 type NotificationsContextValue = {
   notifications: InAppNotification[];
@@ -23,22 +24,35 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const profileId = profile?.id;
   const [notifications, setNotifications] = useState<InAppNotification[]>([]);
   const [loading, setLoading] = useState(false);
+  // Unread rows that are NOT in the loaded page (the inbox is capped at NOTIFICATIONS_LIMIT):
+  // measured at fetch time so the badge does not undercount beyond the cap.
+  const [olderUnread, setOlderUnread] = useState(0);
 
   const fetchNotifications = useCallback(async () => {
     if (!profileId) return;
 
     setLoading(true);
     try {
-      const { data, error } = await supabase
-        .from('in_app_notifications')
-        .select('*')
-        .eq('user_id', profileId)
-        .order('created_at', { ascending: false })
-        .limit(NOTIFICATIONS_LIMIT);
+      const [{ data, error }, { count: unreadTotal }] = await Promise.all([
+        supabase
+          .from('in_app_notifications')
+          .select('*')
+          .eq('user_id', profileId)
+          .order('created_at', { ascending: false })
+          .limit(NOTIFICATIONS_LIMIT),
+        supabase
+          .from('in_app_notifications')
+          .select('id', { count: 'exact', head: true })
+          .eq('user_id', profileId)
+          .eq('read', false),
+      ]);
 
       if (error) throw error;
 
-      setNotifications(data || []);
+      const rows = data || [];
+      setNotifications(rows);
+      const loadedUnread = rows.filter((n) => !n.read).length;
+      setOlderUnread(Math.max(0, (unreadTotal ?? loadedUnread) - loadedUnread));
     } catch (error) {
       console.error('Failed to fetch notifications:', error);
     } finally {
@@ -67,6 +81,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     if (!profileId) return;
 
     setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+    setOlderUnread(0);
 
     try {
       const { error } = await supabase
@@ -159,8 +174,13 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     };
   }, [profileId, fetchNotifications]);
 
+  // Refetch on resume: realtime events are missed while the app is backgrounded.
+  useAppForeground(() => {
+    fetchNotifications();
+  }, !!profileId);
+
   // Derived from the shared list so every read/insert/delete stays in sync
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  const unreadCount = notifications.filter((n) => !n.read).length + olderUnread;
 
   return (
     <NotificationsContext.Provider

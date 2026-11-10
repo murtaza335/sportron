@@ -35,7 +35,22 @@ export type NotificationType =
   | 'session_chat_message'
   | 'session_chat_reply'
   | 'community_chat_message'
-  | 'community_chat_reply';
+  | 'community_chat_reply'
+  | 'tournament_admin_assigned'
+  | 'tournament_module_admin_assigned'
+  | 'tournament_entry_added'
+  | 'tournament_match_scheduled'
+  | 'tournament_match_result'
+  | 'tournament_module_completed'
+  | 'community_post_created'
+  | 'community_post_liked'
+  | 'community_post_commented'
+  | 'streak_reminder'
+  | 'streak_at_risk'
+  | 'streak_milestone'
+  | 'member_joined'
+  | 'community_engagement'
+  | 'new_community';
 
 export interface NotificationData {
   type: NotificationType;
@@ -45,6 +60,9 @@ export interface NotificationData {
   commentId?: string;
   sessionId?: string;
   communityId?: string;
+  postId?: string;
+  tournamentId?: string;
+  moduleId?: string;
   message?: string;
 }
 
@@ -127,6 +145,13 @@ export async function registerForPushNotificationsAsync(): Promise<string | null
 }
 
 export async function saveFCMTokenToProfile(userId: string, fcmToken: string): Promise<void> {
+  // Preferred path (migration 108): atomically move the token to this user and drop it from
+  // every other profile, so a shared device never receives a previous user's pushes.
+  const { error: claimError } = await supabase.rpc('claim_fcm_token', { p_token: fcmToken });
+  if (!claimError) return;
+
+  // Fallback for backends where migration 108 is not applied yet.
+  console.warn('claim_fcm_token failed, falling back to profile update:', claimError.message);
   try {
     const { data: existingProfile, error: fetchError } = await supabase
       .from('profiles')
@@ -236,6 +261,8 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     commentId: data?.commentId,
     sessionId: data?.sessionId,
     communityId: data?.communityId,
+    tournamentId: data?.tournamentId,
+    moduleId: data?.moduleId,
     message: data?.message,
   };
 

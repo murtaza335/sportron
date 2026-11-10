@@ -1,10 +1,10 @@
 import { useEffect, useCallback } from 'react';
-import { ActivityIndicator, View, StyleSheet } from 'react-native';
+import { ActivityIndicator, Platform, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
-import * as QueryParams from 'expo-auth-session/build/QueryParams';
 
-import { supabase } from '@/lib/supabase';
+import { handleAuthRedirectUrl } from '@/services/auth';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 
 export default function AuthCallback() {
@@ -14,32 +14,25 @@ export default function AuthCallback() {
 
   const handleRedirect = useCallback(async (urlStr: string) => {
     try {
-      let normalizedUrl = urlStr;
-      if (urlStr.includes('#')) {
-        normalizedUrl = urlStr.replace('#', '?');
-      }
-
-      const { params, errorCode } = QueryParams.getQueryParams(normalizedUrl);
-      if (errorCode) {
-        throw new Error(errorCode);
-      }
-
-      const { access_token, refresh_token } = params;
-      if (access_token) {
-        const { error } = await supabase.auth.setSession({
-          access_token,
-          refresh_token,
-        });
-        if (error) {
-          throw error;
-        }
-      }
+      // Only an OAuth `code` from a sign-in this app started is accepted (PKCE, SEC-M1).
+      await handleAuthRedirectUrl(urlStr);
+      // On web the root layout's auth gate takes over once the session exists and sends the user
+      // to the page they originally asked for (see lib/returnTo).
+      if (Platform.OS !== 'web') router.replace('/');
     } catch (e) {
       console.error('[T3S] Error handling auth callback:', e);
-    } finally {
-      router.replace('/');
+      router.replace(Platform.OS === 'web' ? '/login' : '/');
     }
   }, [router]);
+
+  // Web: supabase-js finishes the code exchange on page load and the root auth gate then redirects.
+  // If no session shows up, don't leave the user on a spinner.
+  const { session } = useAuth();
+  useEffect(() => {
+    if (Platform.OS !== 'web' || session) return;
+    const t = setTimeout(() => router.replace('/login'), 10_000);
+    return () => clearTimeout(t);
+  }, [session, router]);
 
   useEffect(() => {
     if (url) {

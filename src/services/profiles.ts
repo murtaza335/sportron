@@ -52,7 +52,9 @@ export async function isUsernameAvailable(username: string, excludeUserId?: stri
   let query = supabase
     .from('public_profiles')
     .select('id')
-    .ilike('username', normalized);
+    // Exact match: ilike treats `_` and `%` as wildcards ("a_b" matched "axb"). Usernames are
+    // stored lowercased, so equality is sufficient.
+    .eq('username', normalized);
 
   if (excludeUserId && isValidUUID(excludeUserId)) {
     query = query.neq('id', excludeUserId);

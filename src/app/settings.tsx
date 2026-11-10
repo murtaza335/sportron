@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { resetTips } from '@/lib/tips';
+import { toast } from '@/components/motion/Toast';
 import { Platform, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
 import { AlertTriangle, Bell, BellOff, Info } from 'lucide-react-native';
 
@@ -62,7 +64,7 @@ export default function SettingsScreen() {
   const handleDeleteAccount = () => {
     alert(
       'Delete Account',
-      'This will permanently erase all your data except your name on existing matches. You can sign in again to re-activate your account.',
+      'Your profile photo, bio and notification settings will be removed and your account will be deactivated. Your username, messages, posts and match history remain visible to other members. Signing in again reactivates your account. To request full erasure of your data, email zorozlabs@gmail.com.',
       [
         { text: 'Cancel', style: 'cancel' },
         {
@@ -111,16 +113,40 @@ export default function SettingsScreen() {
             <View style={styles.settingContent}>
               <ThemedText variant="body">Push Notifications</ThemedText>
               <ThemedText variant="caption" muted>
-                {notificationsEnabled ? 'Enabled' : 'Disabled'}
+                {Platform.OS === 'web'
+                  ? 'Alerts are delivered to the Sportron Android app'
+                  : notificationsEnabled
+                    ? 'Enabled'
+                    : 'Disabled'}
               </ThemedText>
             </View>
-            <Switch
-              value={notificationsEnabled}
-              onValueChange={handleMasterToggle}
-              trackColor={{ false: theme.borderMuted, true: theme.accent }}
-              thumbColor={theme.background}
-            />
+            {Platform.OS !== 'web' && (
+              <Switch
+                value={notificationsEnabled}
+                onValueChange={handleMasterToggle}
+                trackColor={{ false: theme.borderMuted, true: theme.accent }}
+                thumbColor={theme.background}
+              />
+            )}
           </View>
+        </Card>
+
+        <Card style={styles.settingCard}>
+          <Pressable
+            style={styles.settingRow}
+            onPress={async () => {
+              await resetTips(user?.id);
+              toast('Tips reset', "You'll see the how-to tips again.");
+            }}
+            accessibilityRole="button">
+            <View style={[styles.settingIcon, { backgroundColor: theme.backgroundElement }]}>
+              <Info size={22} color={theme.text} />
+            </View>
+            <View style={styles.settingContent}>
+              <ThemedText variant="body">Show tips again</ThemedText>
+              <ThemedText variant="caption" muted>Replay the first-run how-to cards</ThemedText>
+            </View>
+          </Pressable>
         </Card>
 
         <Divider spacing={Spacing.xl} />

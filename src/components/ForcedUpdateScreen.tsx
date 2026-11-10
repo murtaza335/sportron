@@ -1,5 +1,8 @@
 import { Linking, Pressable, StyleSheet, Text, View } from 'react-native';
 
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Floating } from '@/components/motion/Floating';
+import { Duration, RM, STAGGER_MS } from '@/lib/motion';
 import { Spacing } from '@/constants/theme';
 
 const DARK_BG = '#0F1115';
@@ -23,14 +26,16 @@ export function ForcedUpdateScreen({ message, storeUrl }: ForcedUpdateScreenProp
   return (
     <View style={styles.container}>
       {/* Large download icon */}
+      <Floating>
       <View style={styles.iconContainer}>
         <Text style={styles.iconArrow} selectable={false}>
           {'\u2B07\uFE0F'}
         </Text>
       </View>
+      </Floating>
 
-      <Text style={styles.title}>Update Required</Text>
-      <Text style={styles.message}>{message}</Text>
+      <Animated.Text entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)} style={styles.title}>Update Required</Animated.Text>
+      <Animated.Text entering={FadeInDown.delay(STAGGER_MS * 3).duration(Duration.base).reduceMotion(RM)} style={styles.message}>{message}</Animated.Text>
 
       {storeUrl ? (
         <Pressable

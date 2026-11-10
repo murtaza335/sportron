@@ -1,18 +1,16 @@
-import { Flame, Sparkles, Trophy, X } from 'lucide-react-native';
+import { Sparkles, Trophy, X } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Dimensions,
-  Modal,
-  Pressable,
-  StyleSheet,
-  Text,
-  View,
-} from 'react-native';
-import { BlurView } from 'expo-blur';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 
+import { AnimatedFlame } from '@/components/motion/AnimatedFlame';
+import { celebrate } from '@/components/motion/Confetti';
+import { CountUp } from '@/components/motion/CountUp';
+import { CenterModal } from '@/components/motion/CenterModal';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
+import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 
 interface StreakModalProps {
   visible: boolean;
@@ -30,6 +28,23 @@ export function StreakModal({
   lastActivityDate = null,
 }: StreakModalProps) {
   const theme = useTheme();
+  const { user } = useAuth();
+
+  // Confetti once per milestone (7, 30, 100, 365 and multiples of 100), remembered per user.
+  useEffect(() => {
+    if (!visible || !user?.id) return;
+    const isMilestone = streakCount === 7 || streakCount === 30 || streakCount === 365 || (streakCount >= 100 && streakCount % 100 === 0);
+    if (!isMilestone) return;
+    const key = `streak_milestone_shown_${user.id}`;
+    AsyncStorage.getItem(key)
+      .then((last) => {
+        if (last === String(streakCount)) return;
+        celebrate();
+        return AsyncStorage.setItem(key, String(streakCount));
+      })
+      .catch(() => {});
+  }, [visible, streakCount, user?.id]);
+
   const [nowTs, setNowTs] = useState(() => Date.now());
 
   useEffect(() => {
@@ -92,8 +107,6 @@ export function StreakModal({
     return `${hours}h ${minutes}m`;
   }, [streakCount, lastActivityDate, nowTs]);
 
-  if (!visible) return null;
-
   const hasStreak = streakCount > 0;
   const streakColor = hasStreak ? theme.error : theme.textSecondary;
 
@@ -103,16 +116,7 @@ export function StreakModal({
   const buttonTextColor = theme.background;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <View style={styles.overlay}>
-        <BlurView
-          tint="dark"
-          intensity={50}
-          style={StyleSheet.absoluteFill}
-        />
-        <View style={[StyleSheet.absoluteFill, styles.darkenOverlay]} />
-        <Pressable style={StyleSheet.absoluteFill} onPress={onClose} accessibilityLabel="Close modal backdrop" />
-
+    <CenterModal visible={visible} onClose={onClose}>
         <View
           style={[
             styles.card,
@@ -141,10 +145,10 @@ export function StreakModal({
             {/* Current Streak */}
             <View style={styles.statBox}>
               <View style={[styles.flameCircle, { backgroundColor: hasStreak ? 'rgba(255, 87, 34, 0.1)' : 'rgba(150, 150, 150, 0.08)' }]}>
-                <Flame size={24} color={streakColor} fill={streakColor} strokeWidth={0} />
+                <AnimatedFlame size={24} color={streakColor} state={hasStreak ? 'idle' : 'cold'} dropIn />
               </View>
               <View style={styles.streakCountRow}>
-                <Text style={[styles.streakNumber, { color: theme.text }]}>{streakCount}</Text>
+                <CountUp value={streakCount} style={[styles.streakNumber, { color: theme.text }]} />
                 <Text style={[styles.streakUnit, { color: theme.textSecondary }]}>
                   {streakCount === 1 ? 'DAY' : 'DAYS'}
                 </Text>
@@ -161,7 +165,7 @@ export function StreakModal({
                 <Trophy size={22} color={theme.warning} strokeWidth={2.2} />
               </View>
               <View style={styles.streakCountRow}>
-                <Text style={[styles.streakNumber, { color: theme.text }]}>{longestStreak}</Text>
+                <CountUp value={longestStreak} delay={250} style={[styles.streakNumber, { color: theme.text }]} />
                 <Text style={[styles.streakUnit, { color: theme.textSecondary }]}>
                   {longestStreak === 1 ? 'DAY' : 'DAYS'}
                 </Text>
@@ -199,26 +203,14 @@ export function StreakModal({
             <Text style={[styles.blackButtonText, { color: buttonTextColor }]}>Close</Text>
           </Pressable>
         </View>
-      </View>
-    </Modal>
+    </CenterModal>
   );
 }
 
-const screenWidth = Dimensions.get('window').width;
-
 const styles = StyleSheet.create({
-  overlay: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: Spacing.md,
-  },
-  darkenOverlay: {
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
-  },
   card: {
     width: '100%',
-    maxWidth: Math.min(screenWidth - 48, 340),
+    maxWidth: 340,
     borderRadius: Radius.lg,
     padding: Spacing.md,
     gap: Spacing.xs,
@@ -295,7 +287,7 @@ const styles = StyleSheet.create({
   },
   ruleCard: {
     flexDirection: 'row',
-    alignItems: 'center',
+    alignItems: 'flex-start',
     gap: 6,
     marginTop: 2,
   },

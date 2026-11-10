@@ -211,6 +211,31 @@ function buildMessage(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Notification preferences (profiles.notification_preferences)
+// ---------------------------------------------------------------------------
+// Mirrors DEFAULT_NOTIFICATION_PREFERENCES in src/types/index.ts. A missing key means
+// "enabled" so older stored preference blobs keep working. The in-app master toggle writes
+// every key to false; that is treated as "push off" for ALL pushes, including chat (chat has
+// no per-type key).
+export type NotificationPrefs = Record<string, unknown> | null | undefined;
+
+export function pushPrefKeyFor(type: string): string {
+  return type.startsWith('tournament_') ? 'tournament_updates' : type;
+}
+
+export function isMasterPushOff(prefs: NotificationPrefs): boolean {
+  if (!prefs || typeof prefs !== 'object') return false;
+  const values = Object.values(prefs).filter((v) => typeof v === 'boolean');
+  return values.length > 0 && values.every((v) => v === false);
+}
+
+export function isPushAllowed(prefs: NotificationPrefs, type: string): boolean {
+  if (!prefs || typeof prefs !== 'object') return true;
+  if (isMasterPushOff(prefs)) return false;
+  return (prefs as Record<string, unknown>)[pushPrefKeyFor(type)] !== false;
+}
+
 // Sends to many tokens in one fan-out. `tokenRows` carries a per-token body
 // (chat pushes have a per-recipient accumulated-unread body); it is used for
 // both the Android/`notification` payload and the iOS `aps.alert` payload.
@@ -225,6 +250,9 @@ export async function pushToTokens(
   const sa = JSON.parse(Deno.env.get('FCM_SERVICE_ACCOUNT') ?? '{}');
   const fcmUrl = `https://fcm.googleapis.com/v1/projects/${sa.project_id}/messages:send`;
 
+  // Tokens FCM reports as permanently invalid; removed from profiles.fcm_tokens afterwards.
+  const deadTokens: string[] = [];
+
   const results = await Promise.allSettled(
     tokenRows.map(async ({ token, body }) => {
       const res = await fetch(fcmUrl, {
@@ -237,6 +265,13 @@ export async function pushToTokens(
       });
       if (!res.ok) {
         const bodyText = await res.text();
+        if (
+          res.status === 404 ||
+          bodyText.includes('UNREGISTERED') ||
+          (res.status === 400 && bodyText.includes('registration token'))
+        ) {
+          deadTokens.push(token);
+        }
         throw new Error(`FCM responded ${res.status}: ${bodyText}`);
       }
       return res;
@@ -248,6 +283,15 @@ export async function pushToTokens(
   for (const r of results) {
     if (r.status === 'fulfilled') sent++;
     else failed++;
+  }
+
+  if (deadTokens.length > 0) {
+    try {
+      const { error } = await supabase.rpc('prune_fcm_tokens', { p_tokens: deadTokens });
+      if (error) console.warn('[fcm] prune_fcm_tokens failed:', error.message);
+    } catch (e) {
+      console.warn('[fcm] prune_fcm_tokens threw:', e);
+    }
   }
 
   return { sent, failed, total: tokenRows.length };

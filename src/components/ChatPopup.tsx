@@ -1,3 +1,26 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import Animated, {
+  FadeIn,
+  FadeInDown,
+  FadeOut,
+  FadeOutDown,
+  useAnimatedStyle,
+  useReducedMotion,
+  useSharedValue,
+  withSpring,
+  withTiming,
+  ZoomIn,
+  ZoomOut,
+  interpolateColor,
+} from 'react-native-reanimated';
+import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
+import { FlashHighlight } from '@/components/motion/FlashHighlight';
+import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal';
+import { SwipeToReply } from '@/components/motion/SwipeToReply';
+import { haptics } from '@/lib/haptics';
+import { enterToSend, isFinePointer } from '@/lib/webKeys';
+import { webContextMenuProps } from '@/lib/webMenu';
+import { Duration, RM, Springs, LayoutShift } from '@/lib/motion';
 import { BlurView } from 'expo-blur';
 import {
   AlertTriangle,
@@ -14,21 +37,7 @@ import {
   X,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  GestureResponderEvent,
-  KeyboardAvoidingView,
-  Modal,
-  NativeScrollEvent,
-  NativeSyntheticEvent,
-  Platform,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-  Dimensions,
-} from 'react-native';
+import { ActivityIndicator, AppState, FlatList, GestureResponderEvent, NativeScrollEvent, NativeSyntheticEvent, Platform, Pressable, StyleSheet, TextInput, View, Dimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ThemedText } from '@/components/ui/Text';
@@ -59,6 +68,32 @@ const CONTEXT_OPTION_H = 52;
 
 // Two taps within this window count as a double-tap that opens the same
 // options popup as a long-press.
+// Outgoing bubbles rise from the composer (bottom-right) with a slight spring; transform + opacity only.
+const MINE_ENTER = (values: { targetOriginY: number }) => {
+  'worklet';
+  void values;
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 12 }, { scale: 0.96 }] },
+    animations: {
+      opacity: withTiming(1, { duration: Duration.fast }),
+      transform: [{ translateY: withSpring(0, Springs.bouncy) }, { scale: withSpring(1, Springs.bouncy) }],
+    },
+  };
+};
+// Incoming bubbles fade and slide in from the left.
+const OTHER_ENTER = (values: { targetOriginY: number }) => {
+  'worklet';
+  void values;
+  return {
+    initialValues: { opacity: 0, transform: [{ translateX: -12 }] },
+    animations: {
+      opacity: withTiming(1, { duration: Duration.base }),
+      transform: [{ translateX: withTiming(0, { duration: Duration.base }) }],
+    },
+  };
+};
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 const DOUBLE_TAP_MS = 300;
 
 // Own-message edit/delete windows (mirrors the DB/enforced server-side). The
@@ -98,6 +133,36 @@ function formatMessageTime(dateString: string) {
   });
 }
 
+function SendButton({ disabled, editing, onPress }: { disabled: boolean; editing: boolean; onPress: () => void }) {
+  const theme = useTheme();
+  const active = useSharedValue(disabled ? 0 : 1);
+  const press = useSharedValue(1);
+  useEffect(() => {
+    active.set(withSpring(disabled ? 0 : 1, Springs.bouncy));
+  }, [disabled, active]);
+  const style = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(Math.min(1, Math.max(0, active.value)), [0, 1], [theme.backgroundElement, theme.success]),
+    transform: [{ scale: (0.9 + 0.1 * active.value) * press.value }],
+  }));
+  const color = disabled ? theme.textSecondary : theme.chatBubbleMineText;
+  return (
+    <AnimatedPressable
+      onPress={onPress}
+      onPressIn={() => press.set(withTiming(0.92, { duration: Duration.instant }))}
+      onPressOut={() => press.set(withSpring(1, Springs.snappy))}
+      onPointerDown={(e) => {
+        // Web-only: block the button's default mouse-down action so the TextInput never blurs
+        // (no keyboard flash). onPress still fires; only the native focus-move is suppressed.
+        if (Platform.OS === 'web') e.preventDefault();
+      }}
+      disabled={disabled}
+      style={[styles.sendBtn, style]}
+    >
+      {editing ? <CheckCheck size={18} color={color} /> : <Send size={18} color={color} />}
+    </AnimatedPressable>
+  );
+}
+
 export function ChatPopup<T extends ChatMessageBase>({
   visible,
   onClose,
@@ -128,6 +193,13 @@ export function ChatPopup<T extends ChatMessageBase>({
   } = chat;
 
   const [draft, setDraft] = useState('');
+  // App foreground state: presence must stop while the app is backgrounded (Android keeps JS
+  // timers alive), otherwise the server believes the user is reading and suppresses pushes.
+  const [appActive, setAppActive] = useState(AppState.currentState === 'active');
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (next) => setAppActive(next === 'active'));
+    return () => sub.remove();
+  }, []);
   const draftRef = useRef('');
   const inputRef = useRef<TextInput>(null);
   const [inputHeight, setInputHeight] = useState(40);
@@ -146,6 +218,12 @@ export function ChatPopup<T extends ChatMessageBase>({
   const lastMarkReadRef = useRef(0);
   const atBottomRef = useRef(true);
   const lastPressRef = useRef(0);
+  // Entrance animations apply only to messages newer than what was loaded on open (never to history,
+  // pagination, or the optimistic->real id swap of our own just-sent message).
+  const initialNewestRef = useRef<number | null>(null);
+  const recentSentRef = useRef<{ content: string; at: number }[]>([]);
+  const [highlightId, setHighlightId] = useState<string | null>(null);
+  const reducedMotion = useReducedMotion();
 
   // The chat list is INVERTED: newest message at index 0 = the scroll origin
   // (offset 0 = the visual bottom). That makes chats behave natively like
@@ -167,6 +245,19 @@ export function ChatPopup<T extends ChatMessageBase>({
       ),
     [messages],
   );
+
+  useEffect(() => {
+    if (!visible) {
+      initialNewestRef.current = null;
+      return;
+    }
+    if (!loading && initialNewestRef.current === null) {
+      initialNewestRef.current = messages.reduce(
+        (max, m) => Math.max(max, new Date(m.created_at).getTime()),
+        0,
+      );
+    }
+  }, [visible, loading, messages]);
 
   // On open, jump to the oldest unread message (or the bottom when caught up),
   // then mark everything read. Subsequent opens reset so it re-evaluates.
@@ -195,7 +286,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   // and skips pushing them. Cleaned up (row deleted) on close or on signing
   // out; if the app dies abruptly the row goes stale and the TTL kicks in.
   useEffect(() => {
-    if (!visible || hasLeft || !chatType || !chatId) return;
+    if (!visible || !appActive || hasLeft || !chatType || !chatId) return;
     const userId = profile?.id;
     if (!userId) return;
 
@@ -213,7 +304,7 @@ export function ChatPopup<T extends ChatMessageBase>({
         console.error('Failed to clear chat presence:', e),
       );
     };
-  }, [visible, hasLeft, chatType, chatId, profile?.id]);
+  }, [visible, appActive, hasLeft, chatType, chatId, profile?.id]);
 
   // Positions the list exactly once on open. Inverted list → offset 0 IS the
   // bottom, and the list starts there by default, so the "caught up" case needs
@@ -319,6 +410,7 @@ export function ChatPopup<T extends ChatMessageBase>({
   // anchor near the finger instead of sliding up a bottom sheet (which would
   // dismiss the keyboard).
   const handleLongPress = useCallback((item: T, e: GestureResponderEvent) => {
+    haptics.medium();
     setContextMenu({ message: item, x: e.nativeEvent.pageX, y: e.nativeEvent.pageY });
   }, []);
 
@@ -335,6 +427,31 @@ export function ChatPopup<T extends ChatMessageBase>({
       lastPressRef.current = now;
     }
   }, []);
+
+  const replyToMessage = useCallback(
+    (message: T) => {
+      if (!canSend) return;
+      setReplyTo(message);
+      setEditingMessage(null);
+      requestAnimationFrame(() => inputRef.current?.focus());
+    },
+    [canSend],
+  );
+
+  const scrollToMessage = useCallback(
+    (id: string) => {
+      const idx = displayMessages.findIndex((m) => m.id === id);
+      if (idx < 0) return;
+      try {
+        listRef.current?.scrollToIndex({ index: idx, viewPosition: 0.5, animated: true });
+      } catch {
+        // unmeasured cell: the list's onScrollToIndexFailed retry handles it
+      }
+      setHighlightId(id);
+      setTimeout(() => setHighlightId((cur) => (cur === id ? null : cur)), 1000);
+    },
+    [displayMessages],
+  );
 
   const replyToContextMessage = useCallback(() => {
     if (!contextMenu) return;
@@ -477,6 +594,8 @@ const contextLayout = useMemo(() => {
     }
 
     const reply = replyTo;
+    haptics.light();
+    recentSentRef.current = [...recentSentRef.current.filter((r) => Date.now() - r.at < 30000), { content: text, at: Date.now() }];
     draftRef.current = '';
     // The input is UNCONTROLLED (no `value` prop), so clear() is the only way
     // the native text ever becomes ''. Nothing can re-assert the old text:
@@ -502,7 +621,11 @@ const contextLayout = useMemo(() => {
     const preview = resolveReplyPreview(item);
     if (!preview.content) return null;
     return (
-      <View
+      <Pressable
+        onPress={() => {
+          const targetId = item.reply_to?.id ?? item.reply_to_id;
+          if (targetId) scrollToMessage(targetId);
+        }}
         style={[
           styles.replyBlock,
           {
@@ -529,7 +652,7 @@ const contextLayout = useMemo(() => {
         >
           {preview.content}
         </ThemedText>
-      </View>
+      </Pressable>
     );
   };
 
@@ -554,8 +677,28 @@ const contextLayout = useMemo(() => {
     const olderDate = olderMsg ? formatChatDate(olderMsg.created_at) : null;
     const showDateSeparator = !olderMsg || itemDate !== olderDate;
 
+    // Entrance: only for live arrivals newer than the initial load, and only while pinned to the
+    // bottom. Own messages animate solely as the optimistic temp (the later id swap must not replay).
+    const createdMs = new Date(item.created_at).getTime();
+    const sentRecently = recentSentRef.current.some(
+      (r) => r.content === item.content && Date.now() - r.at < 30000,
+    );
+    const live =
+      initialNewestRef.current !== null &&
+      createdMs > initialNewestRef.current &&
+      atBottomRef.current;
+    const entering = !live || reducedMotion
+      ? undefined
+      : mine
+        ? isSending
+          ? MINE_ENTER
+          : sentRecently
+            ? undefined
+            : MINE_ENTER
+        : OTHER_ENTER;
+
     return (
-      <View>
+      <Animated.View entering={entering}>
         {showDateSeparator && (
           <View style={styles.dateSeparator}>
             <View style={[styles.dateSeparatorLine, { backgroundColor: theme.border }]} />
@@ -574,9 +717,14 @@ const contextLayout = useMemo(() => {
             <View style={[styles.unreadDividerLine, { backgroundColor: theme.border }]} />
           </View>
         )}
+        <SwipeToReply enabled={canSend && isDeliveredMessage(item)} onReply={() => replyToMessage(item)}>
+        <FlashHighlight active={highlightId === item.id} color={theme.accent}>
         <Pressable
           onLongPress={(e) => handleLongPress(item, e)}
           onPress={(e) => handleMessagePress(item, e)}
+          {...webContextMenuProps((e) => {
+            setContextMenu({ message: item, x: e.pageX, y: e.pageY });
+          })}
           delayLongPress={350}
           style={({ pressed }) => [
             styles.msgRow,
@@ -627,9 +775,13 @@ const contextLayout = useMemo(() => {
                         <AlertTriangle size={12} color={theme.error} strokeWidth={2.5} />
                       </Pressable>
                     ) : isSending ? (
-                      <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                      <Animated.View key="sending" exiting={FadeOut.duration(Duration.fast).reduceMotion(RM)}>
+                        <Clock size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                      </Animated.View>
                     ) : (
-                      <Check size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                      <Animated.View key="sent" entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>
+                        <Check size={12} color="rgba(255,255,255,0.7)" strokeWidth={2.5} />
+                      </Animated.View>
                     )}
                   </View>
                 )}
@@ -643,22 +795,26 @@ const contextLayout = useMemo(() => {
                   {formatMessageTime(item.created_at)}
                 </ThemedText>
                 {item.edited_at && (
-                  <ThemedText
-                    variant="caption"
-                    style={[
-                      styles.msgTime,
-                      styles.editedMark,
-                      { color: mine ? 'rgba(255,255,255,0.7)' : theme.textSecondary },
-                    ]}
-                  >
-                    Edited
-                  </ThemedText>
+                  <Animated.View entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
+                    <ThemedText
+                      variant="caption"
+                      style={[
+                        styles.msgTime,
+                        styles.editedMark,
+                        { color: mine ? 'rgba(255,255,255,0.7)' : theme.textSecondary },
+                      ]}
+                    >
+                      Edited
+                    </ThemedText>
+                  </Animated.View>
                 )}
               </View>
             </View>
           </View>
         </Pressable>
-      </View>
+        </FlashHighlight>
+        </SwipeToReply>
+      </Animated.View>
     );
   };
 
@@ -672,13 +828,9 @@ const contextLayout = useMemo(() => {
 
   return (
     <>
-      <Modal
-        visible={visible}
-        animationType="none"
-        presentationStyle="fullScreen"
-        onRequestClose={onClose}
-      >
+      <SlideUpModal visible={visible} onClose={onClose}>
         <View style={[styles.root, { backgroundColor: theme.background }]}>
+          <SlideUpDragZone>
           <View
             style={[
               styles.header,
@@ -706,8 +858,9 @@ const contextLayout = useMemo(() => {
               <X size={18} color={theme.text} strokeWidth={2.5} />
             </Pressable>
           </View>
+          </SlideUpDragZone>
 
-          <KeyboardAvoidingView
+          <KeyboardAvoider modal
             behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
             keyboardVerticalOffset={0}
             style={styles.keyboardAvoiding}
@@ -803,24 +956,37 @@ const contextLayout = useMemo(() => {
               {/* Jump-to-bottom button: shown whenever the user is not pinned to
                   the bottom (scrolled up / parked at the "New messages" divider). */}
               {!atBottom && (
-                <Pressable
-                  onPress={() => {
-                    scrollToBottom(true);
-                    markRead();
-                  }}
-                  hitSlop={8}
-                  style={({ pressed }) => [
-                    styles.jumpBtn,
-                    { backgroundColor: theme.backgroundElement, borderColor: theme.border },
-                    pressed && { opacity: 0.7 },
-                  ]}
-                >
-                  <ChevronDown size={20} color={theme.text} strokeWidth={2.5} />
-                </Pressable>
+                <Animated.View
+                  entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
+                  exiting={ZoomOut.duration(Duration.fast).reduceMotion(RM)}
+                  style={styles.jumpWrap}>
+                  <Pressable
+                    onPress={() => {
+                      haptics.light();
+                      scrollToBottom(true);
+                      markRead();
+                    }}
+                    hitSlop={8}
+                    style={({ pressed }) => [
+                      styles.jumpBtn,
+                      { backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                      pressed && { opacity: 0.7 },
+                    ]}
+                  >
+                    <ChevronDown size={20} color={theme.text} strokeWidth={2.5} />
+                  </Pressable>
+                  <AnimatedBadge
+                    count={chat.unreadCount}
+                    color={theme.success}
+                    size={18}
+                    style={{ position: 'absolute', top: -6, right: -4 }}
+                  />
+                </Animated.View>
               )}
             </View>
 
-            <View
+            <Animated.View
+              layout={LayoutShift}
               style={[
                 styles.inputBar,
                 {
@@ -831,7 +997,9 @@ const contextLayout = useMemo(() => {
               ]}
             >
               {replyTo && (
-                <View
+                <Animated.View
+                  entering={FadeInDown.duration(Duration.fast).reduceMotion(RM)}
+                  exiting={FadeOutDown.duration(Duration.fast).reduceMotion(RM)}
                   style={[
                     styles.replyBar,
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -849,11 +1017,13 @@ const contextLayout = useMemo(() => {
                   <Pressable onPress={() => setReplyTo(null)} hitSlop={10} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                     <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
                   </Pressable>
-                </View>
+                </Animated.View>
               )}
 
               {editingMessage && (
-                <View
+                <Animated.View
+                  entering={FadeInDown.duration(Duration.fast).reduceMotion(RM)}
+                  exiting={FadeOutDown.duration(Duration.fast).reduceMotion(RM)}
                   style={[
                     styles.replyBar,
                     { backgroundColor: theme.backgroundElement, borderColor: theme.border },
@@ -871,7 +1041,7 @@ const contextLayout = useMemo(() => {
                   <Pressable onPress={cancelEditing} hitSlop={10} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                     <X size={16} color={theme.textSecondary} strokeWidth={2.5} />
                   </Pressable>
-                </View>
+                </Animated.View>
               )}
 
               {actionError && (
@@ -896,9 +1066,22 @@ const contextLayout = useMemo(() => {
                     const h = e.nativeEvent.layout.height;
                     setInputHeight((prev) => (Math.abs(prev - h) > 1 ? h : prev));
                   }}
-                  placeholder={placeholder}
+                  placeholder={isFinePointer() && canSend ? `${placeholder} · Enter to send, Shift+Enter for new line` : placeholder}
                   placeholderTextColor={theme.textSecondary}
                   editable={canSend}
+                  onKeyPress={(e) =>
+                    enterToSend(handleSend, () => {
+                    if (editingMessage) {
+                      cancelEditing();
+                      return true;
+                    }
+                    if (replyTo) {
+                      setReplyTo(null);
+                      return true;
+                    }
+                    return false;
+                  })(e)
+                  }
                   multiline
                   maxLength={1000}
                   style={[
@@ -919,35 +1102,10 @@ const contextLayout = useMemo(() => {
                     },
                   ]}
                 />
-                <Pressable
-                  onPress={handleSend}
-                  onPointerDown={(e) => {
-                    // Web-only: block the button's default mouse-down action so
-                    // the TextInput never blurs → no keyboard flash. onPress
-                    // still fires; only the native focus-move is suppressed.
-                    if (Platform.OS === 'web') e.preventDefault();
-                  }}
-                  // Grey + disabled when the trimmed input is empty and while a
-                  // message is in flight (being added to the UI), otherwise green
-                  // so the input can be reused for the next message immediately.
-                  disabled={sendDisabled}
-                  style={({ pressed }) => [
-                    styles.sendBtn,
-                    {
-                      backgroundColor: sendDisabled ? theme.backgroundElement : theme.success,
-                      opacity: pressed ? 0.8 : 1,
-                    },
-                  ]}
-                >
-                  {editingMessage ? (
-                    <CheckCheck size={18} color={sendDisabled ? theme.textSecondary : theme.chatBubbleMineText} />
-                  ) : (
-                    <Send size={18} color={sendDisabled ? theme.textSecondary : theme.chatBubbleMineText} />
-                  )}
-                </Pressable>
+                <SendButton disabled={sendDisabled} editing={!!editingMessage} onPress={handleSend} />
               </View>
-            </View>
-          </KeyboardAvoidingView>
+            </Animated.View>
+          </KeyboardAvoider>
 
           {/* Floating long-press context menu. Rendered INLINE (not a Modal) so
               the keyboard stays open while it's showing. On iOS the backdrop is
@@ -955,6 +1113,7 @@ const contextLayout = useMemo(() => {
               overlay, so the chat always reads as "background". */}
           {contextMenu && contextLayout && (
             <View style={StyleSheet.absoluteFill} pointerEvents="box-none">
+              <Animated.View style={StyleSheet.absoluteFill} entering={FadeIn.duration(Duration.fast).reduceMotion(RM)}>
               <Pressable style={styles.contextBackdrop} onPress={() => setContextMenu(null)}>
                 {Platform.OS === 'ios' && (
                   <BlurView
@@ -975,7 +1134,9 @@ const contextLayout = useMemo(() => {
                   ]}
                 />
               </Pressable>
-              <View
+              </Animated.View>
+              <Animated.View
+                entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
                 style={[
                   styles.contextCard,
                   {
@@ -1018,7 +1179,7 @@ const contextLayout = useMemo(() => {
                     </Pressable>
                   );
                 })}
-              </View>
+              </Animated.View>
             </View>
           )}
 
@@ -1138,7 +1299,7 @@ const contextLayout = useMemo(() => {
             </View>
           )}
         </View>
-      </Modal>
+      </SlideUpModal>
     </>
   );
 }
@@ -1212,10 +1373,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     flexDirection: 'row',
   },
-  jumpBtn: {
+  jumpWrap: {
     position: 'absolute',
     left: Spacing.lg,
     bottom: Spacing.md,
+    width: 40,
+    height: 40,
+  },
+  jumpBtn: {
     width: 40,
     height: 40,
     borderRadius: Radius.full,

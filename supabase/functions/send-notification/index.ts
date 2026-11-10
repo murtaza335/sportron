@@ -13,7 +13,7 @@
 // cached (with a single-flight promise) across requests in a warm Deno
 // instance, so a fan-out only signs one JWT.
 
-import { supabase, assertServiceRole, pushToTokens } from '../_shared/fcm.ts';
+import { supabase, assertServiceRole, pushToTokens, isPushAllowed } from '../_shared/fcm.ts';
 
 interface NotificationPayload {
   notification_id: string;
@@ -49,12 +49,19 @@ Deno.serve(async (req: Request) => {
 
   const { data: profile, error: profileError } = await supabase
     .from('profiles')
-    .select('fcm_tokens')
+    .select('fcm_tokens, notification_preferences')
     .eq('id', notification.user_id)
     .single();
 
   if (profileError) {
     return new Response('Failed to fetch profile: ' + profileError.message, { status: 500 });
+  }
+
+  // Respect the user's notification preferences server-side (the in-app inbox row stays).
+  if (!isPushAllowed(profile?.notification_preferences, notification.type)) {
+    return new Response(JSON.stringify({ sent: 0, failed: 0, total: 0, skipped: 'preferences' }), {
+      headers: { 'Content-Type': 'application/json' },
+    });
   }
 
   const tokens = (profile?.fcm_tokens ?? []) as string[];

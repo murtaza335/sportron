@@ -1,28 +1,20 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { useRouter } from 'expo-router';
 import { Image as ImageIcon, Trophy, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { Card } from '@/components/ui/Card';
+import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import { createCommunityPost } from '@/services/communities';
 import type { CommunityPostType } from '@/types';
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 
 type PostTab = 'write' | 'photo' | 'match';
 
@@ -78,13 +70,13 @@ export function CreatePostModal({
     if (initialTab === 'write') {
       content = textContent.trim();
       if (!content) {
-        Alert.alert('Empty Post', 'Please write something before posting.');
+        alert('Empty Post', 'Please write something before posting.');
         return;
       }
       postType = 'text';
     } else if (initialTab === 'photo') {
       if (!selectedImage) {
-        Alert.alert('No Photo', 'Please select a photo first.');
+        alert('No Photo', 'Please select a photo first.');
         return;
       }
       content = textContent.trim();
@@ -103,7 +95,7 @@ export function CreatePostModal({
         imageUrl = url;
       } catch (error) {
         console.error('Image upload failed:', error);
-        Alert.alert('Upload Failed', 'Failed to upload image. Please try again.');
+        alert('Upload Failed', 'Failed to upload image. Please try again.');
         setUploading(false);
         return;
       }
@@ -127,29 +119,15 @@ export function CreatePostModal({
       onRefreshFeed?.();
     } catch (error) {
       console.error('Failed to create post:', error);
-      Alert.alert('Error', 'Failed to create post. Please try again.');
+      alert('Error', 'Failed to create post. Please try again.');
     } finally {
       setSubmitting(false);
     }
   };
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      Alert.alert('Permission Required', 'We need access to your photos to upload images.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [4, 3],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setSelectedImage(result.assets[0].uri);
-    }
+    const uri = await pickImageUri({ aspect: [4, 3] });
+    if (uri) setSelectedImage(uri);
   };
 
   const removeImage = () => {
@@ -169,22 +147,17 @@ export function CreatePostModal({
   };
 
   return (
-    <Modal
+    <Sheet
       visible={visible}
-      animationType="slide"
-      transparent={false}
-      onRequestClose={onClose}
+      onClose={onClose}
+      flush
+      avoidKeyboard={false}
+      height="94%"
+      maxHeight="94%"
+      style={{ backgroundColor: theme.background, paddingBottom: 0 }}
     >
-      <View
-        style={[
-          styles.container,
-          {
-            backgroundColor: theme.background,
-            paddingTop: insets.top,
-          },
-        ]}
-      >
-        <KeyboardAvoidingView
+      <View style={styles.container}>
+        <KeyboardAvoider modal
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           style={styles.contentWrapper}
         >
@@ -327,9 +300,9 @@ export function CreatePostModal({
               </ThemedText>
             </Pressable>
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </View>
-    </Modal>
+    </Sheet>
   );
 }
 

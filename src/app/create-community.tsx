@@ -1,17 +1,12 @@
-import * as ImagePicker from 'expo-image-picker';
-import { useRouter } from 'expo-router';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
+import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useState } from 'react';
-import {
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -24,18 +19,22 @@ import { uploadImageFromUri } from '@/lib/cloudinary';
 import { createCommunity } from '@/services/communities';
 import type { CommunityVisibility, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
+import { HScrollView } from '@/components/HScrollView';
 
 export default function CreateCommunityScreen() {
   const theme = useTheme();
   const router = useRouter();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
+  const params = useLocalSearchParams<{ sport?: string; name?: string }>();
+  const initialSport = (Object.keys(SPORT_LABELS) as Sport[]).find((x) => x === params.sport);
 
-  const [name, setName] = useState('');
+  const [name, setName] = useState(typeof params.name === 'string' ? params.name.slice(0, 60) : '');
   const [description, setDescription] = useState('');
   const [organization, setOrganization] = useState('');
   const [location, setLocation] = useState('');
-  const [sport, setSport] = useState<Sport>('table_tennis');
+  const [sport, setSport] = useState<Sport>(initialSport ?? 'table_tennis');
   const [visibility, setVisibility] = useState<CommunityVisibility>('public');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
@@ -44,21 +43,8 @@ export default function CreateCommunityScreen() {
   const canSave = name.trim().length > 0 && !saving && !uploadingImage;
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-    }
+    const uri = await pickImageUri();
+    if (uri) setImageUri(uri);
   };
 
   const removeImage = () => {
@@ -99,7 +85,7 @@ export default function CreateCommunityScreen() {
         sport,
         image_url: uploadedUrl ?? undefined,
       });
-      router.back();
+      goBack(router, '/');
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to create community. Please try again.');
       console.error('Create community error:', e);
@@ -111,14 +97,14 @@ export default function CreateCommunityScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Community</ThemedText>
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -177,7 +163,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Name
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={name}
               onChangeText={setName}
               placeholder="e.g. Table Tennis Club"
@@ -199,7 +185,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="What's this community about?"
@@ -223,7 +209,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Organization (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={organization}
               onChangeText={setOrganization}
               placeholder="e.g. University of Lahore"
@@ -244,7 +230,7 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Location / City (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Lahore"
@@ -265,20 +251,23 @@ export default function CreateCommunityScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Sport
             </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
+            <HScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.sportPicker}>
               {(['table_tennis', 'badminton', 'tennis', 'squash', 'pickleball',
                 'football', 'cricket', 'volleyball', 'handball', 'basketball',
                 'other'] as Sport[]).map((s) => {
                 const selected = s === sport;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={s}
-                    onPress={() => setSport(s)}
-                    style={({ pressed }) => [
+                    onPress={() => {
+                      if (!selected) haptics.selection();
+                      setSport(s);
+                    }}
+                    scaleTo={0.94}
+                    style={[
                       styles.sportPill,
                       { borderColor: theme.border },
                       selected && { backgroundColor: theme.text, borderColor: theme.text },
-                      pressed && { opacity: 0.7 },
                     ]}
                     hitSlop={4}
                   >
@@ -291,10 +280,10 @@ export default function CreateCommunityScreen() {
                     >
                       {SPORT_LABELS[s]}
                     </ThemedText>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
-            </ScrollView>
+            </HScrollView>
           </View>
 
           <View style={styles.field}>
@@ -384,7 +373,7 @@ export default function CreateCommunityScreen() {
             buttonStyle={styles.submit}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }
@@ -462,7 +451,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 0,
   },
   imageChangeButton: {
     position: 'absolute',
@@ -475,7 +464,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 0,
   },
   visibilityRow: {
     flexDirection: 'row',

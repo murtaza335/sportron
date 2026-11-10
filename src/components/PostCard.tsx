@@ -1,16 +1,19 @@
+import { LikeButton } from '@/components/motion/LikeButton';
 import { useRouter } from 'expo-router';
-import { Heart, MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
-import { Alert, Image, Pressable, StyleSheet, View } from 'react-native';
+import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { alert } from '@/lib/alert';
 import { formatRelativeTime } from '@/lib/date';
 import { deleteCommunityPost, toggleCommunityPostLike } from '@/services/communities';
 import type { CommunityPost } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 type PostCardProps = {
   post: CommunityPost;
@@ -33,6 +36,28 @@ export function PostCard({
   const router = useRouter();
   const [liked, setLiked] = useState(post.is_liked_by_user ?? false);
   const [likesCount, setLikesCount] = useState(post.likes_count ?? 0);
+
+  // Re-sync when the post changes under us (realtime like/comment events update the parent
+  // list, refetches replace it); local state only drives the optimistic tap. Uses the
+  // "adjust state while rendering" pattern instead of an effect.
+  const [syncedFrom, setSyncedFrom] = useState({
+    id: post.id,
+    likes: post.likes_count ?? 0,
+    liked: post.is_liked_by_user ?? false,
+  });
+  if (
+    syncedFrom.id !== post.id ||
+    syncedFrom.likes !== (post.likes_count ?? 0) ||
+    syncedFrom.liked !== (post.is_liked_by_user ?? false)
+  ) {
+    setSyncedFrom({
+      id: post.id,
+      likes: post.likes_count ?? 0,
+      liked: post.is_liked_by_user ?? false,
+    });
+    setLiked(post.is_liked_by_user ?? false);
+    setLikesCount(post.likes_count ?? 0);
+  }
   const [showMenu, setShowMenu] = useState(false);
   const [imageLoaded, setImageLoaded] = useState(false);
   const [imageError, setImageError] = useState(false);
@@ -56,7 +81,7 @@ export function PostCard({
 
   const handleDelete = async () => {
     if (!currentUserId) return;
-    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+    alert('Delete Post', 'Are you sure you want to delete this post?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -66,7 +91,7 @@ export function PostCard({
             await deleteCommunityPost(post.id, currentUserId);
           } catch (error) {
             console.error('Failed to delete post:', error);
-            Alert.alert('Error', 'Failed to delete post');
+            alert('Error', 'Failed to delete post');
           }
         },
       },
@@ -92,7 +117,7 @@ export function PostCard({
         <View style={styles.mediaAndTextWrapper}>
           <View style={styles.photoContainer}>
             {!imageLoaded && !imageError && <View style={styles.imagePlaceholder} />}
-            <Image
+            <FadeImage
               source={{ uri: post.image_url }}
               style={styles.postImage}
               onLoad={() => setImageLoaded(true)}
@@ -203,12 +228,7 @@ export function PostCard({
       </Pressable>
 
       <View style={styles.socialRow}>
-        <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-          <Heart size={16} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-          <ThemedText variant="caption" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-            {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-          </ThemedText>
-        </Pressable>
+        <LikeButton liked={liked} count={likesCount} onPress={handleLike} style={styles.socialAction} />
 
         <Pressable onPress={handleCommentPress} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
           <MessageSquare size={16} color={theme.textSecondary} />

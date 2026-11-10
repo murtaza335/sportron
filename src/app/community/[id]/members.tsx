@@ -1,16 +1,14 @@
+import Animated, { FadeOutLeft, ZoomIn } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { ChatRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM } from '@/lib/motion';
+import { Sheet } from '@/components/motion/Sheet';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
-import { ChevronLeft } from 'lucide-react-native';
+import { ChevronLeft, Ellipsis } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Platform, Pressable, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
@@ -27,6 +25,9 @@ import {
   removeMember,
 } from '@/services/communities';
 import type { CommunityInvite, CommunityMember } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
+import { webContextMenuProps } from '@/lib/webMenu';
 
 export default function CommunityMembersScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -179,7 +180,7 @@ export default function CommunityMembersScreen() {
           headerTitleStyle: { color: theme.text },
           headerLeft: () => (
             <Pressable
-              onPress={() => router.back()}
+              onPress={() => goBack(router, `/community/${id}` as Href)}
               hitSlop={12}
               style={({ pressed }) => [
                 { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -192,7 +193,7 @@ export default function CommunityMembersScreen() {
         }}
       />
       {loading ? (
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={ChatRowSkeleton} count={8} gap={0} style={{ marginTop: Spacing.md }} />
       ) : (
         <>
           <FlatList
@@ -200,10 +201,9 @@ export default function CommunityMembersScreen() {
             keyExtractor={(item) => item.profile_id}
             contentContainerStyle={styles.list}
             refreshControl={
-              <RefreshControl
+              <ThemedRefreshControl
                 refreshing={refreshing}
                 onRefresh={handleRefresh}
-                tintColor={theme.text}
               />
             }
             ListHeaderComponent={isAdmin ? (
@@ -248,7 +248,9 @@ export default function CommunityMembersScreen() {
               </>
             ) : null}
             renderItem={({ item }) => (
-              <Pressable
+              <Animated.View exiting={FadeOutLeft.duration(Duration.base).reduceMotion(RM)}>
+              <PressableScale
+                scaleTo={0.98}
                 onPress={() =>
                   router.push({
                     pathname: '/profile/[id]',
@@ -257,14 +259,14 @@ export default function CommunityMembersScreen() {
                 }
                 onLongPress={() => {
                   if (isAdmin && item.profile_id !== userId) {
+                    haptics.medium();
                     setContextMember(item);
                   }
                 }}
-                style={({ pressed }) => [
-                  styles.memberRow,
-                  { borderBottomColor: theme.border },
-                  pressed && { opacity: 0.6 },
-                ]}
+                {...webContextMenuProps(() => {
+                  if (isAdmin && item.profile_id !== userId) setContextMember(item);
+                })}
+                style={[styles.memberRow, { borderBottomColor: theme.border }]}
               >
                 <UserAvatar avatarUrl={item.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
@@ -280,13 +282,25 @@ export default function CommunityMembersScreen() {
                   )}
                 </View>
                 {item.role === 'admin' && (
-                  <View style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
+                  <Animated.View
+                    entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
+                    style={[styles.roleBadge, { backgroundColor: `${theme.warning}20` }]}>
                     <ThemedText variant="caption" style={{ color: theme.warning, fontWeight: '700', fontSize: 11 }}>
                       Admin
                     </ThemedText>
-                  </View>
+                  </Animated.View>
                 )}
-              </Pressable>
+                {Platform.OS === 'web' && isAdmin && item.profile_id !== userId && (
+                  <Pressable
+                    onPress={() => setContextMember(item)}
+                    hitSlop={8}
+                    accessibilityLabel="Member actions"
+                    style={({ pressed }) => [{ padding: Spacing.xs, marginLeft: Spacing.xs }, pressed && { opacity: 0.6 }]}>
+                    <Ellipsis size={20} color={theme.textSecondary} />
+                  </Pressable>
+                )}
+              </PressableScale>
+              </Animated.View>
             )}
             ListEmptyComponent={
               <ThemedText variant="caption" muted style={styles.empty}>
@@ -298,15 +312,18 @@ export default function CommunityMembersScreen() {
       )}
 
       {/* Context Menu Modal */}
-      <Modal
-        transparent
+      <Sheet
         visible={!!contextMember}
-        animationType="fade"
-        onRequestClose={() => setContextMember(null)}
+        onClose={() => setContextMember(null)}
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderTopWidth: 1,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
+          gap: Spacing.sm,
+        }}
       >
-        <Pressable style={styles.backdrop} onPress={() => setContextMember(null)}>
-          <Pressable style={[styles.contextSheet, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <View style={styles.contextHandle} />
             <ThemedText variant="heading" style={styles.contextTitle}>
               {contextMember?.profile?.username ?? 'Member'}
             </ThemedText>
@@ -349,9 +366,7 @@ export default function CommunityMembersScreen() {
                 Cancel
               </ThemedText>
             </Pressable>
-          </Pressable>
-        </Pressable>
-      </Modal>
+      </Sheet>
 
       {/* Invite Member Modal */}
       <InviteMemberModal
@@ -420,30 +435,6 @@ const styles = StyleSheet.create({
     borderRadius: Radius.sm,
   },
   empty: { textAlign: 'center', paddingVertical: Spacing.xxl },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  contextSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    borderLeftWidth: 1,
-    borderRightWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Platform.OS === 'ios' ? 34 : Spacing.lg,
-    gap: Spacing.sm,
-  },
-  contextHandle: {
-    width: 36,
-    height: 4,
-    borderRadius: 2,
-    backgroundColor: 'rgba(128,128,128,0.3)',
-    alignSelf: 'center',
-    marginTop: Spacing.sm,
-    marginBottom: Spacing.xs,
-  },
   contextTitle: {
     marginBottom: Spacing.sm,
   },

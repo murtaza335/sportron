@@ -22,7 +22,7 @@
 // Requires a service_role bearer token (the DB trigger sends the service role
 // key from Vault).
 
-import { supabase, assertServiceRole, pushToTokens } from '../_shared/fcm.ts';
+import { supabase, assertServiceRole, pushToTokens, isMasterPushOff } from '../_shared/fcm.ts';
 
 interface ChatNotificationPayload {
   chat_type: 'session' | 'community';
@@ -108,8 +108,24 @@ Deno.serve(async (req: Request) => {
   // Exclude the reply target from the main recipients list to avoid a
   // duplicate push — they receive the dedicated "replied to you" push instead.
   const replyTargetId = data.reply_target?.id ?? null;
+  // Recipients who switched notifications off (master toggle) get no chat push.
+  const candidateIds = [
+    ...(data.recipients ?? []).map((r) => r.profile_id),
+    ...(replyTargetId ? [replyTargetId] : []),
+  ];
+  const pushOffIds = new Set<string>();
+  if (candidateIds.length > 0) {
+    const { data: prefRows } = await supabase
+      .from('profiles')
+      .select('id, notification_preferences')
+      .in('id', candidateIds);
+    for (const row of prefRows ?? []) {
+      if (isMasterPushOff(row.notification_preferences)) pushOffIds.add(row.id as string);
+    }
+  }
+
   const recipients = (data.recipients ?? []).filter(
-    (r) => !replyTargetId || r.profile_id !== replyTargetId,
+    (r) => (!replyTargetId || r.profile_id !== replyTargetId) && !pushOffIds.has(r.profile_id),
   );
 
   // Pre-compute timestamps for unread filtering (no per-recipient DB calls).
@@ -163,7 +179,7 @@ Deno.serve(async (req: Request) => {
   }
 
   let replyResult = { sent: 0, failed: 0, total: 0 };
-  if (data.reply_target) {
+  if (data.reply_target && !pushOffIds.has(data.reply_target.id)) {
     const replyBody = `${senderName} replied to you: ${content}`;
     const replyPushData = chat_type === 'session'
       ? { type: 'session_chat_reply', sessionId: chat_id, messageId: message_id }

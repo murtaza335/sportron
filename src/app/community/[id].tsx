@@ -1,3 +1,10 @@
+import { TipCard } from '@/components/TipCard';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { haptics } from '@/lib/haptics';
+import { Sheet } from '@/components/motion/Sheet';
 import { FABMenu } from '@/components/FABMenu';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import {
@@ -19,18 +26,8 @@ import {
   X
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { CommunityChatPopup } from '@/components/CommunityChatPopup';
 import { CreatePostModal } from '@/components/CreatePostModal';
@@ -48,6 +45,7 @@ import { useCommunity } from '@/hooks/useCommunity';
 import { useCommunityChat } from '@/hooks/useCommunityChat';
 import { useCommunityPosts } from '@/hooks/useCommunityPosts';
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { supabase } from '@/lib/supabase';
 import {
   fetchCommunityMatchById,
@@ -65,6 +63,7 @@ import type {
   MatchWithProfiles,
 } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
 
 export default function CommunityDetailScreen() {
   const { id, communityName, matchId: matchIdParam, postId: postIdParam } = useLocalSearchParams<{
@@ -118,6 +117,11 @@ export default function CommunityDetailScreen() {
   const [matchesPage, setMatchesPage] = useState(1);
   const [hasMoreMatches, setHasMoreMatches] = useState(false);
   const [loadingMoreMatches, setLoadingMoreMatches] = useState(false);
+  // First page of matches still in flight. Posts and matches load separately, so the feed waits for both
+  // before the first reveal (otherwise matches pop in and reshuffle already-rendered posts).
+  const [matchesInitialLoading, setMatchesInitialLoading] = useState(true);
+  const [feedReady, setFeedReady] = useState(false);
+  const [pullRefreshing, setPullRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [matchPopupVisible, setMatchPopupVisible] = useState(false);
   const [selectedPost, setSelectedPost] = useState<CommunityPost | null>(null);
@@ -142,8 +146,16 @@ export default function CommunityDetailScreen() {
     return { label: 'Join Community', disabled: false } as const;
   })();
 
+  const loadingMoreMatchesRef = useRef(false);
+
   const loadMatches = useCallback(async (page: number = 1, append: boolean = false) => {
     if (!id) return;
+    if (append) {
+      // Guard against several scroll events in the same frame fetching the same page.
+      if (loadingMoreMatchesRef.current) return;
+      loadingMoreMatchesRef.current = true;
+      setLoadingMoreMatches(true);
+    }
     try {
       const { data, hasMore } = await fetchCommunityMatches(id, user?.id, page, 10);
       if (append) {
@@ -160,7 +172,9 @@ export default function CommunityDetailScreen() {
     } catch (e) {
       console.error('Failed to load matches:', e);
     } finally {
+      loadingMoreMatchesRef.current = false;
       setLoadingMoreMatches(false);
+      if (!append && page === 1) setMatchesInitialLoading(false);
     }
   }, [id, user]);
 
@@ -214,18 +228,26 @@ export default function CommunityDetailScreen() {
         },
         (payload) => {
           if (!mountedRef.current) return;
-          const match = payload.new as CommunityMatch;
-          if (match.approval_status === 'pending' && (match.opponent_id === user.id || match.recorded_by === user.id)) {
-            if (payload.eventType === 'INSERT' || payload.eventType === 'UPDATE') {
-              setPendingMatches((prev) => {
-                if (prev.some((m) => m.id === match.id)) {
-                  return prev.map((m) => (m.id === match.id ? match : m));
-                }
-                return [match, ...prev];
-              });
-            } else if (payload.eventType === 'DELETE') {
-              setPendingMatches((prev) => prev.filter((m) => m.id !== (payload.old as { id: string }).id));
+          // DELETE payloads carry only the old row (payload.new is empty): handle them first.
+          if (payload.eventType === 'DELETE') {
+            const deletedId = (payload.old as { id?: string }).id;
+            if (deletedId) {
+              setPendingMatches((prev) => prev.filter((m) => m.id !== deletedId));
             }
+            return;
+          }
+          const match = payload.new as CommunityMatch;
+          const involvesMe = match.opponent_id === user.id || match.recorded_by === user.id;
+          if (match.approval_status === 'pending' && involvesMe) {
+            setPendingMatches((prev) => {
+              if (prev.some((m) => m.id === match.id)) {
+                return prev.map((m) => (m.id === match.id ? match : m));
+              }
+              return [match, ...prev];
+            });
+          } else {
+            // Approved / disputed (or no longer mine): drop any stale pending entry.
+            setPendingMatches((prev) => prev.filter((m) => m.id !== match.id));
           }
         },
       )
@@ -241,7 +263,6 @@ export default function CommunityDetailScreen() {
     };
   }, [id, user]);
 
-  const feedMatches = matches.filter((m) => m.approval_status !== 'pending');
   const pendingFromFeed = matches.filter(
     (m) => m.approval_status === 'pending' && (m.recorded_by === user?.id || m.opponent_id === user?.id),
   );
@@ -293,72 +314,76 @@ export default function CommunityDetailScreen() {
   );
 
   const combinedFeed = useMemo(() => {
-    const feedItems: Array<{ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles }> = [];
+    const feedItems: ({ type: 'post'; data: CommunityPost } | { type: 'match'; data: MatchWithProfiles })[] = [];
+    const approvedMatches = matches.filter((m) => m.approval_status !== 'pending');
 
-    // Add posts
+    // Posts and matches paginate independently. While a source still has older pages, items
+    // older than that source's oldest loaded item could be missing from the merged list, so
+    // only show items at least as new as the newest "oldest loaded" boundary of the sources
+    // that still have more (otherwise older items from the other source would be rendered
+    // before the gap is filled and appear out of order).
+    let cutoff = -Infinity;
+    if (hasMorePosts && posts.length > 0) {
+      cutoff = Math.max(cutoff, new Date(posts[posts.length - 1].created_at).getTime());
+    }
+    if (hasMoreMatches && matches.length > 0) {
+      cutoff = Math.max(
+        cutoff,
+        Math.min(...matches.map((m) => new Date(m.created_at).getTime())),
+      );
+    }
+
+    // Add posts (deduplicated by id)
+    const seenPostIds = new Set<string>();
     (posts ?? []).forEach((post) => {
+      if (seenPostIds.has(post.id)) return;
+      seenPostIds.add(post.id);
       feedItems.push({ type: 'post', data: post });
     });
 
     // Add approved matches (deduplicated by id)
     const seenMatchIds = new Set<string>();
-    (feedMatches ?? []).forEach((match) => {
+    approvedMatches.forEach((match) => {
       if (!seenMatchIds.has(match.id)) {
         seenMatchIds.add(match.id);
         feedItems.push({ type: 'match', data: toMatchWithProfiles(match) });
       }
     });
 
-    // Sort by created_at descending
-    feedItems.sort((a, b) => {
-      const dateA = new Date(a.type === 'post' ? a.data.created_at : a.data.created_at).getTime();
-      const dateB = new Date(b.type === 'post' ? b.data.created_at : b.data.created_at).getTime();
-      return dateB - dateA;
-    });
+    return feedItems
+      .filter((item) => new Date(item.data.created_at).getTime() >= cutoff)
+      .sort((a, b) => new Date(b.data.created_at).getTime() - new Date(a.data.created_at).getTime());
+  }, [posts, matches, hasMorePosts, hasMoreMatches, toMatchWithProfiles]);
 
-    return feedItems;
-  }, [posts, matches, toMatchWithProfiles]);
+  const handlePostPress = (post: CommunityPost) => {
+    setSelectedPost(post);
+    setPostPopupVisible(true);
+  };
 
-  const feedContent = useMemo(() => {
-    // Inline styles for skeleton loader
-    const skeletonContainerStyle = { padding: Spacing.lg, gap: Spacing.md };
-    const skeletonCardStyle = { backgroundColor: theme.backgroundElement, borderRadius: Radius.lg, padding: Spacing.md, gap: Spacing.sm };
-    const skeletonLineStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border };
-    const skeletonLineShortStyle = { height: 16, borderRadius: Radius.sm, backgroundColor: theme.border, width: '60%' as const };
+  const handleMatchPress = (match: MatchWithProfiles) => {
+    setSelectedMatch(match);
+    setMatchPopupVisible(true);
+  };
 
-    // Caught up card styles
-    const caughtUpCardStyle = {
-      flexDirection: 'row' as const,
-      alignItems: 'center' as const,
-      justifyContent: 'center' as const,
-      gap: Spacing.sm,
-      padding: Spacing.lg,
-      marginTop: Spacing.md,
-      borderRadius: Radius.lg,
-      backgroundColor: theme.success + '15',
-      borderWidth: 1,
-      borderColor: theme.success,
-    };
+  // Not memoised by hand: the React Compiler is enabled, and a manual useMemo here previously
+  // went stale because it omitted theme / id / user / handlers from its dependencies (BUG-M4).
+  if (!feedReady && !postsLoading && !matchesInitialLoading) setFeedReady(true);
+  const firstFeedLoad = useFirstLoad(!feedReady);
+  const [fabHidden, setFabHidden] = useState(false);
+  const fabHiddenRef = useRef(false);
+  const lastScrollY = useRef(0);
 
-    if (postsLoading && combinedFeed.length === 0) {
-      return (
-        <View style={skeletonContainerStyle}>
-          {[...Array(3)].map((_, i) => (
-            <View key={i} style={skeletonCardStyle}>
-              <View style={skeletonLineStyle} />
-              <View style={skeletonLineShortStyle} />
-              <View style={skeletonLineStyle} />
-            </View>
-          ))}
-        </View>
-      );
+  const feedContent = (() => {
+    if (!feedReady) {
+      return <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />;
     }
     if (combinedFeed.length > 0) {
       return (
         <>
           {combinedFeed.map((item, index) => (
-            <Pressable
-              key={`${item.type}-${item.data.id}`}
+            <FadeInItem key={`${item.type}-${item.data.id}`} index={index} animate={firstFeedLoad} lateFade>
+            <PressableScale
+              scaleTo={0.985}
               onPress={() => {
                 if (item.type === 'post') {
                   handlePostPress(item.data);
@@ -366,7 +391,7 @@ export default function CommunityDetailScreen() {
                   handleMatchPress(item.data);
                 }
               }}
-              style={({ pressed }) => [styles.feedItem, pressed && styles.pressedFeedItem]}
+              style={styles.feedItem}
               hitSlop={8}
             >
               {item.type === 'post' ? (
@@ -385,18 +410,11 @@ export default function CommunityDetailScreen() {
                   showYoursBadge={false}
                 />
               )}
-            </Pressable>
+            </PressableScale>
+            </FadeInItem>
           ))}
           {(loadingMorePosts || loadingMoreMatches) && (
-            <View style={skeletonContainerStyle}>
-              {[...Array(3)].map((_, i) => (
-                <View key={i} style={skeletonCardStyle}>
-                  <View style={skeletonLineStyle} />
-                  <View style={skeletonLineShortStyle} />
-                  <View style={skeletonLineStyle} />
-                </View>
-              ))}
-            </View>
+            <SkeletonList Item={FeedItemSkeleton} count={2} style={{ padding: Spacing.lg }} />
           )}
           {!hasMorePosts && !hasMoreMatches && combinedFeed.length > 0 && !postsLoading && !loadingMorePosts && !loadingMoreMatches && (
             <View
@@ -547,7 +565,7 @@ export default function CommunityDetailScreen() {
                 shadowOffset: { width: 0, height: 6 },
                 shadowOpacity: 0.35,
                 shadowRadius: 12,
-                elevation: 6,
+                elevation: 0,
               }}
             >
               {/* Inner Circle Container */}
@@ -609,13 +627,33 @@ export default function CommunityDetailScreen() {
               fontSize: 13,
             }}
           >
-            Be the first to Post! Click Plus icon below!
+            {isMember
+              ? 'Be the first to post — share a thought, a photo, or record a match.'
+              : 'Join this community to share posts and matches.'}
           </ThemedText>
+          {isMember ? (
+            <View style={{ flexDirection: 'row', gap: Spacing.sm, marginTop: Spacing.md }}>
+              <Button
+                label="Write a post"
+                onPress={() => {
+                  setCreatePostInitialTab('write');
+                  setCreatePostModalVisible(true);
+                }}
+              />
+              {community?.sport ? (
+                <Button
+                  label="Record a match"
+                  variant="secondary"
+                  onPress={() => router.push(`/add-match?communityId=${id}&sport=${community.sport}`)}
+                />
+              ) : null}
+            </View>
+          ) : null}
         </View>
       );
     }
     return null;
-  }, [combinedFeed, postsLoading, loadingMorePosts, loadingMoreMatches, hasMorePosts, hasMoreMatches]);
+  })();
 
   // Auto-open match detail when navigating from a notification tap
   useEffect(() => {
@@ -677,9 +715,15 @@ export default function CommunityDetailScreen() {
 
   useEffect(() => {
     if (!pingCooldownUntil) return;
-    const interval = setInterval(() => setNowTs(Date.now()), 1000);
+    const until = pingCooldownUntil.getTime();
+    const interval = setInterval(() => {
+      const now = Date.now();
+      setNowTs(now);
+      // Stop ticking once the cooldown is over.
+      if (now >= until) clearInterval(interval);
+    }, 1000);
     return () => clearInterval(interval);
-  }, [pingCooldownUntil, nowTs]);
+  }, [pingCooldownUntil]);
 
   const cooldownRemainingMs = pingCooldownUntil
     ? Math.max(0, pingCooldownUntil.getTime() - nowTs)
@@ -701,8 +745,10 @@ export default function CommunityDetailScreen() {
       await sendPing(id, user.id, pingMessage.trim());
       setPingMessage('');
       setShowPingModal(false);
-      alert('Ping Sent', 'Notification sent to all members.');
+      haptics.success();
+      toast('Ping sent', 'Notification sent to all members.');
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to send ping.');
     } finally {
       setSendingPing(false);
@@ -717,9 +763,11 @@ export default function CommunityDetailScreen() {
     try {
       if (community?.visibility === 'restricted') {
         await requestToJoinCommunity(id, user.id);
-        alert('Request Sent', 'The admin will review your request.');
+        haptics.success();
+        toast('Request sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
+        haptics.success();
         setMembership({
           community_id: id,
           profile_id: user.id,
@@ -734,22 +782,13 @@ export default function CommunityDetailScreen() {
       }
       refresh();
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to join.');
     }
   };
 
   const handleCreatePostClose = () => {
     setCreatePostModalVisible(false);
-  };
-
-  const handlePostPress = (post: CommunityPost) => {
-    setSelectedPost(post);
-    setPostPopupVisible(true);
-  };
-
-  const handleMatchPress = (match: MatchWithProfiles) => {
-    setSelectedMatch(match);
-    setMatchPopupVisible(true);
   };
 
   const headerRight = () => null;
@@ -768,7 +807,7 @@ export default function CommunityDetailScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, '/')}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -784,7 +823,7 @@ export default function CommunityDetailScreen() {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
         <Stack.Screen options={{ headerTitle, headerRight, ...themedHeader }} />
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />
       </View>
     );
   }
@@ -841,8 +880,18 @@ export default function CommunityDetailScreen() {
       <ScrollView
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
+        scrollEventThrottle={16}
         onScroll={({ nativeEvent }) => {
           const { layoutMeasurement, contentOffset, contentSize } = nativeEvent;
+          const dy = contentOffset.y - lastScrollY.current;
+          if (Math.abs(dy) > 8) {
+            const goingDown = dy > 0 && contentOffset.y > 80;
+            if (goingDown !== fabHiddenRef.current) {
+              fabHiddenRef.current = goingDown;
+              setFabHidden(goingDown);
+            }
+            lastScrollY.current = contentOffset.y;
+          }
           const threshold = contentSize.height - layoutMeasurement.height * 1.3;
           if (contentOffset.y >= threshold) {
             if (!loadingMorePosts && hasMorePosts) loadMorePosts();
@@ -850,13 +899,22 @@ export default function CommunityDetailScreen() {
           }
         }}
         refreshControl={
-          <RefreshControl
-            refreshing={loading}
-            onRefresh={() => { refresh(); setMatchesPage(1); setHasMoreMatches(false); loadMatches(1); }}
-            tintColor={theme.text}
+          <ThemedRefreshControl
+            refreshing={pullRefreshing}
+            onRefresh={async () => {
+              setPullRefreshing(true);
+              setMatchesPage(1);
+              setHasMoreMatches(false);
+              try {
+                await Promise.all([refresh(), refreshPosts(), loadMatches(1)]);
+              } finally {
+                setPullRefreshing(false);
+              }
+            }}
           />
         }
       >
+        {isMember ? <TipCard id="community_home" /> : null}
         {/* Pending Matches Banner - solid, full-width, at top of feed */}
         {isMember && allPendingMatches.length > 0 && (
           <Pressable
@@ -1048,23 +1106,21 @@ export default function CommunityDetailScreen() {
         setCreatePostModalVisible={setCreatePostModalVisible}
         router={router}
         onFabMenuClose={() => { }}
+        hidden={fabHidden}
       />
 
       {/* Ping Input Modal (shown when Ping selected from FAB) */}
-      {showPingModal && (
-        <Modal
-          transparent
-          visible={true}
-          animationType="fade"
-          onRequestClose={() => { setShowPingModal(false); setPingMessage(''); }}
-        >
-          <KeyboardAvoidingView
-            behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-            keyboardVerticalOffset={0}
-            style={styles.pingModalKeyboardAvoiding}
-          >
-            <Pressable style={styles.pingModalBackdrop} onPress={() => { setShowPingModal(false); setPingMessage(''); }}>
-              <Pressable style={[styles.pingModalContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
+      <Sheet
+        visible={showPingModal}
+        onClose={() => { setShowPingModal(false); setPingMessage(''); }}
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderWidth: 1,
+          padding: Spacing.lg,
+          gap: Spacing.md,
+        }}
+      >
                 <View style={styles.pingModalHeader}>
                   <ThemedText variant="heading">Ping Everyone</ThemedText>
                   <Pressable onPress={() => { setShowPingModal(false); setPingMessage(''); }} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
@@ -1116,11 +1172,7 @@ export default function CommunityDetailScreen() {
                     />
                   </View>
                 )}
-              </Pressable>
-            </Pressable>
-          </KeyboardAvoidingView>
-        </Modal>
-      )}
+      </Sheet>
 
       <MatchDetailPopup
         match={selectedMatch}
@@ -1468,22 +1520,6 @@ const styles = StyleSheet.create({
   },
 
   // Ping Modal Styles (inline from FAB)
-  pingModalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    justifyContent: 'flex-end',
-  },
-  pingModalKeyboardAvoiding: {
-    flex: 1,
-  },
-  pingModalContent: {
-    width: '100%',
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: 1,
-    padding: Spacing.lg,
-    gap: Spacing.md,
-  },
   pingModalHeader: {
     flexDirection: 'row',
     alignItems: 'center',

@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 import { supabase } from '@/lib/supabase';
 import {
@@ -46,7 +47,8 @@ export function useCommunity(id: string, userId?: string) {
         uid ? fetchCommunityMember(id, uid) : Promise.resolve(null),
       ]);
       setCommunity(communityData);
-      setMembership(memberData);
+      // Only an approved row counts as membership (legacy 'pending' rows grant nothing).
+      setMembership(memberData?.approval_status === 'approved' ? memberData : null);
 
       if (memberData) {
         setMyPendingInvite(null);
@@ -76,6 +78,11 @@ export function useCommunity(id: string, userId?: string) {
       }
     }, [load]),
   );
+
+  // Membership / requests can change while the app is backgrounded.
+  useAppForeground(() => {
+    load(false);
+  }, !!id);
 
   useEffect(() => {
     if (!id || !userId) return;

@@ -17,7 +17,6 @@ import type {
   UpdateCommunityInput,
 } from '@/types';
 import { fetchProfile } from './profiles';
-import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
 // RPC row types — matches the column aliases returned by the SECURITY DEFINER
@@ -30,6 +29,7 @@ type CommunityRpcRow = {
   location: string | null; image_url: string | null; visibility: string; sport: string;
   created_by: string; created_at: string; updated_at: string; pings_enabled: boolean;
   member_count: number; creator_username: string | null; creator_avatar_url: string | null;
+  my_role?: string | null; activity_14d?: number | string; popularity?: number | string;
 };
 
 function rowToCommunity(r: CommunityRpcRow): Community {
@@ -42,6 +42,13 @@ function rowToCommunity(r: CommunityRpcRow): Community {
     creator: r.creator_username
       ? { id: r.created_by, username: r.creator_username }
       : null,
+    ...(r.popularity !== undefined
+      ? {
+          my_role: (r.my_role as CommunityMemberRole | null) ?? null,
+          activity_14d: Number(r.activity_14d ?? 0),
+          popularity: Number(r.popularity),
+        }
+      : {}),
   };
 }
 
@@ -149,6 +156,16 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
   return (data ?? []).map(rowToCommunity);
 }
 
+/**
+ * Discover list: popularity-ranked with the caller's role inlined (migration 120).
+ * Falls back to the legacy RPC when the server hasn't been migrated yet.
+ */
+export async function fetchDiscoverCommunities(): Promise<Community[]> {
+  const { data, error } = await supabase.rpc('get_discover_communities');
+  if (!error) return (data ?? []).map(rowToCommunity);
+  return fetchPublicCommunities();
+}
+
 export async function fetchMyCommunities(userId: string): Promise<Community[]> {
   const { data, error } = await supabase.rpc('get_my_communities');
   if (error) throw error;
@@ -246,10 +263,11 @@ export async function updateCommunity(
   if (input.image_url !== undefined) updates.image_url = input.image_url;
   if (input.pings_enabled !== undefined) updates.pings_enabled = input.pings_enabled;
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .update(updates)
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) {
     if (error.code === '23505' && error.message.includes('idx_communities_name_created_by')) {
@@ -257,28 +275,41 @@ export async function updateCommunity(
     }
     throw error;
   }
+  // RLS filters blocked updates silently (0 rows, no error) - surface that.
+  if (!data || data.length === 0) {
+    throw new Error('You do not have permission to edit this community.');
+  }
 }
 
 export async function setPingsEnabled(communityId: string, enabled: boolean): Promise<void> {
   await requireCommunityAdmin(communityId);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .update({ pings_enabled: enabled })
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('You do not have permission to change this setting.');
+  }
 }
 
 export async function deleteCommunity(communityId: string): Promise<void> {
   await requireCommunityAdmin(communityId);
 
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('communities')
     .delete()
-    .eq('id', communityId);
+    .eq('id', communityId)
+    .select('id');
 
   if (error) throw error;
+  // Only the creator can delete (RLS); a blocked delete returns 0 rows without an error.
+  if (!data || data.length === 0) {
+    throw new Error('Only the creator can delete this community.');
+  }
 }
 
 export async function fetchCommunityMembers(communityId: string): Promise<CommunityMember[]> {
@@ -413,48 +444,34 @@ export async function cancelJoinRequest(communityId: string, userId: string): Pr
 }
 
 export async function leaveCommunity(communityId: string, userId: string): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .delete()
     .eq('community_id', communityId)
-    .eq('profile_id', userId);
+    .eq('profile_id', userId)
+    .select('profile_id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('You are not a member of this community.');
+  }
 }
 
 export async function removeMember(
   communityId: string,
   profileId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .delete()
     .eq('community_id', communityId)
-    .eq('profile_id', profileId);
+    .eq('profile_id', profileId)
+    .select('profile_id');
 
   if (error) throw error;
-}
-
-export async function transferAdmin(
-  communityId: string,
-  currentUserId: string,
-  newAdminId: string,
-): Promise<void> {
-  const { error: demoteError } = await supabase
-    .from('community_members')
-    .update({ role: 'member' })
-    .eq('community_id', communityId)
-    .eq('profile_id', currentUserId);
-
-  if (demoteError) throw demoteError;
-
-  const { error: promoteError } = await supabase
-    .from('community_members')
-    .update({ role: 'admin' })
-    .eq('community_id', communityId)
-    .eq('profile_id', newAdminId);
-
-  if (promoteError) throw promoteError;
+  if (!data || data.length === 0) {
+    throw new Error('Could not remove this member. You may not have permission.');
+  }
 }
 
 export async function fetchJoinRequests(
@@ -584,21 +601,6 @@ export async function sendPing(
   return ping.id;
 }
 
-export async function fetchPings(communityId: string): Promise<Ping[]> {
-  const { data, error } = await supabase
-    .from('pings')
-    .select(`
-      *,
-      sender:sender_id(id, username)
-    `)
-    .eq('community_id', communityId)
-    .order('created_at', { ascending: false })
-    .limit(50);
-
-  if (error) throw error;
-  return data ?? [];
-}
-
 export async function recordCommunityMatch(input: {
   community_id: string;
   recorded_by: string;
@@ -634,12 +636,7 @@ export async function recordCommunityMatch(input: {
 
   if (error) throw error;
 
-  // Update streak for the person recording the match
-  try {
-    await updateStreak(input.recorded_by, 'match_recorded');
-  } catch (e) {
-    console.error('Failed to update streak for match recording:', e);
-  }
+  // Streak for the recorder is updated server-side (migration 105 trigger).
 
   return data;
 }
@@ -784,13 +781,17 @@ export async function promoteToAdmin(
   targetUserId: string,
   actorId: string,
 ): Promise<void> {
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('community_members')
     .update({ role: 'admin' })
     .eq('community_id', communityId)
-    .eq('profile_id', targetUserId);
+    .eq('profile_id', targetUserId)
+    .select('profile_id');
 
   if (error) throw error;
+  if (!data || data.length === 0) {
+    throw new Error('Could not promote this member. You may not have permission.');
+  }
 }
 
 export async function inviteMemberByUsername(

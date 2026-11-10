@@ -1,29 +1,14 @@
-import { X, Edit, Camera, Trophy, Megaphone, Plus, Heart, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { enterToSend } from '@/lib/webKeys';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
+import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
+import { LikeButton } from '@/components/motion/LikeButton';
+import { Sheet, SheetScrollView } from '@/components/motion/Sheet';
+import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { Alert } from 'react-native';
+import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  Keyboard,
-  KeyboardAvoidingView,
-  Modal,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-  Image,
-} from 'react-native';
-import { Gesture, GestureDetector } from 'react-native-gesture-handler';
-import Animated, {
-  useSharedValue,
-  useAnimatedStyle,
-  withSpring,
-  withTiming,
-  interpolate,
-  runOnJS,
-  Extrapolate,
-} from 'react-native-reanimated';
+import { Keyboard, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -37,6 +22,7 @@ import {
   deleteCommunityPost,
 } from '@/services/communities';
 import type { CommunityPost, CommunityPostComment } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
 
 type PostDetailPopupProps = {
   post: CommunityPost | null;
@@ -46,8 +32,6 @@ type PostDetailPopupProps = {
   communityId?: string;
   onRefreshFeed?: () => void;
 };
-
-const SWIPE_THRESHOLD = 100;
 
 export function PostDetailPopup({
   post,
@@ -74,15 +58,7 @@ export function PostDetailPopup({
   const inputWrapperRef = useRef<View>(null);
   const lastPostIdRef = useRef<string | null>(null);
 
-  const translateY = useSharedValue(0);
-  const isDragging = useSharedValue(false);
-  const dragStartY = useSharedValue(0);
-
   const isMine = currentUserId === post?.author_id;
-
-  const animatedStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: translateY.value }],
-  }));
 
   const loadComments = useCallback(async () => {
     if (!post) return;
@@ -105,20 +81,7 @@ export function PostDetailPopup({
     setLiked(post.is_liked_by_user ?? false);
     setLikesCount(post.likes_count ?? 0);
     loadComments();
-    translateY.value = 0;
   }, [visible, post, loadComments]);
-
-  const animateClose = () => {
-    translateY.value = withTiming(400, { duration: 200 }, (finished) => {
-      if (finished) {
-        runOnJS(onClose)();
-      }
-    });
-  };
-
-  const animateOpen = () => {
-    translateY.value = withSpring(0, { damping: 20, stiffness: 150 });
-  };
 
   const scrollToComments = () => {
     if (commentsSectionRef.current) {
@@ -134,30 +97,6 @@ export function PostDetailPopup({
       }
     }, 150);
   };
-
-  const handlePanGesture = Gesture.Pan()
-    .onBegin((e) => {
-      isDragging.value = true;
-      dragStartY.value = e.y;
-    })
-    .onUpdate((e) => {
-      if (!isDragging.value) return;
-      const translationY = e.translationY;
-      if (translationY > 0) {
-        translateY.value = translationY;
-      }
-    })
-    .onEnd((e) => {
-      isDragging.value = false;
-      const velocityY = e.velocityY;
-      const currentY = translateY.value;
-
-      if (currentY > SWIPE_THRESHOLD || velocityY > 500) {
-        animateClose();
-      } else {
-        animateOpen();
-      }
-    });
 
   const handleLike = async () => {
     if (!currentUserId || !post) return;
@@ -187,7 +126,7 @@ export function PostDetailPopup({
     } catch (error) {
       console.error('Failed to add comment:', error);
       setCommentText(content);
-      Alert.alert('Error', 'Failed to post comment');
+      alert('Error', 'Failed to post comment');
     } finally {
       setSendingComment(false);
     }
@@ -195,7 +134,7 @@ export function PostDetailPopup({
 
   const handleDelete = async () => {
     if (!currentUserId || !post) return;
-    Alert.alert('Delete Post', 'Are you sure you want to delete this post?', [
+    alert('Delete Post', 'Are you sure you want to delete this post?', [
       { text: 'Cancel', style: 'cancel' },
       {
         text: 'Delete',
@@ -207,7 +146,7 @@ export function PostDetailPopup({
             onRefreshFeed?.();
           } catch (error) {
             console.error('Failed to delete post:', error);
-            Alert.alert('Error', 'Failed to delete post');
+            alert('Error', 'Failed to delete post');
           }
         },
       },
@@ -222,13 +161,15 @@ export function PostDetailPopup({
       return (
         <View style={styles.photoContainer}>
           {!imageLoaded && !imageError && <View style={styles.imagePlaceholder} />}
-          <Image
-            source={{ uri: post.image_url }}
-            style={styles.postImage}
-            onLoad={() => setImageLoaded(true)}
-            onError={() => setImageError(true)}
-            resizeMode="cover"
-          />
+          <DoubleTapLike liked={liked} onLike={handleLike}>
+            <FadeImage
+              source={{ uri: post.image_url }}
+              style={styles.postImage}
+              onLoad={() => setImageLoaded(true)}
+              onError={() => setImageError(true)}
+              resizeMode="cover"
+            />
+          </DoubleTapLike>
           {imageError && (
             <View style={styles.imageError}>
               <ThemedText variant="caption" muted>Failed to load image</ThemedText>
@@ -262,7 +203,8 @@ export function PostDetailPopup({
     }
 
     return null;
-  }, [post, imageLoaded, imageError, theme]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [post, imageLoaded, imageError, theme, liked]);
 
   const renderCommentsSection = () => {
     if (commentsLoading) {
@@ -274,7 +216,7 @@ export function PostDetailPopup({
     }
     if (comments.length > 0) {
       return comments.map((comment) => (
-        <View key={comment.id} style={styles.comment}>
+        <Animated.View key={comment.id} layout={LayoutShift} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.comment}>
           <Pressable
             disabled={!comment.profile?.id}
             onPress={() => {
@@ -305,7 +247,7 @@ export function PostDetailPopup({
               {comment.content}
             </ThemedText>
           </View>
-        </View>
+        </Animated.View>
       ));
     }
     return (
@@ -318,21 +260,15 @@ export function PostDetailPopup({
   if (!visible || !post) return null;
 
   return (
-    <Modal transparent visible={visible} animationType="fade" onRequestClose={onClose}>
-      <Animated.View style={[styles.modalContainer, animatedStyle]}>
-        <Pressable style={styles.modalBackdrop} onPress={onClose} />
-        <View
-          style={[
-            styles.modalContent,
-            { backgroundColor: theme.background, borderColor: theme.border },
-          ]}
-        >
-          <GestureDetector gesture={handlePanGesture}>
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      flush
+      height="85%"
+      maxHeight="95%"
+      style={{ backgroundColor: theme.background, borderColor: theme.border, borderWidth: 1, paddingBottom: 0 }}
+    >
             <View style={{ flex: 1 }}>
-              <Pressable onPress={animateOpen} style={styles.dragHandleContainer} hitSlop={{ top: 12, bottom: 12, left: 12, right: 12 }}>
-                <View style={[styles.dragHandle, { backgroundColor: theme.border }]} />
-              </Pressable>
-
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
                 <ThemedText variant="heading">Post</ThemedText>
                 <View style={styles.headerRight}>
@@ -351,7 +287,7 @@ export function PostDetailPopup({
                 </View>
               </View>
 
-              <ScrollView
+              <SheetScrollView
                 ref={scrollViewRef}
                 style={styles.scrollView}
                 contentContainerStyle={styles.scrollContent}
@@ -390,12 +326,7 @@ export function PostDetailPopup({
                   {renderPostContent()}
 
                   <View style={styles.postSocialRow}>
-                    <Pressable onPress={handleLike} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
-                      <Heart size={20} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-                      <ThemedText variant="label" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-                        {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                      </ThemedText>
-                    </Pressable>
+                    <LikeButton liked={liked} count={likesCount} onPress={handleLike} iconSize={20} fontSize={14} style={styles.socialAction} />
 
                     <Pressable onPress={scrollToComments} hitSlop={8} style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}>
                       <MessageSquare size={20} color={theme.textSecondary} />
@@ -413,11 +344,9 @@ export function PostDetailPopup({
 
                   {renderCommentsSection()}
                 </View>
-              </ScrollView>
+              </SheetScrollView>
 
-              <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-                keyboardVerticalOffset={0}
+              <View
                 style={[styles.inputContainer, { borderTopColor: theme.border }]}
               >
                 <View ref={inputWrapperRef} style={[styles.inputWrapper, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
@@ -433,6 +362,9 @@ export function PostDetailPopup({
                     multiline
                     maxLength={1000}
                     onSubmitEditing={handleSendComment}
+                    onKeyPress={enterToSend(() => {
+                      if (commentText.trim() && !sendingComment) handleSendComment();
+                    })}
                     returnKeyType="send"
                     blurOnSubmit={false}
                   />
@@ -449,7 +381,7 @@ export function PostDetailPopup({
                     <Send size={20} color={commentText.trim() && !sendingComment ? theme.accent : theme.textSecondary} strokeWidth={2} />
                   </Pressable>
                 </View>
-              </KeyboardAvoidingView>
+              </View>
 
               {showMenu && (
                 <View style={styles.menuOverlay}>
@@ -470,41 +402,10 @@ export function PostDetailPopup({
                 </View>
               )}
             </View>
-          </GestureDetector>
-        </View>
-      </Animated.View>
-    </Modal>
+    </Sheet>
   );
 }
 const styles = StyleSheet.create({
-  modalContainer: {
-    flex: 1,
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0,0,0,0.5)',
-  },
-  modalContent: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
-    bottom: 0,
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderWidth: 1,
-    overflow: 'hidden',
-    height: '65%',
-    maxHeight: '95%',
-  },
-  dragHandleContainer: {
-    alignItems: 'center',
-    paddingVertical: Spacing.sm,
-  },
-  dragHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 3,
-  },
   modalHeader: {
     flexDirection: 'row',
     alignItems: 'center',

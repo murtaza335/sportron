@@ -1,19 +1,10 @@
-import * as ImagePicker from 'expo-image-picker';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { Image as ImageIcon, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Alert,
-  Image,
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Image, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -26,6 +17,8 @@ import { useCommunity } from '@/hooks/useCommunity';
 import { uploadImageFromUri } from '@/lib/cloudinary';
 import { updateCommunity } from '@/services/communities';
 import type { Community, CommunityVisibility } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function EditCommunityScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -87,19 +80,8 @@ function EditCommunityForm({
   const canSave = name.trim().length > 0 && !saving && !uploadingImage;
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: false,
-      quality: 0.8,
-    });
-    if (!result.canceled && result.assets[0]) {
-      setImageUri(result.assets[0].uri);
-    }
+    const uri = await pickImageUri();
+    if (uri) setImageUri(uri);
   };
 
   const removeImage = () => setImageUri(null);
@@ -134,7 +116,7 @@ function EditCommunityForm({
         image_url: imageUrl,
       });
       refresh();
-      router.back();
+      goBack(router, `/community/${community.id}` as Href);
     } catch (e: any) {
       alert('Error', e?.message ?? 'Failed to update.');
     } finally {
@@ -145,7 +127,7 @@ function EditCommunityForm({
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={Platform.OS === 'ios' ? 88 : 0}
@@ -205,7 +187,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Name
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={name}
               onChangeText={setName}
               placeholder="e.g. Table Tennis Club"
@@ -227,7 +209,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="What's this community about?"
@@ -251,7 +233,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Organization (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={organization}
               onChangeText={setOrganization}
               placeholder="e.g. University of Lahore"
@@ -272,7 +254,7 @@ function EditCommunityForm({
             <ThemedText variant="label" muted style={styles.label}>
               Location / City (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Lahore"
@@ -369,7 +351,7 @@ function EditCommunityForm({
           />
 
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </View>
   );
 }
@@ -440,7 +422,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 0,
   },
   imageChangeButton: {
     position: 'absolute',
@@ -453,7 +435,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.15,
     shadowRadius: 3,
-    elevation: 3,
+    elevation: 0,
   },
   visibilityRow: {
     flexDirection: 'row',

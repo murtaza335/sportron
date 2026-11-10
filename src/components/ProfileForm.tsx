@@ -1,6 +1,7 @@
-import * as ImagePicker from 'expo-image-picker';
+import { pickImage as pickImageUri } from '@/lib/pickImage';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
 import { useEffect, useState } from 'react';
-import { Image, Pressable, StyleSheet, TextInput, View } from 'react-native';
+import { Image, Pressable, StyleSheet, View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 
 import { alert } from '@/lib/alert';
@@ -26,6 +27,8 @@ type ProfileFormProps = {
 const RING_RADIUS = 52;
 const CIRCUMFERENCE = 2 * Math.PI * RING_RADIUS;
 
+const USERNAME_PATTERN = /^[a-z0-9._-]{3,20}$/;
+
 export function ProfileForm({
   initialName = '',
   initialBio = '',
@@ -46,17 +49,20 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   const value = username.trim().toLowerCase();
   const isOwnUsername = !!excludeUsername && value === excludeUsername.trim().toLowerCase();
 
-  const checking = value.length > 0 && !isOwnUsername && checked?.value !== value;
+  // 3-20 chars of a-z 0-9 . _ - ; the user's existing (legacy) username is always accepted.
+  const formatValid = isOwnUsername || USERNAME_PATTERN.test(value);
+
+  const checking = value.length > 0 && formatValid && !isOwnUsername && checked?.value !== value;
   const taken = checked?.value === value && checked.status === 'taken';
   const available = isOwnUsername || (checked?.value === value && checked.status === 'available');
-  const canSubmit = value.length > 0 && available;
+  const canSubmit = value.length > 0 && formatValid && available && !uploadingAvatar;
 
   useEffect(() => {
     const currentValue = username.trim().toLowerCase();
     const isOwn = !!excludeUsername && currentValue === excludeUsername.trim().toLowerCase();
 
     const timer = setTimeout(async () => {
-      if (!currentValue || isOwn) {
+      if (!currentValue || isOwn || !USERNAME_PATTERN.test(currentValue)) {
         setChecked(null);
         return;
       }
@@ -73,21 +79,9 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
   }, [username, excludeUsername]);
 
   const pickImage = async () => {
-    const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permissionResult.granted) {
-      alert('Permission required', 'Please grant permission to access your photos.');
-      return;
-    }
+    const uri = await pickImageUri({ aspect: [1, 1] });
 
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ['images'],
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const uri = result.assets[0].uri;
+    if (uri) {
       const previousAvatarUrl = avatarUrl;
       
       // Optimistic UI: Show the local image immediately so the progress ring has a truthy condition to render over
@@ -197,9 +191,10 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         <ThemedText variant="label" muted>
           Username
         </ThemedText>
-        <TextInput
+        <FocusTextInput
           value={username}
-          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9_-]/g, ''))}
+          onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
+          maxLength={20}
           placeholder="Your username"
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, { color: theme.text, borderColor: theme.border }]}
@@ -208,7 +203,11 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           autoComplete="off"
           accessibilityLabel="Username"
         />
-        {checking ? (
+        {value.length > 0 && !formatValid ? (
+          <ThemedText variant="caption" style={{ color: theme.error }}>
+            Use 3-20 characters: lowercase letters, numbers, dots, dashes or underscores.
+          </ThemedText>
+        ) : checking ? (
           <ThemedText variant="caption" muted>
             Checking availability…
           </ThemedText>
@@ -227,10 +226,11 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         <ThemedText variant="label" muted>
           Bio (optional)
         </ThemedText>
-        <TextInput
+        <FocusTextInput
           value={bio}
           onChangeText={setBio}
           placeholder="A short bio"
+          maxLength={300}
           placeholderTextColor={theme.textSecondary}
           style={[styles.input, styles.textArea, { color: theme.text, borderColor: theme.border }]}
           multiline
@@ -248,7 +248,9 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
           onSubmit({
             username: username.trim().toLowerCase(),
             bio: bio.trim(),
-            avatarUrl,
+            // Never submit a local file:// URI (e.g. an upload still pending/failed): keep the
+            // previous remote avatar instead.
+            avatarUrl: avatarUrl === null || avatarUrl.startsWith('http') ? avatarUrl : initialAvatar,
           })
         }
       />

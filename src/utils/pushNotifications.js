@@ -106,3 +106,46 @@ export const setupWebTokenRefreshListener = async (onTokenRefresh) => {
     return () => {};
   }
 };
+
+/**
+ * One-time cleanup (web push is turned off): if this browser already holds a push token, return it
+ * so the caller can remove it from the profile, then delete it and unregister the push service worker.
+ * Never prompts for permission.
+ */
+export const removeWebPushToken = async () => {
+  if (Platform.OS !== 'web' || typeof Notification === 'undefined' || Notification.permission !== 'granted') {
+    return null;
+  }
+  try {
+    const regs = (await navigator.serviceWorker?.getRegistrations?.()) ?? [];
+    const pushReg = regs.find((r) => r.active?.scriptURL?.endsWith('/firebase-messaging-sw.js'));
+    if (!pushReg) return null;
+
+    const { initializeApp } = await import('firebase/app');
+    const { getMessaging, getToken, deleteToken, isSupported } = await import('firebase/messaging');
+    if (!(await isSupported())) return null;
+    const app = initializeApp({
+      apiKey: process.env.EXPO_PUBLIC_FIREBASE_API_KEY || 'YOUR_API_KEY',
+      authDomain: process.env.EXPO_PUBLIC_FIREBASE_AUTH_DOMAIN || 'YOUR_AUTH_DOMAIN',
+      projectId: process.env.EXPO_PUBLIC_FIREBASE_PROJECT_ID || 'YOUR_PROJECT_ID',
+      storageBucket: process.env.EXPO_PUBLIC_FIREBASE_STORAGE_BUCKET || 'YOUR_STORAGE_BUCKET',
+      messagingSenderId: process.env.EXPO_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || 'YOUR_MESSAGING_SENDER_ID',
+      appId: process.env.EXPO_PUBLIC_FIREBASE_APP_ID || 'YOUR_APP_ID',
+    });
+    const messaging = getMessaging(app);
+    const token = await getToken(messaging, {
+      vapidKey: process.env.EXPO_PUBLIC_FIREBASE_VAPID_KEY || 'YOUR_VAPID_PUBLIC_KEY',
+      serviceWorkerRegistration: pushReg,
+    });
+    return {
+      token,
+      finish: async () => {
+        await deleteToken(messaging).catch(() => {});
+        await pushReg.unregister().catch(() => {});
+      },
+    };
+  } catch (error) {
+    console.warn('Web push cleanup failed:', error);
+    return null;
+  }
+};

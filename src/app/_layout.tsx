@@ -1,8 +1,9 @@
 import * as Font from 'expo-font';
-import { Stack, useRouter, useSegments } from 'expo-router';
+import { Stack, ThemeProvider as NavThemeProvider, usePathname, useRouter, useSegments } from 'expo-router';
+import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SplashScreen as AnimatedSplashScreen } from '@/components/SplashScreen';
@@ -11,9 +12,22 @@ import Constants from 'expo-constants';
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
+import { Button } from '@/components/ui/Button';
+import { ThemedText } from '@/components/ui/Text';
+import { KeyboardInsetView } from '@/components/KeyboardAvoider';
 import { FCMInitializer } from '@/components/FCMInitializer';
 import { ForcedUpdateScreen } from '@/components/ForcedUpdateScreen';
 import { MaintenanceScreen } from '@/components/MaintenanceScreen';
+import { InstallPrompt } from '@/components/InstallPrompt';
+import { WebFrame } from '@/components/WebFrame';
+import { WebRefreshButton } from '@/components/WebRefreshButton';
+import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
+import { removeFCMToken } from '@/services/profiles';
+import { removeWebPushToken } from '@/utils/pushNotifications';
+import { Duration } from '@/lib/motion';
+import { AlertHost } from '@/components/motion/AlertHost';
+import { ConfettiHost } from '@/components/motion/Confetti';
+import { ToastHost } from '@/components/motion/Toast';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -23,9 +37,61 @@ function RootNavigator() {
   const theme = useTheme();
   const router = useRouter();
   const segments = useSegments();
-  const { session, profile, loading, profileLoading } = useAuth();
+  const pathname = usePathname();
+  const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  // Navigation + native window backgrounds must match the theme, otherwise the default (white) shows
+  // through during screen/tab transitions in dark mode.
+  const navTheme = useMemo(
+    () => ({
+      dark: theme.resolvedColorScheme === 'dark',
+      colors: {
+        primary: theme.tabBarActive,
+        background: theme.background,
+        card: theme.background,
+        text: theme.text,
+        border: theme.border,
+        notification: theme.error,
+      },
+      fonts: {
+        regular: { fontFamily: 'System', fontWeight: '400' as const },
+        medium: { fontFamily: 'System', fontWeight: '500' as const },
+        bold: { fontFamily: 'System', fontWeight: '700' as const },
+        heavy: { fontFamily: 'System', fontWeight: '800' as const },
+      },
+    }),
+    [theme.resolvedColorScheme, theme.tabBarActive, theme.background, theme.text, theme.border, theme.error],
+  );
+  useEffect(() => {
+    SystemUI.setBackgroundColorAsync(theme.background).catch(() => {});
+  }, [theme.background]);
+
+  // Shared screen option sets (durations live in lib/motion). NOTE: these replace the previous
+  // near-instant `animationDuration: 50`; revert by setting `animation: 'none'` if the old feel is preferred.
+  const web = Platform.OS === 'web';
+  const pushOptions = {
+    headerShown: true,
+    animation: web ? ('none' as const) : ('ios_from_right' as const),
+    animationDuration: Duration.slow,
+    gestureEnabled: true,
+    fullScreenGestureEnabled: true,
+    headerShadowVisible: false,
+    headerStyle: { backgroundColor: theme.background },
+    contentStyle: { backgroundColor: theme.background },
+  };
+  const modalOptions = {
+    presentation: 'fullScreenModal' as const,
+    contentStyle: { backgroundColor: theme.background },
+    animation: web ? ('none' as const) : ('slide_from_bottom' as const),
+    animationDuration: Duration.slow,
+  };
+  const fadeOptions = {
+    animation: web ? ('none' as const) : ('fade' as const),
+    animationDuration: Duration.fast,
+  };
   const [showSplash, setShowSplash] = useState(true);
+  const handleSplashComplete = useCallback(() => setShowSplash(false), []);
 
   useEffect(() => {
     const loadFonts = async () => {
@@ -53,166 +119,127 @@ function RootNavigator() {
     const inAuthGroup = firstSegment === 'login' || firstSegment === 'onboarding' || firstSegment === 'auth';
 
     if (!session && !inAuthGroup) {
+      const search = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
+      saveReturnTo(pathname + search);
       router.replace('/login');
       return;
     }
 
-    if (session && !profile && segments[0] !== 'onboarding') {
+    // Only a SUCCESSFUL fetch that returned no profile means "new user". A failed fetch
+    // (offline / 5xx) shows a retry screen below instead of sending the user to onboarding.
+    if (session && !profile && !profileError && segments[0] !== 'onboarding') {
       router.replace('/onboarding');
       return;
     }
 
     if (session && profile && inAuthGroup) {
-      router.replace('/');
+      router.replace(consumeReturnTo() ?? '/');
     }
-  }, [session, profile, loading, profileLoading, segments, router]);
+  }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
 
-  if (!fontsLoaded || loading || showSplash) {
-    return (
-      <AnimatedSplashScreen onComplete={() => setShowSplash(false)} />
+  // Web push is turned off (W5): once per browser, remove any push token saved by an earlier version
+  // so a shared computer never keeps receiving a previous user's notifications.
+  const userId = session?.user?.id;
+  useEffect(() => {
+    if (Platform.OS !== 'web' || !userId) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        if (window.localStorage.getItem('web-push-cleaned') === '1') return;
+        const found = await removeWebPushToken();
+        if (cancelled) return;
+        if (found?.token) await removeFCMToken(userId, found.token);
+        await found?.finish();
+        window.localStorage.setItem('web-push-cleaned', '1');
+      } catch {
+        // best-effort; retried on the next load
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [userId]);
+
+  const appReady = fontsLoaded && !loading;
+  const splash = showSplash ? <AnimatedSplashScreen ready={appReady} onComplete={handleSplashComplete} /> : null;
+
+  let content: React.ReactNode;
+  if (!appReady) {
+    content = <View style={[styles.container, { backgroundColor: theme.background }]} />;
+  } else if (session && !profile && profileError) {
+    content = (
+      <View style={[styles.container, styles.retryContainer, { backgroundColor: theme.background }]}>
+        <ThemedText variant="body" style={{ textAlign: 'center', marginBottom: 16 }}>
+          Could not load your profile. Check your connection and try again.
+        </ThemedText>
+        <Button label="Retry" onPress={() => { refreshProfile(); }} loading={profileLoading} />
+      </View>
     );
-  }
-
-  return (
-    <View style={[styles.container, { backgroundColor: theme.background }]}>
+  } else {
+    content = (
+    <KeyboardInsetView style={[styles.container, { backgroundColor: theme.background }]}>
       {Platform.OS !== 'web' && <FCMInitializer />}
       <StatusBar style={theme.resolvedColorScheme === 'dark' ? 'light' : 'dark'} />
       <Stack screenOptions={{
         headerShown: false,
-        animationDuration: 50,
         contentStyle: { backgroundColor: theme.background },
         headerStyle: { backgroundColor: theme.background },
         headerTintColor: theme.text,
         headerTitleStyle: { color: theme.text, fontWeight: '600' },
       }}>
-        <Stack.Screen name="login" />
-        <Stack.Screen name="onboarding" />
-        <Stack.Screen name="(tabs)" />
-        <Stack.Screen
-          name="add-match"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="settings"
-          options={{
-            headerShown: true,
-            title: 'Settings',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]"
-          options={{
-            headerShown: true,
-            title: 'Community',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/members"
-          options={{
-            headerShown: true,
-            title: 'Members',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/info"
-          options={{
-            headerShown: true,
-            title: 'Community Info',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/pending-matches"
-          options={{
-            headerShown: true,
-            title: 'Pending Matches',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="community/[id]/edit"
-          options={{
-            headerShown: true,
-            title: 'Edit Community',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="create-community"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="discover"
-          options={{
-            headerShown: true,
-            title: 'Discover',
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
-        <Stack.Screen
-          name="create-session"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="chat"
-          options={{
-            presentation: 'fullScreenModal',
-            animation: 'slide_from_bottom',
-            animationDuration: 50,
-          }}
-        />
-        <Stack.Screen
-          name="profile/[id]"
-          options={{
-            headerShown: true,
-            animation: 'slide_from_right',
-            animationDuration: 50,
-            headerShadowVisible: false,
-            headerStyle: { backgroundColor: theme.background },
-          }}
-        />
+        <Stack.Screen name="login" options={fadeOptions} />
+        <Stack.Screen name="onboarding" options={fadeOptions} />
+        <Stack.Screen name="(tabs)" options={fadeOptions} />
+        <Stack.Screen name="add-match" options={modalOptions} />
+        <Stack.Screen name="create-community" options={modalOptions} />
+        <Stack.Screen name="create-session" options={modalOptions} />
+        <Stack.Screen name="chat" options={modalOptions} />
+        <Stack.Screen name="settings" options={{ ...pushOptions, title: 'Settings' }} />
+        <Stack.Screen name="community/[id]" options={{ ...pushOptions, title: 'Community' }} />
+        <Stack.Screen name="community/[id]/members" options={{ ...pushOptions, title: 'Members' }} />
+        <Stack.Screen name="community/[id]/info" options={{ ...pushOptions, title: 'Community Info' }} />
+        <Stack.Screen name="community/[id]/pending-matches" options={{ ...pushOptions, title: 'Pending Matches' }} />
+        <Stack.Screen name="community/[id]/edit" options={{ ...pushOptions, title: 'Edit Community' }} />
+        <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
+        <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
+        <Stack.Screen name="tournament/[id]/manage" options={{ ...pushOptions, title: 'Manage tournament' }} />
+        <Stack.Screen name="tournament/[id]/fields" options={{ ...pushOptions, title: 'Entry form' }} />
+        <Stack.Screen name="tournament/[id]/module-form" options={modalOptions} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Module' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/manage" options={{ ...pushOptions, title: 'Manage module' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/entry-form" options={modalOptions} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/seeding" options={{ ...pushOptions, title: 'Seeding & bracket' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/knockout" options={{ ...pushOptions, title: 'Build knockout' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
+        <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
-    </View>
+      <ConfettiHost />
+      <ToastHost />
+      {Platform.OS === 'web' && <AlertHost />}
+      {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
+      {Platform.OS === 'web' && session && profile && <InstallPrompt />}
+    </KeyboardInsetView>
+    );
+  }
+
+  // The splash stays at a stable position so its intro never restarts when the app mounts beneath it.
+  return (
+    <NavThemeProvider value={navTheme}>
+      <View style={[styles.container, { backgroundColor: theme.background }]}>
+        {content}
+        {splash}
+      </View>
+    </NavThemeProvider>
   );
 }
 
 export default function RootLayout() {
+  // Web: one site-wide service worker (offline page + bundle cache) so the app is installable.
+  useEffect(() => {
+    if (Platform.OS !== 'web' || __DEV__ || typeof navigator === 'undefined' || !('serviceWorker' in navigator)) return;
+    navigator.serviceWorker.register('/sw.js').catch((e) => console.warn('Service worker registration failed:', e));
+  }, []);
+
   const [maintenanceActive, setMaintenanceActive] = useState<boolean | null>(null);
   const [versionOk, setVersionOk] = useState(true);
   const [storeUrl, setStoreUrl] = useState('');
@@ -222,15 +249,24 @@ export default function RootLayout() {
     let active = true;
 
     (async () => {
-      // Single query for both config rows
-      const { data } = await supabase
-        .from('site_config')
-        .select('key, value')
-        .in('key', ['maintenance', 'min_app_version']);
+      // Single query for both config rows. Fail open on error / timeout (5 s) so a hung request
+      // can never leave the user on the splash screen forever.
+      let rows: { key: string; value: unknown }[] = [];
+      try {
+        const result = await Promise.race([
+          supabase
+            .from('site_config')
+            .select('key, value')
+            .in('key', ['maintenance', 'min_app_version']),
+          new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
+        ]);
+        rows = (result?.data ?? []) as { key: string; value: unknown }[];
+      } catch {
+        rows = [];
+      }
 
       if (!active) return;
 
-      const rows = data ?? [];
       const maintenanceRow = rows.find((r) => r.key === 'maintenance');
       const maintenanceValue = (maintenanceRow?.value ?? {}) as Record<string, unknown>;
       const maintenanceEnabled = Boolean(maintenanceValue.enabled);
@@ -260,9 +296,18 @@ export default function RootLayout() {
     return () => { active = false; };
   }, []);
 
-  // While checking — render nothing (no flash of any screen)
+  // The native splash is normally hidden by RootNavigator, which is not mounted for the
+  // maintenance / forced-update screens - hide it here so those screens are actually visible.
+  const gateScreenShown = maintenanceActive === true || !versionOk;
+  useEffect(() => {
+    if (gateScreenShown) {
+      SplashScreen.hideAsync().catch(() => {});
+    }
+  }, [gateScreenShown]);
+
+  // While checking — render a splash-coloured view (no white flash, no flash of any screen)
   if (maintenanceActive === null) {
-    return <View style={styles.container} />;
+    return <View style={[styles.container, { backgroundColor: '#000000' }]} />;
   }
 
   // Maintenance on — show the screen directly, no providers needed
@@ -289,7 +334,9 @@ export default function RootLayout() {
       <ThemeProvider>
         <AuthProvider>
           <NotificationsProvider>
-            <RootNavigator />
+            <WebFrame>
+              <RootNavigator />
+            </WebFrame>
           </NotificationsProvider>
         </AuthProvider>
       </ThemeProvider>
@@ -300,6 +347,11 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  retryContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: 24,
   },
   loader: {
     flex: 1,

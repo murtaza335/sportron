@@ -1,17 +1,10 @@
+import Animated, { useAnimatedStyle, withTiming, ZoomIn } from 'react-native-reanimated';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { Duration, RM } from '@/lib/motion';
+import { Sheet } from '@/components/motion/Sheet';
 import { Check, Search, Trash2, X } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  FlatList,
-  Modal,
-  PanResponder,
-  Pressable,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { ActivityIndicator, FlatList, Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
@@ -20,7 +13,6 @@ import { useTheme } from '@/hooks/use-theme';
 import type { MatchFormat, Profile } from '@/types';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type TeamSlot = 'playerPartner' | 'opponent' | 'opponentPartner';
 
@@ -58,13 +50,21 @@ function SlotCard({
 }: SlotCardProps) {
   const theme = useTheme();
 
+  const borderStyle = useAnimatedStyle(
+    () => ({ borderColor: withTiming(profile ? theme.accent : theme.border, { duration: Duration.base }) }),
+    [profile, theme.accent, theme.border],
+  );
+
   const content = profile ? (
-    <>
+    <Animated.View
+      key={profile.id}
+      entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}
+      style={{ alignItems: 'center', gap: Spacing.xs }}>
       <UserAvatar avatarUrl={profile.avatar_url} size={64} />
       <ThemedText variant="body" style={styles.slotName} numberOfLines={1}>
         {profile.username}
       </ThemedText>
-    </>
+    </Animated.View>
   ) : (
     <>
       <View style={[styles.avatar, { backgroundColor: theme.backgroundElement }]}>
@@ -82,13 +82,13 @@ function SlotCard({
   );
 
   const card = (
-    <View
+    <Animated.View
       style={[
         styles.slotCard,
         {
-          borderColor: theme.border,
           backgroundColor: locked ? theme.backgroundElement : theme.background,
         },
+        borderStyle,
       ]}>
       <ThemedText variant="caption" muted style={styles.slotLabel}>
         {label}
@@ -106,7 +106,7 @@ function SlotCard({
       <ThemedText variant="caption" muted style={styles.helperText}>
         {helperText}
       </ThemedText>
-    </View>
+    </Animated.View>
   );
 
   if (!onPress) {
@@ -114,9 +114,9 @@ function SlotCard({
   }
 
   return (
-    <Pressable onPress={onPress} style={({ pressed }) => [styles.slotPressable, pressed && styles.pressed]}>
+    <PressableScale onPress={onPress} scaleTo={0.96} style={styles.slotPressable}>
       {card}
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -136,8 +136,6 @@ export function MatchLineupSelector({
   const [searching, setSearching] = useState(false);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const queryRef = useRef('');
-  // Drag-to-dismiss: offset grows as the user pulls the sheet down.
-  const [sheetTranslate] = useState(() => new Animated.Value(0));
 
   const selectedIds = useMemo(() => {
     return new Set(
@@ -206,41 +204,6 @@ export function MatchLineupSelector({
     setSearching(false);
     if (debounceRef.current) clearTimeout(debounceRef.current);
   }, []);
-
-  // Drag-to-dismiss: pulling the sheet down translates it, releasing past a
-  // threshold (or with enough velocity) animates it off-screen and closes.
-  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
-  const [panHandlers, setPanHandlers] =
-    useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
-
-  useEffect(() => {
-    if (!panResponder.current) {
-      panResponder.current = PanResponder.create({
-        onMoveShouldSetPanResponder: (_e, gs) =>
-          Math.abs(gs.dy) > 6 && Math.abs(gs.dy) > Math.abs(gs.dx),
-        onPanResponderMove: (_e, gs) => {
-          if (gs.dy > 0) sheetTranslate.setValue(gs.dy);
-        },
-        onPanResponderRelease: (_e, gs) => {
-          if (gs.dy > 140 || gs.vy > 0.6) {
-            Animated.timing(sheetTranslate, {
-              toValue: SCREEN_HEIGHT,
-              duration: 200,
-              useNativeDriver: true,
-            }).start(closePicker);
-          } else {
-            Animated.spring(sheetTranslate, {
-              toValue: 0,
-              tension: 50,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-      });
-      setPanHandlers(panResponder.current.panHandlers);
-    }
-  }, [sheetTranslate, closePicker]);
 
   const isDoubles = format === 'doubles';
 
@@ -339,20 +302,19 @@ export function MatchLineupSelector({
         </ThemedText> */}
       </View>
 
-      <Modal animationType="none" transparent visible={activeSlot !== null} onRequestClose={closePicker}>
-        <View style={styles.modalBackdrop}>
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: theme.background,
-                transform: [{ translateY: sheetTranslate }],
-              },
-            ]}>
-            <View style={styles.handleContainer} {...panHandlers}>
-              <View style={[styles.handle, { backgroundColor: theme.border }]} />
-            </View>
-            <View style={styles.sheetHeader} {...panHandlers}>
+      <Sheet
+        visible={activeSlot !== null}
+        onClose={closePicker}
+        flush
+        height="92%"
+        maxHeight="92%"
+        style={{
+          backgroundColor: theme.background,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.lg,
+          gap: Spacing.md,
+        }}>
+            <View style={styles.sheetHeader}>
               <View>
                 <ThemedText variant="label">Choose player</ThemedText>
                 <ThemedText variant="caption" muted>
@@ -443,9 +405,7 @@ export function MatchLineupSelector({
                 )
               }
             />
-          </Animated.View>
-        </View>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -536,29 +496,6 @@ const styles = StyleSheet.create({
   },
   boardFooter: {
     textAlign: 'center',
-  },
-  modalBackdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    height: '100%',
-    width: '100%',
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg,
-    gap: Spacing.md,
-  },
-  handleContainer: {
-    width: '100%',
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  handle: {
-    width: 36,
-    height: 5,
-    borderRadius: Radius.full,
   },
   sheetHeader: {
     flexDirection: 'row',

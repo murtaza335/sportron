@@ -1,20 +1,12 @@
-import { AlertTriangle, Calendar, Check, Clock, Globe, Heart, Lock, User, X } from 'lucide-react-native';
+import { haptics } from '@/lib/haptics';
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
+import { LikeButton } from '@/components/motion/LikeButton';
+import { Sheet } from '@/components/motion/Sheet';
+import { AlertTriangle, Calendar, Check, Clock, Globe, Lock, User, X } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
-import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  KeyboardAvoidingView,
-  Modal,
-  PanResponder,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, useWindowDimensions, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { Divider } from '@/components/ui/Card';
@@ -33,7 +25,6 @@ import {
 import type { CommunityMatchComment, MatchWithProfiles, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type MatchDetailPopupProps = {
   match: MatchWithProfiles | null;
@@ -72,8 +63,8 @@ export function MatchDetailPopup({
   communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
+  const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
-  const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
 
   const [comments, setComments] = useState<CommunityMatchComment[]>([]);
   const [loadingComments, setLoadingComments] = useState(false);
@@ -84,38 +75,6 @@ export function MatchDetailPopup({
   const [liking, setLiking] = useState(false);
   const [verificationStatus, setVerificationStatus] = useState<'pending' | 'verified' | 'disputed'>('pending');
   const [updatingStatus, setUpdatingStatus] = useState(false);
-
-  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
-  const [panHandlers, setPanHandlers] = useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
-
-  useEffect(() => {
-    if (!panResponder.current) {
-      panResponder.current = PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gestureState) => gestureState.dy > 8,
-        onPanResponderMove: (_, gestureState) => {
-          if (gestureState.dy > 0) translateY.setValue(gestureState.dy);
-        },
-        onPanResponderRelease: (_, gestureState) => {
-          if (gestureState.dy > 120 || gestureState.vy > 0.4) {
-            Animated.timing(translateY, {
-              toValue: SCREEN_HEIGHT,
-              duration: 220,
-              useNativeDriver: true,
-            }).start(onClose);
-          } else {
-            Animated.spring(translateY, {
-              toValue: 0,
-              tension: 50,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-      });
-      setPanHandlers(panResponder.current.panHandlers);
-    }
-  }, [translateY, onClose]);
 
   useEffect(() => {
     if (visible && match) {
@@ -211,19 +170,6 @@ export function MatchDetailPopup({
     };
   }, [visible, match]);
 
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      translateY.setValue(SCREEN_HEIGHT);
-    }
-  }, [visible, translateY]);
-
   if (!match) return null;
 
   // Player Names
@@ -292,9 +238,12 @@ export function MatchDetailPopup({
     try {
       if (status === 'verified') await approveCommunityMatch(match.id, currentUserId);
       else await disputeCommunityMatch(match.id, currentUserId);
+      if (status === 'verified') haptics.success();
+      else haptics.warning();
       setVerificationStatus(status);
       onRefreshFeed?.();
     } catch {
+      haptics.error();
       alert('Error', 'Failed to update verification status.');
     } finally {
       setUpdatingStatus(false);
@@ -310,26 +259,7 @@ export function MatchDetailPopup({
   const StatusIcon = statusStyle.Icon;
 
   return (
-    <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-      <KeyboardAvoidingView
-        style={styles.keyboardAvoid}
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
-      >
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-          <Animated.View
-            style={[
-              styles.sheet,
-              { backgroundColor: theme.backgroundElement, transform: [{ translateY }] },
-            ]}
-          >
-            {/* Handle Bar */}
-            <View style={styles.handleContainer} {...panHandlers}>
-              <View style={[styles.handle, { backgroundColor: theme.textSecondary, opacity: 0.3 }]} />
-            </View>
-
+    <Sheet visible={visible} onClose={onClose}>
             {/* Modal Header */}
             <View style={styles.header}>
               <View style={styles.headerInfo}>
@@ -350,7 +280,7 @@ export function MatchDetailPopup({
             </View>
 
             <ScrollView
-              style={styles.scroll}
+              style={[styles.scroll, { maxHeight: windowHeight * 0.5 }]}
               contentContainerStyle={styles.scrollContent}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={false}
@@ -478,17 +408,7 @@ export function MatchDetailPopup({
                 <ThemedText variant="body" style={styles.sectionTitle}>
                   Comments ({comments.length})
                 </ThemedText>
-                <Pressable
-                  onPress={handleLike}
-                  disabled={liking}
-                  style={({ pressed }) => [styles.likeActionBtn, pressed && { opacity: 0.6 }]}
-                  hitSlop={8}
-                >
-                  <Heart size={15} color={liked ? theme.error : theme.textSecondary} fill={liked ? theme.error : 'none'} />
-                  <ThemedText variant="caption" style={[styles.likeText, { color: liked ? theme.error : theme.textSecondary }]}>
-                    {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-                  </ThemedText>
-                </Pressable>
+                <LikeButton liked={liked} count={likesCount} onPress={handleLike} disabled={liking} iconSize={15} style={styles.likeActionBtn} />
               </View>
 
               {/* Comments List */}
@@ -501,7 +421,7 @@ export function MatchDetailPopup({
               ) : (
                 <View style={styles.commentsContainer}>
 {comments.map((comment) => (
-                      <View key={comment.id} style={styles.commentRow}>
+                      <Animated.View key={comment.id} layout={LayoutShift} entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.commentRow}>
                         <Pressable
                           disabled={!comment.profile?.id}
                           onPress={() => {
@@ -530,7 +450,7 @@ export function MatchDetailPopup({
                            {comment.content}
                          </ThemedText>
                        </View>
-                     </View>
+                     </Animated.View>
                    ))}
                 </View>
               )}
@@ -562,40 +482,11 @@ export function MatchDetailPopup({
                 </Pressable>
               </View>
             )}
-          </Animated.View>
-        </View>
-      </KeyboardAvoidingView>
-    </Modal>
+    </Sheet>
   );
 }
 
 const styles = StyleSheet.create({
-  keyboardAvoid: {
-    flex: 1,
-  },
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.4)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    paddingHorizontal: Spacing.md,
-    paddingBottom: Platform.OS === 'ios' ? Spacing.lg + 10 : Spacing.md,
-    maxHeight: '85%',
-    gap: Spacing.xs,
-  },
-  handleContainer: {
-    width: '100%',
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-  },
-  handle: {
-    width: 32,
-    height: 4,
-    borderRadius: Radius.full,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -626,7 +517,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexShrink: 1,
-    maxHeight: SCREEN_HEIGHT * 0.5,
   },
   scrollContent: {
     paddingVertical: Spacing.xs,

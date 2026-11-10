@@ -1,16 +1,8 @@
+import { haptics } from '@/lib/haptics';
+import { Sheet } from '@/components/motion/Sheet';
 import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-native';
-import { useEffect, useRef, useState } from 'react';
-import {
-  ActivityIndicator,
-  Animated,
-  Dimensions,
-  Modal,
-  PanResponder,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { useEffect, useState } from 'react';
+import { ActivityIndicator, useWindowDimensions, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 
 import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
@@ -24,7 +16,6 @@ import { useSessionChat } from '@/hooks/useSessionChat';
 import { supabase } from '@/lib/supabase';
 import {
   approveCommitment,
-  checkTimeConflicts,
   commitToSession,
   deleteSession,
   fetchSessionById,
@@ -34,7 +25,6 @@ import {
 } from '@/services/sessions';
 import type { Commitment, Session } from '@/types';
 
-const SCREEN_HEIGHT = Dimensions.get('window').height;
 
 type SessionDetailPopupProps = {
   sessionId: string | null;
@@ -71,7 +61,7 @@ export function SessionDetailPopup({
   onRefreshFeed,
 }: SessionDetailPopupProps) {
   const theme = useTheme();
-  const [translateY] = useState(() => new Animated.Value(SCREEN_HEIGHT));
+  const { height: windowHeight } = useWindowDimensions();
 
   const [session, setSession] = useState<Session | null>(() => initialSession as Session | null);
   const [commitments, setCommitments] = useState<Commitment[]>([]);
@@ -85,41 +75,6 @@ export function SessionDetailPopup({
   const isLoading = visible && sessionId !== null && loadedSessionId !== sessionId;
   const isCreator = currentUserId && (session?.created_by ?? (initialSession as Session | null)?.created_by) === currentUserId;
 
-  // Drag-to-dismiss
-  const panResponder = useRef<ReturnType<typeof PanResponder.create> | null>(null);
-  const [panHandlers, setPanHandlers] =
-    useState<ReturnType<typeof PanResponder.create>['panHandlers'] | null>(null);
-
-  useEffect(() => {
-    if (!panResponder.current) {
-      panResponder.current = PanResponder.create({
-        onStartShouldSetPanResponder: () => true,
-        onMoveShouldSetPanResponder: (_, gs) => gs.dy > 8,
-        onPanResponderMove: (_, gs) => {
-          if (gs.dy > 0) translateY.setValue(gs.dy);
-        },
-        onPanResponderRelease: (_, gs) => {
-          if (gs.dy > 120 || gs.vy > 0.4) {
-            Animated.timing(translateY, {
-              toValue: SCREEN_HEIGHT,
-              duration: 220,
-              useNativeDriver: true,
-            }).start(onClose);
-          } else {
-            Animated.spring(translateY, {
-              toValue: 0,
-              tension: 50,
-              friction: 8,
-              useNativeDriver: true,
-            }).start();
-          }
-        },
-      });
-      setPanHandlers(panResponder.current.panHandlers);
-    }
-  }, [translateY, onClose]);
-
-  // Load session data when popup opens
   useEffect(() => {
     if (!visible || !sessionId) return;
     const id = sessionId;
@@ -188,36 +143,13 @@ export function SessionDetailPopup({
     };
   }, [visible, sessionId, currentUserId]);
 
-  // Animate sheet
-  useEffect(() => {
-    if (visible) {
-      Animated.spring(translateY, {
-        toValue: 0,
-        tension: 50,
-        friction: 8,
-        useNativeDriver: true,
-      }).start();
-    } else {
-      translateY.setValue(SCREEN_HEIGHT);
-    }
-  }, [visible, translateY]);
-
   const handleCommit = async () => {
     if (!currentUserId || !sessionId) return;
     setJoining(true);
     try {
-      const conflicts = await checkTimeConflicts(currentUserId, session!.date_time);
-      const otherConflicts = conflicts.filter((c) => c.id !== sessionId);
-      if (otherConflicts.length > 0) {
-        alert(
-          'Time Conflict',
-          `You have a conflicting session within ±30 minutes:\n\n${otherConflicts
-            .map((c) => `• ${c.purpose} at ${new Date(c.date_time).toLocaleString()}`)
-            .join('\n')}`,
-        );
-        return;
-      }
+      // Time-conflict check lives in commitToSession (single source of truth).
       await commitToSession(sessionId, currentUserId);
+      haptics.success();
       setMyCommitmentStatus('pending');
       onRefreshFeed?.();
     } catch (e: any) {
@@ -250,6 +182,7 @@ export function SessionDetailPopup({
     setApprovingId(commitmentId);
     try {
       await approveCommitment(commitmentId, uid);
+      haptics.success();
       setReloadKey((k) => k + 1);
       const sessionData = await fetchSessionById(id, uid);
       setSession(sessionData);
@@ -269,6 +202,7 @@ export function SessionDetailPopup({
     setApprovingId(commitmentId);
     try {
       await rejectCommitment(commitmentId, uid);
+      haptics.warning();
       setReloadKey((k) => k + 1);
       onRefreshFeed?.();
     } catch (e) {
@@ -342,25 +276,19 @@ export function SessionDetailPopup({
 
   return (
     <>
-      <Modal transparent visible={visible} animationType="none" onRequestClose={onClose}>
-        <View style={styles.backdrop}>
-          <Pressable style={StyleSheet.absoluteFill} onPress={onClose} />
-
-          <Animated.View
-            style={[
-              styles.sheet,
-              {
-                backgroundColor: theme.background,
-                borderColor: theme.border,
-                transform: [{ translateY }],
-              },
-            ]}
-          >
-          <View style={styles.handleContainer} {...panHandlers}>
-            <View style={[styles.handle, { backgroundColor: theme.border }]} />
-          </View>
-
-          <View style={styles.header} {...panHandlers}>
+      <Sheet
+        visible={visible}
+        onClose={onClose}
+        maxHeight="80%"
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderTopWidth: 1,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.lg + 10,
+        }}
+      >
+          <View style={styles.header}>
             <ThemedText variant="heading" numberOfLines={1} style={{ flex: 1 }}>
               {session?.title ??
                 session?.purpose ??
@@ -396,7 +324,7 @@ export function SessionDetailPopup({
           </View>
 
           <ScrollView
-            style={styles.scroll}
+            style={[styles.scroll, { maxHeight: windowHeight * 0.5 }]}
             contentContainerStyle={styles.scrollContent}
             showsVerticalScrollIndicator={false}
           >
@@ -707,6 +635,15 @@ export function SessionDetailPopup({
                         Your request is pending approval
                       </ThemedText>
                     )}
+                    {myCommitmentStatus === 'pending' && (
+                      <Button
+                        label="Cancel request"
+                        variant="secondary"
+                        onPress={handleUncommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
+                    )}
                     {myCommitmentStatus === 'left' && (
                       <View style={[styles.leftBanner, { backgroundColor: `${theme.info}15`, borderColor: `${theme.info}30` }]}>
                         <ThemedText
@@ -716,6 +653,14 @@ export function SessionDetailPopup({
                           You left this session
                         </ThemedText>
                       </View>
+                    )}
+                    {myCommitmentStatus === 'left' && !isSessionFull && (
+                      <Button
+                        label="Apply again"
+                        onPress={handleCommit}
+                        loading={joining}
+                        buttonStyle={styles.actionBtn}
+                      />
                     )}
                     {myCommitmentStatus === 'rejected' && (
                       <ThemedText
@@ -752,9 +697,7 @@ export function SessionDetailPopup({
               </>
             )}
           </ScrollView>
-        </Animated.View>
-      </View>
-      </Modal>
+      </Sheet>
 
       <SessionChatPopup
         sessionId={sessionId}
@@ -771,30 +714,6 @@ export function SessionDetailPopup({
 }
 
 const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  sheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.lg + 10,
-    maxHeight: '80%',
-  },
-  handleContainer: {
-    width: '100%',
-    paddingVertical: Spacing.sm,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  handle: {
-    width: 36,
-    height: 4,
-    borderRadius: Radius.full,
-  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -841,7 +760,6 @@ const styles = StyleSheet.create({
   },
   scroll: {
     flexGrow: 0,
-    maxHeight: SCREEN_HEIGHT * 0.5,
   },
   scrollContent: {
     paddingBottom: Spacing.md,

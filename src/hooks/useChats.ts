@@ -1,5 +1,6 @@
 import { useCallback, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
+import { useAppForeground } from '@/hooks/useAppForeground';
 
 import {
   getChatUnreadCountsByKind,
@@ -201,6 +202,11 @@ export function useChats(userId: string | undefined) {
       }
     }, [userId, showCache, load]),
   );
+
+  // Unread counts / last-message order go stale while the app is backgrounded.
+  useAppForeground(() => {
+    if (userId) load({ silent: true });
+  }, !!userId);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);

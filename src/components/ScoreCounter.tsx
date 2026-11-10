@@ -1,6 +1,10 @@
 import { Minus, Plus } from 'lucide-react-native';
 import { Alert, Platform, Pressable, StyleSheet, View } from 'react-native';
 
+import { AnimatedNumber } from '@/components/motion/AnimatedNumber';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -66,25 +70,31 @@ export function ScoreCounter({ label, score, onIncrement, onDecrement, onScorePr
       </ThemedText>
 
       <View style={[styles.scoreBlock, { borderColor: theme.border, backgroundColor: theme.background }]}>
-        <Pressable
-          onPress={onDecrement}
-          style={({ pressed }) => [styles.control, pressed && styles.pressed]}
+        <PressableScale
+          onPress={() => {
+            haptics.selection();
+            onDecrement();
+          }}
+          scaleTo={0.9}
+          style={styles.control}
           hitSlop={12}>
           <Minus size={28} color={theme.text} strokeWidth={2.5} />
-        </Pressable>
+        </PressableScale>
 
         <Pressable onPress={handleScorePress} style={({ pressed }) => [styles.scoreTouchArea, pressed && { opacity: 0.7 }]} hitSlop={16}>
-          <ThemedText variant="hero" style={styles.score}>
-            {score}
-          </ThemedText>
+          <AnimatedNumber value={score} style={[styles.score, { color: theme.text }]} />
         </Pressable>
 
-        <Pressable
-          onPress={onIncrement}
-          style={({ pressed }) => [styles.control, pressed && styles.pressed]}
+        <PressableScale
+          onPress={() => {
+            haptics.selection();
+            onIncrement();
+          }}
+          scaleTo={0.9}
+          style={styles.control}
           hitSlop={12}>
           <Plus size={28} color={theme.text} strokeWidth={2.5} />
-        </Pressable>
+        </PressableScale>
       </View>
     </View>
   );
@@ -122,6 +132,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     fontSize: 64,
     lineHeight: 68,
+    fontWeight: '800',
   },
   scoreTouchArea: {
     minWidth: 80,

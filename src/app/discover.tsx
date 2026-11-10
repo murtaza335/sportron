@@ -1,9 +1,19 @@
+import Animated from 'react-native-reanimated';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { useFocusBorder } from '@/components/motion/useFocusBorder';
+import { CommunityCardSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { haptics } from '@/lib/haptics';
 import { router, Stack } from 'expo-router';
-import { Plus } from 'lucide-react-native';
+import { Plus, Search } from 'lucide-react-native';
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, RefreshControl, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
+import { Button } from '@/components/ui/Button';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { CommunityCard } from '@/components/CommunityCard';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,16 +22,30 @@ import { useCommunities } from '@/hooks/useCommunities';
 import { fetchMyCommunityMemberships } from '@/services/communities';
 import type { CommunityMemberRole, Sport } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { HScrollView } from '@/components/HScrollView';
 
 const ALL_SPORTS = Object.keys(SPORT_LABELS) as Sport[];
 
 export default function DiscoverScreen() {
   const theme = useTheme();
+  const searchBorder = useFocusBorder(theme.border, theme.inputBorderFocus);
   const { user } = useAuth();
   const { communities, loading, refreshing, refresh } = useCommunities();
+  const [membershipsLoaded, setMembershipsLoaded] = useState(false);
   const [search, setSearch] = useState('');
   const [selectedSport, setSelectedSport] = useState<Sport | null>(null);
-  const [membershipMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
+  const [sortBy, setSortBy] = useState<'popular' | 'new'>('popular');
+  // New RPC (migration 120) inlines the caller's role; legacy servers need the extra memberships request.
+  const hasInlineRole = communities.some((c) => c.popularity !== undefined);
+  const [fetchedMap, setMembershipMap] = useState<Record<string, CommunityMemberRole>>({});
+  const membershipMap = useMemo(() => {
+    if (!hasInlineRole) return fetchedMap;
+    const map: Record<string, CommunityMemberRole> = {};
+    for (const c of communities) if (c.my_role) map[c.id] = c.my_role;
+    return map;
+  }, [hasInlineRole, fetchedMap, communities]);
+  const membersReady = hasInlineRole || membershipsLoaded;
+  const firstLoad = useFirstLoad(loading || (!!user?.id && !membersReady));
 
   useEffect(() => {
     if (!user?.id) return;
@@ -33,7 +57,8 @@ export default function DiscoverScreen() {
         }
         setMembershipMap(map);
       })
-      .catch(console.error);
+      .catch(console.error)
+      .finally(() => setMembershipsLoaded(true));
   }, [user?.id]);
 
   const filteredCommunities = useMemo(() => {
@@ -45,8 +70,15 @@ export default function DiscoverScreen() {
     if (selectedSport) {
       list = list.filter((c) => c.sport === selectedSport);
     }
-    return list;
-  }, [communities, search, selectedSport]);
+    const rank = (c: (typeof list)[number]) => c.popularity ?? c.member_count ?? 0;
+    return [...list].sort((a, b) => {
+      if (sortBy === 'new') return b.created_at.localeCompare(a.created_at);
+      // Popular: keep non-members first (Discover is for finding new ones), then by score.
+      const am = membershipMap[a.id] ? 1 : 0;
+      const bm = membershipMap[b.id] ? 1 : 0;
+      return am - bm || rank(b) - rank(a);
+    });
+  }, [communities, search, selectedSport, sortBy, membershipMap]);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
@@ -80,7 +112,7 @@ export default function DiscoverScreen() {
                   shadowOffset: { width: 0, height: 2 },
                   shadowOpacity: 0.4,
                   shadowRadius: 4,
-                  elevation: 4,
+                  elevation: 0,
                 }}
               >
                 <Plus size={20} color={theme.chatBubbleMineText} strokeWidth={3} />
@@ -90,8 +122,9 @@ export default function DiscoverScreen() {
         }}
       />
       <View style={[styles.searchContainer, { borderBottomColor: theme.border }]}>
-        <View style={[styles.searchBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
+        <Animated.View style={[styles.searchBar, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, searchBorder.style]}>
           <TextInput
+            {...searchBorder.handlers}
             style={[styles.searchInput, { color: theme.text }]}
             placeholder="Search communities..."
             placeholderTextColor={theme.textSecondary}
@@ -100,14 +133,40 @@ export default function DiscoverScreen() {
             autoCapitalize="none"
             autoCorrect={false}
           />
-        </View>
-        <ScrollView
+        </Animated.View>
+        <HScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.filterRow}
         >
-          <Pressable
-            onPress={() => setSelectedSport(null)}
+          {(['popular', 'new'] as const).map((k) => (
+            <PressableScale
+              key={k}
+              scaleTo={0.94}
+              onPress={() => {
+                if (sortBy !== k) haptics.selection();
+                setSortBy(k);
+              }}
+              style={[
+                styles.filterChip,
+                { backgroundColor: sortBy === k ? theme.accent : theme.backgroundElement },
+              ]}
+            >
+              <ThemedText
+                variant="caption"
+                style={{ color: sortBy === k ? theme.chatBubbleMineText : theme.textSecondary, fontWeight: '700' }}
+              >
+                {k === 'popular' ? '🔥 Popular' : '✨ New'}
+              </ThemedText>
+            </PressableScale>
+          ))}
+          <View style={{ width: 1, backgroundColor: theme.border, marginHorizontal: 2 }} />
+          <PressableScale
+            scaleTo={0.94}
+            onPress={() => {
+              if (selectedSport) haptics.selection();
+              setSelectedSport(null);
+            }}
             style={[
               styles.filterChip,
               { backgroundColor: !selectedSport ? theme.text : theme.backgroundElement },
@@ -119,11 +178,15 @@ export default function DiscoverScreen() {
             >
               All
             </ThemedText>
-          </Pressable>
+          </PressableScale>
           {ALL_SPORTS.map((sport) => (
-            <Pressable
+            <PressableScale
               key={sport}
-              onPress={() => setSelectedSport(sport === selectedSport ? null : sport)}
+              scaleTo={0.94}
+              onPress={() => {
+                haptics.selection();
+                setSelectedSport(sport === selectedSport ? null : sport);
+              }}
               style={[
                 styles.filterChip,
                 { backgroundColor: selectedSport === sport ? theme.text : theme.backgroundElement },
@@ -135,34 +198,62 @@ export default function DiscoverScreen() {
               >
                 {SPORT_LABELS[sport]}
               </ThemedText>
-            </Pressable>
+            </PressableScale>
           ))}
-        </ScrollView>
+        </HScrollView>
       </View>
 
       <ScrollView
         style={styles.flex}
         contentContainerStyle={styles.container}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
-        {loading ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+        {loading || (!!user?.id && !membersReady) ? (
+          <SkeletonList Item={CommunityCardSkeleton} count={3} />
         ) : filteredCommunities.length === 0 ? (
-          <View style={styles.empty}>
-            <ThemedText variant="body" muted style={styles.emptyText}>
-              No communities found
+          <EmptyReveal
+            style={styles.empty}
+            icon={<Search size={44} color={theme.textSecondary} strokeWidth={1.5} />}>
+            <ThemedText variant="heading" style={styles.emptyText}>
+              {search.trim()
+                ? `Nothing called "${search.trim()}" yet`
+                : selectedSport
+                  ? `No ${SPORT_LABELS[selectedSport]} communities yet`
+                  : 'No communities yet'}
             </ThemedText>
-          </View>
+            <ThemedText variant="body" muted style={styles.emptyText}>
+              {selectedSport
+                ? `Be the first — start one and the ${SPORT_LABELS[selectedSport]} players around you can find and join it.`
+                : 'Start the first community in your area.'}
+            </ThemedText>
+            <Button
+              label={
+                search.trim()
+                  ? `Create "${search.trim().slice(0, 24)}"`
+                  : selectedSport
+                    ? `Create a ${SPORT_LABELS[selectedSport]} community`
+                    : 'Create a community'
+              }
+              onPress={() =>
+                router.push({
+                  pathname: '/create-community',
+                  params: {
+                    ...(selectedSport ? { sport: selectedSport } : {}),
+                    ...(search.trim() ? { name: search.trim() } : {}),
+                  },
+                })
+              }
+              buttonStyle={{ marginTop: Spacing.sm }}
+            />
+          </EmptyReveal>
         ) : (
           <View style={styles.grid}>
-            {filteredCommunities.map((community) => (
-              <CommunityCard
-                key={community.id}
-                community={community}
-                membershipRole={membershipMap[community.id] ?? null}
-              />
+            {filteredCommunities.map((community, index) => (
+              <FadeInItem key={community.id} index={index} animate={firstLoad}>
+                <CommunityCard community={community} membershipRole={membershipMap[community.id] ?? null} />
+              </FadeInItem>
             ))}
           </View>
         )}
@@ -231,5 +322,6 @@ const styles = StyleSheet.create({
   },
   emptyText: {
     fontWeight: '600',
+    textAlign: 'center',
   },
 });

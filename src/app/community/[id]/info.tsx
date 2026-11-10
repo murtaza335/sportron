@@ -16,16 +16,8 @@ import {
   User,
 } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import {
-  ActivityIndicator,
-  Image,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  Switch,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, Switch, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { Button } from '@/components/ui/Button';
 import { Card } from '@/components/ui/Card';
@@ -36,6 +28,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useCommunity } from '@/hooks/useCommunity';
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import {
   deleteCommunity,
   fetchCommunityMembers,
@@ -49,6 +42,10 @@ import {
 import { fetchProfile } from '@/services/profiles';
 import type { CommunityMember, Profile } from '@/types';
 import { SPORT_LABELS } from '@/types';
+import { FadeImage } from '@/components/motion/FadeImage';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
+import { webContextMenuProps } from '@/lib/webMenu';
 
 export default function CommunityInfoScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -103,6 +100,7 @@ export default function CommunityInfoScreen() {
 
   const isMember = !!membership;
   const isAdmin = membership?.role === 'admin';
+  const isCreator = !!user && community?.created_by === user.id;
   const isRestricted = community?.visibility === 'restricted';
 
   const sortedMembers = useMemo(
@@ -135,7 +133,7 @@ export default function CommunityInfoScreen() {
     try {
       if (isRestricted) {
         await requestToJoinCommunity(id, user.id);
-        alert('Request Sent', 'The admin will review your request.');
+        toast('Request sent', 'The admin will review your request.');
       } else {
         await joinCommunity(id, user.id);
         setMembership({
@@ -170,8 +168,8 @@ export default function CommunityInfoScreen() {
             try {
               await leaveCommunity(id, user.id);
               setMembership(null);
-              refresh();
-              router.back();
+              // router.back() would land on the stale community screen: go to the list.
+              router.dismissTo('/');
             } catch (e: any) {
               alert('Error', e?.message ?? 'Failed to leave.');
             }
@@ -194,7 +192,8 @@ export default function CommunityInfoScreen() {
           onPress: async () => {
             try {
               await deleteCommunity(id);
-              router.back();
+              // The community no longer exists: back() would land on "Community not found".
+              router.dismissTo('/');
             } catch (e: any) {
               alert('Error', e?.message ?? 'Failed to delete community.');
             }
@@ -246,7 +245,7 @@ export default function CommunityInfoScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -276,6 +275,15 @@ export default function CommunityInfoScreen() {
     );
   }
 
+  const openMemberMenu = (member: (typeof displayMembers)[number]) => {
+    if (!isAdmin || member.profile_id === user?.id) return;
+    alert(member.profile?.username || 'Member', undefined, [
+      { text: 'Make Admin', onPress: () => handleMakeAdmin(member) },
+      { text: 'Remove', style: 'destructive', onPress: () => handleRemove(member) },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
+  };
+
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <Stack.Screen options={{ title: '', ...themedHeader }} />
@@ -284,17 +292,16 @@ export default function CommunityInfoScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
+          <ThemedRefreshControl
             refreshing={loading}
             onRefresh={refresh}
-            tintColor={theme.text}
           />
         }
       >
         {/* Cover Image */}
         {community.image_url ? (
           <View style={styles.coverContainer}>
-            <Image source={{ uri: community.image_url }} style={styles.coverImage} resizeMode="cover" />
+            <FadeImage source={{ uri: community.image_url }} style={styles.coverImage} resizeMode="cover" />
             <View style={[styles.coverOverlay, { backgroundColor: theme.background }]} />
           </View>
         ) : (
@@ -416,26 +423,8 @@ export default function CommunityInfoScreen() {
                 }
                 style={({ pressed }) => [styles.memberRow, { borderBottomColor: theme.border }, pressed && { opacity: 0.7 }]}
                 hitSlop={8}
-                onLongPress={() => {
-                  if (isAdmin && member.profile_id !== user?.id) {
-                    alert(
-                      member.profile?.username || 'Member',
-                      undefined,
-                      [
-                        {
-                          text: 'Make Admin',
-                          onPress: () => handleMakeAdmin(member),
-                        },
-                        {
-                          text: 'Remove',
-                          style: 'destructive',
-                          onPress: () => handleRemove(member),
-                        },
-                        { text: 'Cancel', style: 'cancel' },
-                      ],
-                    );
-                  }
-                }}
+                {...webContextMenuProps(() => openMemberMenu(member))}
+                onLongPress={() => openMemberMenu(member)}
               >
                 <UserAvatar avatarUrl={member.profile?.avatar_url} size={40} />
                 <View style={styles.memberInfo}>
@@ -533,19 +522,21 @@ export default function CommunityInfoScreen() {
                   </ThemedText>
                   <ChevronRight size={18} color={theme.textSecondary} strokeWidth={2} />
                 </Pressable>
-                <Pressable
-                  style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
-                  onPress={handleDelete}
-                  hitSlop={8}
-                >
-                  <Trash2 size={20} color={theme.error} strokeWidth={2} />
-                  <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
-                    Delete Community
-                  </ThemedText>
-                </Pressable>
+                {isCreator && (
+                  <Pressable
+                    style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
+                    onPress={handleDelete}
+                    hitSlop={8}
+                  >
+                    <Trash2 size={20} color={theme.error} strokeWidth={2} />
+                    <ThemedText variant="body" style={{ fontWeight: '600', flex: 1, color: theme.error }}>
+                      Delete Community
+                    </ThemedText>
+                  </Pressable>
+                )}
               </>
             )}
-            {!isAdmin && (
+            {!isCreator && (
               <Pressable
                 style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
                 onPress={handleLeave}

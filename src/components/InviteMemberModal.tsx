@@ -1,9 +1,11 @@
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { Sheet } from '@/components/motion/Sheet';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, StyleSheet, TextInput, View, Modal } from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Search, UserCheck, UserPlus, X } from 'lucide-react-native';
 
-import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -126,7 +128,7 @@ export function InviteMemberModal({
     try {
       await inviteMemberByUsername(communityId, adminId, profile.username);
       setInvitedIds((prev) => new Set(prev).add(profile.id));
-      alert('Invite Sent', `Invitation sent to @${profile.username}`);
+      toast('Invite sent', `Invitation sent to @${profile.username}`);
       onSuccess();
       onClose();
     } catch (err) {
@@ -140,9 +142,17 @@ export function InviteMemberModal({
   if (!visible) return null;
 
   return (
-    <Modal visible={visible} animationType="slide" presentationStyle="formSheet" onRequestClose={onClose}>
-      <SafeAreaView style={[styles.safe, { backgroundColor: theme.background, flex: 1 }]}>
-        <KeyboardAvoidingView
+    <Sheet
+      visible={visible}
+      onClose={onClose}
+      flush
+      avoidKeyboard={false}
+      height="92%"
+      maxHeight="92%"
+      style={{ backgroundColor: theme.background, paddingBottom: 0 }}
+    >
+      <SafeAreaView edges={['bottom']} style={[styles.safe, { backgroundColor: theme.background, flex: 1 }]}>
+        <KeyboardAvoider modal
           style={styles.flex}
           behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
           keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 100}
@@ -267,9 +277,9 @@ export function InviteMemberModal({
               </View>
             )}
           </ScrollView>
-        </KeyboardAvoidingView>
+        </KeyboardAvoider>
       </SafeAreaView>
-    </Modal>
+    </Sheet>
   );
 }
 

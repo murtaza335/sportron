@@ -9,16 +9,45 @@ import { useAuth } from '@/contexts/AuthContext';
 export function FCMInitializer() {
   const { session, profile } = useAuth();
   const { initialize, handleNotificationResponse, isLoading } = useFCM();
-  const initializedRef = useRef(false);
+  // User id FCM was initialised for, and the listener cleanup returned by initialize().
+  // Keyed per user (not once per process) so account switches re-register the token and the
+  // previous user's listeners are removed (BUG-H8).
+  const initializedForRef = useRef<string | null>(null);
+  const cleanupRef = useRef<(() => void) | null>(null);
   const lastResponse = Notifications.useLastNotificationResponse();
+  const userId = session?.user?.id ?? null;
 
-  // Initialize FCM once when we have a valid session/profile.
   useEffect(() => {
-    if (session && profile && !initializedRef.current && !isLoading) {
-      initializedRef.current = true;
-      initialize();
+    if (!userId) {
+      // Signed out: tear down listeners so they cannot save tokens for the old user.
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+      initializedForRef.current = null;
+      return;
     }
-  }, [session, profile, initialize, isLoading]);
+    if (!profile || isLoading || initializedForRef.current === userId) return;
+
+    cleanupRef.current?.();
+    cleanupRef.current = null;
+    initializedForRef.current = userId;
+
+    initialize().then((cleanup) => {
+      if (!cleanup) return;
+      if (initializedForRef.current === userId) {
+        cleanupRef.current = cleanup;
+      } else {
+        cleanup();
+      }
+    });
+  }, [userId, profile, initialize, isLoading]);
+
+  // Remove listeners when the component unmounts.
+  useEffect(() => {
+    return () => {
+      cleanupRef.current?.();
+      cleanupRef.current = null;
+    };
+  }, []);
 
   // Handle notification taps (native only; lastResponse is null on web).
   useEffect(() => {

@@ -1,6 +1,8 @@
+import { haptics } from '@/lib/haptics';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
-import { Bell, Check, CheckCircle, Swords, UserPlus, X, XCircle } from 'lucide-react-native';
+import { router } from 'expo-router';
+import { Bell, Check, CheckCircle, Swords, Trophy, UserPlus, X, XCircle } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
@@ -10,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
+import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
 import type { InAppNotification, NotificationType } from '@/types';
@@ -26,6 +29,14 @@ const DECLINED_TYPE_MAP: Partial<Record<NotificationType, NotificationType>> = {
   community_match_pending: 'community_match_disputed',
 };
 
+/** The request this notification points at was already approved/rejected (or no longer exists). */
+class AlreadyHandledError extends Error {
+  constructor() {
+    super('Already handled');
+    this.name = 'AlreadyHandledError';
+  }
+}
+
 interface ActivityCardProps {
   notification: InAppNotification;
   onComplete: () => void;
@@ -38,6 +49,13 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
       return <UserPlus size={20} color={theme.text} strokeWidth={2.2} />;
     case 'community_match_pending':
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
+    case 'tournament_admin_assigned':
+    case 'tournament_module_admin_assigned':
+    case 'tournament_entry_added':
+    case 'tournament_match_scheduled':
+    case 'tournament_match_result':
+    case 'tournament_module_completed':
+      return <Trophy size={20} color={theme.text} strokeWidth={2.2} />;
     default:
       return <Bell size={20} color={theme.text} strokeWidth={2.2} />;
   }
@@ -189,7 +207,7 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
         }
         const { data: commitments, error: ce } = await query;
         if (ce) throw ce;
-        if (!commitments?.length) throw new Error('No pending requests');
+        if (!commitments?.length) throw new AlreadyHandledError();
         if (action === 'accepted') {
           await approveCommitment(commitments[0].id, userId);
         } else {
@@ -213,11 +231,24 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           .order('created_at', { ascending: true })
           .limit(1);
         if (re) throw re;
-        if (!requests?.length) throw new Error('No pending requests');
+        if (!requests?.length) throw new AlreadyHandledError();
         await respondToJoinRequest(requests[0].id, action === 'accepted' ? 'approved' : 'rejected');
         return;
       }
     }
+  };
+
+  // The request was resolved elsewhere: the actionable card has no purpose anymore, so remove
+  // it from the inbox (instead of leaving it stuck in "Action Required" with an error).
+  const dismissAlreadyHandled = async () => {
+    try {
+      await supabase.from('in_app_notifications').delete().eq('id', notification.id);
+    } catch {
+      // best-effort
+    }
+    alert('Already handled', 'This request was already handled.');
+    setActionLoading(false);
+    onComplete();
   };
 
   const handleAccept = async () => {
@@ -225,7 +256,12 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     setActionLoading(true);
     try {
       await doAction('accepted');
+      haptics.success();
     } catch (err) {
+      if (err instanceof AlreadyHandledError) {
+        await dismissAlreadyHandled();
+        return;
+      }
       console.error('Accept action failed:', err);
       alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
@@ -246,7 +282,12 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
     setActionLoading(true);
     try {
       await doAction('declined');
+      haptics.warning();
     } catch (err) {
+      if (err instanceof AlreadyHandledError) {
+        await dismissAlreadyHandled();
+        return;
+      }
       console.error('Decline action failed:', err);
       alert('Action failed', err instanceof Error ? err.message : 'Something went wrong');
       setActionLoading(false);
@@ -267,7 +308,34 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
 
   return (
     <Pressable
-      onPress={() => markAsRead(notification.id)}
+      onPress={() => {
+        markAsRead(notification.id);
+        const cId = notification.data?.communityId;
+        if (notification.type.startsWith('community_post_') && typeof cId === 'string') {
+          const pId = notification.data?.postId;
+          router.push({
+            pathname: '/community/[id]',
+            params: typeof pId === 'string' ? { id: cId, postId: pId } : { id: cId },
+          });
+        } else if (
+          (notification.type === 'member_joined' ||
+            notification.type === 'community_engagement' ||
+            notification.type === 'new_community') &&
+          typeof cId === 'string'
+        ) {
+          router.push({ pathname: '/community/[id]', params: { id: cId } });
+        } else if (notification.type.startsWith('streak_')) {
+          router.navigate('/');
+        } else if (notification.type.startsWith('tournament_')) {
+          const tId = notification.data?.tournamentId;
+          const mId = notification.data?.moduleId;
+          if (typeof tId === 'string' && typeof mId === 'string') {
+            router.push(tournamentRoutes.module(tId, mId));
+          } else if (typeof tId === 'string') {
+            router.push(tournamentRoutes.tournament(tId));
+          }
+        }
+      }}
       style={({ pressed }) => ({
         backgroundColor: notification.read ? theme.backgroundElement : unreadBg,
         borderBottomWidth: 1,

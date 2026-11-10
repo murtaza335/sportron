@@ -11,6 +11,10 @@ import {
 } from '@/services/communities';
 import type { CommunityPost } from '@/types';
 
+// Unique realtime topic per subscription run (see useChat.ts): supabase.channel(name) reuses a
+// registered channel with the same topic, and .on() throws after subscribe().
+let postsChannelSeq = 0;
+
 export function useCommunityPosts(communityId: string | null, userId: string | null) {
   const [posts, setPosts] = useState<CommunityPost[]>([]);
   const [loading, setLoading] = useState(true);
@@ -21,13 +25,22 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
   const mountedRef = useRef(true);
   const channelRef = useRef<ReturnType<typeof supabase.channel> | null>(null);
   const initialLoadRef = useRef(true);
+  // Latest posts for realtime handlers, so the channel is NOT re-created on every posts change.
+  const postsRef = useRef<CommunityPost[]>([]);
+  useEffect(() => {
+    postsRef.current = posts;
+  }, [posts]);
 
   const loadPosts = useCallback(async (pageNum: number = 1, append: boolean = false) => {
     if (!communityId) return;
     try {
       const { data, hasMore: more } = await fetchCommunityPosts(communityId, userId ?? undefined, pageNum, 20);
       if (append) {
-        setPosts((prev) => [...prev, ...data]);
+        // Realtime inserts shift offsets, so a later page can repeat rows: dedupe by id.
+        setPosts((prev) => {
+          const seen = new Set(prev.map((p) => p.id));
+          return [...prev, ...data.filter((p) => !seen.has(p.id))];
+        });
       } else {
         setPosts(data);
       }
@@ -42,11 +55,11 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
     }
   }, [communityId, userId]);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback(async () => {
     setPage(1);
     setHasMore(false);
     setRefreshing(true);
-    loadPosts(1);
+    await loadPosts(1);
   }, [loadPosts]);
 
   const loadMore = useCallback(async () => {
@@ -68,7 +81,7 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
     if (!communityId || !userId) return;
 
     const channel = supabase
-      .channel(`community-posts-${communityId}-${userId}`)
+      .channel(`community-posts-${communityId}-${userId}-${++postsChannelSeq}`)
       .on(
         'postgres_changes',
         {
@@ -103,21 +116,24 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
           event: '*',
           schema: 'public',
           table: 'community_post_likes',
-          filter: `post_id=in.(${posts.map(p => p.id).join(',')})`,
         },
         (payload) => {
           if (!mountedRef.current) return;
           const postId = (payload.new as { post_id: string })?.post_id ?? (payload.old as { post_id: string })?.post_id;
-          if (!postId) return;
+          // RLS limits events to communities the user belongs to; ignore posts not in state.
+          if (!postId || !postsRef.current.some((p) => p.id === postId)) return;
           setPosts((prev) =>
             prev.map((p) => {
               if (p.id !== postId) return p;
               if (payload.eventType === 'INSERT') {
                 const isMe = (payload.new as { profile_id: string }).profile_id === userId;
+                // My own like is applied optimistically by the UI: only sync if state lags.
+                if (isMe && p.is_liked_by_user) return p;
                 return { ...p, likes_count: (p.likes_count ?? 0) + 1, is_liked_by_user: isMe || p.is_liked_by_user };
               }
               if (payload.eventType === 'DELETE') {
                 const isMe = (payload.old as { profile_id: string }).profile_id === userId;
+                if (isMe && !p.is_liked_by_user) return p;
                 return { ...p, likes_count: Math.max(0, (p.likes_count ?? 0) - 1), is_liked_by_user: isMe ? false : p.is_liked_by_user };
               }
               return p;
@@ -131,12 +147,11 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
           event: 'INSERT',
           schema: 'public',
           table: 'community_post_comments',
-          filter: `post_id=in.(${posts.map(p => p.id).join(',')})`,
         },
         (payload) => {
           if (!mountedRef.current) return;
           const postId = (payload.new as { post_id: string }).post_id;
-          if (!postId) return;
+          if (!postId || !postsRef.current.some((p) => p.id === postId)) return;
           setPosts((prev) =>
             prev.map((p) => (p.id === postId ? { ...p, comments_count: (p.comments_count ?? 0) + 1 } : p)),
           );
@@ -152,7 +167,7 @@ export function useCommunityPosts(communityId: string | null, userId: string | n
         channelRef.current = null;
       }
     };
-  }, [communityId, userId, posts]);
+  }, [communityId, userId]);
 
   return {
     posts,

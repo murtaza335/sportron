@@ -1,4 +1,5 @@
-import { Heart, MessageSquare } from 'lucide-react-native';
+import { LikeButton } from '@/components/motion/LikeButton';
+import { MessageSquare } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
@@ -58,6 +59,23 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
   const [liked, setLiked] = useState(match.is_liked_by_user);
   const [likesCount, setLikesCount] = useState(match.likes_count);
+
+  // Re-sync with the list when likes change elsewhere (realtime, refetch): adjust state while
+  // rendering rather than in an effect.
+  const [syncedFrom, setSyncedFrom] = useState({
+    id: match.id,
+    likes: match.likes_count,
+    liked: match.is_liked_by_user,
+  });
+  if (
+    syncedFrom.id !== match.id ||
+    syncedFrom.likes !== match.likes_count ||
+    syncedFrom.liked !== match.is_liked_by_user
+  ) {
+    setSyncedFrom({ id: match.id, likes: match.likes_count, liked: match.is_liked_by_user });
+    setLiked(match.is_liked_by_user);
+    setLikesCount(match.likes_count);
+  }
 
   const isParticipant = useMemo(() =>
     currentUserId &&
@@ -313,20 +331,7 @@ export function MatchCard({ match, currentUserId, showYoursBadge = true, onPress
 
          {/* Social Row Footer */}
          <View style={styles.socialRow}>
-            <Pressable
-              onPress={handleLike}
-              hitSlop={8}
-              style={({ pressed }) => [styles.socialAction, pressed && styles.pressedSocial]}
-            >
-              <Heart
-                size={16}
-                color={liked ? theme.error : theme.textSecondary}
-                fill={liked ? theme.error : 'none'}
-              />
-              <ThemedText variant="caption" style={[styles.socialText, { color: liked ? theme.error : theme.textSecondary }]}>
-               {likesCount} {likesCount === 1 ? 'like' : 'likes'}
-             </ThemedText>
-           </Pressable>
+            <LikeButton liked={liked} count={likesCount} onPress={handleLike} style={styles.socialAction} />
 
             <Pressable
               onPress={onPress}

@@ -1,7 +1,6 @@
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput, FeedbackStatus } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH } from '@/types';
-import { updateStreak } from './streak';
 
 // ---------------------------------------------------------------------------
 // RPC row types — matches the column aliases returned by the SECURITY DEFINER
@@ -192,12 +191,16 @@ export const MAX_SESSION_DURATION_MINUTES = 7 * 24 * 60; // 10080 minutes
 export const MIN_SESSION_PARTICIPANTS = 1;
 export const MAX_SESSION_PARTICIPANTS = 50;
 
-// Maximum future date for session: end of day, 7 days from now (inclusive)
-const now = new Date();
-const maxDate = new Date(now);
-maxDate.setDate(maxDate.getDate() + 7);
-maxDate.setHours(23, 59, 59, 999);
-export const MAX_SESSION_FUTURE_DATE = maxDate.toISOString();
+/**
+ * Latest allowed session start: end of the day 7 days from NOW (inclusive). Computed on every
+ * call - a module-level constant went stale when the app stayed open for days.
+ */
+export function getMaxSessionFutureDate(): Date {
+  const max = new Date();
+  max.setDate(max.getDate() + 7);
+  max.setHours(23, 59, 59, 999);
+  return max;
+}
 
 export async function createSession(
   userId: string,
@@ -220,7 +223,10 @@ export async function createSession(
   }
 
   const sessionDate = new Date(input.date_time);
-  const maxFutureDate = new Date(MAX_SESSION_FUTURE_DATE);
+  const maxFutureDate = getMaxSessionFutureDate();
+  if (sessionDate.getTime() < Date.now() - 60 * 1000) {
+    throw new Error('Pick a time in the future.');
+  }
   if (sessionDate > maxFutureDate) {
     throw new Error('Session cannot be scheduled more than 1 week in the future');
   }
@@ -245,12 +251,7 @@ export async function createSession(
 
   if (error) throw error;
 
-  // Update streak for the session creator
-  try {
-    await updateStreak(userId, 'session_created');
-  } catch (e) {
-    console.error('Failed to update streak for session creation:', e);
-  }
+  // Streak for the creator is updated server-side (migration 105 trigger).
 
   return { ...data, commitment_count: 0 };
 }
@@ -263,6 +264,16 @@ export async function fetchSessionCommitments(
   });
   if (error) throw error;
   return (data ?? []).map(rowToCommitment);
+}
+
+function mapCommitmentError(error: { message?: string } | null): Error {
+  const msg = error?.message ?? '';
+  if (msg.includes('SESSION_FULL')) return new Error('This session is full.');
+  if (msg.includes('SESSION_NOT_OPEN')) return new Error('This session is no longer open.');
+  if (msg.includes('CANNOT_JOIN_OWN_SESSION')) return new Error('You cannot join your own session.');
+  if (msg.includes('FEEDBACK_NOT_ALLOWED')) return new Error('Feedback can only be given after the session has ended.');
+  if (msg.includes('NOT_ALLOWED')) return new Error('You are not allowed to do that.');
+  return error as Error;
 }
 
 export async function commitToSession(
@@ -302,7 +313,7 @@ export async function commitToSession(
     .select()
     .single();
 
-  if (error) throw error;
+  if (error) throw mapCommitmentError(error);
 
   return data;
 }
@@ -339,7 +350,7 @@ export async function approveCommitment(
     .update({ status: 'accepted' })
     .eq('id', commitmentId);
 
-  if (error) throw error;
+  if (error) throw mapCommitmentError(error);
 
   if (sessionRow?.max_participants != null) {
     const countMap = await fetchAcceptedCounts([commitment.session_id]);
@@ -352,12 +363,7 @@ export async function approveCommitment(
     }
   }
 
-  // Update streak for the user whose commitment was accepted (they're attending)
-  try {
-    await updateStreak(commitment.user_id, 'session_joined');
-  } catch (e) {
-    console.error('Failed to update streak for session join:', e);
-  }
+  // The participant's streak is updated server-side when the commitment is accepted (migration 105).
 }
 
 export async function rejectCommitment(
@@ -408,52 +414,6 @@ export async function uncommitFromSession(sessionId: string, userId: string): Pr
       if (statusError) console.error('Failed to reopen session:', statusError);
     }
   }
-}
-
-export async function fetchUserSessions(
-  userId: string,
-): Promise<Session[]> {
-  await closeExpiredSessions(userId);
-
-  const { data: committedRows, error: committedError } = await supabase
-    .from('commitments')
-    .select('session_id')
-    .eq('user_id', userId)
-    .eq('status', 'accepted');
-
-  if (committedError) throw committedError;
-
-  const committedIds = (committedRows ?? []).map((c) => c.session_id);
-
-  let query = supabase
-    .from('sessions')
-    .select(`
-      *,
-      commitments:commitments (id, user_id, status)
-    `);
-
-  if (committedIds.length > 0) {
-    query = query.or(
-      `created_by.eq.${userId},and(status.in.(open,full),id.in.(${committedIds.join(',')}))`,
-    );
-  } else {
-    query = query.eq('created_by', userId);
-  }
-
-  const { data, error } = await query.order('date_time', { ascending: true });
-
-  if (error) throw error;
-
-  const sessions = data ?? [];
-  const [countMap, creatorMap] = await Promise.all([
-    fetchAcceptedCounts(sessions.map((s) => s.id)),
-    resolveCreatorProfiles(sessions),
-  ]);
-
-  return sessions.map((row) => {
-    const enriched = { ...row, creator: creatorMap.get(row.created_by) ?? null };
-    return normalizeSession(enriched as SessionRow, userId, countMap[row.id] ?? 0);
-  });
 }
 
 export async function deleteSession(sessionId: string, userId: string): Promise<void> {
@@ -697,6 +657,6 @@ export async function submitSessionFeedback(
   );
 
   for (const result of results) {
-    if (result.error) throw result.error;
+    if (result.error) throw mapCommitmentError(result.error);
   }
 }

@@ -1,15 +1,15 @@
+import { TipCard } from '@/components/TipCard';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { PressableScale } from '@/components/motion/PressableScale';
+import { SessionCardSkeleton, SkeletonList } from '@/components/skeletons';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { haptics } from '@/lib/haptics';
+import { Sheet } from '@/components/motion/Sheet';
 import { router, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
 
@@ -27,6 +27,7 @@ import type { Session, SessionStatus } from '@/types';
 import { formatSessionPurpose, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 import { fetchPendingFeedbackSessions, getRemainingTime } from '@/services/sessions';
 import type { PendingFeedbackSession } from '@/services/sessions';
+import { HScrollView } from '@/components/HScrollView';
 
 function formatSessionDate(dateString: string) {
   const date = new Date(dateString);
@@ -82,10 +83,7 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
   const isActive = session.status === 'open' || session.status === 'full';
 
   return (
-    <Pressable
-      onPress={onPress}
-      style={({ pressed }) => [{ opacity: pressed ? 0.85 : 1 }]}
-    >
+    <PressableScale scaleTo={0.98} onPress={onPress}>
       <Card style={styles.sessionCard}>
         <View style={styles.cardTop}>
           <ThemedText variant="heading" style={styles.purposeName} numberOfLines={1}>
@@ -176,7 +174,7 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
           </ThemedText>
         </View>
       </Card>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -191,8 +189,12 @@ function FilterChip({
 }) {
   const theme = useTheme();
   return (
-    <Pressable
-      onPress={onPress}
+    <PressableScale
+      onPress={() => {
+        if (!selected) haptics.selection();
+        onPress();
+      }}
+      scaleTo={0.94}
       style={[
         styles.chip,
         { backgroundColor: selected ? theme.text : theme.backgroundElement, borderColor: theme.border },
@@ -204,7 +206,7 @@ function FilterChip({
       >
         {label}
       </ThemedText>
-    </Pressable>
+    </PressableScale>
   );
 }
 
@@ -284,13 +286,14 @@ export default function SessionsScreen() {
   const listLoading = isHistory ? historyLoading : loading;
   const listRefreshing = isHistory ? historyRefreshing : refreshing;
   const onRefresh = isHistory ? refreshHistory : refresh;
+  const firstLoad = useFirstLoad(listLoading);
 
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.container}>
         {!isHistory && (
           <View style={styles.filterBar}>
-            <ScrollView
+            <HScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.chipsRow}
@@ -329,12 +332,12 @@ export default function SessionsScreen() {
                   strokeWidth={2.5}
                 />
               </Pressable>
-            </ScrollView>
+            </HScrollView>
           </View>
         )}
 
         {listLoading && !listRefreshing ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={SessionCardSkeleton} count={4} style={{ padding: Spacing.md }} />
         ) : (
           <FlatList
             data={listData}
@@ -345,10 +348,12 @@ export default function SessionsScreen() {
             ]}
             showsVerticalScrollIndicator={false}
             refreshControl={
-              <RefreshControl refreshing={listRefreshing} onRefresh={onRefresh} tintColor={theme.text} />
+              <ThemedRefreshControl refreshing={listRefreshing} onRefresh={onRefresh} />
             }
             ListHeaderComponent={
-              (isHistory || scope === 'all') ? (
+              <>
+              <TipCard id="sessions" />
+              {(isHistory || scope === 'all') ? (
                 <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                   <View style={styles.statItem}>
                     <ThemedText variant="heading" style={{ fontWeight: '700' }}>
@@ -364,15 +369,19 @@ export default function SessionsScreen() {
                     <ThemedText variant="caption" muted>Completed</ThemedText>
                   </View>
                 </View>
-              ) : null
+              ) : null}
+              </>
             }
             ItemSeparatorComponent={() => <View style={{ height: Spacing.sm }} />}
             ListEmptyComponent={
               !listRefreshing ? (
-                <View style={styles.empty}>
-                  <View style={styles.emptyIcon}>
-                    <Calendar size={48} color={theme.textSecondary} strokeWidth={1.5} />
-                  </View>
+                <EmptyReveal
+                  style={styles.empty}
+                  icon={
+                    <View style={styles.emptyIcon}>
+                      <Calendar size={48} color={theme.textSecondary} strokeWidth={1.5} />
+                    </View>
+                  }>
                   {!isHistory ? (
                     scope === 'all' ? (
                       <>
@@ -418,17 +427,19 @@ export default function SessionsScreen() {
                       </ThemedText>
                     </>
                   )}
-                </View>
+                </EmptyReveal>
               ) : null
             }
-            renderItem={({ item }) => (
-              <SessionCard
-                session={item}
-                onPress={() => {
-                  setSelectedSessionId(item.id);
-                  setSelectedSessionData(item);
-                }}
-              />
+            renderItem={({ item, index }) => (
+              <FadeInItem index={index} animate={firstLoad}>
+                <SessionCard
+                  session={item}
+                  onPress={() => {
+                    setSelectedSessionId(item.id);
+                    setSelectedSessionData(item);
+                  }}
+                />
+              </FadeInItem>
             )}
           />
         )}
@@ -461,23 +472,18 @@ export default function SessionsScreen() {
         }}
       />
 
-      <Modal
-        transparent
+      <Sheet
         visible={showPurposeModal}
-        animationType="fade"
-        onRequestClose={() => setShowPurposeModal(false)}
+        onClose={() => setShowPurposeModal(false)}
+        maxHeight="70%"
+        style={{
+          backgroundColor: theme.background,
+          borderColor: theme.border,
+          borderTopWidth: 1,
+          paddingHorizontal: Spacing.lg,
+          paddingBottom: Spacing.xl,
+        }}
       >
-        <View style={styles.modalOverlay}>
-          <Pressable
-            style={StyleSheet.absoluteFill}
-            onPress={() => setShowPurposeModal(false)}
-          />
-          <View
-            style={[
-              styles.pickerSheet,
-              { backgroundColor: theme.background, borderColor: theme.border },
-            ]}
-          >
             <ThemedText variant="label" style={styles.pickerTitle}>
               Filter by purpose
             </ThemedText>
@@ -530,9 +536,7 @@ export default function SessionsScreen() {
                 </Pressable>
               ))}
             </ScrollView>
-          </View>
-        </View>
-      </Modal>
+      </Sheet>
     </View>
   );
 }
@@ -585,20 +589,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     gap: 4,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
-    justifyContent: 'flex-end',
-  },
-  pickerSheet: {
-    borderTopLeftRadius: Radius.lg,
-    borderTopRightRadius: Radius.lg,
-    borderTopWidth: 1,
-    paddingTop: Spacing.md,
-    paddingHorizontal: Spacing.lg,
-    paddingBottom: Spacing.xl,
-    maxHeight: '70%',
   },
   pickerTitle: {
     marginBottom: Spacing.sm,
@@ -708,7 +698,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
-    elevation: 3,
+    elevation: 0,
   },
   statItem: {
     flex: 1,

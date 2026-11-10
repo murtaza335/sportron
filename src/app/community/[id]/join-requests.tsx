@@ -1,13 +1,12 @@
+import Animated, { FadeIn, FadeOutRight } from 'react-native-reanimated';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { NotificationRowSkeleton, SkeletonList } from '@/components/skeletons';
+import { haptics } from '@/lib/haptics';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { useCallback, useEffect, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { Check, ChevronLeft, UserPlus, X } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
@@ -19,6 +18,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { supabase } from '@/lib/supabase';
 import { fetchJoinRequests, respondToJoinRequest } from '@/services/communities';
 import type { CommunityJoinRequest } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function CommunityJoinRequestsScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -84,8 +85,11 @@ export default function CommunityJoinRequestsScreen() {
     setProcessingId(request.id);
     try {
       await respondToJoinRequest(request.id, status);
+      if (status === 'approved') haptics.success();
+      else haptics.warning();
       setJoinRequests((prev) => prev.filter((r) => r.id !== request.id));
     } catch (e: any) {
+      haptics.error();
       alert('Error', e?.message ?? 'Failed to respond.');
     } finally {
       setProcessingId(null);
@@ -99,7 +103,7 @@ export default function CommunityJoinRequestsScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginRight: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -119,24 +123,28 @@ export default function CommunityJoinRequestsScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.content}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={handleRefresh} tintColor={theme.text} />
+          <ThemedRefreshControl refreshing={refreshing} onRefresh={handleRefresh} />
         }
       >
         {loading ? (
-          <ActivityIndicator color={theme.text} style={styles.loader} />
+          <SkeletonList Item={NotificationRowSkeleton} count={4} style={{ padding: Spacing.md }} />
         ) : joinRequests.length === 0 ? (
-          <View style={styles.empty}>
-            <UserPlus size={40} color={theme.textSecondary} strokeWidth={1.5} />
+          <EmptyReveal style={styles.empty} icon={<UserPlus size={40} color={theme.textSecondary} strokeWidth={1.5} />}>
             <ThemedText variant="body" muted style={{ fontWeight: '600' }}>
               No pending requests
             </ThemedText>
             <ThemedText variant="caption" muted style={{ textAlign: 'center' }}>
               When someone requests to join this community, they&apos;ll show up here
             </ThemedText>
-          </View>
+          </EmptyReveal>
         ) : (
           joinRequests.map((req) => (
-            <Card key={req.id} style={styles.requestCard}>
+            <Animated.View
+              key={req.id}
+              layout={LayoutShift}
+              entering={FadeIn.duration(Duration.base).reduceMotion(RM)}
+              exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
+            <Card style={styles.requestCard}>
               <View style={styles.requestInfo}>
                 <UserAvatar avatarUrl={req.profile?.avatar_url} size={36} />
                 <View style={styles.memberInfo}>
@@ -185,6 +193,7 @@ export default function CommunityJoinRequestsScreen() {
                 )}
               </View>
             </Card>
+            </Animated.View>
           ))
         )}
       </ScrollView>

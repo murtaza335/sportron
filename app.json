@@ -6,10 +6,9 @@
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "t3s",
-    "userInterfaceStyle": "light",
+    "userInterfaceStyle": "automatic",
     "ios": {
-      "icon": "./assets/images/icon.png",
-      "googleServicesFile": "./GoogleService-Info.plist"
+      "icon": "./assets/images/icon.png"
     },
     "android": {
       "softwareKeyboardLayoutMode": "resize",
@@ -41,7 +40,7 @@
       [
         "expo-notifications",
         {
-          "icon": "./assets/images/icon-512.png",
+          "icon": "./assets/images/android-icon-monochrome.png",
           "color": "#000000"
         }
       ],

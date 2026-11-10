@@ -1,6 +1,9 @@
+import Animated, { FadeInDown } from 'react-native-reanimated';
+import { Duration, RM, STAGGER_MS } from '@/lib/motion';
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useRouter } from 'expo-router';
 import { useState } from 'react';
-import { KeyboardAvoidingView, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -41,7 +44,7 @@ export default function OnboardingScreen() {
 
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]}>
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         keyboardVerticalOffset={0}>
@@ -51,22 +54,22 @@ export default function OnboardingScreen() {
           showsVerticalScrollIndicator={false}>
           
           {/* Minimal Header */}
-          <View style={styles.header}>
+          <Animated.View entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.header}>
             <ThemedText variant="title" style={styles.title}>
               Create Profile
             </ThemedText>
             <ThemedText variant="body" muted style={styles.subtitle}>
               Set up your information to get started with matches and leaderboards.
             </ThemedText>
-          </View>
+          </Animated.View>
 
           {/* Form Section */}
-          <View style={styles.formContainer}>
+          <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)} style={styles.formContainer}>
             <ProfileForm submitLabel="Get Started" loading={loading} onSubmit={handleSubmit} />
-          </View>
+          </Animated.View>
 
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

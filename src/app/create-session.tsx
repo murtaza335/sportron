@@ -1,16 +1,14 @@
+import { PressableScale } from '@/components/motion/PressableScale';
+import { haptics } from '@/lib/haptics';
+import { CharCounter } from '@/components/motion/CharCounter';
+import { FocusTextInput } from '@/components/motion/FocusTextInput';
+import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker';
+import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { useRouter } from 'expo-router';
 import { CalendarDays, Clock, Timer, X } from 'lucide-react-native';
 import { useRef, useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  ScrollView,
-  StyleSheet,
-  TextInput,
-  View,
-} from 'react-native';
+import { Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
@@ -23,12 +21,24 @@ import { useTheme } from '@/hooks/use-theme';
 import {
   checkTimeConflicts,
   createSession,
-  MAX_SESSION_FUTURE_DATE,
+  getMaxSessionFutureDate,
   MAX_SESSION_PARTICIPANTS,
   MIN_SESSION_PARTICIPANTS,
 } from '@/services/sessions';
 import type { CreateSessionInput, SessionPurpose } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
+import { goBack } from '@/lib/nav';
+import { HScrollView } from '@/components/HScrollView';
+
+function combineDateAndTime(date: Date, time: Date): Date {
+  return new Date(
+    date.getFullYear(),
+    date.getMonth(),
+    date.getDate(),
+    time.getHours(),
+    time.getMinutes(),
+  );
+}
 
 export default function CreateSessionScreen() {
   const theme = useTheme();
@@ -50,7 +60,7 @@ export default function CreateSessionScreen() {
   const [saving, setSaving] = useState(false);
   const [conflicts, setConflicts] = useState<{ purpose: string; date_time: string; location: string }[]>([]);
 
-  const MAX_DATE = new Date(MAX_SESSION_FUTURE_DATE);
+  const MAX_DATE = getMaxSessionFutureDate();
 
   const EXPIRE_OPTIONS = [
     { label: '30 min', value: 30 },
@@ -106,9 +116,11 @@ export default function CreateSessionScreen() {
       selectedTime.getMinutes(),
     ).toISOString();
 
-    const maxDate = new Date();
-    maxDate.setDate(maxDate.getDate() + 7);
-    if (new Date(dateTime) > maxDate) {
+    if (new Date(dateTime).getTime() < Date.now() - 60 * 1000) {
+      alert('Invalid time', 'Pick a time in the future.');
+      return;
+    }
+    if (new Date(dateTime) > getMaxSessionFutureDate()) {
       alert('Invalid Date', 'Session date cannot be more than 7 days in the future.');
       return;
     }
@@ -147,7 +159,7 @@ export default function CreateSessionScreen() {
       };
 
       await createSession(user.id, input);
-      router.back();
+      goBack(router, '/history');
     } catch (e) {
       alert('Error', 'Failed to create session. Please try again.');
       console.error('Create session error:', e);
@@ -159,14 +171,14 @@ export default function CreateSessionScreen() {
   return (
     <SafeAreaView style={[styles.safe, { backgroundColor: theme.background }]} edges={['top']}>
       <View style={[styles.header, { borderBottomColor: theme.border }]}>
-        <Pressable onPress={() => router.back()} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+        <Pressable onPress={() => goBack(router, '/history')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
           <X size={24} color={theme.text} strokeWidth={2} />
         </Pressable>
         <ThemedText variant="heading">New Session</ThemedText>
         <View style={{ width: 24 }} />
       </View>
 
-      <KeyboardAvoidingView
+      <KeyboardAvoider
         style={styles.flex}
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       >
@@ -200,13 +212,17 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Purpose
             </ThemedText>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purposePicker}>
+            <HScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.purposePicker}>
               {SESSION_PURPOSES.map((p) => {
                 const selected = p === purpose;
                 return (
-                  <Pressable
+                  <PressableScale
                     key={p}
-                    onPress={() => setPurpose(p)}
+                    scaleTo={0.94}
+                    onPress={() => {
+                      if (!selected) haptics.selection();
+                      setPurpose(p);
+                    }}
                     style={[
                       styles.purposePill,
                       { borderColor: theme.border },
@@ -222,10 +238,10 @@ export default function CreateSessionScreen() {
                     >
                       {SESSION_PURPOSE_LABELS[p]}
                     </ThemedText>
-                  </Pressable>
+                  </PressableScale>
                 );
               })}
-            </ScrollView>
+            </HScrollView>
             {purpose === null && (
               <ThemedText variant="caption" muted style={styles.hintText}>
                 Select a purpose
@@ -237,7 +253,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Short Title
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={title}
               onChangeText={setTitle}
               placeholder="e.g. Evening doubles"
@@ -253,16 +269,14 @@ export default function CreateSessionScreen() {
               ]}
               autoFocus
             />
-            <ThemedText variant="caption" muted style={styles.hintText}>
-              {title.length}/{MAX_SESSION_TITLE_LENGTH} characters
-            </ThemedText>
+            <CharCounter count={title.length} max={MAX_SESSION_TITLE_LENGTH} style={styles.hintText} />
           </View>
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
               Location
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={location}
               onChangeText={setLocation}
               placeholder="e.g. Gym Hall, Court 3"
@@ -278,101 +292,122 @@ export default function CreateSessionScreen() {
             />
           </View>
 
+          {Platform.OS === 'web' ? (
+            // @react-native-community/datetimepicker has no web implementation: use a native
+            // datetime-local input (BUG-H7).
+            <View style={styles.field}>
+              <ThemedText variant="label" muted style={styles.label}>
+                Date & time
+              </ThemedText>
+              <DateTimeField
+                value={combineDateAndTime(selectedDate, selectedTime)}
+                onChange={(d) => {
+                  if (!d) return;
+                  setSelectedDate(d);
+                  setSelectedTime(d);
+                }}
+                clearable={false}
+                min={new Date()}
+                max={MAX_DATE}
+              />
+            </View>
+          ) : (
           <View style={styles.row}>
-            <View style={[styles.field, { flex: 1 }]}>
-              <ThemedText variant="label" muted style={styles.label}>
-                Date
-              </ThemedText>
-              <Pressable
-                onPress={() => {
-                  if (Date.now() - datePickerDismissedAt.current < 600) return;
-                  setShowDatePicker(true);
-                }}
-                style={[
-                  styles.input,
-                  styles.pickerButton,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <CalendarDays size={18} color={theme.textSecondary} />
-                <ThemedText variant="body">
-                  {selectedDate.toLocaleDateString('en-US', {
-                    month: 'short',
-                    day: 'numeric',
-                    year: 'numeric',
-                  })}
+              <View style={[styles.field, { flex: 1 }]}>
+                <ThemedText variant="label" muted style={styles.label}>
+                  Date
                 </ThemedText>
-              </Pressable>
-              {showDatePicker && (
-                <DateTimePicker
-                  value={selectedDate}
-                  mode="date"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  minimumDate={new Date()}
-                  maximumDate={MAX_DATE}
-                  onChange={(event: DateTimePickerEvent, date?: Date) => {
-                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
-                    if (Platform.OS === 'android') {
-                      setShowDatePicker(false);
-                      datePickerDismissedAt.current = Date.now();
-                    }
-
-                    if (event.type === 'dismissed') return;
-
-                    if (date) setSelectedDate(date);
+                <Pressable
+                  onPress={() => {
+                    if (Date.now() - datePickerDismissedAt.current < 600) return;
+                    setShowDatePicker(true);
                   }}
-                />
-              )}
-            </View>
-            <View style={[styles.field, { flex: 1 }]}>
-              <ThemedText variant="label" muted style={styles.label}>
-                Time
-              </ThemedText>
-              <Pressable
-                onPress={() => {
-                  if (Date.now() - timePickerDismissedAt.current < 600) return;
-                  setShowTimePicker(true);
-                }}
-                style={[
-                  styles.input,
-                  styles.pickerButton,
-                  {
-                    backgroundColor: theme.backgroundElement,
-                    borderColor: theme.border,
-                  },
-                ]}
-              >
-                <Clock size={18} color={theme.textSecondary} />
-                <ThemedText variant="body">
-                  {selectedTime.toLocaleTimeString('en-US', {
-                    hour: '2-digit',
-                    minute: '2-digit',
-                  })}
+                  style={[
+                    styles.input,
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <CalendarDays size={18} color={theme.textSecondary} />
+                  <ThemedText variant="body">
+                    {selectedDate.toLocaleDateString('en-US', {
+                      month: 'short',
+                      day: 'numeric',
+                      year: 'numeric',
+                    })}
+                  </ThemedText>
+                </Pressable>
+                {showDatePicker && (
+                  <DateTimePicker
+                    value={selectedDate}
+                    mode="date"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    minimumDate={new Date()}
+                    maximumDate={MAX_DATE}
+                    onChange={(event: DateTimePickerEvent, date?: Date) => {
+                      // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                      if (Platform.OS === 'android') {
+                        setShowDatePicker(false);
+                        datePickerDismissedAt.current = Date.now();
+                      }
+  
+                      if (event.type === 'dismissed') return;
+  
+                      if (date) setSelectedDate(date);
+                    }}
+                  />
+                )}
+              </View>
+              <View style={[styles.field, { flex: 1 }]}>
+                <ThemedText variant="label" muted style={styles.label}>
+                  Time
                 </ThemedText>
-              </Pressable>
-              {showTimePicker && (
-                <DateTimePicker
-                  value={selectedTime}
-                  mode="time"
-                  display={Platform.OS === 'ios' ? 'spinner' : 'default'}
-                  onChange={(event: DateTimePickerEvent, date?: Date) => {
-                    // Always close the picker on Android when an action occurs ('set' or 'dismissed')
-                    if (Platform.OS === 'android') {
-                      setShowTimePicker(false);
-                      timePickerDismissedAt.current = Date.now();
-                    }
-
-                    if (event.type === 'dismissed') return;
-
-                    if (date) setSelectedTime(date);
+                <Pressable
+                  onPress={() => {
+                    if (Date.now() - timePickerDismissedAt.current < 600) return;
+                    setShowTimePicker(true);
                   }}
-                />
-              )}
+                  style={[
+                    styles.input,
+                    styles.pickerButton,
+                    {
+                      backgroundColor: theme.backgroundElement,
+                      borderColor: theme.border,
+                    },
+                  ]}
+                >
+                  <Clock size={18} color={theme.textSecondary} />
+                  <ThemedText variant="body">
+                    {selectedTime.toLocaleTimeString('en-US', {
+                      hour: '2-digit',
+                      minute: '2-digit',
+                    })}
+                  </ThemedText>
+                </Pressable>
+                {showTimePicker && (
+                  <DateTimePicker
+                    value={selectedTime}
+                    mode="time"
+                    display={Platform.OS === 'ios' ? 'spinner' : 'default'}
+                    onChange={(event: DateTimePickerEvent, date?: Date) => {
+                      // Always close the picker on Android when an action occurs ('set' or 'dismissed')
+                      if (Platform.OS === 'android') {
+                        setShowTimePicker(false);
+                        timePickerDismissedAt.current = Date.now();
+                      }
+  
+                      if (event.type === 'dismissed') return;
+  
+                      if (date) setSelectedTime(date);
+                    }}
+                  />
+                )}
+              </View>
             </View>
-          </View>
+          )}
           {Platform.OS === 'ios' && (showDatePicker || showTimePicker) && (
             <Pressable
               onPress={() => {
@@ -392,7 +427,7 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Max Participants
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={maxParticipants}
               onChangeText={handleParticipantsChange}
               placeholder="2"
@@ -416,15 +451,19 @@ export default function CreateSessionScreen() {
             <ThemedText variant="label" muted style={styles.label}>
               Duration
             </ThemedText>
-            <ScrollView
+            <HScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
               contentContainerStyle={styles.expireRow}
             >
               {EXPIRE_OPTIONS.map((opt, idx) => (
-                <Pressable
+                <PressableScale
                   key={opt.value}
-                  onPress={() => setExpireIndex(idx)}
+                  scaleTo={0.94}
+                  onPress={() => {
+                    if (idx !== expireIndex) haptics.selection();
+                    setExpireIndex(idx);
+                  }}
                   style={[
                     styles.expireChip,
                     {
@@ -443,16 +482,16 @@ export default function CreateSessionScreen() {
                   >
                     {opt.label}
                   </ThemedText>
-                </Pressable>
+                </PressableScale>
               ))}
-            </ScrollView>
+            </HScrollView>
           </View>
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
               Description (optional)
             </ThemedText>
-            <TextInput
+            <FocusTextInput
               value={description}
               onChangeText={setDescription}
               placeholder="Any additional info..."
@@ -480,7 +519,7 @@ export default function CreateSessionScreen() {
             buttonStyle={styles.submit}
           />
         </ScrollView>
-      </KeyboardAvoidingView>
+      </KeyboardAvoider>
     </SafeAreaView>
   );
 }

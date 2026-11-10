@@ -1,5 +1,5 @@
 import { Session, User } from '@supabase/supabase-js';
-import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
 import { supabase } from '@/lib/supabase';
 import { fetchOwnProfile, reEnableAccount } from '@/services/profiles';
@@ -11,6 +11,8 @@ type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
   profileLoading: boolean;
+  /** True when the last profile fetch FAILED (offline / 5xx) - not the same as "no profile yet". */
+  profileError: boolean;
   refreshProfile: () => Promise<void>;
 };
 
@@ -21,6 +23,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [profile, setProfile] = useState<Profile | null>(null);
   const [loading, setLoading] = useState(true);
   const [profileLoading, setProfileLoading] = useState(false);
+  const [profileError, setProfileError] = useState(false);
+  // Latest signed-in user id; results for a previous user (fast logout/login) are ignored.
+  const currentUserIdRef = useRef<string | null>(null);
 
   const loadProfile = useCallback(async (userId: string) => {
     setProfileLoading(true);
@@ -30,11 +35,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await reEnableAccount(userId);
         data.deleted_at = null;
       }
+      if (currentUserIdRef.current !== userId) return;
       setProfile(data);
+      setProfileError(false);
     } catch (error) {
       console.error('Failed to load profile:', error);
+      // Do NOT treat a failed fetch as "no profile": the root layout would send an existing
+      // user to onboarding. Surface it so a retry screen can be shown.
+      if (currentUserIdRef.current === userId) setProfileError(true);
     } finally {
-      setProfileLoading(false);
+      if (currentUserIdRef.current === userId) setProfileLoading(false);
     }
   }, []);
 
@@ -47,17 +57,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
+      currentUserIdRef.current = currentSession?.user.id ?? null;
       setSession(currentSession);
       setLoading(false);
     });
 
-    const { data: authListener } = supabase.auth.onAuthStateChange((_event, nextSession) => {
+    const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
+      currentUserIdRef.current = nextSession?.user.id ?? null;
       setSession(nextSession);
 
       if (nextSession?.user.id) {
-        loadProfile(nextSession.user.id);
+        // Hourly token refreshes do not change the profile: skip the reload.
+        if (event !== 'TOKEN_REFRESHED') {
+          loadProfile(nextSession.user.id);
+        }
       } else {
         setProfile(null);
+        setProfileError(false);
+        setProfileLoading(false);
       }
     });
 
@@ -73,9 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       profile,
       loading,
       profileLoading,
+      profileError,
       refreshProfile,
     }),
-    [session, profile, loading, profileLoading, refreshProfile],
+    [session, profile, loading, profileLoading, profileError, refreshProfile],
   );
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

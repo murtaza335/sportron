@@ -1,14 +1,14 @@
+import Animated, { FadeOutRight } from 'react-native-reanimated';
+import { FadeInItem } from '@/components/motion/FadeInItem';
+import { useFirstLoad } from '@/hooks/useFirstLoad';
+import { EmptyReveal } from '@/components/motion/EmptyReveal';
+import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
+import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ChevronLeft, Clock } from 'lucide-react-native';
 import { useCallback, useState } from 'react';
-import {
-  ActivityIndicator,
-  Pressable,
-  RefreshControl,
-  ScrollView,
-  StyleSheet,
-  View,
-} from 'react-native';
+import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 
 import { ThemedText } from '@/components/ui/Text';
 import { MatchCard } from '@/components/MatchCard';
@@ -18,6 +18,8 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { fetchCommunityMatches } from '@/services/communities';
 import type { CommunityMatch, MatchWithProfiles } from '@/types';
+import { goBack } from '@/lib/nav';
+import type { Href } from 'expo-router';
 
 export default function PendingMatchesScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
@@ -25,6 +27,7 @@ export default function PendingMatchesScreen() {
   const { user } = useAuth();
   const [matches, setMatches] = useState<CommunityMatch[]>([]);
   const [loading, setLoading] = useState(true);
+  const firstLoad = useFirstLoad(loading);
   const [refreshing, setRefreshing] = useState(false);
   const [selectedMatch, setSelectedMatch] = useState<MatchWithProfiles | null>(null);
   const [matchPopupVisible, setMatchPopupVisible] = useState(false);
@@ -112,7 +115,7 @@ export default function PendingMatchesScreen() {
     headerTitleStyle: { color: theme.text },
     headerLeft: () => (
       <Pressable
-        onPress={() => router.back()}
+        onPress={() => goBack(router, `/community/${id}` as Href)}
         hitSlop={12}
         style={({ pressed }) => [
           { marginLeft: 8, width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
@@ -128,7 +131,7 @@ export default function PendingMatchesScreen() {
     return (
       <View style={[styles.safe, { backgroundColor: theme.background }]}>
         <Stack.Screen options={{ ...themedHeader, headerTitle: () => <ThemedText style={{ fontSize: 18, fontWeight: '700', color: theme.text }}>{'Pending Matches'}</ThemedText> }} />
-        <ActivityIndicator color={theme.text} style={styles.loader} />
+        <SkeletonList Item={FeedItemSkeleton} count={3} style={{ padding: Spacing.lg }} />
       </View>
     );
   }
@@ -150,34 +153,38 @@ export default function PendingMatchesScreen() {
         style={styles.scroll}
         contentContainerStyle={styles.scrollContent}
         refreshControl={
-          <RefreshControl
+          <ThemedRefreshControl
             refreshing={refreshing}
             onRefresh={onRefresh}
-            tintColor={theme.text}
           />
         }
       >
         {matches.length === 0 ? (
-          <View style={styles.emptyState}>
-            <Clock size={48} color={theme.textSecondary} strokeWidth={1.5} />
+          <EmptyReveal style={styles.emptyState} icon={<Clock size={48} color={theme.textSecondary} strokeWidth={1.5} />}>
             <ThemedText variant="heading" style={{ marginTop: Spacing.md, color: theme.textSecondary }}>
               {'No Pending Matches'}
             </ThemedText>
             <ThemedText variant="body" muted style={{ marginTop: Spacing.xs, textAlign: 'center', paddingHorizontal: Spacing.lg, color: theme.textSecondary }}>
               {'You have no pending matches to review.'}
             </ThemedText>
-          </View>
+          </EmptyReveal>
         ) : (
           <View style={styles.list}>
-            {matches.map((match) => (
-              <MatchCard
+            {matches.map((match, index) => (
+              <Animated.View
                 key={match.id}
-                match={toMatchWithProfiles(match)}
-                currentUserId={user?.id}
-                showYoursBadge={false}
-                communityId={id}
-                onPress={() => handleMatchPress(match)}
-              />
+                layout={LayoutShift}
+                exiting={FadeOutRight.duration(Duration.base).reduceMotion(RM)}>
+                <FadeInItem index={index} animate={firstLoad}>
+                <MatchCard
+                  match={toMatchWithProfiles(match)}
+                  currentUserId={user?.id}
+                  showYoursBadge={false}
+                  communityId={id}
+                  onPress={() => handleMatchPress(match)}
+                />
+                </FadeInItem>
+              </Animated.View>
             ))}
           </View>
         )}
