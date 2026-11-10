@@ -6,6 +6,7 @@ import { AuthCallback } from './pages/AuthCallback';
 import { NotAuthorized } from './pages/NotAuthorized';
 import { Overview } from './pages/Overview';
 import { Settings } from './pages/Settings';
+import { Staff } from './pages/Staff';
 import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
@@ -34,7 +35,14 @@ export const router = createBrowserRouter([
       { path: 'tournaments', element: <Tournaments /> },
       { path: 'tournaments/new', element: <TournamentNew /> },
       { path: 'tournaments/:id', element: <TournamentDetail /> },
-      // The staff page is added in the next step.
+      {
+        path: 'staff',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Staff />
+          </RequireRole>
+        ),
+      },
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
