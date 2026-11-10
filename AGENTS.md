@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 121 (next = 122) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 121 (next = 125) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -220,6 +220,12 @@ supabase/
 - **Realtime**: `useTournamentModule` subscribes to `tournament_matches` (module filter, 400 ms debounce) so the bracket updates live
 - **Notifications** (088): 6 `tournament_*` types created by triggers (only while the tournament is `published`, except admin-assigned); push via the existing `trg_fcm_push`; tap → module/tournament screen. Optional pref `tournament_updates`
 - **Admin UI**: gear on tournament/module pages → manage screens (entry-form editor, module form, seeding, rounds); results via the match sheet (Enter/Edit result, Schedule, Reset)
+
+### 11. Admin panel (migrations 122–124; plan in [`docs/admin-panel/PLAN.md`](docs/admin-panel/PLAN.md))
+- Separate staff-only website in `admin/` (Vite + React SPA, own Vercel project, NOT part of the Expo build; excluded from root tsconfig/ESLint). Replaces the owner SQL runbooks (`owner-sql.md`, `maintainence-toggle.txt` are now emergency fallbacks)
+- **The database is the gate**: `platform_admins` (122; roles `super_admin` | `tournament_manager`, soft revoke, no client policies) + internal `platform_role` / `assert_platform_role` / `log_admin_action`. Every `admin_*` function (SECURITY DEFINER, `revoke … from public, anon`, `grant … to authenticated`) starts with `assert_platform_role(...)`. Staff roles grant **no** in-app powers; you can't change/revoke your own role
+- 123: `admin_get_site_config` / `admin_set_maintenance` / `admin_set_min_app_version` (same JSON shapes `RootLayout` reads). 124: tournament ops (`admin_list/get/create/update_tournament`, `admin_set_tournament_status`, add/remove admin, `admin_reopen_module`, `admin_delete_tournament` — super only). Writes log via `log_admin_action` (`metadata.admin = true`)
+- Tests: `docs/admin-panel/sql-tests.sql` (run via `docs/tournaments/local-db/run.sh`). Adding a role (e.g. `moderator`) = additive change to the role check constraint
 
 ---
 
@@ -368,7 +374,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **122**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **125**
 
 ### Server-side hardening (migrations 098–119 — see `bugreport.md`)
 - **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.

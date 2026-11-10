@@ -1,5 +1,7 @@
 # Tournaments — owner SQL guide
 
+> **Superseded by the admin panel** (`admin/`, see docs/admin-panel/PLAN.md). Use the panel for day-to-day work; this SQL stays as an emergency fallback only.
+
 Run these in the **Supabase SQL editor** (service role / postgres). Tournaments and tournament admins
 can only be created here — there is no in-app way, by design.
 
