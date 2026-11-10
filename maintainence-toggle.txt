@@ -1,3 +1,4 @@
+-- Superseded by the admin panel (Settings -> Maintenance). Keep this SQL as an emergency fallback only.
 -- Enable
 UPDATE site_config SET value = '{"enabled": true, "message": "Back in ~30 min."}' WHERE key = 'maintenance';
 

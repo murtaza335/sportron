@@ -1,6 +1,6 @@
 # Sportron Admin Panel — v1 Plan: replace the SQL runbooks
 
-Status: **draft, not started**. Next migration number at time of writing: **122**.
+Status: **implemented in code (migrations 122–124 + `admin/` site); not yet deployed or applied to the live project.** Next migration number: **125**.
 
 v1 is a small, separate website (`admin.sportron.app`) where the Sportron team does what it currently
 does by pasting SQL into the Supabase editor. Nothing more. Moderation (reports, bans) comes later
