@@ -5,6 +5,7 @@ import { Login } from './pages/Login';
 import { AuthCallback } from './pages/AuthCallback';
 import { NotAuthorized } from './pages/NotAuthorized';
 import { Overview } from './pages/Overview';
+import { Settings } from './pages/Settings';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -19,7 +20,15 @@ export const router = createBrowserRouter([
     ),
     children: [
       { index: true, element: <Overview /> },
-      // Pages for tournaments, settings and staff are added in the next steps.
+      {
+        path: 'settings',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Settings />
+          </RequireRole>
+        ),
+      },
+      // Pages for tournaments and staff are added in the next steps.
       { path: '*', element: <Navigate to="/" replace /> },
     ],
   },
