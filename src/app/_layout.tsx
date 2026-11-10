@@ -25,6 +25,7 @@ import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { removeFCMToken } from '@/services/profiles';
 import { removeWebPushToken } from '@/utils/pushNotifications';
 import { Duration } from '@/lib/motion';
+import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
 import { isVersionSatisfied } from '@/services/config';
@@ -214,6 +215,7 @@ function RootNavigator() {
       </Stack>
       <ConfettiHost />
       <ToastHost />
+      {Platform.OS === 'web' && <AlertHost />}
       {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
       {Platform.OS === 'web' && session && profile && <InstallPrompt />}
     </KeyboardInsetView>
