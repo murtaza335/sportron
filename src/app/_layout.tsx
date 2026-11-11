@@ -200,7 +200,8 @@ function RootNavigator() {
         <Stack.Screen name="community/[id]" options={{ ...pushOptions, title: 'Community' }} />
         <Stack.Screen name="community/[id]/members" options={{ ...pushOptions, title: 'Members' }} />
         <Stack.Screen name="community/[id]/info" options={{ ...pushOptions, title: 'Community Info' }} />
-        <Stack.Screen name="community/[id]/pending-matches" options={{ ...pushOptions, title: 'Pending Matches' }} />
+        <Stack.Screen name="community/[id]/join-requests" options={{ ...pushOptions, title: 'Join Requests' }} />
+        <Stack.Screen name="community/[id]/pending-matches"options={{ ...pushOptions, title: 'Pending Matches' }} />
         <Stack.Screen name="community/[id]/edit" options={{ ...pushOptions, title: 'Edit Community' }} />
         <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
