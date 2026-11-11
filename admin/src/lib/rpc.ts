@@ -36,7 +36,7 @@ export interface StaffRow {
   granted_at: string;
 }
 export interface SiteConfigRow {
-  key: 'maintenance' | 'min_app_version';
+  key: 'maintenance' | 'min_app_version' | 'recommended_app_version';
   value: Record<string, unknown>;
   updated_at: string | null;
 }
@@ -95,6 +95,21 @@ export interface TournamentPatch {
   ends_at?: string | null;
 }
 
+export interface FeatureFlagRow {
+  key: string;
+  enabled: boolean;
+  description: string | null;
+  min_app_version: string | null;
+  rollout_percent: number;
+  platforms: string[];
+  updated_at: string;
+}
+export interface RemoteConfigRow {
+  key: string;
+  value: unknown;
+  updated_at: string;
+}
+
 export type AnnouncementPlacement = 'app_open_modal' | 'home_banner' | 'tournaments_banner' | 'sessions_banner';
 export interface AnnouncementRow {
   id: string;
@@ -145,6 +160,21 @@ export const rpc = {
       p_store_url: storeUrl,
       p_message: message,
       p_note: note || null,
+    }),
+
+  listFlags: () => call<FeatureFlagRow[]>('admin_list_feature_flags'),
+  upsertFlag: (f: { key: string; enabled: boolean; rollout: number; minVersion: string; platforms: string[]; description: string }) =>
+    call<void>('admin_upsert_feature_flag', {
+      p_key: f.key, p_enabled: f.enabled, p_rollout_percent: f.rollout,
+      p_min_app_version: f.minVersion || null, p_platforms: f.platforms, p_description: f.description || null,
+    }),
+  deleteFlag: (key: string) => call<void>('admin_delete_feature_flag', { p_key: key }),
+  getRemoteConfig: () => call<RemoteConfigRow[]>('admin_get_remote_config'),
+  setRemoteConfig: (key: string, value: unknown, note?: string) =>
+    call<void>('admin_set_remote_config', { p_key: key, p_value: value, p_note: note || null }),
+  setRecommendedVersion: (version: string, storeUrl: string, message: string, note?: string) =>
+    call<void>('admin_set_recommended_app_version', {
+      p_version: version, p_store_url: storeUrl, p_message: message, p_note: note || null,
     }),
 
   listAnnouncements: () => call<AnnouncementRow[]>('admin_list_announcements'),

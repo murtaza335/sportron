@@ -33,6 +33,15 @@ const FIELD_LABELS: Record<string, string> = {
   platforms: 'Platforms must be android, ios or web.',
   max_shows: 'Max shows must be 1 or more.',
   data: 'Invalid request.',
+  key: 'Key is not valid (lowercase letters, digits, underscore) or not allowed.',
+  rollout_percent: 'Rollout must be 0–100.',
+  value: 'Value is required.',
+  sports: 'Sports list is invalid: each item needs key, label, kind (racket/team), tier (primary/more); keys must be unique and not "other".',
+  tips: 'Tips must be a JSON object keyed by tip id.',
+  whats_new: 'What\'s New must be {"version": "…", "items": [...]}.',
+  limits: 'Limits must be a JSON object.',
+  expire_options: 'Expire options must be a JSON array.',
+  session_purposes: 'Session purposes must be a JSON array.',
 };
 
 const CODES: Record<string, string> = {
