@@ -22,7 +22,7 @@ import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
 import { WebRefreshButton } from '@/components/WebRefreshButton';
-import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
+import { consumeReturnTo, clearReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { removeFCMToken } from '@/services/profiles';
 import { removeWebPushToken } from '@/utils/pushNotifications';
 import { Duration } from '@/lib/motion';
@@ -138,6 +138,9 @@ function RootNavigator() {
 
     if (session && profile && inAuthGroup) {
       router.replace(consumeReturnTo() ?? '/');
+    } else if (session && profile) {
+      // settled in the app: a leftover saved link must not hijack a later sign-in
+      clearReturnTo();
     }
   }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
 
