@@ -366,5 +366,6 @@ export type ModuleSettingsPatch = Partial<
     | 'group_count'
     | 'advance_per_group'
     | 'grand_final_reset'
+    | 'scoring_mode'
   >
 >;

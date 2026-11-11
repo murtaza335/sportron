@@ -186,6 +186,12 @@ export async function reorderEntryFields(tournamentId: string, ids: string[]): P
   await rpc<null>('reorder_tournament_entry_fields', { p_tournament: tournamentId, p_ids: ids });
 }
 
+/** Other / More sports carry their exact name + key (migration 126); known sports send nothing extra. */
+function sportDetailParams(input: ModuleFormInput): Record<string, string | null> {
+  if (input.sport !== 'other') return {};
+  return { p_custom_sport_name: input.custom_sport_name ?? null, p_sport_key: input.sport_key ?? null };
+}
+
 export async function createModule(tournamentId: string, input: ModuleFormInput): Promise<string> {
   return rpc<string>('create_tournament_module', {
     p_tournament: tournamentId,
@@ -198,6 +204,7 @@ export async function createModule(tournamentId: string, input: ModuleFormInput)
     p_max_entries: input.max_entries,
     p_third_place: input.third_place_match,
     p_seeding_method: input.seeding_method,
+    ...sportDetailParams(input),
   });
 }
 
@@ -213,6 +220,7 @@ export async function updateModule(moduleId: string, input: ModuleFormInput): Pr
     p_max_entries: input.max_entries,
     p_third_place: input.third_place_match,
     p_seeding_method: input.seeding_method,
+    ...sportDetailParams(input),
   });
 }
 
