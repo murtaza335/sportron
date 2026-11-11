@@ -22,7 +22,7 @@ end $$;
 
 do $$
 declare
-  v_ids uuid[]; v_sa uuid; v_user uuid; v_ann uuid; v_n int;
+  v_ids uuid[]; v_sa uuid; v_user uuid; v_ann uuid; v_n int; v_t uuid; v_m uuid; v_m2 uuid; v_d jsonb; v_c uuid;
 begin
   select array_agg(id) into v_ids from (select id from public.profiles where deleted_at is null order by created_at, id limit 3) s;
   v_sa := v_ids[1]; v_user := v_ids[2];
@@ -73,6 +73,51 @@ begin
   perform public.admin_set_remote_config('limits', '{"chat_max_length":800}');
   perform public.admin_set_recommended_app_version('1.0.9', 'https://play.google.com/x', 'Update!');
   perform rm_test.chk((select value->>'version' from public.site_config where key = 'recommended_app_version') = '1.0.9', 'recommended version saved');
+
+  -- ── 126 custom sport names + scoring mode ──
+  perform rm_test.as_user(v_sa);
+  v_t := public.admin_create_tournament('{"name":"Roadmap Cup"}'::jsonb);
+  perform public.admin_add_tournament_admin(v_t, v_user);
+  perform rm_test.as_user(v_user);
+  -- old-style 10-arg call still works (named params, no new ones)
+  v_m := public.create_tournament_module(p_tournament => v_t, p_name => 'Old style', p_sport => 'other', p_description => null,
+    p_rules_text => null, p_venue => null, p_starts_at => null, p_max_entries => null, p_third_place => false, p_seeding_method => 'manual');
+  perform rm_test.chk((select custom_sport_name is null from public.tournament_modules where id = v_m), 'old client: Other module without a name is allowed (switch off)');
+  v_m2 := public.create_tournament_module(p_tournament => v_t, p_name => 'Chess open', p_sport => 'other', p_description => null,
+    p_rules_text => null, p_venue => null, p_starts_at => null, p_max_entries => null, p_third_place => false, p_seeding_method => 'manual',
+    p_custom_sport_name => '  Chess  ', p_sport_key => 'chess');
+  perform rm_test.chk((select custom_sport_name = 'Chess' and sport_key = 'chess' from public.tournament_modules where id = v_m2), 'name trimmed, key stored');
+  perform rm_test.expect_err(format($q$select public.create_tournament_module(%L, 'Long', 'other', null, null, null, null, null, false, 'manual', %L, null)$q$, v_t, repeat('x', 31)),
+    'FIELD_INVALID:custom_sport_name', 'name max 30');
+  perform rm_test.expect_err(format($q$select public.create_tournament_module(%L, 'Bad key', 'other', null, null, null, null, null, false, 'manual', 'x', 'Bad Key!')$q$, v_t),
+    'FIELD_INVALID:sport_key', 'sport_key format');
+  -- known sport drops any name/key
+  perform public.update_tournament_module(v_m2, 'Chess open', 'tennis', null, null, null, null, null, false, 'manual', 'ignored', 'chess');
+  perform rm_test.chk((select sport = 'tennis' and custom_sport_name is null and sport_key is null from public.tournament_modules where id = v_m2), 'known sport clears name + key');
+  -- scoring_mode through the settings RPC
+  perform public.update_tournament_module_settings(v_m, '{"scoring_mode":"games","allow_draws":false}'::jsonb);
+  perform rm_test.chk((select scoring_mode = 'games' and allow_draws = false from public.tournament_modules where id = v_m), 'scoring_mode set + other keys delegated');
+  perform rm_test.expect_err(format($q$select public.update_tournament_module_settings(%L, '{"scoring_mode":"bogus"}'::jsonb)$q$, v_m), 'FIELD_INVALID:scoring_mode', 'scoring_mode validated');
+  perform rm_test.chk(public.get_module_detail(v_m) -> 'module' ->> 'scoring_mode' = 'games', 'get_module_detail returns scoring_mode');
+  v_d := public.get_tournament_detail(v_t);
+  perform rm_test.chk(jsonb_array_length(v_d -> 'modules') = 2 and (v_d -> 'modules' -> 0) ? 'custom_sport_name' and (v_d -> 'modules' -> 0) ? 'scoring_mode', 'tournament detail modules carry new keys');
+  -- server-side "required" switch
+  perform rm_test.as_user(v_sa);
+  perform public.admin_set_require_custom_sport_name(true);
+  perform rm_test.as_user(v_user);
+  perform rm_test.expect_err(format($q$select public.create_tournament_module(%L, 'Strict', 'other', null, null, null, null, null, false, 'manual')$q$, v_t),
+    'CUSTOM_SPORT_REQUIRED', 'required once switched on');
+  -- communities
+  insert into public.communities (name, sport, created_by, custom_sport_name) values ('Padel crew', 'other', v_user, ' Padel ') returning id into v_c;
+  perform rm_test.chk((select custom_sport_name = 'Padel' from public.communities where id = v_c), 'community name trimmed');
+  perform rm_test.expect_err($q$insert into public.communities (name, sport, created_by) values ('NoName', 'other', null)$q$, 'CUSTOM_SPORT_REQUIRED', 'community Other needs name once on');
+  perform rm_test.as_user(v_sa);
+  perform public.admin_set_require_custom_sport_name(false);
+  insert into public.community_members (community_id, profile_id, role) values (v_c, v_user, 'admin');
+  perform rm_test.as_user(v_user);
+  perform rm_test.chk((select custom_sport_name from public.get_community_by_id(v_c)) = 'Padel', 'get_community_by_id returns custom_sport_name');
+  perform rm_test.chk(exists (select 1 from public.get_my_communities() where id = v_c and custom_sport_name = 'Padel'), 'get_my_communities returns it');
+  perform rm_test.expect_err(format($q$insert into public.community_matches (community_id) values (%L)$q$, v_c), 'NOT_ALLOWED', 'no matches in Other communities');
 
   -- (more tests are inserted above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';

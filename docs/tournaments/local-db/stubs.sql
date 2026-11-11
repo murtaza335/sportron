@@ -10,7 +10,15 @@ create publication supabase_realtime;
 create table public.profiles (id uuid primary key default gen_random_uuid(), username text, avatar_url text,
   deleted_at timestamptz, created_at timestamptz default now(), sport_interests text[]);
 create view public.public_profiles as select id, username, avatar_url, deleted_at from public.profiles;
-create table public.communities (id uuid primary key default gen_random_uuid());
+create table public.communities (id uuid primary key default gen_random_uuid(), name text, description text,
+  organization text, location text, image_url text, visibility text default 'public', sport text default 'table_tennis',
+  created_by uuid, created_at timestamptz default now(), updated_at timestamptz default now(), pings_enabled boolean default true);
+create table public.community_members (community_id uuid, profile_id uuid, role text default 'member',
+  approval_status text default 'approved');
+create table public.community_matches (id uuid primary key default gen_random_uuid(), community_id uuid,
+  approval_status text default 'pending', created_at timestamptz default now());
+create table public.community_posts (id uuid primary key default gen_random_uuid(), community_id uuid,
+  created_at timestamptz default now());
 create table public.in_app_notifications (id uuid primary key default gen_random_uuid(), user_id uuid not null,
   type text not null, title text, body text, data jsonb, read boolean default false, created_at timestamptz default now());
 create function public._notification_already_exists(p_user_id uuid, p_type text, p_data jsonb, p_window_seconds int default 10)
