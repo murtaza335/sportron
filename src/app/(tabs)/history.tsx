@@ -1,4 +1,5 @@
 import { TipCard } from '@/components/TipCard';
+import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
@@ -352,6 +353,7 @@ export default function SessionsScreen() {
             }
             ListHeaderComponent={
               <>
+              <AnnouncementHost placement="sessions_banner" />
               <TipCard id="sessions" />
               {(isHistory || scope === 'all') ? (
                 <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>

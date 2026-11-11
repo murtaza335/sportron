@@ -1,4 +1,5 @@
 import { Trophy } from 'lucide-react-native';
+import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { useState } from 'react';
 import { FlatList, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
@@ -56,7 +57,12 @@ export default function TournamentsScreen() {
             <TournamentCard tournament={item} />
           </FadeInItem>
         )}
-        ListHeaderComponent={<TipCard id="tournaments" />}
+        ListHeaderComponent={
+          <>
+            <AnnouncementHost placement="tournaments_banner" />
+            <TipCard id="tournaments" />
+          </>
+        }
         contentContainerStyle={[styles.list, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
         ItemSeparatorComponent={() => <View style={{ height: Spacing.md }} />}
         refreshControl={<ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />}

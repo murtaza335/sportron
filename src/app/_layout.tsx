@@ -29,6 +29,7 @@ import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
 import { HeaderBack } from '@/components/HeaderBack';
+import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -216,6 +217,7 @@ function RootNavigator() {
         <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
         <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
+      {session && profile && !showSplash && <AnnouncementHost placement="app_open_modal" />}
       <ConfettiHost />
       <ToastHost />
       {Platform.OS === 'web' && <AlertHost />}
