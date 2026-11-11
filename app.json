@@ -40,16 +40,6 @@
               "scheme": "https",
               "host": "sportron.app",
               "pathPrefix": "/profile"
-            },
-            {
-              "scheme": "https",
-              "host": "sportron.app",
-              "pathPrefix": "/match"
-            },
-            {
-              "scheme": "https",
-              "host": "sportron.app",
-              "pathPrefix": "/session"
             }
           ],
           "category": [

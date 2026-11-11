@@ -1,4 +1,6 @@
 import { haptics } from '@/lib/haptics';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { LikeButton } from '@/components/motion/LikeButton';
@@ -274,6 +276,22 @@ export function MatchDetailPopup({
                 </View>
               </View>
 
+              {communityId && (
+                <ShareButton
+                  size={18}
+                  payload={() => {
+                    const aWon = match.player_score >= match.opponent_score;
+                    const a = [match.player?.username, match.playerPartner?.username].filter(Boolean).join(' + ') || 'Player A';
+                    const b = [match.opponent?.username, match.opponentPartner?.username].filter(Boolean).join(' + ') || match.opponent_guest_name || 'Guest';
+                    return shareCopy.match({
+                      communityId,
+                      winner: aWon ? a : b,
+                      loser: aWon ? b : a,
+                      score: `${Math.max(match.player_score, match.opponent_score)}–${Math.min(match.player_score, match.opponent_score)}`,
+                    });
+                  }}
+                />
+              )}
               <Pressable onPress={onClose} hitSlop={8} style={[styles.closeBtn, { backgroundColor: theme.background }]}>
                 <X size={16} color={theme.text} />
               </Pressable>

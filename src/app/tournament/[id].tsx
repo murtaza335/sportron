@@ -1,4 +1,6 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -35,8 +37,10 @@ export default function TournamentScreen() {
       <Stack.Screen
         options={{
           title: 'Tournament',
-          headerRight: () =>
-            isTournamentAdmin ? (
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {t && <ShareButton payload={shareCopy.tournament({ id: t.id, name: t.name, live: liveCount > 0 })} />}
+              {isTournamentAdmin ? (
               <Pressable
                 onPress={() => router.push(tournamentRoutes.manage(id))}
                 hitSlop={12}
@@ -46,7 +50,9 @@ export default function TournamentScreen() {
               >
                 <Settings size={22} color={theme.text} strokeWidth={2} />
               </Pressable>
-            ) : null,
+              ) : null}
+            </View>
+          ),
         }}
       />
       {loading && !detail ? (

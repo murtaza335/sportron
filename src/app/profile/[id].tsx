@@ -1,4 +1,6 @@
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { CountUp } from '@/components/motion/CountUp';
 import { SkeletonProvider } from '@/components/motion/Skeleton';
 import { ProfileHeaderSkeleton } from '@/components/skeletons';
@@ -84,9 +86,12 @@ export default function PublicProfileScreen() {
           headerShown: true,
           title: profile?.username ?? 'Profile',
           headerRight: () => (
-            <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-              <X size={22} color={theme.text} strokeWidth={2} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {profile && <ShareButton payload={shareCopy.profile({ id: profile.id, username: profile.username })} />}
+              <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                <X size={22} color={theme.text} strokeWidth={2} />
+              </Pressable>
+            </View>
           ),
         }}
       />

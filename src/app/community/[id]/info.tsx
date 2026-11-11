@@ -1,4 +1,6 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import {
   Building2,
   ChevronLeft,
@@ -243,6 +245,10 @@ export default function CommunityInfoScreen() {
     headerShadowVisible: false,
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
+    headerRight: () =>
+      community ? (
+        <ShareButton payload={shareCopy.community({ id: community.id, name: community.name, memberCount: community.member_count ?? undefined })} />
+      ) : null,
     headerLeft: () => (
       <Pressable
         onPress={() => goBack(router, `/community/${id}` as Href)}

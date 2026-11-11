@@ -1,4 +1,6 @@
 import { haptics } from '@/lib/haptics';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { Sheet } from '@/components/motion/Sheet';
 import { Check, Clock, MapPin, MessageCircle, Users, X } from 'lucide-react-native';
 import { useEffect, useState } from 'react';
@@ -313,6 +315,17 @@ export function SessionDetailPopup({
                   )}
                 </Pressable>
               )}
+              <ShareButton
+                size={18}
+                payload={() => {
+                  const when = session?.date_time ?? initialSession?.date_time;
+                  return shareCopy.session({
+                    title: session?.title ?? session?.purpose ?? initialSession?.purpose ?? 'a session',
+                    when: when ? `${formatSessionDate(when)} at ${formatSessionTime(when)}` : undefined,
+                    spotsLeft: maxParticipants ? Math.max(0, maxParticipants - commitmentCount) : undefined,
+                  });
+                }}
+              />
               <Pressable
                 onPress={onClose}
                 hitSlop={16}

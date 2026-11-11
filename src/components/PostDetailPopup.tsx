@@ -1,4 +1,6 @@
 import { enterToSend } from '@/lib/webKeys';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
@@ -280,6 +282,12 @@ export function PostDetailPopup({
                     >
                       <MoreHorizontal size={20} color={theme.text} strokeWidth={2} />
                     </Pressable>
+                  )}
+                  {communityId && post && (
+                    <ShareButton
+                      size={20}
+                      payload={() => shareCopy.post({ communityId, author: post.author?.username ?? 'Someone' })}
+                    />
                   )}
                   <Pressable onPress={onClose} hitSlop={16} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                     <X size={24} color={theme.text} strokeWidth={2.5} />
