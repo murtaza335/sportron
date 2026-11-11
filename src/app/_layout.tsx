@@ -28,6 +28,7 @@ import { Duration } from '@/lib/motion';
 import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
+import { HeaderBack } from '@/components/HeaderBack';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -77,6 +78,7 @@ function RootNavigator() {
     gestureEnabled: true,
     fullScreenGestureEnabled: true,
     headerShadowVisible: false,
+    headerLeft: () => <HeaderBack />,
     headerStyle: { backgroundColor: theme.background },
     contentStyle: { backgroundColor: theme.background },
   };

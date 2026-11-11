@@ -186,7 +186,7 @@ export function FABMenu({
     { icon: Edit, label: 'WRITE', disabled: false, onPress: handleWrite },
     { icon: Camera, label: 'PHOTO', disabled: false, onPress: handlePhoto },
     { icon: Trophy, label: 'MATCH', disabled: false, onPress: handleMatch },
-  ];
+  ].filter((i) => !(i.label === 'MATCH' && communitySport === 'other'));
 
   return (
     <>
