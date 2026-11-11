@@ -66,6 +66,10 @@ export type TournamentModule = {
   tournament_id: string;
   name: string;
   sport: Sport;
+  /** A4 (migration 126): exact name for Other / More sports, key of the More-list entry, how a match is won. */
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
+  scoring_mode?: ScoringMode | null;
   description: string | null;
   rules_text: string | null;
   venue: string | null;
@@ -212,10 +216,15 @@ export type TournamentChampion = {
   third: ChampionRef | null;
 };
 
+export type ScoringMode = 'games' | 'score';
+
 export type TournamentModuleSummary = {
   id: string;
   name: string;
   sport: Sport;
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
+  scoring_mode?: ScoringMode | null;
   status: ModuleStatus;
   entry_count: number;
   starts_at: string | null;
@@ -254,6 +263,8 @@ export type ModuleDetail = {
 export type ModuleFormInput = {
   name: string;
   sport: Sport;
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
   description: string | null;
   rules_text: string | null;
   venue: string | null;

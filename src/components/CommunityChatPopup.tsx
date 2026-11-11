@@ -1,6 +1,6 @@
 import { ChatPopup } from '@/components/ChatPopup';
 import type { ChatThread } from '@/hooks/useChat';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import type { Community, CommunityChatMessage } from '@/types';
 
 type CommunityChatPopupProps = {
@@ -21,7 +21,7 @@ export function CommunityChatPopup({
   chat,
 }: CommunityChatPopupProps) {
   const headerSubtitle = [
-    community?.sport ? (SPORT_LABELS[community.sport] ?? community.sport) : '',
+    community?.sport ? communitySportLabel({ sport: community.sport, custom_sport_name: community.custom_sport_name }) : '',
     community?.member_count != null ? `${community.member_count} members` : '',
   ]
     .filter(Boolean)

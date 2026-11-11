@@ -64,7 +64,7 @@ import type {
   CommunityPost,
   MatchWithProfiles,
 } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { goBack } from '@/lib/nav';
 
 export default function CommunityDetailScreen() {
@@ -985,7 +985,7 @@ export default function CommunityDetailScreen() {
                 <View style={[styles.sportBadgeSmall, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                   <Swords size={12} color={theme.textSecondary} strokeWidth={2} />
                   <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
-                    {SPORT_LABELS[community.sport] || community.sport}
+                    {communitySportLabel(community)}
                   </ThemedText>
                 </View>
               </View>

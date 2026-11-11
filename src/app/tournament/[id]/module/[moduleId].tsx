@@ -287,7 +287,7 @@ export default function ModuleScreen() {
         >
           <View style={styles.header}>
             <View style={styles.pills}>
-              <InfoPill label={sportLabel(mod.sport)} />
+              <InfoPill label={sportLabel(mod.sport, mod.custom_sport_name)} />
               <StatusPill tone={moduleStatusTone(mod.status)} />
             </View>
             <ThemedText variant="caption" muted>
@@ -415,6 +415,7 @@ export default function ModuleScreen() {
       <ResultEntrySheet
         match={m.matches.find((x) => x.id === resultMatchId) ?? null}
         sport={mod?.sport ?? 'other'}
+        scoringMode={mod?.scoring_mode}
         onClose={() => setResultMatchId(null)}
         onSaved={m.refresh}
       />

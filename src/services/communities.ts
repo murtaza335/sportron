@@ -30,13 +30,14 @@ type CommunityRpcRow = {
   created_by: string; created_at: string; updated_at: string; pings_enabled: boolean;
   member_count: number; creator_username: string | null; creator_avatar_url: string | null;
   my_role?: string | null; activity_14d?: number | string; popularity?: number | string;
+  custom_sport_name?: string | null;
 };
 
 function rowToCommunity(r: CommunityRpcRow): Community {
   return {
     id: r.id, name: r.name, description: r.description, organization: r.organization,
     location: r.location, image_url: r.image_url, visibility: r.visibility as any,
-    sport: r.sport as any, created_by: r.created_by, created_at: r.created_at,
+    sport: r.sport as any, custom_sport_name: r.custom_sport_name ?? null, created_by: r.created_by, created_at: r.created_at,
     updated_at: r.updated_at, pings_enabled: r.pings_enabled,
     member_count: Number(r.member_count) ?? 0,
     creator: r.creator_username
@@ -205,6 +206,8 @@ export async function createCommunity(
       location: input.location?.trim() || null,
       visibility: input.visibility,
       sport: input.sport,
+      // Only sent for Other communities (needs migration 126; older rows/columns are never touched).
+      ...(input.sport === 'other' ? { custom_sport_name: input.custom_sport_name?.trim() || null } : {}),
       image_url: input.image_url || null,
       created_by: userId,
     })
@@ -261,6 +264,7 @@ export async function updateCommunity(
   if (input.location !== undefined) updates.location = input.location?.trim() || null;
   if (input.visibility !== undefined) updates.visibility = input.visibility;
   if (input.image_url !== undefined) updates.image_url = input.image_url;
+  if (input.custom_sport_name !== undefined) updates.custom_sport_name = input.custom_sport_name?.trim() || null;
   if (input.pings_enabled !== undefined) updates.pings_enabled = input.pings_enabled;
 
   const { data, error } = await supabase

@@ -4,6 +4,7 @@ import type {
   BracketSide,
   EntryFieldType,
   ModuleStatus,
+  ScoringMode,
   ParticipantType,
   Sport,
   TournamentFormat,
@@ -71,8 +72,17 @@ export function isAdminRole(role: TournamentRole): boolean {
   return role === 'tournament_admin' || role === 'module_admin';
 }
 
-export function sportLabel(sport: Sport): string {
+export function sportLabel(sport: Sport, customName?: string | null): string {
+  if (sport === 'other' && customName?.trim()) return customName.trim();
   return SPORT_LABELS[sport] ?? 'Other';
+}
+
+/**
+ * How a match is won (A4.4): best-of games/sets/maps (`games`) or one final score (`score`).
+ * Stored `scoring_mode` wins; an empty one keeps today's behaviour (racket sports = games).
+ */
+export function moduleScoringMode(m: { sport: Sport; scoring_mode?: ScoringMode | null }): ScoringMode {
+  return m.scoring_mode ?? (isRacketSport(m.sport) ? 'games' : 'score');
 }
 
 export function matchStatusLabel(status: TournamentMatchStatus): string {
@@ -174,7 +184,7 @@ export function formatMatchTime(iso: string | null): string | null {
 }
 
 export function listSportsLabel(t: Pick<TournamentListItem, 'sports'>): string {
-  return t.sports.map(sportLabel).join(', ');
+  return t.sports.map((s) => sportLabel(s)).join(', ');
 }
 
 // ─── Rosters (v2) ────────────────────────────────────────────────────────────
@@ -286,8 +296,8 @@ export function sideLabel(side: BracketSide): string {
   }
 }
 
-export function defaultAllowDraws(sport: Sport): boolean {
-  return !isRacketSport(sport);
+export function defaultAllowDraws(sport: Sport, scoringMode?: ScoringMode | null): boolean {
+  return scoringMode ? scoringMode === 'score' : !isRacketSport(sport);
 }
 
 // ─── Match presentation (v2) ─────────────────────────────────────────────────

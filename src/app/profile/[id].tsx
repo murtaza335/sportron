@@ -28,7 +28,7 @@ import type {
   CommunityMemberStats,
   Profile,
 } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { formatDate } from '@/lib/date';
 import { StreakDisplay } from '@/components/StreakDisplay';
 import { goBack } from '@/lib/nav';
@@ -144,7 +144,7 @@ export default function PublicProfileScreen() {
                 {communityInfo && (
                   <View style={[styles.sportBadge, { backgroundColor: theme.backgroundSelected }]}>
                     <ThemedText variant="caption" style={styles.sportBadgeText}>
-                      {SPORT_LABELS[communityInfo.sport]}
+                      {communitySportLabel(communityInfo)}
                     </ThemedText>
                   </View>
                 )}

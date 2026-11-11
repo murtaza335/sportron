@@ -12,10 +12,9 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
-import { matchTitle } from '@/lib/tournamentFormat';
+import { matchTitle, moduleScoringMode } from '@/lib/tournamentFormat';
 import { recordResult, recordWalkover } from '@/services/tournaments';
-import type { ScoreDetailRow, Sport, TournamentMatch } from '@/types';
-import { isRacketSport } from '@/types';
+import type { ScoreDetailRow, ScoringMode, Sport, TournamentMatch } from '@/types';
 
 /** Compact −/value/+ stepper with direct numeric input (the hero ScoreCounter is too tall for game rows). */
 function MiniStepper({ value, onChange, label }: { value: number; onChange: (n: number) => void; label: string }) {
@@ -48,17 +47,20 @@ type Mode = 'played' | 'walkover';
 export function ResultEntrySheet({
   match,
   sport,
+  scoringMode,
   onClose,
   onSaved,
 }: {
   match: TournamentMatch | null;
   sport: Sport;
+  /** A4.4: how a match is won; falls back to the sport's default when unset. */
+  scoringMode?: ScoringMode | null;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
 }) {
   return (
     <BottomSheet visible={!!match} onClose={onClose}>
-      {match && <ResultBody key={match.id + match.status} match={match} sport={sport} onClose={onClose} onSaved={onSaved} />}
+      {match && <ResultBody key={match.id + match.status} match={match} sport={sport} scoringMode={scoringMode} onClose={onClose} onSaved={onSaved} />}
     </BottomSheet>
   );
 }
@@ -66,15 +68,17 @@ export function ResultEntrySheet({
 function ResultBody({
   match,
   sport,
+  scoringMode,
   onClose,
   onSaved,
 }: {
   match: TournamentMatch;
   sport: Sport;
+  scoringMode?: ScoringMode | null;
   onClose: () => void;
   onSaved: () => Promise<void> | void;
 }) {
-  const racket = isRacketSport(sport);
+  const racket = moduleScoringMode({ sport, scoring_mode: scoringMode }) === 'games';
   const a = match.entry_a!;
   const b = match.entry_b!;
   const bestOf = Math.max(match.best_of, 1);

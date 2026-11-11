@@ -24,7 +24,7 @@ import { useSessionChat } from '@/hooks/useSessionChat';
 import { useChats } from '@/hooks/useChats';
 import { useTheme } from '@/hooks/use-theme';
 import type { Community, Session } from '@/types';
-import { formatSessionPurpose, SPORT_LABELS } from '@/types';
+import { communitySportLabel, formatSessionPurpose } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
 
 type ChatTab = 'communities' | 'sessions';
@@ -62,7 +62,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
 
   const subtitle = isCommunity
     ? [
-        SPORT_LABELS[row.community.sport] ?? row.community.sport,
+        communitySportLabel(row.community),
         `${row.community.member_count ?? 0} members`,
       ].join(' · ')
     : `Session · ${formatSessionDate(row.session.date_time)} ${formatSessionTime(row.session.date_time)}`;

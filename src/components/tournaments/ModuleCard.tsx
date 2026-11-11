@@ -38,7 +38,7 @@ export function ModuleCard({
     >
       <Card style={styles.card}>
         <View style={styles.top}>
-          <InfoPill label={sportLabel(module.sport)} />
+          <InfoPill label={sportLabel(module.sport, module.custom_sport_name)} />
           <StatusPill tone={moduleStatusTone(module.status)} />
         </View>
         <ThemedText variant="body" style={styles.name} numberOfLines={2}>

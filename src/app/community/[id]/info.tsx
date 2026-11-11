@@ -43,7 +43,7 @@ import {
 } from '@/services/communities';
 import { fetchProfile } from '@/services/profiles';
 import type { CommunityMember, Profile } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
 import { goBack } from '@/lib/nav';
 import type { Href } from 'expo-router';
@@ -327,7 +327,7 @@ export default function CommunityInfoScreen() {
             {community.name}
           </ThemedText>
           <ThemedText variant="caption" muted>
-            {SPORT_LABELS[community.sport] || community.sport} &bull; {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
+            {communitySportLabel(community)} &bull; {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
           </ThemedText>
         </View>
 
@@ -336,7 +336,7 @@ export default function CommunityInfoScreen() {
           {/* <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <Swords size={14} color={theme.text} strokeWidth={2} />
             <ThemedText variant="caption" style={styles.badgeText}>
-              {SPORT_LABELS[community.sport] || community.sport}
+              {communitySportLabel(community)}
             </ThemedText>
           </View> */}
           <View

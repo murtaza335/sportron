@@ -208,7 +208,7 @@ export default function TournamentManageScreen() {
             style={({ pressed }) => [styles.linkRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }, pressed && { opacity: 0.7 }]}
             accessibilityRole="button"
           >
-            <InfoPill label={sportLabel(m.sport)} />
+            <InfoPill label={sportLabel(m.sport, m.custom_sport_name)} />
             <ThemedText style={{ flex: 1, fontWeight: '600' }} numberOfLines={1}>{m.name}</ThemedText>
             <StatusPill tone={moduleStatusTone(m.status)} />
             <ChevronRight size={18} color={theme.textSecondary} />
