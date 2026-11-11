@@ -356,6 +356,9 @@ tournament_entries / tournament_rounds / tournament_matches   -- migration 084 (
 --        last-message timestamps for the Chats hub, scoped via auth.uid())
 ```
 
+### 12. Tournament discount codes (migration 128)
+- `tournament_promos` / `tournament_promo_reveals` have no client policies; reads via `get_tournament_promos` (code null until revealed unless `display_mode = 'visible'`) and `reveal_tournament_promo`; tournament admins write via `upsert_tournament_promo` / `end_tournament_promo` / `get_tournament_promos_manage`; platform staff via `admin_*_tournament_promo`. Code format (`PROMO_CODE_INVALID`) is validated by trigger. UI: `PromoCodeCard` (tournament screen), `PromoManageSection` (manage screen), admin panel TournamentDetail.
+
 ### Notification Types
 See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `tournament_module_completed`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`). The DB `in_app_notifications.type` check constraint (migrations 008/014/034/071/077/079/082/088) is the source of truth for stored types and also allows `member_joined`, `community_engagement` and `new_community`, which are **not** in the TS union yet — **adding any new notification type requires a migration extending that check constraint** (a past bug: streak types were inserted before the constraint allowed them, fixed in 071).
 

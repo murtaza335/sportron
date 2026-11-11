@@ -12,6 +12,9 @@ import type {
   Sport,
   Tournament,
   TournamentDetail,
+  TournamentPromo,
+  TournamentPromoAdmin,
+  TournamentPromoInput,
   TeamMemberInput,
   TournamentEntry,
   TournamentEntryMember,
@@ -361,3 +364,33 @@ export async function scheduleMatch(
 }
 
 export type { Tournament };
+
+// ─── Discount codes (A8) ─────────────────────────────────────────────────────
+
+export async function fetchTournamentPromos(tournamentId: string): Promise<TournamentPromo[]> {
+  const rows = await rpc<TournamentPromo[] | null>('get_tournament_promos', { p_tournament: tournamentId });
+  return rows ?? [];
+}
+
+/** Returns the code and records the reveal (idempotent). */
+export async function revealTournamentPromo(promoId: string): Promise<string> {
+  return rpc<string>('reveal_tournament_promo', { p_promo: promoId });
+}
+
+export async function fetchTournamentPromosManage(tournamentId: string): Promise<TournamentPromoAdmin[]> {
+  const rows = await rpc<TournamentPromoAdmin[] | null>('get_tournament_promos_manage', { p_tournament: tournamentId });
+  return (rows ?? []).map((r) => ({ ...r, reveal_count: Number(r.reveal_count ?? 0) }));
+}
+
+/** Create (promoId null) or patch a promo. Only the keys present in `input` change. */
+export async function upsertTournamentPromo(
+  tournamentId: string,
+  promoId: string | null,
+  input: TournamentPromoInput,
+): Promise<string> {
+  return rpc<string>('upsert_tournament_promo', { p_tournament: tournamentId, p_promo: promoId, p_set: input });
+}
+
+export async function endTournamentPromo(promoId: string): Promise<void> {
+  await rpc<void>('end_tournament_promo', { p_promo: promoId });
+}

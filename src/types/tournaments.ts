@@ -369,3 +369,49 @@ export type ModuleSettingsPatch = Partial<
     | 'scoring_mode'
   >
 >;
+
+// ─── Discount codes (A8, migration 128) ─────────────────────────────────────
+
+export type PromoDisplayMode = 'visible' | 'reveal' | 'hidden';
+
+/** Player view. `code` is null until revealed (unless display_mode is 'visible'). */
+export interface TournamentPromo {
+  id: string;
+  tournament_id: string;
+  title: string;
+  description: string | null;
+  partner_name: string | null;
+  cta_url: string | null;
+  display_mode: PromoDisplayMode;
+  ends_at: string | null;
+  revealed: boolean;
+  code: string | null;
+}
+
+/** Admin view (manage screen): includes the code, schedule, state and reveal count. */
+export interface TournamentPromoAdmin {
+  id: string;
+  tournament_id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  partner_name: string | null;
+  cta_url: string | null;
+  display_mode: PromoDisplayMode;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  reveal_count: number;
+  created_at: string;
+}
+
+export interface TournamentPromoInput {
+  code?: string;
+  title?: string;
+  description?: string | null;
+  partner_name?: string | null;
+  cta_url?: string | null;
+  display_mode?: PromoDisplayMode;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}

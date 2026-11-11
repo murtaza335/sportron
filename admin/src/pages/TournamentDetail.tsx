@@ -3,6 +3,7 @@ import { Link, useNavigate, useParams } from 'react-router-dom';
 import {
   rpc,
   type ModuleRow,
+  type PromoRow,
   type TournamentAdminRow,
   type TournamentRow,
   type TournamentStatus,
@@ -33,15 +34,23 @@ export function TournamentDetail() {
   const [t, setT] = useState<TournamentRow | null>(null);
   const [admins, setAdmins] = useState<TournamentAdminRow[]>([]);
   const [modules, setModules] = useState<ModuleRow[]>([]);
+  const [promos, setPromos] = useState<PromoRow[]>([]);
+  const [promo, setPromo] = useState({ title: '', partner: '', code: '', mode: 'reveal' as PromoRow['display_mode'] });
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
     try {
-      const [tt, aa, mm] = await Promise.all([rpc.getTournament(id), rpc.listTournamentAdmins(id), rpc.listModules(id)]);
+      const [tt, aa, mm, pp] = await Promise.all([
+        rpc.getTournament(id),
+        rpc.listTournamentAdmins(id),
+        rpc.listModules(id),
+        rpc.listPromos(id),
+      ]);
       setT(tt);
       setAdmins(aa);
       setModules(mm);
+      setPromos(pp);
       setError(null);
     } catch (e) {
       setError(errorText(e));
@@ -90,6 +99,19 @@ export function TournamentDetail() {
     });
     if (res) await run(() => rpc.removeTournamentAdmin(id, a.profile_id, res.note), 'Admin removed.');
   }
+
+  async function endPromo(p: PromoRow) {
+    const res = await confirm({
+      title: `End "${p.title}"?`,
+      body: 'The code disappears for players.',
+      confirmLabel: 'End code',
+      destructive: true,
+      askNote: true,
+    });
+    if (res) await run(() => rpc.endPromo(p.id, res.note), 'Code ended.');
+  }
+
+  const promoCodeOk = /^\d{6}$/.test(promo.code);
 
   async function reopen(m: ModuleRow) {
     const res = await confirm({
@@ -190,6 +212,85 @@ export function TournamentDetail() {
               ))}
             </tbody>
           </table>
+        </div>
+      </div>
+
+      <h2>Discount codes</h2>
+      <div className="card">
+        <p className="muted" style={{ marginTop: 0 }}>
+          A 6-digit code shown on the tournament page; redeemed off-app. Tournament admins can also manage it in the app.
+        </p>
+        <div className="table-wrap">
+          <table>
+            <thead><tr><th>Offer</th><th>Code</th><th>Mode</th><th>Revealed</th><th>State</th><th /></tr></thead>
+            <tbody>
+              {promos.length === 0 && <tr><td colSpan={6} className="muted">No codes yet.</td></tr>}
+              {promos.map((p) => (
+                <tr key={p.id}>
+                  <td>{p.title}{p.partner_name ? ` · ${p.partner_name}` : ''}</td>
+                  <td>{p.code}</td>
+                  <td>{p.display_mode}</td>
+                  <td>{p.reveal_count}</td>
+                  <td>{p.is_active ? 'active' : 'ended'}</td>
+                  <td>
+                    {p.is_active && (
+                      <button className="btn btn-sm" disabled={busy} onClick={() => void endPromo(p)}>End</button>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+        <div className="row" style={{ marginTop: 12 }}>
+          <label className="field"><span>Offer title</span>
+            <input value={promo.title} maxLength={80} onChange={(e) => setPromo({ ...promo, title: e.target.value })} /></label>
+          <label className="field"><span>Partner (optional)</span>
+            <input value={promo.partner} maxLength={60} onChange={(e) => setPromo({ ...promo, partner: e.target.value })} /></label>
+        </div>
+        <div className="row">
+          <label className="field"><span>6-digit code</span>
+            <input
+              value={promo.code}
+              inputMode="numeric"
+              maxLength={6}
+              onChange={(e) => setPromo({ ...promo, code: e.target.value.replace(/\D/g, '').slice(0, 6) })}
+            /></label>
+          <label className="field"><span>How players find it</span>
+            <select value={promo.mode} onChange={(e) => setPromo({ ...promo, mode: e.target.value as PromoRow['display_mode'] })}>
+              <option value="reveal">Tap to reveal</option>
+              <option value="visible">Visible</option>
+              <option value="hidden">Hidden (long-press cover)</option>
+            </select></label>
+        </div>
+        <div className="toolbar" style={{ marginBottom: 0 }}>
+          <button
+            className="btn"
+            type="button"
+            onClick={() => setPromo({ ...promo, code: String(Math.floor(Math.random() * 1_000_000)).padStart(6, '0') })}
+          >
+            Generate code
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={busy || !promoCodeOk || !promo.title.trim()}
+            onClick={() =>
+              void run(
+                async () => {
+                  await rpc.createPromo(id, {
+                    title: promo.title.trim(),
+                    code: promo.code,
+                    display_mode: promo.mode,
+                    partner_name: promo.partner.trim() || null,
+                  });
+                  setPromo({ title: '', partner: '', code: '', mode: 'reveal' });
+                },
+                'Code published.',
+              )
+            }
+          >
+            Publish code
+          </button>
         </div>
       </div>
 

@@ -126,6 +126,8 @@ Left out for now (niche; can be added from the admin panel with no release): Arm
 
 ### A8. Tournament discount code (6 digits, found on the tournament page)
 
+> **Status: implemented** (migration 128, `PromoCodeCard`, `PromoManageSection`, admin panel *Discount codes*). Per-promo `display_mode` = `reveal` (default) | `visible` | `hidden` (long-press the cover). The code is withheld by `get_tournament_promos` until `reveal_tournament_promo` is called.
+
 **Goal:** a 6-digit code (e.g. `482913`) shown somewhere on the tournament page that players can find and use to get a discount (entry fee, sponsor shop, café, kit partner…). The app only **displays** the code; redemption happens off-app (at the desk / partner), so no payment logic is needed.
 
 **Data — migration 128 (additive)**

@@ -22,7 +22,7 @@ end $$;
 
 do $$
 declare
-  v_ids uuid[]; v_sa uuid; v_user uuid; v_ann uuid; v_n int; v_t uuid; v_m uuid; v_m2 uuid; v_d jsonb; v_c uuid;
+  v_ids uuid[]; v_sa uuid; v_user uuid; v_ann uuid; v_n int; v_t uuid; v_m uuid; v_m2 uuid; v_d jsonb; v_c uuid; v_p uuid; v_p2 uuid;
 begin
   select array_agg(id) into v_ids from (select id from public.profiles where deleted_at is null order by created_at, id limit 3) s;
   v_sa := v_ids[1]; v_user := v_ids[2];
@@ -118,6 +118,41 @@ begin
   perform rm_test.chk((select custom_sport_name from public.get_community_by_id(v_c)) = 'Padel', 'get_community_by_id returns custom_sport_name');
   perform rm_test.chk(exists (select 1 from public.get_my_communities() where id = v_c and custom_sport_name = 'Padel'), 'get_my_communities returns it');
   perform rm_test.expect_err(format($q$insert into public.community_matches (community_id) values (%L)$q$, v_c), 'NOT_ALLOWED', 'no matches in Other communities');
+
+  -- ── 128 tournament promos ──
+  perform rm_test.as_user(v_ids[3]);
+  perform rm_test.expect_err(format($q$select public.upsert_tournament_promo(%L, null, '{"title":"x","code":"123456"}')$q$, v_t), 'NOT_ALLOWED', 'non-admin cannot create promo');
+  perform rm_test.as_user(v_user);
+  insert into public.tournament_admins (tournament_id, profile_id) values (v_t, v_user) on conflict do nothing;
+  perform rm_test.expect_err(format($q$select public.upsert_tournament_promo(%L, null, '{"title":"x","code":"12345"}')$q$, v_t), 'PROMO_CODE_INVALID', 'code must be 6 digits');
+  perform rm_test.expect_err(format($q$select public.upsert_tournament_promo(%L, null, '{"title":"x","code":"12345a"}')$q$, v_t), 'PROMO_CODE_INVALID', 'digits only');
+  perform rm_test.expect_err(format($q$select public.upsert_tournament_promo(%L, null, '{"title":"","code":"123456"}')$q$, v_t), 'FIELD_INVALID:title', 'title required');
+  perform rm_test.expect_err(format($q$select public.upsert_tournament_promo(%L, null, '{"title":"x","code":"123456","cta_url":"http://a.b"}')$q$, v_t), 'FIELD_INVALID:cta_url', 'https cta only');
+  v_p := public.upsert_tournament_promo(v_t, null, '{"title":"10% off entry","code":"482913","partner_name":"Cafe X"}');
+  perform rm_test.chk((select code is null and not revealed from public.get_tournament_promos(v_t) where id = v_p), 'reveal mode withholds the code');
+  perform rm_test.chk((select reveal_count = 0 from public.get_tournament_promos_manage(v_t) where id = v_p), 'manage view starts at 0 reveals');
+  perform rm_test.chk(public.reveal_tournament_promo(v_p) = '482913', 'reveal returns the code');
+  perform public.reveal_tournament_promo(v_p);
+  perform rm_test.chk((select code = '482913' and revealed from public.get_tournament_promos(v_t) where id = v_p), 'code visible after reveal');
+  perform rm_test.chk((select reveal_count = 1 from public.get_tournament_promos_manage(v_t) where id = v_p), 'reveal counted once per user');
+  perform public.upsert_tournament_promo(v_t, v_p, '{"display_mode":"visible"}');
+  perform rm_test.chk((select display_mode = 'visible' and code = '482913' from public.get_tournament_promos(v_t) where id = v_p), 'visible mode shows code, patch keeps other fields');
+  perform public.upsert_tournament_promo(v_t, v_p, '{"ends_at":"2000-01-01T00:00:00Z"}');
+  perform rm_test.chk((select count(*) = 0 from public.get_tournament_promos(v_t)), 'expired promo hidden from players');
+  perform rm_test.expect_err(format($q$select public.reveal_tournament_promo(%L)$q$, v_p), 'NOT_FOUND', 'cannot reveal an expired promo');
+  perform public.upsert_tournament_promo(v_t, v_p, '{"ends_at":null}');
+  perform public.end_tournament_promo(v_p);
+  perform rm_test.chk((select count(*) = 0 from public.get_tournament_promos(v_t)), 'ended promo hidden from players');
+  perform rm_test.chk((select not is_active from public.get_tournament_promos_manage(v_t) where id = v_p), 'ended promo still listed for admins');
+  perform rm_test.as_user(v_ids[3]);
+  perform rm_test.expect_err(format($q$select * from public.get_tournament_promos_manage(%L)$q$, v_t), 'NOT_ALLOWED', 'other users cannot read the manage view');
+  perform rm_test.as_user(v_user);
+  perform rm_test.expect_err($q$select * from public.admin_list_tournament_promos(null)$q$, 'NOT_ALLOWED', 'platform RPC needs staff role');
+  perform rm_test.as_user(v_sa);
+  v_p2 := public.admin_upsert_tournament_promo(v_t, null, '{"title":"Staff promo","code":"000111"}', 'test');
+  perform rm_test.chk(exists (select 1 from public.admin_list_tournament_promos(v_t) where id = v_p2 and code = '000111'), 'staff can create + list');
+  perform public.admin_end_tournament_promo(v_p2);
+  perform rm_test.chk((select not is_active from public.admin_list_tournament_promos(v_t) where id = v_p2), 'staff can end');
 
   -- (more tests are inserted above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';

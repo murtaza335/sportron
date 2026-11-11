@@ -7,6 +7,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { FormField, PillSelect, SectionLabel, TextField } from '@/components/tournaments/form';
+import { PromoManageSection } from '@/components/tournaments/PromoManageSection';
 import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
@@ -218,6 +219,8 @@ export default function TournamentManageScreen() {
           <Button label="Add module" variant="secondary" onPress={() => router.push(tournamentRoutes.moduleForm(id))} />
         )}
       </View>
+
+      <PromoManageSection tournamentId={id} />
 
       <View style={{ gap: Spacing.sm }}>
         <SectionLabel>Tournament admins</SectionLabel>

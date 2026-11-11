@@ -75,6 +75,7 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('ROSTER_TOO_LARGE')) return 'This team has more players than allowed.';
   if (message.includes('DUPLICATE_SQUAD_NUMBER')) return 'Two players have the same squad number.';
 
+  if (message.includes('PROMO_CODE_INVALID')) return 'The discount code must be exactly 6 digits.';
   if (message.includes('CUSTOM_SPORT_REQUIRED')) return 'Enter the exact sport name.';
   if (message.includes('NOT_ALLOWED')) return "You don't have permission to do that.";
   if (message.includes('INVALID_STATUS')) return "That isn't possible at this stage.";

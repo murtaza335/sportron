@@ -207,4 +207,27 @@ export const rpc = {
     call<void>('admin_reopen_module', { p_module: moduleId, p_clear_results: clearResults, p_note: note || null }),
   deleteTournament: (id: string, confirmName: string, note?: string) =>
     call<void>('admin_delete_tournament', { p_tournament: id, p_confirm_name: confirmName, p_note: note || null }),
+  listPromos: (id: string) => call<PromoRow[]>('admin_list_tournament_promos', { p_tournament: id }),
+  createPromo: (id: string, set: PromoSet, note?: string) =>
+    call<string>('admin_upsert_tournament_promo', { p_tournament: id, p_promo: null, p_set: set, p_note: note || null }),
+  endPromo: (promoId: string, note?: string) =>
+    call<void>('admin_end_tournament_promo', { p_promo: promoId, p_note: note || null }),
 };
+
+export type PromoRow = {
+  id: string;
+  tournament_id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  partner_name: string | null;
+  cta_url: string | null;
+  display_mode: 'visible' | 'reveal' | 'hidden';
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  reveal_count: number;
+  created_at: string;
+};
+
+export type PromoSet = Partial<Pick<PromoRow, 'code' | 'title' | 'description' | 'partner_name' | 'cta_url' | 'display_mode'>>;
