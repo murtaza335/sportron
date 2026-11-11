@@ -207,6 +207,14 @@ export const rpc = {
     call<void>('admin_reopen_module', { p_module: moduleId, p_clear_results: clearResults, p_note: note || null }),
   deleteTournament: (id: string, confirmName: string, note?: string) =>
     call<void>('admin_delete_tournament', { p_tournament: id, p_confirm_name: confirmName, p_note: note || null }),
+  countBroadcastAudience: (a: BroadcastAudience) =>
+    call<number>('admin_count_broadcast_audience', { p_audience: a.audience, p_sport: a.sport ?? null, p_community: a.community ?? null }),
+  sendBroadcast: (b: BroadcastInput) =>
+    call<number>('admin_send_broadcast', {
+      p_title: b.title, p_body: b.body, p_audience: b.audience, p_sport: b.sport ?? null,
+      p_community: b.community ?? null, p_cta_url: b.cta_url ?? null, p_note: b.note ?? null,
+    }),
+  listBroadcasts: () => call<BroadcastRow[]>('admin_list_broadcasts', { p_limit: 25 }),
   listPromos: (id: string) => call<PromoRow[]>('admin_list_tournament_promos', { p_tournament: id }),
   createPromo: (id: string, set: PromoSet, note?: string) =>
     call<string>('admin_upsert_tournament_promo', { p_tournament: id, p_promo: null, p_set: set, p_note: note || null }),
@@ -231,3 +239,10 @@ export type PromoRow = {
 };
 
 export type PromoSet = Partial<Pick<PromoRow, 'code' | 'title' | 'description' | 'partner_name' | 'cta_url' | 'display_mode'>>;
+
+export type BroadcastAudience = { audience: 'all' | 'sport' | 'community'; sport?: string | null; community?: string | null };
+export type BroadcastInput = BroadcastAudience & { title: string; body: string; cta_url?: string | null; note?: string | null };
+export type BroadcastRow = {
+  id: string; title: string; body: string; cta_url: string | null; audience: string; sport: string | null;
+  community_id: string | null; recipient_count: number; created_by_username: string | null; created_at: string;
+};

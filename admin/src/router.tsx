@@ -9,6 +9,7 @@ import { Settings } from './pages/Settings';
 import { Staff } from './pages/Staff';
 import { Announcements } from './pages/Announcements';
 import { Config } from './pages/Config';
+import { Broadcasts } from './pages/Broadcasts';
 import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
@@ -39,6 +40,14 @@ export const router = createBrowserRouter([
         element: (
           <RequireRole roles={['super_admin']}>
             <Announcements />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'broadcasts',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Broadcasts />
           </RequireRole>
         ),
       },

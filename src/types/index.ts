@@ -261,7 +261,9 @@ export type NotificationType =
   // DB-only types (allowed by the in_app_notifications check constraint, migrations 080/081/083)
   | 'member_joined'
   | 'community_engagement'
-  | 'new_community';
+  | 'new_community'
+  // Staff broadcast from the admin panel (migration 129)
+  | 'admin_broadcast';
 
 export type InAppNotification = {
   id: string;

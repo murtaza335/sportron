@@ -50,10 +50,12 @@ export type NotificationType =
   | 'streak_milestone'
   | 'member_joined'
   | 'community_engagement'
-  | 'new_community';
+  | 'new_community'
+  | 'admin_broadcast';
 
 export interface NotificationData {
   type: NotificationType;
+  cta_url?: string;
   matchId?: string;
   senderId?: string;
   senderName?: string;

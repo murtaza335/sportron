@@ -154,6 +154,24 @@ begin
   perform public.admin_end_tournament_promo(v_p2);
   perform rm_test.chk((select not is_active from public.admin_list_tournament_promos(v_t) where id = v_p2), 'staff can end');
 
+  -- ── 129 admin broadcast ──
+  perform rm_test.as_user(v_user);
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('Hi', 'Body', 'all')$q$, 'NOT_ALLOWED', 'non-staff cannot broadcast');
+  perform rm_test.expect_err($q$select public.admin_count_broadcast_audience('all')$q$, 'NOT_ALLOWED', 'non-staff cannot preview audience');
+  perform rm_test.as_user(v_sa);
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('', 'Body', 'all')$q$, 'FIELD_INVALID:title', 'title required');
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('Hi', 'Body', 'nobody')$q$, 'FIELD_INVALID:audience', 'audience validated');
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('Hi', 'Body', 'all', null, null, 'javascript:alert(1)')$q$, 'FIELD_INVALID:cta_url', 'cta must be route or https');
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('Hi', 'Body', 'sport', 'zzz_no_such_sport')$q$, 'AUDIENCE_EMPTY', 'empty audience refused');
+  perform rm_test.expect_err($q$select public.admin_send_broadcast('Hi', 'Body', 'community', null, null)$q$, 'FIELD_INVALID:community', 'community audience needs an id');
+  select public.admin_count_broadcast_audience('all') into v_n;
+  perform rm_test.chk(v_n = (select count(*) from public.profiles where deleted_at is null), 'preview counts live profiles');
+  perform rm_test.chk(public.admin_count_broadcast_audience('community', null, v_c) = 1, 'community audience = approved members');
+  perform rm_test.chk(public.admin_send_broadcast('Cup day', 'Bracket is live', 'community', null, v_c, '/tournament/abc', 'test') = 1, 'send returns recipient count');
+  perform rm_test.chk(exists (select 1 from public.in_app_notifications where user_id = v_user and type = 'admin_broadcast'
+    and data->>'cta_url' = '/tournament/abc' and data ? 'broadcastId'), 'recipient got a notification with cta + id');
+  perform rm_test.chk((select recipient_count = 1 and created_by_username is not null from public.admin_list_broadcasts() limit 1), 'history lists it');
+
   -- (more tests are inserted above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;

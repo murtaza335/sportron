@@ -2,7 +2,7 @@ import { haptics } from '@/lib/haptics';
 import { useEffect, useState } from 'react';
 import { ActivityIndicator, Pressable, View } from 'react-native';
 import { router } from 'expo-router';
-import { Bell, Check, CheckCircle, Swords, Trophy, UserPlus, X, XCircle } from 'lucide-react-native';
+import { Bell, Check, CheckCircle, Megaphone, Swords, Trophy, UserPlus, X, XCircle } from 'lucide-react-native';
 
 import { alert } from '@/lib/alert';
 import { ThemedText } from '@/components/ui/Text';
@@ -12,6 +12,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useNotifications } from '@/hooks/useNotifications';
 import { formatRelativeTime } from '@/lib/date';
 import { supabase } from '@/lib/supabase';
+import { openTarget } from '@/lib/openTarget';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { approveCommitment, rejectCommitment } from '@/services/sessions';
 import { approveCommunityMatch, disputeCommunityMatch, respondToJoinRequest } from '@/services/communities';
@@ -56,6 +57,8 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
     case 'tournament_match_result':
     case 'tournament_module_completed':
       return <Trophy size={20} color={theme.text} strokeWidth={2.2} />;
+    case 'admin_broadcast':
+      return <Megaphone size={20} color={theme.text} strokeWidth={2.2} />;
     default:
       return <Bell size={20} color={theme.text} strokeWidth={2.2} />;
   }
@@ -334,6 +337,9 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           } else if (typeof tId === 'string') {
             router.push(tournamentRoutes.tournament(tId));
           }
+        } else if (notification.type === 'admin_broadcast') {
+          const cta = notification.data?.cta_url;
+          if (typeof cta === 'string') void openTarget(router, cta);
         }
       }}
       style={({ pressed }) => ({

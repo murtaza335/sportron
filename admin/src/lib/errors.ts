@@ -41,6 +41,8 @@ const FIELD_LABELS: Record<string, string> = {
   whats_new: 'What\'s New must be {"version": "…", "items": [...]}.',
   limits: 'Limits must be a JSON object.',
   expire_options: 'Expire options must be a JSON array.',
+  sport: 'Pick a sport.',
+  community: 'Enter the id of an existing community.',
   session_purposes: 'Session purposes must be a JSON array.',
 };
 
@@ -53,6 +55,8 @@ const CODES: Record<string, string> = {
   CANNOT_CHANGE_SELF: 'You cannot change your own role. Ask another super admin.',
   NOT_COMPLETED: 'Only a completed module can be reopened.',
   TOURNAMENT_FINISHED: 'The tournament is completed or cancelled. Set it back to published or draft first.',
+  AUDIENCE_EMPTY: 'Nobody matches that audience.',
+  AUDIENCE_TOO_LARGE: 'That audience is over the 5,000 recipient limit. Narrow it down (a sport or a community).',
   CONFIRM_MISMATCH: 'The name you typed does not match.',
 };
 
