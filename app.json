@@ -20,7 +20,44 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.murtazabaig.T3S",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/community"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/tournament"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/profile"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/match"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/session"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -58,6 +95,13 @@
         "projectId": "0fa66530-b790-4094-84eb-3366edafc566"
       }
     },
-    "owner": "murtazabaig"
+    "owner": "murtazabaig",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0fa66530-b790-4094-84eb-3366edafc566",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }
