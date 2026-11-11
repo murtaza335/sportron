@@ -8,7 +8,7 @@ create function auth.uid() returns uuid language sql stable as $$
   select nullif(nullif(current_setting('request.jwt.claims', true), '')::json ->> 'sub', '')::uuid $$;
 create publication supabase_realtime;
 create table public.profiles (id uuid primary key default gen_random_uuid(), username text, avatar_url text,
-  deleted_at timestamptz, created_at timestamptz default now());
+  deleted_at timestamptz, created_at timestamptz default now(), sport_interests text[]);
 create view public.public_profiles as select id, username, avatar_url, deleted_at from public.profiles;
 create table public.communities (id uuid primary key default gen_random_uuid());
 create table public.in_app_notifications (id uuid primary key default gen_random_uuid(), user_id uuid not null,
