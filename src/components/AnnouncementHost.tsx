@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import {
   getAnnouncementState,
@@ -51,11 +52,12 @@ export function AnnouncementHost({ placement }: { placement: AnnouncementPlaceme
   const router = useRouter();
   const { session } = useAuth();
   const userId = session?.user?.id;
+  const enabled = useFlag('announcements', true);
   const [item, setItem] = useState<Announcement | null>(null);
   const [open, setOpen] = useState(true);
 
   useEffect(() => {
-    if (!userId) return;
+    if (!userId || !enabled) return;
     let cancelled = false;
     (async () => {
       const all = await loadAnnouncements();
@@ -76,7 +78,7 @@ export function AnnouncementHost({ placement }: { placement: AnnouncementPlaceme
     return () => {
       cancelled = true;
     };
-  }, [userId, placement]);
+  }, [userId, placement, enabled]);
 
   const dismiss = useCallback(() => {
     if (!item) return;
@@ -92,7 +94,7 @@ export function AnnouncementHost({ placement }: { placement: AnnouncementPlaceme
     await openTarget(router, item.cta_url);
   }, [item, router, placement]);
 
-  if (!item || !open) return null;
+  if (!enabled || !item || !open) return null;
 
   const content = (
     <>

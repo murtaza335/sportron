@@ -1,5 +1,6 @@
 import { useCallback } from 'react';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
+import { UpdateBanner } from '@/components/UpdateBanner';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import Animated, {
   Easing,
@@ -85,6 +86,7 @@ export default function CommunitiesScreen() {
           <ThemedRefreshControl refreshing={refreshing} onRefresh={refresh} />
         }
       >
+        <UpdateBanner />
         <AnnouncementHost placement="home_banner" />
         <TipCard id="communities" />
         {loading ? (

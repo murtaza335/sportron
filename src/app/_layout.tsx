@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
@@ -338,11 +339,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.container}>
       <ThemeProvider>
         <AuthProvider>
+          <RemoteConfigProvider>
           <NotificationsProvider>
             <WebFrame>
               <RootNavigator />
             </WebFrame>
           </NotificationsProvider>
+          </RemoteConfigProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

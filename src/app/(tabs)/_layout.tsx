@@ -1,4 +1,5 @@
 import { router, Tabs, useIsFocused } from 'expo-router';
+import { useWhatsNew } from '@/hooks/useWhatsNew';
 import { CalendarDays, Activity, History, MessageSquare, Plus, Trophy, Users, X, User } from 'lucide-react-native';
 import { ColorValue, Platform, Pressable, Text, View } from 'react-native';
 import Animated, {
@@ -43,7 +44,6 @@ import { Duration, Springs } from '@/lib/motion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
-const CURRENT_WHATS_NEW_VERSION = '1.0.1';
 
 async function getProfileDotViewedVersion(): Promise<string | null> {
   try {
@@ -56,14 +56,15 @@ async function getProfileDotViewedVersion(): Promise<string | null> {
 function ProfileTabIcon({ color, size }: { color: ColorValue; size: number }) {
   const theme = useTheme();
   const [showDot, setShowDot] = useState(false);
+  const { version: whatsNewVersion } = useWhatsNew();
 
   useEffect(() => {
     const check = async () => {
       const viewed = await getProfileDotViewedVersion();
-      setShowDot(viewed !== CURRENT_WHATS_NEW_VERSION);
+      setShowDot(viewed !== whatsNewVersion);
     };
     check();
-  }, []);
+  }, [whatsNewVersion]);
 
   return (
     <View style={{ position: 'relative' }}>

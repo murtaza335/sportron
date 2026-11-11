@@ -1,4 +1,5 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -176,6 +177,9 @@ export function ChatPopup<T extends ChatMessageBase>({
   chatId,
 }: ChatPopupProps<T>) {
   const theme = useTheme();
+  // Remote limit (B4) can only tighten the server's 1000-character rule, never exceed it.
+  const { chat_max_length: remoteChatMax } = useRemoteConfig<{ chat_max_length?: number }>('limits', {});
+  const chatMaxLength = Math.min(1000, Math.max(50, Number(remoteChatMax) || 1000));
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const {
@@ -1083,7 +1087,7 @@ const contextLayout = useMemo(() => {
                   })(e)
                   }
                   multiline
-                  maxLength={1000}
+                  maxLength={chatMaxLength}
                   style={[
                     styles.input,
                     {

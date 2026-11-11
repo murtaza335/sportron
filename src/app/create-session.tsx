@@ -1,4 +1,5 @@
 import { PressableScale } from '@/components/motion/PressableScale';
+import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { haptics } from '@/lib/haptics';
 import { CharCounter } from '@/components/motion/CharCounter';
 import { FocusTextInput } from '@/components/motion/FocusTextInput';
@@ -62,7 +63,8 @@ export default function CreateSessionScreen() {
 
   const MAX_DATE = getMaxSessionFutureDate();
 
-  const EXPIRE_OPTIONS = [
+  const remoteExpire = useRemoteConfig<{ label: string; value: number }[] | null>('expire_options', null);
+  const bundledExpire = [
     { label: '30 min', value: 30 },
     { label: '1 hr', value: 60 },
     { label: '2 hr', value: 120 },
@@ -71,6 +73,13 @@ export default function CreateSessionScreen() {
     { label: '5 hr', value: 300 },
     { label: '6 hr', value: 360 },
   ];
+  // Remote list (B4) when valid; the server still enforces its own expiry rules.
+  const EXPIRE_OPTIONS =
+    Array.isArray(remoteExpire) &&
+    remoteExpire.length > 0 &&
+    remoteExpire.every((o) => typeof o?.label === 'string' && Number.isFinite(o?.value) && o.value > 0)
+      ? remoteExpire
+      : bundledExpire;
   const [expireIndex, setExpireIndex] = useState(0); // 30 min default
 
   const handleParticipantsChange = (text: string) => {

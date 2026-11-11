@@ -58,7 +58,7 @@ insert into public.remote_config (key, value) values
 ]'::jsonb),
 ('expire_options', '[
   {"label":"30 min","value":30},{"label":"1 hr","value":60},{"label":"2 hr","value":120},
-  {"label":"3 hr","value":180},{"label":"6 hr","value":360}
+  {"label":"3 hr","value":180},{"label":"4 hr","value":240},{"label":"5 hr","value":300},{"label":"6 hr","value":360}
 ]'::jsonb),
 ('limits', '{"chat_max_length":1000,"session_max_days_ahead":7}'::jsonb)
 on conflict (key) do nothing;

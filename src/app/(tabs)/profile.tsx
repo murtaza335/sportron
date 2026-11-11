@@ -21,10 +21,9 @@ import { removeFCMToken, updateNotificationPreferences, updateProfile } from '@/
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
-import { WHATS_NEW_CONTENT } from '@/lib/whatsNew';
+import { useWhatsNew } from '@/hooks/useWhatsNew';
 
 const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
-const CURRENT_WHATS_NEW_VERSION = '1.0.1';
 
 async function setProfileDotViewedVersion(version: string): Promise<void> {
   try {
@@ -36,6 +35,7 @@ async function setProfileDotViewedVersion(version: string): Promise<void> {
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { version: whatsNewVersion, items: whatsNewItems } = useWhatsNew();
   const { colorScheme, setTheme } = useTheme();
   const { profile, refreshProfile, user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -48,8 +48,8 @@ export default function ProfileScreen() {
   // Mark profile dot as viewed when screen is focused
   useFocusEffect(
     useMemo(() => () => {
-      setProfileDotViewedVersion(CURRENT_WHATS_NEW_VERSION);
-    }, [])
+      setProfileDotViewedVersion(whatsNewVersion);
+    }, [whatsNewVersion])
   );
 
 
@@ -288,7 +288,7 @@ export default function ProfileScreen() {
             Version 1.0.1 — New features and improvements
           </ThemedText>
           <View style={styles.whatsNewList}>
-            {WHATS_NEW_CONTENT.map((item) => (
+            {whatsNewItems.map((item) => (
               <View key={item.id} style={styles.whatsNewItem}>
                 <View style={[styles.whatsNewTypeBadge, { backgroundColor: getTypeColor(item.type) }]}>
                   <ThemedText variant="caption" style={{ color: '#fff', fontWeight: '700', textTransform: 'uppercase' }}>
