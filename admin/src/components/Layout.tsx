@@ -13,6 +13,7 @@ export function Layout() {
             Overview
           </NavLink>
           <NavLink to="/tournaments">Tournaments</NavLink>
+          {isSuper && <NavLink to="/announcements">Announcements</NavLink>}
           {isSuper && <NavLink to="/settings">Settings</NavLink>}
           {isSuper && <NavLink to="/staff">Staff</NavLink>}
         </nav>

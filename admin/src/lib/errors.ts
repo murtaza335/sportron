@@ -23,6 +23,16 @@ const FIELD_LABELS: Record<string, string> = {
   store_url: 'Store link must be empty or start with https://.',
   enabled: 'Invalid value.',
   settings: 'Invalid request.',
+  title: 'Title is required (max 80).',
+  body: 'Body is too long (max 400).',
+  image_url: 'Image must be a Cloudinary (https://res.cloudinary.com/…) URL.',
+  cta_label: 'Button label is too long (max 30).',
+  cta_url: 'Button link must start with / (in-app) or https://.',
+  placement: 'Invalid placement.',
+  audience: 'Invalid audience.',
+  platforms: 'Platforms must be android, ios or web.',
+  max_shows: 'Max shows must be 1 or more.',
+  data: 'Invalid request.',
 };
 
 const CODES: Record<string, string> = {

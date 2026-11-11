@@ -95,6 +95,35 @@ export interface TournamentPatch {
   ends_at?: string | null;
 }
 
+export type AnnouncementPlacement = 'app_open_modal' | 'home_banner' | 'tournaments_banner' | 'sessions_banner';
+export interface AnnouncementRow {
+  id: string;
+  title: string;
+  body: string | null;
+  image_url: string | null;
+  cta_label: string | null;
+  cta_url: string | null;
+  placement: AnnouncementPlacement;
+  platforms: string[];
+  min_app_version: string | null;
+  max_app_version: string | null;
+  sport_interests: string[];
+  audience: 'all' | 'new_users';
+  starts_at: string;
+  ends_at: string | null;
+  priority: number;
+  dismissible: boolean;
+  max_shows: number | null;
+  is_active: boolean;
+  created_at: string;
+  views: number;
+  clicks: number;
+  dismissals: number;
+}
+export type AnnouncementPatch = Partial<
+  Omit<AnnouncementRow, 'id' | 'created_at' | 'views' | 'clicks' | 'dismissals'>
+>;
+
 // ── Calls ────────────────────────────────────────────────────────────────────
 export const rpc = {
   myRole: () => call<PlatformRole | null>('get_my_platform_role'),
@@ -117,6 +146,12 @@ export const rpc = {
       p_message: message,
       p_note: note || null,
     }),
+
+  listAnnouncements: () => call<AnnouncementRow[]>('admin_list_announcements'),
+  createAnnouncement: (data: AnnouncementPatch) => call<string>('admin_create_announcement', { p_data: data }),
+  updateAnnouncement: (id: string, data: AnnouncementPatch) =>
+    call<string>('admin_update_announcement', { p_id: id, p_data: data }),
+  endAnnouncement: (id: string) => call<void>('admin_end_announcement', { p_id: id }),
 
   listTournaments: (args: { status?: TournamentStatus | null; search?: string; limit?: number; offset?: number }) =>
     call<TournamentListRow[]>('admin_list_tournaments', {
