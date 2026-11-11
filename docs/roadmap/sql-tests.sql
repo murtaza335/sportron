@@ -51,6 +51,29 @@ begin
   select count(*) into v_n from public.get_active_announcements('android', '1.0.10');
   perform rm_test.chk(v_n = 0, 'ended announcement disappears');
 
+  -- ── 127 flags + remote config ──
+  perform rm_test.as_user(v_user);
+  perform rm_test.expect_err($q$select public.admin_upsert_feature_flag('x_flag', true)$q$, 'NOT_ALLOWED', 'user cannot set flags');
+  perform rm_test.chk((select enabled from public.get_feature_flags('android','1.0.1') where key = 'announcements'), 'seeded flag readable and on');
+  perform rm_test.as_user(v_sa);
+  perform public.admin_upsert_feature_flag('beta_x', true, 100, '1.0.5', array['android'], 'test');
+  perform rm_test.as_user(v_user);
+  perform rm_test.chk(not (select enabled from public.get_feature_flags('android','1.0.4') where key = 'beta_x'), 'flag off below min version');
+  perform rm_test.chk((select enabled from public.get_feature_flags('android','1.0.5') where key = 'beta_x'), 'flag on at min version');
+  perform rm_test.chk(not (select enabled from public.get_feature_flags('web','1.0.9') where key = 'beta_x'), 'flag off on other platform');
+  perform rm_test.as_user(v_sa);
+  perform public.admin_upsert_feature_flag('beta_x', true, 0);
+  perform rm_test.as_user(v_user);
+  perform rm_test.chk(not (select enabled from public.get_feature_flags('android','1.0.9') where key = 'beta_x'), 'rollout 0% = off');
+  perform rm_test.chk((select count(*) from public.get_remote_config() where key = 'sports') = 1, 'sports config readable');
+  perform rm_test.chk((select jsonb_array_length(value) from public.get_remote_config() where key = 'sports') = 14, 'sports seeded (10 + 4 more)');
+  perform rm_test.as_user(v_sa);
+  perform rm_test.expect_err($q$select public.admin_set_remote_config('sports', '[{"key":"other","label":"x","kind":"team","tier":"more"}]')$q$, 'FIELD_INVALID:sports', 'sports cannot define other');
+  perform rm_test.expect_err($q$select public.admin_set_remote_config('nope', '{}')$q$, 'FIELD_INVALID:key', 'config key allowlist');
+  perform public.admin_set_remote_config('limits', '{"chat_max_length":800}');
+  perform public.admin_set_recommended_app_version('1.0.9', 'https://play.google.com/x', 'Update!');
+  perform rm_test.chk((select value->>'version' from public.site_config where key = 'recommended_app_version') = '1.0.9', 'recommended version saved');
+
   -- (more tests are inserted above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
