@@ -43,7 +43,16 @@
 **Goal:** organisers should rarely need "Other". The module form keeps today's sport pills (table tennis, badminton, tennis, squash, pickleball, football, cricket, volleyball, handball, basketball) and adds a **More** pill that opens a searchable dropdown/sheet of extra sports. **Other** stays as the last resort.
 
 **Extra sports list:** the sports from the reference image that the app doesn't support yet.
-> ⚠️ **TODO:** the sports image wasn't attached. Fill in this list once it's shared.
+Chosen from the reference image (only common sports the app lacks), seeded as `tier = 'more'` rows in the remote `sports` config (B4):
+
+| Key | Label | Who plays | How a match is won | Draws |
+|---|---|---|---|---|
+| `futsal` | Futsal | teams (5–10) | final score | on |
+| `chess` | Chess | players | final score | on |
+| `egaming` | Egaming | players or teams | best-of games | off |
+| `athletics` | Athletics (sprints & runs) | players | final score | off |
+
+Left out for now (niche; can be added from the admin panel with no release): Arm Wrestling, Tug of War, Throwball.
 
 **Where the list comes from**
 - **If B4 (remote lists) is implemented:** do **not** hardcode the list. The More options come from the remote `sports` config (key, label, icon/emoji, `kind` racket/team, default roster min/max, `tier` primary | more, `enabled_for` tournaments/communities). The bundled fallback is just today's sports, so new sports can be added from the admin panel with no release.
@@ -187,5 +196,6 @@ Principle: **the server decides what the app shows; the app renders it.**
 - [ ] Ship B1 (OTA updates) in the very next store build? (recommended)
 - [ ] Which screen is "pending invites" (A7)?
 - [ ] Web domain to use in share links (Vercel domain vs `sportron.app`)?
-- [ ] A4.1: share the sports image so the "More" list can be filled in.
+- [x] A4.1: "More" list chosen: Futsal, Chess, Egaming, Athletics.
+- [x] Decided: share domain `sportron.app`; ship OTA (B1) in the next store build; discount code = tap to reveal, one shared code per tournament.
 - [ ] Discount code (A8): visible card, tap to reveal, or hidden easter egg? One shared code per tournament or unique per user?
