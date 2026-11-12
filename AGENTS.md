@@ -448,6 +448,19 @@ npx expo install   # Install dependencies matching SDK 57
 supabase functions deploy <name>  # Deploy a changed edge function (e.g. send-notification)
 ```
 
+### Dependencies & lock file (mandatory — EAS `npm ci` failure, Nov 2026)
+- EAS Build runs **`npm ci --include=dev` with an older npm (v10)** than local dev (v11). npm 11 tolerates a lock file that npm 10 rejects with `EUSAGE … package.json and package-lock.json are in sync` (e.g. `Missing: @react-native-async-storage/async-storage@1.24.0` — Firebase's optional peer, nested copies under `firebase/` and `@firebase/auth-compat/`).
+- **After any change to `package.json` / `package-lock.json`, regenerate the lock with npm 10 and verify with both versions before building:**
+  ```bash
+  npx -y npm@10 install --package-lock-only
+  npx -y npm@10 ci --dry-run --include=dev   # must pass (this is what EAS runs)
+  npm ci --dry-run --include=dev             # must also pass
+  ```
+- Never hand-edit the lock file or commit one generated only by npm 11. Always commit `package-lock.json` together with `package.json`.
+
+### Release version bump (mandatory checklist)
+- Bump the app version in **all** of: `app.json` (`expo.version`), `src/lib/whatsNew.ts` (`WHATS_NEW_VERSION`), and the "Version x.y.z" text in `src/app/(tabs)/profile.tsx`. Android `versionCode` is managed by EAS (`appVersionSource: remote` + `autoIncrement`) — do not set it manually.
+
 ### Environment
 Create `.env` from `.env.example` (see README) — includes Supabase + Cloudinary creds.
 

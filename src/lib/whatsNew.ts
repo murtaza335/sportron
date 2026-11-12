@@ -2,7 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const WHATS_NEW_KEY = 'whats_new_viewed_version';
 /** Bundled fallback version. A remote `whats_new` config (B3) overrides it without a release. */
-export const WHATS_NEW_VERSION = '1.0.1';
+export const WHATS_NEW_VERSION = '1.0.2';
 const CURRENT_VERSION = WHATS_NEW_VERSION;
 
 export interface WhatsNewItem {

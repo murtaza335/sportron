@@ -285,7 +285,7 @@ export default function ProfileScreen() {
             </ThemedText>
           </View>
           <ThemedText variant="body" muted style={styles.whatsNewSubtitle}>
-            Version 1.0.1 — New features and improvements
+            Version 1.0.2 — New features and improvements
           </ThemedText>
           <View style={styles.whatsNewList}>
             {whatsNewItems.map((item) => (
