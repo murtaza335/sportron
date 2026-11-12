@@ -73,7 +73,10 @@
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
