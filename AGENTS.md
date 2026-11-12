@@ -411,6 +411,10 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Modals (`fullScreenModal` + slide_from_bottom): `/add-match`, `/create-community`, `/create-session`, `/chat`
 - `src/app/chat.tsx` reads `{ type: 'community' | 'session', id }` and renders the matching `CommunityChatPopup` / `SessionChatPopup` full screen. Chat **push notification** taps (`session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply`) navigate here directly via `useFCM.navigateToNotification` (previously they opened the community/history screen).
 - Auth screens: `/login`, `/onboarding`, `/auth/callback`
+- **New-route rules (mandatory — web deep links / hard reloads)**:
+  1. **Back must never land on a non-existent screen.** `HeaderBack` falls back to the *parent path* (last segment cut) when there is no history (refresh, shared link). That parent must be a real screen. Folders with no index screen (`/community`, `/tournament`, `/profile`, `/auth`, and the `/module` segment) are mapped in `NON_SCREEN_PARENTS` / `parentOf` in `src/components/HeaderBack.tsx`. When you add a route whose parent folder has no screen of its own, add it there (or pass an explicit `fallback` to `goBack`/`HeaderBack`). Past bug: `/tournament/<id>/module/<mid>` → Back → `/tournament/<id>/module` = "Unmatched Route".
+  2. **Every new dynamic route needs a rewrite in `vercel.json`** (`/foo/:id` → `/foo/[id]` — destination without `.html`, because `cleanUrls` is on), otherwise a hard reload / pasted link on the web build is a Vercel 404. Deploy with the steps in `web-deploy-commands.txt` (includes copying `+not-found.html` to `dist/404.html` so unknown URLs show the app's own page).
+  3. After adding routes, sanity-check each route's parent and rewrite (the script idea: list `src/app` routes, compute `parentOf`, confirm the result is a screen).
 
 ### Theme
 - `useTheme()` returns `{ ...Colors[resolvedColorScheme], colorScheme(from origin), resolvedColorScheme, toggleTheme, setTheme }`

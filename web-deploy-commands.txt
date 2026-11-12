@@ -1,3 +1,4 @@
 npx expo export -p web
 cp vercel.json dist/vercel.json
+cp "dist/+not-found.html" dist/404.html
 vercel ./dist --prod

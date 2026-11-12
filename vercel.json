@@ -1,9 +1,85 @@
 {
   "cleanUrls": true,
+  "redirects": [
+    {
+      "source": "/tournament",
+      "destination": "/tournaments",
+      "permanent": false
+    },
+    {
+      "source": "/community",
+      "destination": "/",
+      "permanent": false
+    }
+  ],
   "rewrites": [
     {
-      "source": "/:path*",
-      "destination": "/index.html"
+      "source": "/tournament/:id/module/:moduleId/entry-form",
+      "destination": "/tournament/[id]/module/[moduleId]/entry-form"
+    },
+    {
+      "source": "/tournament/:id/module/:moduleId/knockout",
+      "destination": "/tournament/[id]/module/[moduleId]/knockout"
+    },
+    {
+      "source": "/tournament/:id/module/:moduleId/manage",
+      "destination": "/tournament/[id]/module/[moduleId]/manage"
+    },
+    {
+      "source": "/tournament/:id/module/:moduleId/rounds",
+      "destination": "/tournament/[id]/module/[moduleId]/rounds"
+    },
+    {
+      "source": "/tournament/:id/module/:moduleId/seeding",
+      "destination": "/tournament/[id]/module/[moduleId]/seeding"
+    },
+    {
+      "source": "/tournament/:id/module/:moduleId",
+      "destination": "/tournament/[id]/module/[moduleId]"
+    },
+    {
+      "source": "/tournament/:id/fields",
+      "destination": "/tournament/[id]/fields"
+    },
+    {
+      "source": "/tournament/:id/manage",
+      "destination": "/tournament/[id]/manage"
+    },
+    {
+      "source": "/tournament/:id/module-form",
+      "destination": "/tournament/[id]/module-form"
+    },
+    {
+      "source": "/tournament/:id",
+      "destination": "/tournament/[id]"
+    },
+    {
+      "source": "/community/:id/edit",
+      "destination": "/community/[id]/edit"
+    },
+    {
+      "source": "/community/:id/info",
+      "destination": "/community/[id]/info"
+    },
+    {
+      "source": "/community/:id/join-requests",
+      "destination": "/community/[id]/join-requests"
+    },
+    {
+      "source": "/community/:id/members",
+      "destination": "/community/[id]/members"
+    },
+    {
+      "source": "/community/:id/pending-matches",
+      "destination": "/community/[id]/pending-matches"
+    },
+    {
+      "source": "/community/:id",
+      "destination": "/community/[id]"
+    },
+    {
+      "source": "/profile/:id",
+      "destination": "/profile/[id]"
     }
   ],
   "headers": [
