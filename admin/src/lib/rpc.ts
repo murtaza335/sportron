@@ -1,7 +1,7 @@
 import { supabase } from './supabase';
 import { toAdminError } from './errors';
 
-export type PlatformRole = 'super_admin' | 'tournament_manager';
+export type PlatformRole = 'super_admin' | 'tournament_manager' | 'moderator';
 export type TournamentStatus = 'draft' | 'published' | 'completed' | 'cancelled';
 
 async function call<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
@@ -215,12 +215,71 @@ export const rpc = {
       p_community: b.community ?? null, p_cta_url: b.cta_url ?? null, p_note: b.note ?? null,
     }),
   listBroadcasts: () => call<BroadcastRow[]>('admin_list_broadcasts', { p_limit: 25 }),
+  listReports: (args: { status?: ReportStatus; targetType?: string | null; before?: string | null; limit?: number }) =>
+    call<ReportQueueRow[]>('admin_list_reports', {
+      p_status: args.status ?? 'open',
+      p_target_type: args.targetType ?? null,
+      p_limit: args.limit ?? 50,
+      p_before: args.before ?? null,
+    }),
+  getReportTarget: (type: string, id: string) =>
+    call<ReportTargetDetail>('admin_get_report_target', { p_target_type: type, p_target_id: id }),
+  resolveReports: (type: string, id: string, status: 'actioned' | 'dismissed', action: ReportAction | null, note?: string) =>
+    call<number>('admin_resolve_reports', {
+      p_target_type: type, p_target_id: id, p_status: status, p_action: action, p_note: note || null,
+    }),
+  removeReportedContent: (type: string, id: string, note?: string) =>
+    call<number>('admin_remove_reported_content', { p_target_type: type, p_target_id: id, p_note: note || null }),
+  reportStats: async () => (await call<ReportStats[]>('admin_report_stats'))[0],
   listPromos: (id: string) => call<PromoRow[]>('admin_list_tournament_promos', { p_tournament: id }),
   createPromo: (id: string, set: PromoSet, note?: string) =>
     call<string>('admin_upsert_tournament_promo', { p_tournament: id, p_promo: null, p_set: set, p_note: note || null }),
   endPromo: (promoId: string, note?: string) =>
     call<void>('admin_end_tournament_promo', { p_promo: promoId, p_note: note || null }),
 };
+
+export type ReportStatus = 'open' | 'actioned' | 'dismissed';
+export type ReportAction = 'none' | 'content_removed' | 'warned' | 'other';
+export interface ReportQueueRow {
+  target_type: string;
+  target_id: string;
+  report_count: number;
+  reporter_count: number;
+  top_reason: string;
+  first_reported: string;
+  last_reported: string;
+  snapshot: Record<string, unknown> | null;
+  owner_id: string | null;
+  owner_username: string | null;
+  community_id: string | null;
+  session_id: string | null;
+}
+export interface ReportItem {
+  id: string;
+  reporter_id: string;
+  reporter_username: string | null;
+  reason: string;
+  details: string | null;
+  status: ReportStatus;
+  action_taken: ReportAction | null;
+  resolution_note: string | null;
+  created_at: string;
+  resolved_at: string | null;
+}
+export interface ReportTargetDetail {
+  target_type: string;
+  target_id: string;
+  reports: ReportItem[];
+  snapshot: Record<string, unknown> | null;
+  live: { deleted: boolean; content: Record<string, unknown> | null };
+  owner: { id: string; username: string | null; avatar_url: string | null; deleted: boolean; created_at: string } | null;
+  owner_history: { open: number; actioned: number; dismissed: number } | null;
+}
+export interface ReportStats {
+  open_count: number;
+  opened_last_24h: number;
+  oldest_open: string | null;
+}
 
 export type PromoRow = {
   id: string;

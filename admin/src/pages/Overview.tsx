@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { rpc, type Overview as OverviewData } from '../lib/rpc';
+import { rpc, type Overview as OverviewData, type ReportStats } from '../lib/rpc';
 import { errorText } from '../lib/errors';
 import { useAuth } from '../auth/AuthProvider';
 
@@ -8,9 +8,12 @@ export function Overview() {
   const { role } = useAuth();
   const [data, setData] = useState<OverviewData | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [reports, setReports] = useState<ReportStats | null>(null);
 
   useEffect(() => {
     rpc.overview().then(setData).catch((e) => setError(errorText(e)));
+    // Super admins also see the moderation queue size (non-fatal if it fails).
+    rpc.reportStats().then(setReports).catch(() => undefined);
   }, []);
 
   if (error) return <p className="error">{error}</p>;
@@ -31,6 +34,24 @@ export function Overview() {
           Maintenance mode is <strong>ON</strong>: app users see the maintenance screen.{' '}
           {role === 'super_admin' && <Link to="/settings">Change</Link>}
         </div>
+      )}
+      {reports && (
+        <>
+          <h2>Reports</h2>
+          <div className="tiles">
+            <Link to="/reports" className="tile">
+              <span className="tile-n">{Number(reports.open_count)}</span>
+              <span className="muted">Open reports</span>
+            </Link>
+            <Link to="/reports" className="tile">
+              <span className="tile-n">{Number(reports.opened_last_24h)}</span>
+              <span className="muted">New in 24 h</span>
+            </Link>
+          </div>
+          {reports.oldest_open && (
+            <p className="muted">Oldest open report: {new Date(reports.oldest_open).toLocaleString()}</p>
+          )}
+        </>
       )}
       <h2>Tournaments</h2>
       <div className="tiles">

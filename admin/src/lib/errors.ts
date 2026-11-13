@@ -43,6 +43,7 @@ const FIELD_LABELS: Record<string, string> = {
   expire_options: 'Expire options must be a JSON array.',
   sport: 'Pick a sport.',
   community: 'Enter the id of an existing community.',
+  note: 'Note is too long (max 1000).',
   session_purposes: 'Session purposes must be a JSON array.',
 };
 
@@ -58,6 +59,8 @@ const CODES: Record<string, string> = {
   AUDIENCE_EMPTY: 'Nobody matches that audience.',
   AUDIENCE_TOO_LARGE: 'That audience is over the 5,000 recipient limit. Narrow it down (a sport or a community).',
   CONFIRM_MISMATCH: 'The name you typed does not match.',
+  NOT_REMOVABLE: 'This kind of content cannot be removed from here. Use Mark actioned after dealing with it.',
+  INVALID_ACTION: 'Invalid action.',
 };
 
 export function messageFor(code: string, field?: string): string {
