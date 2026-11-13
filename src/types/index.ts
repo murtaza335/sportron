@@ -94,6 +94,8 @@ export type Profile = {
   streak_updated_at: string | null;
   completed_sessions: number;
   total_committed_sessions: number;
+  /** Server-owned (migration 131): when the username was last changed; null = never. */
+  username_changed_at?: string | null;
 };
 
 export type NotificationPreferences = {
