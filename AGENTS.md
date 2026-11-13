@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 121 (next = 125) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 131 (next = 132) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -209,6 +209,7 @@ supabase/
 - **Theme picker**: Light / Dark / System (bottom sheet, persisted)
 - **Push notification master toggle** (profile + `/settings`); per-type preferences exist in `profiles.notification_preferences` (`NotificationPreferences`, 33 keys) with defaults in `DEFAULT_NOTIFICATION_PREFERENCES`. Web shows `EnablePushNotificationsButton`
 - **Delete account** (soft delete); re-enabled on re-login
+- **Username change limit (migration 131)**: a username can be changed only **once every 30 days** (rolling, UTC). `profiles.username_changed_at` is server-owned (BEFORE UPDATE trigger `trg_username_change_limit` stamps it and reverts client writes); onboarding INSERT is free; service role/staff are exempt. The error carries a readable `message`, `hint = 'USERNAME_CHANGE_LIMIT'` and the next-allowed ISO date in `detail`. UI: helper text / locked field in `ProfileForm` (`usernameChangedAt`), confirm via `alert()` and the unchanged username is omitted from the update in `(tabs)/profile.tsx`. **Never add a CHECK for this** (trigger-based, fires only on a real change)
 
 ### 10. Tournaments (migrations 084–097; specs in [`docs/tournaments/PLAN.md`](docs/tournaments/PLAN.md) (v1) and [`PLAN-v2.md`](docs/tournaments/PLAN-v2.md) (v2), status in [`PROGRESS.md`](docs/tournaments/PROGRESS.md))
 - **Hierarchy**: Tournament (no sport; created + admins assigned by the owner via SQL — [`owner-sql.md`](docs/tournaments/owner-sql.md)) → **Modules** (one sport each, created by tournament admins) → **entries** (added by module admins only, no self-registration) → a **bracket / fixture list** in one of four **formats**: single elimination (optional 3rd-place match, byes, walkovers), round-robin **league**, **groups + knockout**, **double elimination**. Tournament admins can edit all tournament settings (name, description, organization, location, cover image, dates, status via `update_tournament`, migration 089), edit the entry form, create modules and assign module admins; they also hold module-admin powers in all their modules
@@ -362,6 +363,13 @@ tournament_entries / tournament_rounds / tournament_matches   -- migration 084 (
 ### 13. Admin broadcast push (migration 129)
 - Super admins send a push from the admin panel *Broadcasts* page to everyone / a sport's followers / a community. `admin_send_broadcast` inserts one `admin_broadcast` row per recipient in `in_app_notifications` (so the normal `trg_fcm_push` → `send-notification` path delivers it; no edge function change), logs to `admin_broadcasts` + audit, caps at 5,000 recipients. Tap → `openTarget(data.cta_url)` or Activity. Old builds show it in Past Activity and ignore the tap.
 
+### 14. Reporting (migration 130; plan in [`docs/reporting/PLAN.md`](docs/reporting/PLAN.md))
+- Any signed-in user can report chat messages (session/community), posts, post comments, matches, match comments, profiles, communities, sessions and tournaments. **Ships OTA behind the `reports` feature flag (OFF by default)**: client gate is `useCanReport(ownerId)` (flag + signed in + not your own); old builds simply show no Report UI
+- `reports` has no client access (RLS on, all privileges revoked). `submit_report(p_target_type, p_target_id, p_reason, p_details)` is the only client write: it resolves the target and checks the caller can see it (else `NOT_FOUND`, same code as missing), blocks self-reports (`CANNOT_REPORT_SELF`), is idempotent per (reporter, target) while open, rate-limits to 20 / 24 h (`RATE_LIMITED`) and builds a **server-side snapshot** (chat reports include 5 preceding messages) so a deleted message stays reviewable
+- Staff (roles `super_admin` + new `moderator`, which has report functions only): `admin_list_reports` (grouped by target), `admin_get_report_target`, `admin_resolve_reports`, `admin_remove_reported_content` (deletes chat messages / posts / comments; matches, profiles, communities, sessions, tournaments are not removable from the panel), `admin_report_stats`. The chat-message delete triggers (039/043) were redefined as SECURITY DEFINER with a platform-staff bypass
+- Client: `ReportHost` (mounted once in `_layout.tsx`) + `openReport({type,id,label})` from `lib/reportStore.ts`; `ReportButton` for headers; reasons per target in `lib/reports.ts`. Entry points: `ChatPopup` long-press, `PostCard`/`PostDetailPopup` ⋯ menu, post/match comment long-press, `MatchDetailPopup`, `profile/[id]`, `community/[id]/info`, `SessionDetailPopup`, `tournament/[id]`. Admin panel: `admin/src/pages/Reports.tsx`, nav badge, Overview card, `moderator` in Staff
+- Tests: `docs/reporting/sql-tests.sql` (+ `sql-tests-username.sql`), run via `docs/tournaments/local-db/run.sh`
+
 ### Notification Types
 See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `tournament_module_completed`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`). The DB `in_app_notifications.type` check constraint (migrations 008/014/034/071/077/079/082/088) is the source of truth for stored types and also allows `member_joined`, `community_engagement` and `new_community`, which are **not** in the TS union yet — **adding any new notification type requires a migration extending that check constraint** (a past bug: streak types were inserted before the constraint allowed them, fixed in 071).
 
@@ -380,7 +388,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **125**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **132**
 
 ### Server-side hardening (migrations 098–119 — see `bugreport.md`)
 - **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.

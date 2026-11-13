@@ -1,6 +1,6 @@
 # Reporting (content & user reports) + username change limit — Plan
 
-Status: **draft, not started**. Target delivery: **migrations + admin-panel deploy + EAS Update (OTA)** — no new store build.
+Status: **implemented in code (steps 1–11 of §9); rollout (§8) pending — needs the owner**. Target delivery: **migrations + admin-panel deploy + EAS Update (OTA)** — no new store build.
 
 This release has two parts:
 - **Part A: Reporting** (§1–§11)
@@ -216,17 +216,17 @@ Reporter usernames are visible to staff only, never to the reported user.
 
 ## 9. Implementation steps (checklist)
 
-1. [ ] Migration 130: `reports` table, indexes, RLS lock-down, audit trigger, `moderator` role.
-2. [ ] `submit_report` with per-type visibility checks, snapshot builder, rate limit.
-3. [ ] Admin RPCs: list / get target / resolve / remove content / stats.
-4. [ ] SQL tests; run on the local container.
-5. [ ] `src/lib/reports.ts`, `src/services/reports.ts`, `src/lib/reportStore.ts`, `useCanReport`.
-6. [ ] `ReportSheet` + `<ReportHost/>` mounted in the root layout.
-7. [ ] Entry points 1–9 (chat first, since it's the highest abuse risk; tournaments last).
-8. [ ] Admin panel: Reports page, nav + badge, Overview card, `moderator` role in Staff.
-9. [ ] `tsc` + lint + web pass; verify `git diff --stat` touches no `app.json` / `package.json` / native files.
-10. [ ] **Username limit (§12):** migration 131 + SQL tests; `username_changed_at` on the `Profile` type; profile edit form (helper text, locked state, confirm sheet); onboarding hint; error mapping.
-11. [ ] Update `AGENTS.md`: new section "14. Reporting", the 30-day username rule under Profile, `reports` + `profiles.username_changed_at` in the data model, next migration number (132).
+1. [x] Migration 130: `reports` table, indexes, RLS lock-down, audit trigger, `moderator` role.
+2. [x] `submit_report` with per-type visibility checks, snapshot builder, rate limit.
+3. [x] Admin RPCs: list / get target / resolve / remove content / stats.
+4. [x] SQL tests; run on the local container.
+5. [x] `src/lib/reports.ts`, `src/services/reports.ts`, `src/lib/reportStore.ts`, `useCanReport`.
+6. [x] `ReportSheet` + `<ReportHost/>` mounted in the root layout.
+7. [x] Entry points 1–9 (chat first, since it's the highest abuse risk; tournaments last).
+8. [x] Admin panel: Reports page, nav + badge, Overview card, `moderator` role in Staff.
+9. [x] `tsc` + lint + web pass; verify `git diff --stat` touches no `app.json` / `package.json` / native files.
+10. [x] **Username limit (§12):** migration 131 + SQL tests; `username_changed_at` on the `Profile` type; profile edit form (helper text, locked state, confirm sheet); onboarding hint; error mapping.
+11. [x] Update `AGENTS.md`: new section "14. Reporting", the 30-day username rule under Profile, `reports` + `profiles.username_changed_at` in the data model, next migration number (132).
 12. [ ] Rollout §8.
 
 Rough size: migration ~350 lines SQL, client ~500 lines, admin page ~400 lines.
