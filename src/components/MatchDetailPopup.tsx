@@ -296,7 +296,7 @@ export function MatchDetailPopup({
                   }}
                 />
               )}
-              <ReportButton target={{ type: 'community_match', id: match.id, label: 'match' }} ownerId={match.created_by} size={18} />
+              <ReportButton target={{ type: 'community_match', id: match.id, label: 'match' }} ownerId={(match as { recorded_by?: string }).recorded_by ?? match.recorder?.id} size={18} />
               <Pressable onPress={onClose} hitSlop={8} style={[styles.closeBtn, { backgroundColor: theme.background }]}>
                 <X size={16} color={theme.text} />
               </Pressable>
