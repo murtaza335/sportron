@@ -17,7 +17,7 @@ for f in supabase/migrations/08[4-9]_*.sql supabase/migrations/09[0-7]_*.sql sup
   if echo "$out" | grep -q "ERROR"; then echo "== $f"; echo "$out" | head -8; exit 1; fi
 done
 echo "migrations OK"
-for t in docs/tournaments/sql-tests.sql docs/tournaments/sql-tests-v2.sql docs/admin-panel/sql-tests.sql docs/roadmap/sql-tests.sql docs/reporting/sql-tests.sql; do
+for t in docs/tournaments/sql-tests.sql docs/tournaments/sql-tests-v2.sql docs/admin-panel/sql-tests.sql docs/roadmap/sql-tests.sql docs/reporting/sql-tests.sql docs/reporting/sql-tests-username.sql; do
   echo "== $t"
   $P -f $t 2>&1 | grep -E "ERROR|FAIL|ALL TESTS|CONTEXT|DETAIL|HINT" | head -8
 done
