@@ -1,5 +1,8 @@
 import { haptics } from '@/lib/haptics';
+import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
+import { useCanReport } from '@/hooks/useCanReport';
+import { openReport } from '@/lib/reportStore';
 import { shareCopy } from '@/lib/share';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
@@ -65,6 +68,7 @@ export function MatchDetailPopup({
   communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
+  const canReportOthers = useCanReport(); // per-comment owner is checked at the call site
   const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
 
@@ -292,6 +296,7 @@ export function MatchDetailPopup({
                   }}
                 />
               )}
+              <ReportButton target={{ type: 'community_match', id: match.id, label: 'match' }} ownerId={match.created_by} size={18} />
               <Pressable onPress={onClose} hitSlop={8} style={[styles.closeBtn, { backgroundColor: theme.background }]}>
                 <X size={16} color={theme.text} />
               </Pressable>
@@ -448,7 +453,15 @@ export function MatchDetailPopup({
                         >
                           <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
                         </Pressable>
-                        <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
+                        <Pressable
+                          style={[styles.commentBody, { backgroundColor: theme.background }]}
+                          disabled={!canReportOthers || !comment.profile_id || comment.profile_id === currentUserId}
+                          delayLongPress={350}
+                          onLongPress={() => {
+                            haptics.medium();
+                            openReport({ type: 'community_match_comment', id: comment.id, label: 'comment' });
+                          }}
+                        >
                           <View style={styles.commentMeta}>
                             <Pressable
                               disabled={!comment.profile?.id}
@@ -467,7 +480,7 @@ export function MatchDetailPopup({
                          <ThemedText variant="body" style={styles.commentContent}>
                            {comment.content}
                          </ThemedText>
-                       </View>
+                       </Pressable>
                      </Animated.View>
                    ))}
                 </View>
