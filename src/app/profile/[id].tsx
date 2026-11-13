@@ -1,4 +1,5 @@
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
 import { CountUp } from '@/components/motion/CountUp';
@@ -88,6 +89,7 @@ export default function PublicProfileScreen() {
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {profile && <ShareButton payload={shareCopy.profile({ id: profile.id, username: profile.username })} />}
+              {profile && <ReportButton target={{ type: 'profile', id: profile.id, label: 'profile' }} ownerId={profile.id} />}
               <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
                 <X size={22} color={theme.text} strokeWidth={2} />
               </Pressable>

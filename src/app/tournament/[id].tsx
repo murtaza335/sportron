@@ -1,4 +1,5 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
+import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
@@ -64,6 +65,9 @@ export default function TournamentScreen() {
               >
                 <Settings size={22} color={theme.text} strokeWidth={2} />
               </Pressable>
+              ) : null}
+              {t && !isTournamentAdmin ? (
+                <ReportButton target={{ type: 'tournament', id: t.id, label: 'tournament' }} />
               ) : null}
             </View>
           ),

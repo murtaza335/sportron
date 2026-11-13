@@ -1,4 +1,5 @@
 import { haptics } from '@/lib/haptics';
+import { ReportButton } from '@/components/ReportButton';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
 import { Sheet } from '@/components/motion/Sheet';
@@ -326,6 +327,13 @@ export function SessionDetailPopup({
                   });
                 }}
               />
+              {sessionId ? (
+                <ReportButton
+                  target={{ type: 'session', id: sessionId, label: 'session' }}
+                  ownerId={session?.created_by ?? initialSession?.created_by}
+                  size={18}
+                />
+              ) : null}
               <Pressable
                 onPress={onClose}
                 hitSlop={16}

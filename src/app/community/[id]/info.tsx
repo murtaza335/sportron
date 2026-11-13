@@ -1,8 +1,12 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
 import { ShareButton } from '@/components/ShareButton';
+import { useCanReport } from '@/hooks/useCanReport';
+import { haptics } from '@/lib/haptics';
+import { openReport } from '@/lib/reportStore';
 import { shareCopy } from '@/lib/share';
 import {
   Building2,
+  Flag,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -103,6 +107,7 @@ export default function CommunityInfoScreen() {
   const isMember = !!membership;
   const isAdmin = membership?.role === 'admin';
   const isCreator = !!user && community?.created_by === user.id;
+  const canReportCommunity = useCanReport(community?.created_by);
   const isRestricted = community?.visibility === 'restricted';
 
   const sortedMembers = useMemo(
@@ -484,6 +489,26 @@ export default function CommunityInfoScreen() {
               disabled={!!myPendingInvite || !!myJoinRequest}
               buttonStyle={styles.actionButton}
             />
+          </View>
+        )}
+
+        {/* Report (flag-gated, shown to anyone who can see the community, never to its creator) */}
+        {canReportCommunity && community && (
+          <View style={styles.actionSection}>
+            <Pressable
+              style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                haptics.light();
+                openReport({ type: 'community', id: community.id, label: 'community' });
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Flag size={20} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText variant="body" muted style={{ fontWeight: '600', flex: 1 }}>
+                Report community
+              </ThemedText>
+            </Pressable>
           </View>
         )}
 
