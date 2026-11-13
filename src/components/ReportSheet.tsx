@@ -1,5 +1,5 @@
 import { Check } from 'lucide-react-native';
-import { useEffect, useState } from 'react';
+import { useState } from 'react';
 import { Pressable, StyleSheet, TextInput, View } from 'react-native';
 
 import { Sheet, SheetScrollView } from '@/components/motion/Sheet';
@@ -21,9 +21,7 @@ export function ReportHost() {
   const target = useReportTarget();
   // Keep rendering the last target while the sheet animates out.
   const [shown, setShown] = useState<ReportTarget | null>(null);
-  useEffect(() => {
-    if (target) setShown(target);
-  }, [target]);
+  if (target && target !== shown) setShown(target);
 
   return (
     <Sheet visible={!!target} onClose={closeReport} maxHeight="90%" onClosed={() => setShown(null)}>
