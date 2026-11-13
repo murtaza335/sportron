@@ -19,6 +19,27 @@ export function saveReturnTo(path: string) {
   }
 }
 
+function valid(path: string | null): Href | null {
+  return path && path.startsWith('/') && !path.startsWith('//') && !SKIP.test(path) ? (path as Href) : null;
+}
+
+/** Returns the saved page WITHOUT clearing it (native OAuth callback). */
+export function peekReturnTo(): Href | null {
+  return valid(memory);
+}
+
+/** Forget any saved page (called once the user is signed in and settled in the app). */
+export function clearReturnTo() {
+  memory = null;
+  if (Platform.OS === 'web') {
+    try {
+      window.sessionStorage.removeItem(KEY);
+    } catch {
+      // ignore
+    }
+  }
+}
+
 /** Returns the saved page (once) and clears it. */
 export function consumeReturnTo(): Href | null {
   let path = memory;
@@ -31,5 +52,5 @@ export function consumeReturnTo(): Href | null {
       // ignore
     }
   }
-  return path && path.startsWith('/') && !path.startsWith('//') && !SKIP.test(path) ? (path as Href) : null;
+  return valid(path);
 }

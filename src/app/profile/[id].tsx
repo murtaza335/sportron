@@ -1,4 +1,7 @@
 import Animated, { FadeInDown, ZoomIn } from 'react-native-reanimated';
+import { ReportButton } from '@/components/ReportButton';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { CountUp } from '@/components/motion/CountUp';
 import { SkeletonProvider } from '@/components/motion/Skeleton';
 import { ProfileHeaderSkeleton } from '@/components/skeletons';
@@ -26,7 +29,7 @@ import type {
   CommunityMemberStats,
   Profile,
 } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { formatDate } from '@/lib/date';
 import { StreakDisplay } from '@/components/StreakDisplay';
 import { goBack } from '@/lib/nav';
@@ -84,9 +87,13 @@ export default function PublicProfileScreen() {
           headerShown: true,
           title: profile?.username ?? 'Profile',
           headerRight: () => (
-            <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
-              <X size={22} color={theme.text} strokeWidth={2} />
-            </Pressable>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {profile && <ShareButton payload={shareCopy.profile({ id: profile.id, username: profile.username })} />}
+              {profile && <ReportButton target={{ type: 'profile', id: profile.id, label: 'profile' }} ownerId={profile.id} />}
+              <Pressable onPress={() => goBack(router, '/')} hitSlop={12} style={({ pressed }) => pressed && { opacity: 0.6 }}>
+                <X size={22} color={theme.text} strokeWidth={2} />
+              </Pressable>
+            </View>
           ),
         }}
       />
@@ -139,7 +146,7 @@ export default function PublicProfileScreen() {
                 {communityInfo && (
                   <View style={[styles.sportBadge, { backgroundColor: theme.backgroundSelected }]}>
                     <ThemedText variant="caption" style={styles.sportBadgeText}>
-                      {SPORT_LABELS[communityInfo.sport]}
+                      {communitySportLabel(communityInfo)}
                     </ThemedText>
                   </View>
                 )}

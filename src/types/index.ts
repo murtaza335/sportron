@@ -30,6 +30,12 @@ export const SPORT_LABELS: Record<Sport, string> = {
   other: 'Other',
 };
 
+/** Label for a community's sport: the exact name for Other communities, else the standard label. */
+export function communitySportLabel(c: { sport: Sport; custom_sport_name?: string | null }): string {
+  if (c.sport === 'other' && c.custom_sport_name?.trim()) return c.custom_sport_name.trim();
+  return SPORT_LABELS[c.sport] ?? c.sport;
+}
+
 export function isRacketSport(sport: Sport): boolean {
   return RACKET_SPORTS.includes(sport);
 }
@@ -88,6 +94,8 @@ export type Profile = {
   streak_updated_at: string | null;
   completed_sessions: number;
   total_committed_sessions: number;
+  /** Server-owned (migration 131): when the username was last changed; null = never. */
+  username_changed_at?: string | null;
 };
 
 export type NotificationPreferences = {
@@ -255,7 +263,9 @@ export type NotificationType =
   // DB-only types (allowed by the in_app_notifications check constraint, migrations 080/081/083)
   | 'member_joined'
   | 'community_engagement'
-  | 'new_community';
+  | 'new_community'
+  // Staff broadcast from the admin panel (migration 129)
+  | 'admin_broadcast';
 
 export type InAppNotification = {
   id: string;
@@ -279,6 +289,8 @@ export type Community = {
   image_url: string | null;
   visibility: CommunityVisibility;
   sport: Sport;
+  /** Exact sport name when `sport` is 'other' (migration 126; null for older rows). */
+  custom_sport_name?: string | null;
   created_by: string;
   created_at: string;
   updated_at: string;
@@ -320,6 +332,8 @@ export type CreateCommunityInput = {
   location?: string;
   visibility: CommunityVisibility;
   sport: Sport;
+  /** Required (new builds) when sport is 'other'. */
+  custom_sport_name?: string;
   image_url?: string;
 };
 
@@ -330,6 +344,8 @@ export type UpdateCommunityInput = {
   location?: string | null;
   visibility?: CommunityVisibility;
   image_url?: string | null;
+  /** Admins can set or fix the exact name of an Other community (the sport itself is locked). */
+  custom_sport_name?: string | null;
   pings_enabled?: boolean;
 };
 

@@ -23,6 +23,28 @@ const FIELD_LABELS: Record<string, string> = {
   store_url: 'Store link must be empty or start with https://.',
   enabled: 'Invalid value.',
   settings: 'Invalid request.',
+  title: 'Title is required (max 80).',
+  body: 'Body is too long (max 400).',
+  image_url: 'Image must be a Cloudinary (https://res.cloudinary.com/…) URL.',
+  cta_label: 'Button label is too long (max 30).',
+  cta_url: 'Button link must start with / (in-app) or https://.',
+  placement: 'Invalid placement.',
+  audience: 'Invalid audience.',
+  platforms: 'Platforms must be android, ios or web.',
+  max_shows: 'Max shows must be 1 or more.',
+  data: 'Invalid request.',
+  key: 'Key is not valid (lowercase letters, digits, underscore) or not allowed.',
+  rollout_percent: 'Rollout must be 0–100.',
+  value: 'Value is required.',
+  sports: 'Sports list is invalid: each item needs key, label, kind (racket/team), tier (primary/more); keys must be unique and not "other".',
+  tips: 'Tips must be a JSON object keyed by tip id.',
+  whats_new: 'What\'s New must be {"version": "…", "items": [...]}.',
+  limits: 'Limits must be a JSON object.',
+  expire_options: 'Expire options must be a JSON array.',
+  sport: 'Pick a sport.',
+  community: 'Enter the id of an existing community.',
+  note: 'Note is too long (max 1000).',
+  session_purposes: 'Session purposes must be a JSON array.',
 };
 
 const CODES: Record<string, string> = {
@@ -34,7 +56,11 @@ const CODES: Record<string, string> = {
   CANNOT_CHANGE_SELF: 'You cannot change your own role. Ask another super admin.',
   NOT_COMPLETED: 'Only a completed module can be reopened.',
   TOURNAMENT_FINISHED: 'The tournament is completed or cancelled. Set it back to published or draft first.',
+  AUDIENCE_EMPTY: 'Nobody matches that audience.',
+  AUDIENCE_TOO_LARGE: 'That audience is over the 5,000 recipient limit. Narrow it down (a sport or a community).',
   CONFIRM_MISMATCH: 'The name you typed does not match.',
+  NOT_REMOVABLE: 'This kind of content cannot be removed from here. Use Mark actioned after dealing with it.',
+  INVALID_ACTION: 'Invalid action.',
 };
 
 export function messageFor(code: string, field?: string): string {

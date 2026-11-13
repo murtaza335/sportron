@@ -7,9 +7,14 @@ import { NotAuthorized } from './pages/NotAuthorized';
 import { Overview } from './pages/Overview';
 import { Settings } from './pages/Settings';
 import { Staff } from './pages/Staff';
+import { Announcements } from './pages/Announcements';
+import { Config } from './pages/Config';
+import { Broadcasts } from './pages/Broadcasts';
 import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
+import { Reports } from './pages/Reports';
+import { HomeRedirect } from './pages/HomeRedirect';
 
 export const router = createBrowserRouter([
   { path: '/login', element: <Login /> },
@@ -23,7 +28,15 @@ export const router = createBrowserRouter([
       </RequireRole>
     ),
     children: [
-      { index: true, element: <Overview /> },
+      { index: true, element: <HomeRedirect><Overview /></HomeRedirect> },
+      {
+        path: 'reports',
+        element: (
+          <RequireRole roles={['super_admin', 'moderator']}>
+            <Reports />
+          </RequireRole>
+        ),
+      },
       {
         path: 'settings',
         element: (
@@ -32,9 +45,33 @@ export const router = createBrowserRouter([
           </RequireRole>
         ),
       },
-      { path: 'tournaments', element: <Tournaments /> },
-      { path: 'tournaments/new', element: <TournamentNew /> },
-      { path: 'tournaments/:id', element: <TournamentDetail /> },
+      {
+        path: 'announcements',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Announcements />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'broadcasts',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Broadcasts />
+          </RequireRole>
+        ),
+      },
+      {
+        path: 'config',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <Config />
+          </RequireRole>
+        ),
+      },
+      { path: 'tournaments', element: <RequireRole roles={['super_admin', 'tournament_manager']}><Tournaments /></RequireRole> },
+      { path: 'tournaments/new', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentNew /></RequireRole> },
+      { path: 'tournaments/:id', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentDetail /></RequireRole> },
       {
         path: 'staff',
         element: (

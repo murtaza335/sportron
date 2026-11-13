@@ -6,6 +6,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/lib/supabase';
+import { openTarget } from '@/lib/openTarget';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { removeFCMToken } from '@/services/profiles';
 import {
@@ -179,6 +180,13 @@ export function useFCM() {
           } else if (data.tournamentId) {
             router.push(tournamentRoutes.tournament(data.tournamentId));
           }
+          return;
+        }
+        case 'admin_broadcast': {
+          // Staff broadcast: open its link if it has one, otherwise the Activity inbox.
+          openTarget(router, data.cta_url).then((ok) => {
+            if (!ok) router.navigate('/updates');
+          });
           return;
         }
         default:

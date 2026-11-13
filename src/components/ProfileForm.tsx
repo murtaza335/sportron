@@ -8,7 +8,9 @@ import { alert } from '@/lib/alert';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
+import { Lock } from 'lucide-react-native';
 import { Radius, Spacing } from '@/constants/theme';
+import { formatLongDate, nextUsernameChangeDate, USERNAME_CHANGE_WINDOW_DAYS } from '@/lib/date';
 import { useTheme } from '@/hooks/use-theme';
 import { uploadImageFromUri, type UploadProgress } from '@/lib/cloudinary';
 import { isUsernameAvailable } from '@/services/profiles';
@@ -20,6 +22,12 @@ type ProfileFormProps = {
   submitLabel?: string;
   loading?: boolean;
   excludeUsername?: string;
+  /** When the username was last changed (profile.username_changed_at). Within 30 days the field is locked. */
+  usernameChangedAt?: string | null;
+  /** Helper text under the username field (default: the edit-profile wording). */
+  usernameHint?: string;
+  /** Inline error for the username field, e.g. the server's 30-day limit. */
+  usernameError?: string | null;
   onSubmit: (data: { username: string; bio: string; avatarUrl?: string | null }) => void;
 };
 
@@ -36,9 +44,13 @@ export function ProfileForm({
   submitLabel = 'Continue',
   loading = false,
   excludeUsername,
+  usernameChangedAt = null,
+  usernameHint = `You can change your username once every ${USERNAME_CHANGE_WINDOW_DAYS} days.`,
+  usernameError = null,
   onSubmit,
 }: ProfileFormProps) {
   const theme = useTheme();
+  const lockedUntil = nextUsernameChangeDate(usernameChangedAt);
   const [username, setUsername] = useState(initialName);
   const [bio, setBio] = useState(initialBio);
 const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
@@ -191,19 +203,38 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
         <ThemedText variant="label" muted>
           Username
         </ThemedText>
+        <View style={styles.usernameRow}>
         <FocusTextInput
-          value={username}
+          value={lockedUntil ? initialName : username}
+          editable={!lockedUntil}
           onChangeText={(text) => setUsername(text.toLowerCase().replace(/[^a-z0-9._-]/g, ''))}
           maxLength={20}
           placeholder="Your username"
           placeholderTextColor={theme.textSecondary}
-          style={[styles.input, { color: theme.text, borderColor: theme.border }]}
+          style={[styles.input, { flex: 1, color: lockedUntil ? theme.textSecondary : theme.text, borderColor: theme.border }]}
           autoCapitalize="none"
           autoCorrect={false}
           autoComplete="off"
           accessibilityLabel="Username"
         />
-        {value.length > 0 && !formatValid ? (
+        {lockedUntil ? <Lock size={18} color={theme.textSecondary} strokeWidth={2} style={styles.lockIcon} /> : null}
+        </View>
+        {lockedUntil ? (
+          <ThemedText variant="caption" muted>
+            {usernameChangedAt ? `You changed your username on ${formatLongDate(usernameChangedAt)}. ` : ''}
+            You can change it again on {formatLongDate(lockedUntil)}.
+          </ThemedText>
+        ) : (
+          <ThemedText variant="caption" muted>
+            {usernameHint}
+          </ThemedText>
+        )}
+        {usernameError ? (
+          <ThemedText variant="caption" style={{ color: theme.error }}>
+            {usernameError}
+          </ThemedText>
+        ) : null}
+        {lockedUntil ? null : value.length > 0 && !formatValid ? (
           <ThemedText variant="caption" style={{ color: theme.error }}>
             Use 3-20 characters: lowercase letters, numbers, dots, dashes or underscores.
           </ThemedText>
@@ -259,6 +290,8 @@ const [avatarUrl, setAvatarUrl] = useState<string | null>(initialAvatar);
 }
 
 const styles = StyleSheet.create({
+  usernameRow: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm },
+  lockIcon: { marginRight: Spacing.xs },
   container: {
     gap: Spacing.lg,
   },

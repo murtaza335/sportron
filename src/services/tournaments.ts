@@ -12,6 +12,9 @@ import type {
   Sport,
   Tournament,
   TournamentDetail,
+  TournamentPromo,
+  TournamentPromoAdmin,
+  TournamentPromoInput,
   TeamMemberInput,
   TournamentEntry,
   TournamentEntryMember,
@@ -186,6 +189,12 @@ export async function reorderEntryFields(tournamentId: string, ids: string[]): P
   await rpc<null>('reorder_tournament_entry_fields', { p_tournament: tournamentId, p_ids: ids });
 }
 
+/** Other / More sports carry their exact name + key (migration 126); known sports send nothing extra. */
+function sportDetailParams(input: ModuleFormInput): Record<string, string | null> {
+  if (input.sport !== 'other') return {};
+  return { p_custom_sport_name: input.custom_sport_name ?? null, p_sport_key: input.sport_key ?? null };
+}
+
 export async function createModule(tournamentId: string, input: ModuleFormInput): Promise<string> {
   return rpc<string>('create_tournament_module', {
     p_tournament: tournamentId,
@@ -198,6 +207,7 @@ export async function createModule(tournamentId: string, input: ModuleFormInput)
     p_max_entries: input.max_entries,
     p_third_place: input.third_place_match,
     p_seeding_method: input.seeding_method,
+    ...sportDetailParams(input),
   });
 }
 
@@ -213,6 +223,7 @@ export async function updateModule(moduleId: string, input: ModuleFormInput): Pr
     p_max_entries: input.max_entries,
     p_third_place: input.third_place_match,
     p_seeding_method: input.seeding_method,
+    ...sportDetailParams(input),
   });
 }
 
@@ -353,3 +364,33 @@ export async function scheduleMatch(
 }
 
 export type { Tournament };
+
+// ─── Discount codes (A8) ─────────────────────────────────────────────────────
+
+export async function fetchTournamentPromos(tournamentId: string): Promise<TournamentPromo[]> {
+  const rows = await rpc<TournamentPromo[] | null>('get_tournament_promos', { p_tournament: tournamentId });
+  return rows ?? [];
+}
+
+/** Returns the code and records the reveal (idempotent). */
+export async function revealTournamentPromo(promoId: string): Promise<string> {
+  return rpc<string>('reveal_tournament_promo', { p_promo: promoId });
+}
+
+export async function fetchTournamentPromosManage(tournamentId: string): Promise<TournamentPromoAdmin[]> {
+  const rows = await rpc<TournamentPromoAdmin[] | null>('get_tournament_promos_manage', { p_tournament: tournamentId });
+  return (rows ?? []).map((r) => ({ ...r, reveal_count: Number(r.reveal_count ?? 0) }));
+}
+
+/** Create (promoId null) or patch a promo. Only the keys present in `input` change. */
+export async function upsertTournamentPromo(
+  tournamentId: string,
+  promoId: string | null,
+  input: TournamentPromoInput,
+): Promise<string> {
+  return rpc<string>('upsert_tournament_promo', { p_tournament: tournamentId, p_promo: promoId, p_set: input });
+}
+
+export async function endTournamentPromo(promoId: string): Promise<void> {
+  await rpc<void>('end_tournament_promo', { p_promo: promoId });
+}

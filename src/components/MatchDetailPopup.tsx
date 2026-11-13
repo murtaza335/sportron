@@ -1,4 +1,9 @@
 import { haptics } from '@/lib/haptics';
+import { ReportButton } from '@/components/ReportButton';
+import { ShareButton } from '@/components/ShareButton';
+import { useCanReport } from '@/hooks/useCanReport';
+import { openReport } from '@/lib/reportStore';
+import { shareCopy } from '@/lib/share';
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { LikeButton } from '@/components/motion/LikeButton';
@@ -63,6 +68,7 @@ export function MatchDetailPopup({
   communityId,
 }: MatchDetailPopupProps) {
   const theme = useTheme();
+  const canReportOthers = useCanReport(); // per-comment owner is checked at the call site
   const { height: windowHeight } = useWindowDimensions();
   const router = useRouter();
 
@@ -274,6 +280,23 @@ export function MatchDetailPopup({
                 </View>
               </View>
 
+              {communityId && (
+                <ShareButton
+                  size={18}
+                  payload={() => {
+                    const aWon = match.player_score >= match.opponent_score;
+                    const a = [match.player?.username, match.playerPartner?.username].filter(Boolean).join(' + ') || 'Player A';
+                    const b = [match.opponent?.username, match.opponentPartner?.username].filter(Boolean).join(' + ') || match.opponent_guest_name || 'Guest';
+                    return shareCopy.match({
+                      communityId,
+                      winner: aWon ? a : b,
+                      loser: aWon ? b : a,
+                      score: `${Math.max(match.player_score, match.opponent_score)}–${Math.min(match.player_score, match.opponent_score)}`,
+                    });
+                  }}
+                />
+              )}
+              <ReportButton target={{ type: 'community_match', id: match.id, label: 'match' }} ownerId={(match as { recorded_by?: string }).recorded_by ?? match.recorder?.id} size={18} />
               <Pressable onPress={onClose} hitSlop={8} style={[styles.closeBtn, { backgroundColor: theme.background }]}>
                 <X size={16} color={theme.text} />
               </Pressable>
@@ -430,7 +453,15 @@ export function MatchDetailPopup({
                         >
                           <UserAvatar avatarUrl={comment.profile?.avatar_url} size={28} />
                         </Pressable>
-                        <View style={[styles.commentBody, { backgroundColor: theme.background }]}>
+                        <Pressable
+                          style={[styles.commentBody, { backgroundColor: theme.background }]}
+                          disabled={!canReportOthers || !comment.profile_id || comment.profile_id === currentUserId}
+                          delayLongPress={350}
+                          onLongPress={() => {
+                            haptics.medium();
+                            openReport({ type: 'community_match_comment', id: comment.id, label: 'comment' });
+                          }}
+                        >
                           <View style={styles.commentMeta}>
                             <Pressable
                               disabled={!comment.profile?.id}
@@ -449,7 +480,7 @@ export function MatchDetailPopup({
                          <ThemedText variant="body" style={styles.commentContent}>
                            {comment.content}
                          </ThemedText>
-                       </View>
+                       </Pressable>
                      </Animated.View>
                    ))}
                 </View>

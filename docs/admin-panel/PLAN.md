@@ -2,7 +2,7 @@
 
 Status: **implemented in code (migrations 122–124 + `admin/` site); not yet deployed or applied to the live project.** Next migration number: **125**.
 
-v1 is a small, separate website (`admin.sportron.app`) where the Sportron team does what it currently
+v1 is a small, separate website (`sportron-admin.vercel.app`) where the Sportron team does what it currently
 does by pasting SQL into the Supabase editor. Nothing more. Moderation (reports, bans) comes later
 (§11) and isn't part of this plan.
 
@@ -37,7 +37,7 @@ matches (tournament and module admins keep doing that in the app), and any chang
 ## 2. Architecture
 
 ```
-admin.sportron.app  (Vite + React SPA, its own Vercel project, code in admin/)
+sportron-admin.vercel.app  (Vite + React SPA, its own Vercel project, code in admin/)
    │  Google sign-in, same Supabase project, PKCE
    │  anon key + the staff member's own JWT. The service_role key never reaches the browser
    └── supabase.rpc('admin_*')  ──►  SECURITY DEFINER functions (migrations 122–124)
@@ -205,8 +205,8 @@ admin/
 
 ## 6. Hosting and security
 
-- A separate Vercel project, root directory `admin/`, domain `admin.sportron.app`.
-- Supabase → Auth → URL configuration: add `https://admin.sportron.app/auth/callback` and
+- A separate Vercel project, root directory `admin/`, domain `sportron-admin.vercel.app`.
+- Supabase → Auth → URL configuration: add `https://sportron-admin.vercel.app/auth/callback` and
   `http://localhost:5174/auth/callback` to the redirect allowlist. The app's own redirects are untouched.
 - `vercel.json`:
   - SPA rewrite;
@@ -290,6 +290,6 @@ The v1 role table and `admin_*` conventions are built so these slot in without r
 
 ## 12. Open questions
 
-1. Domain: is `admin.sportron.app` OK?
+1. Domain: `sportron-admin.vercel.app` (confirmed).
 2. Who are the first staff, and which role does each get?
 3. Should `tournament_manager` also be able to delete tournaments, or keep that super-admin only?

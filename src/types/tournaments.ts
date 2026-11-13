@@ -66,6 +66,10 @@ export type TournamentModule = {
   tournament_id: string;
   name: string;
   sport: Sport;
+  /** A4 (migration 126): exact name for Other / More sports, key of the More-list entry, how a match is won. */
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
+  scoring_mode?: ScoringMode | null;
   description: string | null;
   rules_text: string | null;
   venue: string | null;
@@ -212,10 +216,15 @@ export type TournamentChampion = {
   third: ChampionRef | null;
 };
 
+export type ScoringMode = 'games' | 'score';
+
 export type TournamentModuleSummary = {
   id: string;
   name: string;
   sport: Sport;
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
+  scoring_mode?: ScoringMode | null;
   status: ModuleStatus;
   entry_count: number;
   starts_at: string | null;
@@ -254,6 +263,8 @@ export type ModuleDetail = {
 export type ModuleFormInput = {
   name: string;
   sport: Sport;
+  custom_sport_name?: string | null;
+  sport_key?: string | null;
   description: string | null;
   rules_text: string | null;
   venue: string | null;
@@ -355,5 +366,52 @@ export type ModuleSettingsPatch = Partial<
     | 'group_count'
     | 'advance_per_group'
     | 'grand_final_reset'
+    | 'scoring_mode'
   >
 >;
+
+// ─── Discount codes (A8, migration 128) ─────────────────────────────────────
+
+export type PromoDisplayMode = 'visible' | 'reveal' | 'hidden';
+
+/** Player view. `code` is null until revealed (unless display_mode is 'visible'). */
+export interface TournamentPromo {
+  id: string;
+  tournament_id: string;
+  title: string;
+  description: string | null;
+  partner_name: string | null;
+  cta_url: string | null;
+  display_mode: PromoDisplayMode;
+  ends_at: string | null;
+  revealed: boolean;
+  code: string | null;
+}
+
+/** Admin view (manage screen): includes the code, schedule, state and reveal count. */
+export interface TournamentPromoAdmin {
+  id: string;
+  tournament_id: string;
+  code: string;
+  title: string;
+  description: string | null;
+  partner_name: string | null;
+  cta_url: string | null;
+  display_mode: PromoDisplayMode;
+  starts_at: string | null;
+  ends_at: string | null;
+  is_active: boolean;
+  reveal_count: number;
+  created_at: string;
+}
+
+export interface TournamentPromoInput {
+  code?: string;
+  title?: string;
+  description?: string | null;
+  partner_name?: string | null;
+  cta_url?: string | null;
+  display_mode?: PromoDisplayMode;
+  starts_at?: string | null;
+  ends_at?: string | null;
+}

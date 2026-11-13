@@ -35,12 +35,17 @@ export default function CreateCommunityScreen() {
   const [organization, setOrganization] = useState('');
   const [location, setLocation] = useState('');
   const [sport, setSport] = useState<Sport>(initialSport ?? 'table_tennis');
+  const [customSportName, setCustomSportName] = useState('');
   const [visibility, setVisibility] = useState<CommunityVisibility>('public');
   const [imageUri, setImageUri] = useState<string | null>(null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const canSave = name.trim().length > 0 && !saving && !uploadingImage;
+  const canSave =
+    name.trim().length > 0 &&
+    (sport !== 'other' || customSportName.trim().length > 0) &&
+    !saving &&
+    !uploadingImage;
 
   const pickImage = async () => {
     const uri = await pickImageUri();
@@ -83,6 +88,7 @@ export default function CreateCommunityScreen() {
         location: location.trim() || undefined,
         visibility,
         sport,
+        custom_sport_name: sport === 'other' ? customSportName.trim() : undefined,
         image_url: uploadedUrl ?? undefined,
       });
       goBack(router, '/');
@@ -285,6 +291,29 @@ export default function CreateCommunityScreen() {
               })}
             </HScrollView>
           </View>
+
+          {sport === 'other' && (
+            <View style={styles.field}>
+              <ThemedText variant="label" muted style={styles.label}>
+                What sport exactly?
+              </ThemedText>
+              <FocusTextInput
+                value={customSportName}
+                onChangeText={setCustomSportName}
+                placeholder="e.g. Padel, Chess, Carrom"
+                placeholderTextColor={theme.textSecondary}
+                style={[
+                  styles.input,
+                  {
+                    color: theme.text,
+                    backgroundColor: theme.backgroundElement,
+                    borderColor: theme.border,
+                  },
+                ]}
+                maxLength={30}
+              />
+            </View>
+          )}
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>

@@ -16,15 +16,15 @@ import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useFCM } from '@/hooks/useFCM';
+import { formatLongDate, USERNAME_CHANGE_WINDOW_DAYS } from '@/lib/date';
 import { signOut } from '@/services/auth';
 import { removeFCMToken, updateNotificationPreferences, updateProfile } from '@/services/profiles';
 import { DEFAULT_NOTIFICATION_PREFERENCES } from '@/types';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import messaging from '@react-native-firebase/messaging';
-import { WHATS_NEW_CONTENT } from '@/lib/whatsNew';
+import { useWhatsNew } from '@/hooks/useWhatsNew';
 
 const PROFILE_DOT_KEY = 'profile_dot_viewed_version';
-const CURRENT_WHATS_NEW_VERSION = '1.0.1';
 
 async function setProfileDotViewedVersion(version: string): Promise<void> {
   try {
@@ -36,11 +36,14 @@ async function setProfileDotViewedVersion(version: string): Promise<void> {
 
 export default function ProfileScreen() {
   const theme = useTheme();
+  const { version: whatsNewVersion, items: whatsNewItems } = useWhatsNew();
   const { colorScheme, setTheme } = useTheme();
   const { profile, refreshProfile, user } = useAuth();
   const insets = useSafeAreaInsets();
   const { requestPermissions } = useFCM();
   const [editing, setEditing] = useState(false);
+  const [saving, setSaving] = useState(false);
+  const [usernameError, setUsernameError] = useState<string | null>(null);
   const [signingOut, setSigningOut] = useState(false);
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [showThemeModal, setShowThemeModal] = useState(false);
@@ -48,8 +51,8 @@ export default function ProfileScreen() {
   // Mark profile dot as viewed when screen is focused
   useFocusEffect(
     useMemo(() => () => {
-      setProfileDotViewedVersion(CURRENT_WHATS_NEW_VERSION);
-    }, [])
+      setProfileDotViewedVersion(whatsNewVersion);
+    }, [whatsNewVersion])
   );
 
 
@@ -96,20 +99,49 @@ export default function ProfileScreen() {
       return;
     }
 
-    setEditing(false);
+    setUsernameError(null);
+    const usernameChanged = data.username !== profile.username;
 
-    try {
-      await updateProfile(profile.id, {
-        username: data.username,
-        bio: data.bio,
-        avatarUrl: data.avatarUrl,
-      });
-      await refreshProfile();
-    } catch (error) {
-      setEditing(true);
-      const message = error instanceof Error ? error.message : 'Could not update profile';
-      alert('Update failed', message);
+    const save = async () => {
+      setSaving(true);
+      try {
+        await updateProfile(profile.id, {
+          // Omitted when unchanged so a locked username never blocks a bio/avatar save (migration 131).
+          ...(usernameChanged ? { username: data.username } : {}),
+          bio: data.bio,
+          avatarUrl: data.avatarUrl,
+        });
+        await refreshProfile();
+        setEditing(false);
+      } catch (error) {
+        const err = error as { message?: string; hint?: string; details?: string } | null;
+        if (err?.hint === 'USERNAME_CHANGE_LIMIT') {
+          // Race / another device: show it inline on the field and keep the form open.
+          const when = err.details ? formatLongDate(err.details) : '';
+          setUsernameError(
+            when ? `You can change your username again on ${when}.` : (err.message ?? 'You can change your username only once every 30 days.'),
+          );
+        } else {
+          alert('Update failed', err?.message ?? 'Could not update profile');
+        }
+      } finally {
+        setSaving(false);
+      }
+    };
+
+    if (!usernameChanged) {
+      await save();
+      return;
     }
+    const until = formatLongDate(new Date(Date.now() + USERNAME_CHANGE_WINDOW_DAYS * 24 * 60 * 60 * 1000));
+    alert(
+      `Change username to @${data.username}?`,
+      `You can only change your username once every ${USERNAME_CHANGE_WINDOW_DAYS} days. You won't be able to change it again until ${until}.`,
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Change username', onPress: () => void save() },
+      ],
+    );
   };
 
   const handleSignOut = async () => {
@@ -166,6 +198,9 @@ export default function ProfileScreen() {
             initialAvatar={profile?.avatar_url ?? null}
             submitLabel="Save changes"
             excludeUsername={profile?.username}
+            usernameChangedAt={profile?.username_changed_at ?? null}
+            usernameError={usernameError}
+            loading={saving}
             onSubmit={handleSave}
           />
         )}
@@ -285,10 +320,10 @@ export default function ProfileScreen() {
             </ThemedText>
           </View>
           <ThemedText variant="body" muted style={styles.whatsNewSubtitle}>
-            Version 1.0.1 — New features and improvements
+            Version 1.0.2 — New features and improvements
           </ThemedText>
           <View style={styles.whatsNewList}>
-            {WHATS_NEW_CONTENT.map((item) => (
+            {whatsNewItems.map((item) => (
               <View key={item.id} style={styles.whatsNewItem}>
                 <View style={[styles.whatsNewTypeBadge, { backgroundColor: getTypeColor(item.type) }]}>
                   <ThemedText variant="caption" style={{ color: '#fff', fontWeight: '700', textTransform: 'uppercase' }}>

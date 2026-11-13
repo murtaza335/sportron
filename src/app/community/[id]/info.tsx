@@ -1,6 +1,12 @@
 import { router, Stack, useFocusEffect, useLocalSearchParams } from 'expo-router';
+import { ShareButton } from '@/components/ShareButton';
+import { useCanReport } from '@/hooks/useCanReport';
+import { haptics } from '@/lib/haptics';
+import { openReport } from '@/lib/reportStore';
+import { shareCopy } from '@/lib/share';
 import {
   Building2,
+  Flag,
   ChevronLeft,
   ChevronRight,
   Clock,
@@ -41,7 +47,7 @@ import {
 } from '@/services/communities';
 import { fetchProfile } from '@/services/profiles';
 import type { CommunityMember, Profile } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
 import { goBack } from '@/lib/nav';
 import type { Href } from 'expo-router';
@@ -101,6 +107,7 @@ export default function CommunityInfoScreen() {
   const isMember = !!membership;
   const isAdmin = membership?.role === 'admin';
   const isCreator = !!user && community?.created_by === user.id;
+  const canReportCommunity = useCanReport(community?.created_by);
   const isRestricted = community?.visibility === 'restricted';
 
   const sortedMembers = useMemo(
@@ -243,6 +250,10 @@ export default function CommunityInfoScreen() {
     headerShadowVisible: false,
     headerTintColor: theme.text,
     headerTitleStyle: { color: theme.text },
+    headerRight: () =>
+      community ? (
+        <ShareButton payload={shareCopy.community({ id: community.id, name: community.name, memberCount: community.member_count ?? undefined })} />
+      ) : null,
     headerLeft: () => (
       <Pressable
         onPress={() => goBack(router, `/community/${id}` as Href)}
@@ -321,7 +332,7 @@ export default function CommunityInfoScreen() {
             {community.name}
           </ThemedText>
           <ThemedText variant="caption" muted>
-            {SPORT_LABELS[community.sport] || community.sport} &bull; {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
+            {communitySportLabel(community)} &bull; {community.member_count ?? 0} member{(community.member_count ?? 0) !== 1 ? 's' : ''}
           </ThemedText>
         </View>
 
@@ -330,7 +341,7 @@ export default function CommunityInfoScreen() {
           {/* <View style={[styles.badge, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
             <Swords size={14} color={theme.text} strokeWidth={2} />
             <ThemedText variant="caption" style={styles.badgeText}>
-              {SPORT_LABELS[community.sport] || community.sport}
+              {communitySportLabel(community)}
             </ThemedText>
           </View> */}
           <View
@@ -478,6 +489,26 @@ export default function CommunityInfoScreen() {
               disabled={!!myPendingInvite || !!myJoinRequest}
               buttonStyle={styles.actionButton}
             />
+          </View>
+        )}
+
+        {/* Report (flag-gated, shown to anyone who can see the community, never to its creator) */}
+        {canReportCommunity && community && (
+          <View style={styles.actionSection}>
+            <Pressable
+              style={({ pressed }) => [styles.settingRow, { backgroundColor: theme.backgroundElement }, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                haptics.light();
+                openReport({ type: 'community', id: community.id, label: 'community' });
+              }}
+              hitSlop={8}
+              accessibilityRole="button"
+            >
+              <Flag size={20} color={theme.textSecondary} strokeWidth={2} />
+              <ThemedText variant="body" muted style={{ fontWeight: '600', flex: 1 }}>
+                Report community
+              </ThemedText>
+            </Pressable>
           </View>
         )}
 

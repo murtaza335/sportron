@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 
 import { AuthProvider, useAuth } from '@/contexts/AuthContext';
 import { NotificationsProvider } from '@/contexts/NotificationsContext';
+import { RemoteConfigProvider } from '@/contexts/RemoteConfigContext';
 import { ThemeProvider, useTheme } from '@/contexts/ThemeContext';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
@@ -21,13 +22,16 @@ import { MaintenanceScreen } from '@/components/MaintenanceScreen';
 import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
 import { WebRefreshButton } from '@/components/WebRefreshButton';
-import { consumeReturnTo, saveReturnTo } from '@/lib/returnTo';
+import { consumeReturnTo, clearReturnTo, saveReturnTo } from '@/lib/returnTo';
 import { removeFCMToken } from '@/services/profiles';
 import { removeWebPushToken } from '@/utils/pushNotifications';
 import { Duration } from '@/lib/motion';
 import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
+import { ReportHost } from '@/components/ReportSheet';
+import { HeaderBack } from '@/components/HeaderBack';
+import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
 
@@ -77,6 +81,7 @@ function RootNavigator() {
     gestureEnabled: true,
     fullScreenGestureEnabled: true,
     headerShadowVisible: false,
+    headerLeft: () => <HeaderBack />,
     headerStyle: { backgroundColor: theme.background },
     contentStyle: { backgroundColor: theme.background },
   };
@@ -134,6 +139,9 @@ function RootNavigator() {
 
     if (session && profile && inAuthGroup) {
       router.replace(consumeReturnTo() ?? '/');
+    } else if (session && profile) {
+      // settled in the app: a leftover saved link must not hijack a later sign-in
+      clearReturnTo();
     }
   }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
 
@@ -198,7 +206,8 @@ function RootNavigator() {
         <Stack.Screen name="community/[id]" options={{ ...pushOptions, title: 'Community' }} />
         <Stack.Screen name="community/[id]/members" options={{ ...pushOptions, title: 'Members' }} />
         <Stack.Screen name="community/[id]/info" options={{ ...pushOptions, title: 'Community Info' }} />
-        <Stack.Screen name="community/[id]/pending-matches" options={{ ...pushOptions, title: 'Pending Matches' }} />
+        <Stack.Screen name="community/[id]/join-requests" options={{ ...pushOptions, title: 'Join Requests' }} />
+        <Stack.Screen name="community/[id]/pending-matches"options={{ ...pushOptions, title: 'Pending Matches' }} />
         <Stack.Screen name="community/[id]/edit" options={{ ...pushOptions, title: 'Edit Community' }} />
         <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
@@ -213,7 +222,9 @@ function RootNavigator() {
         <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
         <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
+      {session && profile && !showSplash && <AnnouncementHost placement="app_open_modal" />}
       <ConfettiHost />
+      {session && profile && <ReportHost />}
       <ToastHost />
       {Platform.OS === 'web' && <AlertHost />}
       {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
@@ -333,11 +344,13 @@ export default function RootLayout() {
     <GestureHandlerRootView style={styles.container}>
       <ThemeProvider>
         <AuthProvider>
+          <RemoteConfigProvider>
           <NotificationsProvider>
             <WebFrame>
               <RootNavigator />
             </WebFrame>
           </NotificationsProvider>
+          </RemoteConfigProvider>
         </AuthProvider>
       </ThemeProvider>
     </GestureHandlerRootView>

@@ -1,4 +1,5 @@
 import { Lightbulb, X } from 'lucide-react-native';
+import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Collapsible } from '@/components/motion/Collapsible';
@@ -12,7 +13,8 @@ import { TIPS, useTip, type TipId } from '@/lib/tips';
 export function TipCard({ id }: { id: TipId }) {
   const theme = useTheme();
   const { visible, dismiss } = useTip(id);
-  const tip = TIPS[id];
+  const remoteTips = useRemoteConfig<Partial<Record<TipId, { title: string; body: string }>>>('tips', {});
+  const tip = remoteTips[id] ?? TIPS[id];
   return (
     <Collapsible open={visible}>
       <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>

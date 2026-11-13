@@ -2,7 +2,7 @@
   "expo": {
     "name": "Sportron",
     "slug": "T3S",
-    "version": "1.0.1",
+    "version": "1.0.2",
     "orientation": "portrait",
     "icon": "./assets/images/icon.png",
     "scheme": "t3s",
@@ -20,7 +20,34 @@
       },
       "predictiveBackGestureEnabled": false,
       "package": "com.murtazabaig.T3S",
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "intentFilters": [
+        {
+          "action": "VIEW",
+          "autoVerify": true,
+          "data": [
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/community"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/tournament"
+            },
+            {
+              "scheme": "https",
+              "host": "sportron.app",
+              "pathPrefix": "/profile"
+            }
+          ],
+          "category": [
+            "BROWSABLE",
+            "DEFAULT"
+          ]
+        }
+      ]
     },
     "web": {
       "output": "static",
@@ -46,7 +73,10 @@
       ],
       "@react-native-firebase/app",
       "@react-native-firebase/messaging",
-      "@react-native-community/datetimepicker"
+      "@react-native-community/datetimepicker",
+      "expo-image",
+      "expo-secure-store",
+      "expo-web-browser"
     ],
     "experiments": {
       "typedRoutes": true,
@@ -58,6 +88,13 @@
         "projectId": "0fa66530-b790-4094-84eb-3366edafc566"
       }
     },
-    "owner": "murtazabaig"
+    "owner": "murtazabaig",
+    "runtimeVersion": {
+      "policy": "fingerprint"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/0fa66530-b790-4094-84eb-3366edafc566",
+      "fallbackToCacheTimeout": 0
+    }
   }
 }

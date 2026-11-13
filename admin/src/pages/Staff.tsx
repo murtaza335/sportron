@@ -9,6 +9,7 @@ import { UserPicker } from '../components/UserPicker';
 const ROLE_LABEL: Record<PlatformRole, string> = {
   super_admin: 'Super admin',
   tournament_manager: 'Tournament manager',
+  moderator: 'Moderator',
 };
 
 export function Staff() {
@@ -54,7 +55,9 @@ export function Staff() {
       body:
         newRole === 'super_admin'
           ? 'Super admins can change settings (maintenance, minimum version), delete tournaments and manage staff.'
-          : 'Tournament managers can manage tournaments, their admins and details.',
+          : newRole === 'moderator'
+            ? 'Moderators can review reports and remove reported content. They cannot do anything else in the panel.'
+            : 'Tournament managers can manage tournaments, their admins and details.',
       confirmLabel: 'Add',
       destructive: newRole === 'super_admin',
       askNote: false,
@@ -97,6 +100,7 @@ export function Staff() {
             <span>Role for the person you add</span>
             <select value={newRole} onChange={(e) => setNewRole(e.target.value as PlatformRole)}>
               <option value="tournament_manager">Tournament manager</option>
+              <option value="moderator">Moderator</option>
               <option value="super_admin">Super admin</option>
             </select>
           </label>
@@ -133,6 +137,7 @@ export function Staff() {
                         style={{ width: 'auto' }}
                       >
                         <option value="tournament_manager">Tournament manager</option>
+                        <option value="moderator">Moderator</option>
                         <option value="super_admin">Super admin</option>
                       </select>
                     </td>

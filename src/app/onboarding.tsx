@@ -65,7 +65,12 @@ export default function OnboardingScreen() {
 
           {/* Form Section */}
           <Animated.View entering={FadeInDown.delay(STAGGER_MS * 2).duration(Duration.base).reduceMotion(RM)} style={styles.formContainer}>
-            <ProfileForm submitLabel="Get Started" loading={loading} onSubmit={handleSubmit} />
+            <ProfileForm
+              submitLabel="Get Started"
+              loading={loading}
+              usernameHint="Choose carefully: after this you can change your username once every 30 days."
+              onSubmit={handleSubmit}
+            />
           </Animated.View>
 
         </ScrollView>

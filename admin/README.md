@@ -25,8 +25,8 @@ Sign in needs `http://localhost:5174/auth/callback` in Supabase → Auth → URL
 
 1. New Vercel project, **Root Directory = `admin`**, framework Vite (`npm run build`, output `dist`).
 2. Env vars: `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `VITE_CLOUDINARY_CLOUD_NAME`, `VITE_CLOUDINARY_UPLOAD_PRESET`.
-3. Domain: `admin.sportron.app` (placeholder, confirm before pointing DNS).
-4. Supabase → Auth → URL configuration → add `https://admin.sportron.app/auth/callback` to the redirect allowlist (the app's own redirects stay untouched).
+3. Domain: `sportron-admin.vercel.app`.
+4. Supabase → Auth → URL configuration → add `https://sportron-admin.vercel.app/auth/callback` to the redirect allowlist (the app's own redirects stay untouched).
 5. Apply migrations 122–124, then bootstrap the first super admin (one-time SQL):
 
 ```sql

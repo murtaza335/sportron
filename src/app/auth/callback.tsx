@@ -3,6 +3,7 @@ import { ActivityIndicator, Platform, View, StyleSheet } from 'react-native';
 import { useRouter } from 'expo-router';
 import * as Linking from 'expo-linking';
 
+import { peekReturnTo } from '@/lib/returnTo';
 import { handleAuthRedirectUrl } from '@/services/auth';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -18,7 +19,9 @@ export default function AuthCallback() {
       await handleAuthRedirectUrl(urlStr);
       // On web the root layout's auth gate takes over once the session exists and sends the user
       // to the page they originally asked for (see lib/returnTo).
-      if (Platform.OS !== 'web') router.replace('/');
+      // Native: go back to the link the user opened before signing in (if any). A brand-new user
+      // without a profile is sent to onboarding by the root gate, which keeps the saved link.
+      if (Platform.OS !== 'web') router.replace(peekReturnTo() ?? '/');
     } catch (e) {
       console.error('[T3S] Error handling auth callback:', e);
       router.replace(Platform.OS === 'web' ? '/login' : '/');

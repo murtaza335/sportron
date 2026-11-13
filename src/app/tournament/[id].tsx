@@ -1,4 +1,7 @@
 import { Building2, CalendarDays, MapPin, Settings, Trophy } from 'lucide-react-native';
+import { ReportButton } from '@/components/ReportButton';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
@@ -15,6 +18,9 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentPromos } from '@/hooks/useTournamentPromos';
+import { PromoCodeCard } from '@/components/tournaments/PromoCodeCard';
+import { haptics } from '@/lib/haptics';
 import { formatDateRange, tournamentStatusTone } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { FadeImage } from '@/components/motion/FadeImage';
@@ -26,6 +32,17 @@ export default function TournamentScreen() {
   const insets = useSafeAreaInsets();
   const { detail, loading, refreshing, refresh, isTournamentAdmin } = useTournament(id);
   const [expanded, setExpanded] = useState(false);
+  const { promos, reveal } = useTournamentPromos(id);
+  // 'hidden' promos stay out of sight until the cover is long-pressed (easter egg)
+  const [unlocked, setUnlocked] = useState(false);
+  const visiblePromos = promos.filter((p) => p.display_mode !== 'hidden' || p.code || unlocked);
+  const unlockHidden = async () => {
+    const hidden = promos.filter((p) => p.display_mode === 'hidden' && !p.code);
+    if (hidden.length === 0) return;
+    haptics.medium();
+    setUnlocked(true);
+    await Promise.all(hidden.map((p) => reveal(p.id)));
+  };
 
   const t = detail?.tournament;
   const liveCount = detail?.modules.filter((m) => m.status === 'in_progress').length ?? 0;
@@ -35,8 +52,10 @@ export default function TournamentScreen() {
       <Stack.Screen
         options={{
           title: 'Tournament',
-          headerRight: () =>
-            isTournamentAdmin ? (
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {t && <ShareButton payload={shareCopy.tournament({ id: t.id, name: t.name, live: liveCount > 0 })} />}
+              {isTournamentAdmin ? (
               <Pressable
                 onPress={() => router.push(tournamentRoutes.manage(id))}
                 hitSlop={12}
@@ -46,7 +65,12 @@ export default function TournamentScreen() {
               >
                 <Settings size={22} color={theme.text} strokeWidth={2} />
               </Pressable>
-            ) : null,
+              ) : null}
+              {t && !isTournamentAdmin ? (
+                <ReportButton target={{ type: 'tournament', id: t.id, label: 'tournament' }} />
+              ) : null}
+            </View>
+          ),
         }}
       />
       {loading && !detail ? (
@@ -70,13 +94,18 @@ export default function TournamentScreen() {
             </View>
           )}
 
-          <View style={[styles.cover, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}>
+          <Pressable
+            onLongPress={unlockHidden}
+            delayLongPress={900}
+            accessible={false}
+            style={[styles.cover, { backgroundColor: theme.backgroundSelected, borderColor: theme.border }]}
+          >
             {t.image_url ? (
               <FadeImage source={{ uri: t.image_url }} style={styles.coverImage} resizeMode="cover" />
             ) : (
               <Trophy size={40} color={theme.textSecondary} strokeWidth={1.5} />
             )}
-          </View>
+          </Pressable>
 
           <View style={styles.header}>
             <ThemedText variant="heading">{t.name}</ThemedText>
@@ -108,6 +137,14 @@ export default function TournamentScreen() {
               </View>
             )}
           </View>
+
+          {visiblePromos.length > 0 && (
+            <View style={styles.section}>
+              {visiblePromos.map((p) => (
+                <PromoCodeCard key={p.id} promo={p} onReveal={reveal} />
+              ))}
+            </View>
+          )}
 
           {detail.champions.length > 0 && (
             <View style={styles.section}>

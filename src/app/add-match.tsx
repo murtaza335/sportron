@@ -1,7 +1,7 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { X } from 'lucide-react-native';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import {
   Platform,
   Pressable,
@@ -13,6 +13,7 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { alert } from '@/lib/alert';
+import { toast } from '@/components/motion/Toast';
 import { MatchLineupSelector } from '@/components/MatchLineupSelector';
 import { celebrate } from '@/components/motion/Confetti';
 import { haptics } from '@/lib/haptics';
@@ -42,7 +43,6 @@ export default function AddMatchScreen() {
   const { user, profile } = useAuth();
 
   const [sport] = useState<Sport>(sportParam ?? 'table_tennis');
-  const [customSportName] = useState('');
   const [teamAName, setTeamAName] = useState('');
   const [teamBName, setTeamBName] = useState('');
   const [matchFormat, setMatchFormat] = useState<MatchFormat>('singles');
@@ -85,11 +85,20 @@ export default function AddMatchScreen() {
     [communityId, user?.id],
   );
 
+  // Matches aren't supported for "Other" communities (no opponent can be picked) — A5.
+  const unsupportedSport = sport === 'other';
+  useEffect(() => {
+    if (unsupportedSport) {
+      toast("Matches aren't available", "Matches aren't available for this community.");
+      goBack(router, communityId ? (`/community/${communityId}` as never) : '/');
+    }
+  }, [unsupportedSport, router, communityId]);
+
   const isRacket = isRacketSport(sport);
   const isTeam = isTeamSport(sport);
 
   const canSave =
-    (sport === 'other' ? customSportName.trim().length > 0 : true) &&
+    !unsupportedSport &&
     (isRacket
       ? (matchFormat === 'singles'
           ? selection.opponent !== null
@@ -98,7 +107,7 @@ export default function AddMatchScreen() {
             selection.opponentPartner !== null)
       : isTeam
         ? selection.opponent !== null && teamAName.trim().length > 0 && teamBName.trim().length > 0
-        : true) &&
+        : false) &&
     (playerScore > 0 || opponentScore > 0);
 
   const handleSave = async () => {
@@ -123,7 +132,7 @@ try {
           opponent_id: opponent.id,
           opponent_partner_id: selection.opponentPartner?.id ?? null,
           sport,
-          custom_sport_name: sport === 'other' ? customSportName.trim() : null,
+          custom_sport_name: null,
           team_a_name: isTeam ? teamAName.trim() : null,
           team_b_name: isTeam ? teamBName.trim() : null,
           player_score: playerScore,

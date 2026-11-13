@@ -9,8 +9,7 @@ import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { pointsHint, tint } from '@/lib/tournamentFormat';
-import { isRacketSport } from '@/types';
+import { moduleScoringMode, pointsHint, tint } from '@/lib/tournamentFormat';
 import type { StandingsGroup, TournamentMatch, TournamentModule } from '@/types';
 
 /** Groups + knockout: one card per group (PLAN-v2 §9.6). */
@@ -75,7 +74,7 @@ export function ModuleGroupsTab({
               rows={g.table}
               viewerId={viewerId}
               compact
-              hideDraws={!module.allow_draws || isRacketSport(module.sport)}
+              hideDraws={!module.allow_draws || moduleScoringMode(module) === 'games'}
               advance={g.advance}
               pointsHint={pointsHint(module)}
               onSelect={onSelectEntry}

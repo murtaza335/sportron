@@ -1,4 +1,6 @@
 import { MapPin, Settings, Trophy } from 'lucide-react-native';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -252,8 +254,10 @@ export default function ModuleScreen() {
       <Stack.Screen
         options={{
           title: mod?.name ?? 'Module',
-          headerRight: () =>
-            m.isModuleAdmin ? (
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              {mod && <ShareButton payload={shareCopy.module({ tournamentId: id, moduleId, name: mod.name })} />}
+              {m.isModuleAdmin ? (
               <Pressable
                 onPress={() => router.push(tournamentRoutes.moduleManage(id, moduleId))}
                 hitSlop={12}
@@ -263,7 +267,9 @@ export default function ModuleScreen() {
               >
                 <Settings size={22} color={theme.text} strokeWidth={2} />
               </Pressable>
-            ) : null,
+              ) : null}
+            </View>
+          ),
         }}
       />
       {m.loading && !mod ? (
@@ -281,7 +287,7 @@ export default function ModuleScreen() {
         >
           <View style={styles.header}>
             <View style={styles.pills}>
-              <InfoPill label={sportLabel(mod.sport)} />
+              <InfoPill label={sportLabel(mod.sport, mod.custom_sport_name)} />
               <StatusPill tone={moduleStatusTone(mod.status)} />
             </View>
             <ThemedText variant="caption" muted>
@@ -409,6 +415,7 @@ export default function ModuleScreen() {
       <ResultEntrySheet
         match={m.matches.find((x) => x.id === resultMatchId) ?? null}
         sport={mod?.sport ?? 'other'}
+        scoringMode={mod?.scoring_mode}
         onClose={() => setResultMatchId(null)}
         onSaved={m.refresh}
       />

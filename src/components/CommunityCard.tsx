@@ -8,7 +8,7 @@ import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import type { Community, CommunityMemberRole } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 
 type CommunityCardProps = {
   community: Community;
@@ -96,7 +96,7 @@ export function CommunityCard({ community, membershipRole }: CommunityCardProps)
                   { color: isDark ? '#2DD4BF' : '#00A8B5' },
                 ]}
               >
-                {SPORT_LABELS[community.sport]}
+                {communitySportLabel(community)}
               </ThemedText>
             </View>
 

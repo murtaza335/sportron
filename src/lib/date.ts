@@ -58,3 +58,23 @@ export function formatChatDate(dateString: string): string {
     year: 'numeric',
   });
 }
+
+/** Username changes are limited to once every 30 days (migration 131). */
+export const USERNAME_CHANGE_WINDOW_DAYS = 30;
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** The date the user may change their username again, or null if they can change it now. */
+export function nextUsernameChangeDate(changedAt: string | null | undefined, now: number = Date.now()): Date | null {
+  if (!changedAt) return null;
+  const t = new Date(changedAt).getTime();
+  if (Number.isNaN(t)) return null;
+  const next = t + USERNAME_CHANGE_WINDOW_DAYS * DAY_MS;
+  return next > now ? new Date(next) : null;
+}
+
+/** "2 Dec 2026" (UTC, matching the server's message). */
+export function formatLongDate(date: Date | string): string {
+  const d = typeof date === 'string' ? new Date(date) : date;
+  if (Number.isNaN(d.getTime())) return '';
+  return d.toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric', timeZone: 'UTC' });
+}

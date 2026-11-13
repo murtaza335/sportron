@@ -1,4 +1,5 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
+import { useRemoteConfig } from '@/contexts/RemoteConfigContext';
 import Animated, {
   FadeIn,
   FadeInDown,
@@ -17,6 +18,8 @@ import { AnimatedBadge } from '@/components/motion/AnimatedBadge';
 import { FlashHighlight } from '@/components/motion/FlashHighlight';
 import { SlideUpDragZone, SlideUpModal } from '@/components/motion/SlideUpModal';
 import { SwipeToReply } from '@/components/motion/SwipeToReply';
+import { useCanReport } from '@/hooks/useCanReport';
+import { openReport } from '@/lib/reportStore';
 import { haptics } from '@/lib/haptics';
 import { enterToSend, isFinePointer } from '@/lib/webKeys';
 import { webContextMenuProps } from '@/lib/webMenu';
@@ -31,6 +34,7 @@ import {
   MessageCircle,
   Pencil,
   RefreshCw,
+  Flag,
   Reply,
   Send,
   Trash2,
@@ -176,6 +180,9 @@ export function ChatPopup<T extends ChatMessageBase>({
   chatId,
 }: ChatPopupProps<T>) {
   const theme = useTheme();
+  // Remote limit (B4) can only tighten the server's 1000-character rule, never exceed it.
+  const { chat_max_length: remoteChatMax } = useRemoteConfig<{ chat_max_length?: number }>('limits', {});
+  const chatMaxLength = Math.min(1000, Math.max(50, Number(remoteChatMax) || 1000));
   const insets = useSafeAreaInsets();
   const { profile } = useAuth();
   const {
@@ -453,6 +460,15 @@ export function ChatPopup<T extends ChatMessageBase>({
     [displayMessages],
   );
 
+  // Reporting (flag-gated): closes the options menu, then opens the shared report sheet.
+  const canReport = useCanReport();
+  const reportContextMessage = useCallback(() => {
+    if (!contextMenu || !chatType) return;
+    const id = contextMenu.message.id;
+    setContextMenu(null);
+    openReport({ type: chatType === 'session' ? 'session_message' : 'community_message', id, label: 'message' });
+  }, [contextMenu, chatType]);
+
   const replyToContextMessage = useCallback(() => {
     if (!contextMenu) return;
     setReplyTo(contextMenu.message);
@@ -516,9 +532,12 @@ const contextOptions = useMemo(() => {
   const msg = contextMenu.message;
   const mine = msg.sender_id === currentUserId;
   const delivered = isDeliveredMessage(msg);
-  const options: { id: 'reply' | 'edit' | 'delete'; label: string; icon: typeof Reply }[] = [
+  const options: { id: 'reply' | 'edit' | 'delete' | 'report'; label: string; icon: typeof Reply }[] = [
     { id: 'reply', label: 'Reply', icon: Reply },
   ];
+  if (!mine && delivered && canReport && chatType) {
+    options.push({ id: 'report', label: 'Report', icon: Flag });
+  }
   if (mine && delivered && canSend && isWithinWindow(msg.created_at, EDIT_WINDOW_MS)) {
     options.push({ id: 'edit', label: 'Edit', icon: Pencil });
   }
@@ -526,7 +545,7 @@ const contextOptions = useMemo(() => {
     options.push({ id: 'delete', label: 'Delete', icon: Trash2 });
   }
   return options;
-}, [contextMenu, currentUserId, canSend]);
+}, [contextMenu, currentUserId, canSend, canReport, chatType]);
 
 // Clamp the floating card so it stays on screen. Defaults to hovering ABOVE
 // the touch point; flips below the touch near the top.
@@ -1083,7 +1102,7 @@ const contextLayout = useMemo(() => {
                   })(e)
                   }
                   multiline
-                  maxLength={1000}
+                  maxLength={chatMaxLength}
                   style={[
                     styles.input,
                     {
@@ -1165,6 +1184,7 @@ const contextLayout = useMemo(() => {
                         if (option.id === 'reply') replyToContextMessage();
                         else if (option.id === 'edit') startEditing();
                         else if (option.id === 'delete') promptDeleteContextMessage();
+                        else if (option.id === 'report') reportContextMessage();
                       }}
                     >
                       <View style={styles.contextOptionRow}>

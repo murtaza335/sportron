@@ -5,29 +5,36 @@ import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
+import { MoreSportsSheet } from '@/components/tournaments/MoreSportsSheet';
 import { FormField, ModalHeader, NumberStepper, PillSelect, SwitchRow, TextField } from '@/components/tournaments/form';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useSports, type SportEntry } from '@/hooks/useSports';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
-import { DEFAULT_ROSTER, FORMAT_HINT, FORMAT_LABEL, allowedParticipantTypes, defaultAllowDraws } from '@/lib/tournamentFormat';
+import { DEFAULT_ROSTER, FORMAT_HINT, FORMAT_LABEL, allowedParticipantTypes, defaultAllowDraws, moduleScoringMode } from '@/lib/tournamentFormat';
 import {
   createModule,
   fetchModuleDetail,
   updateModule,
   updateModuleSettings,
 } from '@/services/tournaments';
-import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, SeedingMethod, Sport, TournamentFormat } from '@/types';
+import type { ModuleDetail, ModuleSettingsPatch, ParticipantType, ScoringMode, SeedingMethod, Sport, TournamentFormat } from '@/types';
 import { isRacketSport, isTeamSport, SPORT_LABELS } from '@/types';
 import { goBack } from '@/lib/nav';
 
 const FORMATS: TournamentFormat[] = ['single_elimination', 'round_robin', 'groups_knockout', 'double_elimination'];
 const FORMAT_OPTIONS = FORMATS.map((f) => ({ value: f, label: FORMAT_LABEL[f] }));
 
-const SPORT_OPTIONS = (Object.keys(SPORT_LABELS) as Sport[]).map((s) => ({ value: s, label: SPORT_LABELS[s] }));
+type SportChoice = Sport | 'more';
+const PRIMARY_OPTIONS = (Object.keys(SPORT_LABELS) as Sport[]).filter((s) => s !== 'other');
+const SCORING_OPTIONS: { value: ScoringMode; label: string }[] = [
+  { value: 'games', label: 'Best of games / sets / maps' },
+  { value: 'score', label: 'One final score' },
+];
 
 export default function ModuleFormScreen() {
   const { id, moduleId } = useLocalSearchParams<{ id: string; moduleId?: string }>();
@@ -86,7 +93,13 @@ function ModuleFormBody({
 }) {
   const m = initial?.module ?? null;
   const [name, setName] = useState(m?.name ?? '');
+  const { more: moreSports, byKey } = useSports('tournaments');
   const [sport, setSport] = useState<Sport>(m?.sport ?? 'table_tennis');
+  // A "More" sport is stored as Other + sport_key + its label as the custom name (old builds see a valid Other).
+  const [moreKey, setMoreKey] = useState<string | null>(m?.sport_key ?? null);
+  const [customName, setCustomName] = useState(m?.custom_sport_name ?? '');
+  const [scoringMode, setScoringMode] = useState<ScoringMode>(m?.scoring_mode ?? 'score');
+  const [showMore, setShowMore] = useState(false);
   const [venue, setVenue] = useState(m?.venue ?? '');
   const [startsAt, setStartsAt] = useState<Date | null>(m?.starts_at ? new Date(m.starts_at) : null);
   const [maxEntries, setMaxEntries] = useState(m?.max_entries != null ? String(m.max_entries) : '');
@@ -122,12 +135,48 @@ function ModuleFormBody({
   const formatLocked = !!m && (hasBracket || !['draft', 'open'].includes(m.status));
   const entryCount = initial?.counts.entries ?? 0;
   const isLeagueLike = format === 'round_robin' || format === 'groups_knockout';
-  const racket = isRacketSport(sport);
+  // How a match is won: the chosen mode for Other / More sports, today's per-sport rule otherwise.
+  const scoring: ScoringMode = sport === 'other' ? scoringMode : moduleScoringMode({ sport });
+  const gamesMode = scoring === 'games';
+  const moreEntry = moreKey ? byKey.get(moreKey) ?? null : null;
+  const sportChoice: SportChoice = sport === 'other' && moreKey ? 'more' : sport;
+  const needsName = sport === 'other' && !moreKey;
   const pointsInvalid = isLeagueLike && !(pointsWin > pointsDraw && pointsDraw >= pointsLoss);
   const playersLocked =
     !!m && ((initial?.counts.entries ?? 0) + (initial?.counts.withdrawn ?? 0) > 0 || !['draft', 'open'].includes(m.status));
   const allowedTypes = allowedParticipantTypes(sport);
   const doubles = participantType === 'team' && isRacketSport(sport);
+
+  /** Picking a "More" sport applies that entry's defaults (who plays, roster, scoring, draws). */
+  const onMorePick = (s: SportEntry) => {
+    setShowMore(false);
+    setSport('other');
+    setMoreKey(s.key);
+    setCustomName(s.label);
+    const mode: ScoringMode = s.scoring_mode ?? 'score';
+    setScoringMode(mode);
+    if (playersLocked) return;
+    const type: ParticipantType = s.participant_type ?? 'individual';
+    setParticipantType(type);
+    const d = DEFAULT_ROSTER.other;
+    setRosterMin(s.roster_min ?? d.min);
+    setRosterMax(s.roster_max ?? d.max);
+    setLineup(s.lineup_size ?? d.lineup);
+    if (!formatLocked) setAllowDraws((s.allow_draws ?? mode === 'score') && isLeagueLike);
+  };
+
+  const onChoice = (c: SportChoice) => {
+    if (c === 'more') {
+      setShowMore(true);
+      return;
+    }
+    setMoreKey(null);
+    if (c === 'other') {
+      if (sport !== 'other') setCustomName('');
+      setScoringMode('score');
+    }
+    onSportChange(c);
+  };
 
   /** Changing the sport re-applies the player defaults (only while they are still editable). */
   const onSportChange = (next: Sport) => {
@@ -149,11 +198,18 @@ function ModuleFormBody({
 
   const maxN = maxEntries.trim() === '' ? null : parseInt(maxEntries, 10);
   const maxInvalid = maxN !== null && (Number.isNaN(maxN) || maxN < 2 || maxN > 128);
-  const canSave = name.trim().length >= 2 && !maxInvalid && !pointsInvalid && !saving;
+  const nameInvalid = needsName && customName.trim().length === 0;
+  const canSave = name.trim().length >= 2 && !maxInvalid && !pointsInvalid && !nameInvalid && !saving;
 
   const submit = async () => {
     if (!canSave) {
-      setError(name.trim().length < 2 ? 'Name must be at least 2 characters.' : 'Max entries must be 2–128.');
+      setError(
+        name.trim().length < 2
+          ? 'Name must be at least 2 characters.'
+          : nameInvalid
+            ? 'Enter the exact sport name.'
+            : 'Max entries must be 2–128.',
+      );
       return;
     }
     setSaving(true);
@@ -161,6 +217,8 @@ function ModuleFormBody({
     const input = {
       name: name.trim(),
       sport,
+      custom_sport_name: sport === 'other' ? (moreEntry?.label ?? customName.trim()) : null,
+      sport_key: sport === 'other' ? moreKey : null,
       description: description.trim() || null,
       rules_text: rules.trim() || null,
       venue: venue.trim() || null,
@@ -190,8 +248,13 @@ function ModuleFormBody({
         );
       }
       if (!formatLocked) patch.format = format;
+      if (sport === 'other' && !hasBracket && scoringMode !== (m?.scoring_mode ?? 'score')) {
+        patch.scoring_mode = scoringMode;
+      } else if (sport === 'other' && !m) {
+        patch.scoring_mode = scoringMode;
+      }
       if (isLeagueLike) {
-        const draws = allowDraws && !racket;
+        const draws = allowDraws && !gamesMode;
         patch.allow_draws = draws;
         patch.rr_legs = legs;
         patch.points_win = pointsWin;
@@ -223,8 +286,42 @@ function ModuleFormBody({
         </FormField>
 
         <FormField label="Sport *" hint={sportLocked ? 'Sport can’t be changed once the bracket exists.' : undefined}>
-          <PillSelect options={SPORT_OPTIONS} value={sport} onChange={onSportChange} disabled={sportLocked} />
+          <PillSelect
+            options={[
+              ...PRIMARY_OPTIONS.map((s) => ({ value: s as SportChoice, label: SPORT_LABELS[s] })),
+              ...(moreSports.length > 0 || moreKey
+                ? [{ value: 'more' as SportChoice, label: moreKey ? `More · ${moreEntry?.label ?? customName}` : 'More' }]
+                : []),
+              { value: 'other' as SportChoice, label: SPORT_LABELS.other },
+            ]}
+            value={sportChoice}
+            onChange={onChoice}
+            disabled={sportLocked}
+          />
         </FormField>
+
+        {needsName && (
+          <FormField label="Sport name *" error={error && nameInvalid ? error : null}>
+            <TextField value={customName} onChangeText={setCustomName} placeholder="e.g. Padel, Carrom, Valorant" maxLength={30} editable={!sportLocked} />
+          </FormField>
+        )}
+
+        {sport === 'other' && (
+          <FormField
+            label="How is a match won?"
+            hint={settingsLocked ? 'Can’t change once the bracket exists.' : undefined}
+          >
+            <PillSelect options={SCORING_OPTIONS} value={scoringMode} onChange={setScoringMode} disabled={settingsLocked} />
+          </FormField>
+        )}
+
+        <MoreSportsSheet
+          visible={showMore}
+          sports={moreSports}
+          selectedKey={moreKey}
+          onSelect={onMorePick}
+          onClose={() => setShowMore(false)}
+        />
 
         <FormField
           label="Format *"
@@ -255,7 +352,7 @@ function ModuleFormBody({
                 disabled={formatLocked}
               />
             </FormField>
-            {!racket && (
+            {!gamesMode && (
               <SwitchRow
                 label="Draws allowed"
                 hint="A level score in a league match is recorded as a draw."
@@ -273,7 +370,7 @@ function ModuleFormBody({
                   <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>Win</ThemedText>
                   <NumberStepper label="Points for a win" value={pointsWin} min={0} max={10} onChange={setPointsWin} disabled={!!m && m.status === 'in_progress'} />
                 </View>
-                {allowDraws && !racket && (
+                {allowDraws && !gamesMode && (
                   <View style={{ gap: Spacing.xs }}>
                     <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>Draw</ThemedText>
                     <NumberStepper label="Points for a draw" value={pointsDraw} min={0} max={10} onChange={setPointsDraw} disabled={!!m && m.status === 'in_progress'} />

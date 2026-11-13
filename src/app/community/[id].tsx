@@ -1,4 +1,6 @@
 import { TipCard } from '@/components/TipCard';
+import { ShareButton } from '@/components/ShareButton';
+import { shareCopy } from '@/lib/share';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
 import { FeedItemSkeleton, SkeletonList } from '@/components/skeletons';
@@ -62,7 +64,7 @@ import type {
   CommunityPost,
   MatchWithProfiles,
 } from '@/types';
-import { SPORT_LABELS } from '@/types';
+import { communitySportLabel } from '@/types';
 import { goBack } from '@/lib/nav';
 
 export default function CommunityDetailScreen() {
@@ -866,14 +868,20 @@ export default function CommunityDetailScreen() {
                 {optimisticTitle}
               </ThemedText>
             ),
-          headerRight: () =>
-            isMember ? (
-              <View>
+          headerRight: () => (
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+              {community && (
+                <ShareButton
+                  payload={shareCopy.community({ id: community.id, name: community.name, memberCount: community.member_count ?? undefined })}
+                />
+              )}
+              {isMember && (
                 <Pressable onPress={() => router.navigate(`/community/${id}/info`)} hitSlop={12} style={({ pressed }) => [styles.headerIcon, pressed && { opacity: 0.6 }]}>
                   <MoreHorizontal size={22} color={theme.text} strokeWidth={2} />
                 </Pressable>
-              </View>
-            ) : null,
+              )}
+            </View>
+          ),
         }}
       />
 
@@ -977,7 +985,7 @@ export default function CommunityDetailScreen() {
                 <View style={[styles.sportBadgeSmall, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                   <Swords size={12} color={theme.textSecondary} strokeWidth={2} />
                   <ThemedText variant="caption" style={{ fontWeight: '700', fontSize: 11 }}>
-                    {SPORT_LABELS[community.sport] || community.sport}
+                    {communitySportLabel(community)}
                   </ThemedText>
                 </View>
               </View>

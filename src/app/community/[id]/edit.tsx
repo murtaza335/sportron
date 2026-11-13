@@ -71,13 +71,19 @@ function EditCommunityForm({
   const [name, setName] = useState(community.name);
   const [description, setDescription] = useState(community.description ?? '');
   const [organization, setOrganization] = useState(community.organization ?? '');
+  const [customSportName, setCustomSportName] = useState(community.custom_sport_name ?? '');
   const [location, setLocation] = useState(community.location ?? '');
   const [visibility, setVisibility] = useState<CommunityVisibility>(community.visibility);
   const [imageUri, setImageUri] = useState<string | null>(community.image_url ?? null);
   const [uploadingImage, setUploadingImage] = useState(false);
   const [saving, setSaving] = useState(false);
 
-  const canSave = name.trim().length > 0 && !saving && !uploadingImage;
+  // Other communities need an exact sport name (older ones may still be blank until an admin fixes it).
+  const canSave =
+    name.trim().length > 0 &&
+    (community.sport !== 'other' || customSportName.trim().length > 0) &&
+    !saving &&
+    !uploadingImage;
 
   const pickImage = async () => {
     const uri = await pickImageUri();
@@ -114,6 +120,7 @@ function EditCommunityForm({
         location: location.trim() || null,
         visibility,
         image_url: imageUrl,
+        ...(community.sport === 'other' ? { custom_sport_name: customSportName.trim() || null } : {}),
       });
       refresh();
       goBack(router, `/community/${community.id}` as Href);
@@ -228,6 +235,25 @@ function EditCommunityForm({
               maxLength={300}
             />
           </View>
+
+          {community.sport === 'other' && (
+            <View style={styles.field}>
+              <ThemedText variant="label" muted style={styles.label}>
+                What sport exactly?
+              </ThemedText>
+              <FocusTextInput
+                value={customSportName}
+                onChangeText={setCustomSportName}
+                placeholder="e.g. Padel, Chess, Carrom"
+                placeholderTextColor={theme.textSecondary}
+                style={[
+                  styles.input,
+                  { color: theme.text, backgroundColor: theme.backgroundElement, borderColor: theme.border },
+                ]}
+                maxLength={30}
+              />
+            </View>
+          )}
 
           <View style={styles.field}>
             <ThemedText variant="label" muted style={styles.label}>
