@@ -6,7 +6,7 @@ import { Duration, RM, LayoutShift } from '@/lib/motion';
 import { DoubleTapLike } from '@/components/motion/DoubleTapLike';
 import { LikeButton } from '@/components/motion/LikeButton';
 import { Sheet, SheetScrollView } from '@/components/motion/Sheet';
-import { X, MessageSquare, Send, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { X, MessageSquare, Send, MoreHorizontal, Trash2, Flag } from 'lucide-react-native';
 import { useRouter } from 'expo-router';
 import { alert } from '@/lib/alert';
 import { useCallback, useEffect, useRef, useState } from 'react';
@@ -16,6 +16,9 @@ import { ThemedText } from '@/components/ui/Text';
 import { UserAvatar } from '@/components/UserAvatar';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useCanReport } from '@/hooks/useCanReport';
+import { haptics } from '@/lib/haptics';
+import { openReport } from '@/lib/reportStore';
 import { formatRelativeTime } from '@/lib/date';
 import {
   fetchCommunityPostComments,
@@ -61,6 +64,8 @@ export function PostDetailPopup({
   const lastPostIdRef = useRef<string | null>(null);
 
   const isMine = currentUserId === post?.author_id;
+  const canReport = useCanReport(post?.author_id);
+  const canReportOthers = useCanReport(); // comments: the owner is checked per comment below
 
   const loadComments = useCallback(async () => {
     if (!post) return;
@@ -228,7 +233,15 @@ export function PostDetailPopup({
           >
             <UserAvatar avatarUrl={comment.profile?.avatar_url} size={32} />
           </Pressable>
-          <View style={styles.commentContent}>
+          <Pressable
+            style={styles.commentContent}
+            disabled={!canReportOthers || !comment.profile?.id || comment.profile.id === currentUserId}
+            delayLongPress={350}
+            onLongPress={() => {
+              haptics.medium();
+              openReport({ type: 'community_post_comment', id: comment.id, label: 'comment' });
+            }}
+          >
             <View style={styles.commentHeader}>
               <Pressable
                 disabled={!comment.profile?.id}
@@ -248,7 +261,7 @@ export function PostDetailPopup({
             <ThemedText variant="body" style={styles.commentText}>
               {comment.content}
             </ThemedText>
-          </View>
+          </Pressable>
         </Animated.View>
       ));
     }
@@ -274,7 +287,7 @@ export function PostDetailPopup({
               <View style={[styles.modalHeader, { borderBottomColor: theme.border }]}>
                 <ThemedText variant="heading">Post</ThemedText>
                 <View style={styles.headerRight}>
-                  {isMine && (
+                  {(isMine || canReport) && (
                     <Pressable
                       onPress={() => setShowMenu(true)}
                       hitSlop={12}
@@ -395,12 +408,28 @@ export function PostDetailPopup({
                 <View style={styles.menuOverlay}>
                   <Pressable onPress={() => setShowMenu(false)} style={styles.menuOverlayBackdrop} />
                   <View style={[styles.menuContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-                    <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
-                      <Trash2 size={18} color={theme.error} strokeWidth={2} />
-                      <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
-                        Delete
-                      </ThemedText>
-                    </Pressable>
+                    {isMine ? (
+                      <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
+                        <Trash2 size={18} color={theme.error} strokeWidth={2} />
+                        <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
+                          Delete
+                        </ThemedText>
+                      </Pressable>
+                    ) : (
+                      <Pressable
+                        onPress={() => {
+                          setShowMenu(false);
+                          if (post) openReport({ type: 'community_post', id: post.id, label: 'post' });
+                        }}
+                        style={styles.menuItem}
+                        hitSlop={8}
+                      >
+                        <Flag size={18} color={theme.text} strokeWidth={2} />
+                        <ThemedText variant="body" style={{ color: theme.text, marginLeft: Spacing.sm }}>
+                          Report
+                        </ThemedText>
+                      </Pressable>
+                    )}
                     <Pressable onPress={() => setShowMenu(false)} style={styles.menuItem} hitSlop={8}>
                       <ThemedText variant="body" style={{ color: theme.text }}>
                         Cancel

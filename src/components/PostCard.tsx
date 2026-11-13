@@ -1,6 +1,6 @@
 import { LikeButton } from '@/components/motion/LikeButton';
 import { useRouter } from 'expo-router';
-import { MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
+import { Flag, MessageSquare, MoreHorizontal, Trash2 } from 'lucide-react-native';
 import { useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -11,6 +11,8 @@ import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { alert } from '@/lib/alert';
 import { formatRelativeTime } from '@/lib/date';
+import { useCanReport } from '@/hooks/useCanReport';
+import { openReport } from '@/lib/reportStore';
 import { deleteCommunityPost, toggleCommunityPostLike } from '@/services/communities';
 import type { CommunityPost } from '@/types';
 import { FadeImage } from '@/components/motion/FadeImage';
@@ -63,6 +65,7 @@ export function PostCard({
   const [imageError, setImageError] = useState(false);
 
   const isMine = currentUserId === post.author_id;
+  const canReport = useCanReport(post.author_id);
 
   const handleLike = async () => {
     if (!currentUserId) return;
@@ -212,7 +215,7 @@ export function PostCard({
           </View>
         )}
 
-        {isMine && (
+        {(isMine || canReport) && (
           <Pressable
             onPress={() => setShowMenu(true)}
             hitSlop={12}
@@ -242,12 +245,28 @@ export function PostCard({
         <View style={styles.menuOverlay}>
           <Pressable onPress={() => setShowMenu(false)} style={styles.menuOverlayBackdrop} />
           <View style={[styles.menuContent, { backgroundColor: theme.background, borderColor: theme.border }]}>
-            <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
-              <Trash2 size={18} color={theme.error} strokeWidth={2} />
-              <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
-                Delete
-              </ThemedText>
-            </Pressable>
+            {isMine ? (
+              <Pressable onPress={handleDelete} style={styles.menuItem} hitSlop={8}>
+                <Trash2 size={18} color={theme.error} strokeWidth={2} />
+                <ThemedText variant="body" style={{ color: theme.error, marginLeft: Spacing.sm }}>
+                  Delete
+                </ThemedText>
+              </Pressable>
+            ) : (
+              <Pressable
+                onPress={() => {
+                  setShowMenu(false);
+                  openReport({ type: 'community_post', id: post.id, label: 'post' });
+                }}
+                style={styles.menuItem}
+                hitSlop={8}
+              >
+                <Flag size={18} color={theme.text} strokeWidth={2} />
+                <ThemedText variant="body" style={{ color: theme.text, marginLeft: Spacing.sm }}>
+                  Report
+                </ThemedText>
+              </Pressable>
+            )}
             <Pressable onPress={() => setShowMenu(false)} style={styles.menuItem} hitSlop={8}>
               <ThemedText variant="body" style={{ color: theme.text }}>
                 Cancel
