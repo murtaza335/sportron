@@ -1,7 +1,7 @@
-import { Trophy } from 'lucide-react-native';
+import { Info, Trophy } from 'lucide-react-native';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { useState } from 'react';
-import { FlatList, StyleSheet, View } from 'react-native';
+import { FlatList, Linking, StyleSheet, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { EmptyReveal } from '@/components/motion/EmptyReveal';
 import { FadeInItem } from '@/components/motion/FadeInItem';
@@ -14,6 +14,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { TournamentCard } from '@/components/tournaments/TournamentCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { TipCard } from '@/components/TipCard';
+import { Card } from '@/components/ui/Card';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
@@ -34,6 +35,8 @@ const EMPTY: Record<TournamentScope, { title: string; sub?: string }> = {
   mine: { title: "You're not part of any tournament yet", sub: 'When an admin adds you, it will show up here.' },
   all: { title: 'No tournaments' },
 };
+
+const HOST_EMAIL = 'support.sportron@gmail.com';
 
 export default function TournamentsScreen() {
   const theme = useTheme();
@@ -61,6 +64,16 @@ export default function TournamentsScreen() {
           <>
             <AnnouncementHost placement="tournaments_banner" />
             <TipCard id="tournaments" />
+            {scope === 'mine' && (
+              <Card style={styles.hostInfo} onPress={() => Linking.openURL(`mailto:${HOST_EMAIL}`).catch(() => {})}>
+                <Info size={20} color={theme.textSecondary} />
+                <View style={{ flex: 1 }}>
+                  <ThemedText variant="body">
+                    Want to host a tournament? Contact us at <ThemedText style={{ fontWeight: '700' }}>{HOST_EMAIL}</ThemedText>
+                  </ThemedText>
+                </View>
+              </Card>
+            )}
           </>
         }
         contentContainerStyle={[styles.list, { paddingBottom: Spacing.lg + Math.max(insets.bottom, 56) }]}
@@ -110,6 +123,7 @@ const styles = StyleSheet.create({
     alignSelf: 'center',
     padding: Spacing.md,
   },
+  hostInfo: { flexDirection: 'row', alignItems: 'center', gap: Spacing.sm, padding: Spacing.md, marginBottom: Spacing.md },
   loader: { marginTop: Spacing.xxl },
   empty: { alignItems: 'center', gap: Spacing.sm, marginTop: Spacing.xxxl, paddingHorizontal: Spacing.lg },
   emptySub: { textAlign: 'center' },
