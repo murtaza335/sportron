@@ -797,6 +797,54 @@ begin
     perform tt_test.expect_err(format('select public.reset_tournament_match(%L)', v_wb), 'DOWNSTREAM_PLAYED', 'cannot reset a WB match whose winner already played on');
   end;
 
+  -- ── section S1: get_tournament_schedule (migration 132)
+  declare v_t uuid := tt_test.ctx('t')::uuid; v_m uuid; v_a uuid; v_b uuid; v_c uuid; v_far uuid; v_n int;
+    v_from timestamptz := date_trunc('day', now()) + interval '1 day';
+    v_to timestamptz := date_trunc('day', now()) + interval '2 days';
+  begin
+    v_m := tt_test.mk_format('Sched', 'table_tennis', 4, '{"format":"single_elimination"}'::jsonb);
+    perform tt_test.as_user('admin');
+    select id into v_a from public.tournament_matches where module_id = v_m and round_number = 1 order by match_number limit 1;
+    select id into v_b from public.tournament_matches where module_id = v_m and round_number = 1 order by match_number offset 1 limit 1;
+    select id into v_far from public.tournament_matches where module_id = v_m and round_number = 2 limit 1;
+    perform public.schedule_tournament_match(v_a, v_from + interval '10 hours', 'Hall', 'T2');
+    perform public.schedule_tournament_match(v_b, v_from + interval '9 hours', 'Hall', 'T1');
+    perform public.schedule_tournament_match(v_far, v_to + interval '3 hours', 'Hall', 'T1');
+
+    select count(*) into v_n from public.get_tournament_schedule(v_t, v_from, v_to);
+    perform tt_test.chk(v_n = 2, 'window returns only the matches scheduled inside it');
+    perform tt_test.chk((select id from public.get_tournament_schedule(v_t, v_from, v_to) limit 1) = v_b,
+                        'rows come back in time order (09:00 before 10:00)');
+    perform tt_test.chk((select bool_and(module_id = v_m and entry_a is not null and (entry_a ? 'profile_ids'))
+                         from public.get_tournament_schedule(v_t, v_from, v_to)),
+                        'rows carry module id and the same entry jsonb shape as get_module_matches');
+    perform tt_test.chk((select count(*) from public.get_tournament_schedule(v_t, v_to, v_to + interval '1 day')) = 1,
+                        'the next window returns the later match');
+    perform tt_test.chk((select count(*) from public.get_tournament_schedule(v_t, v_to - interval '1 minute', v_to)) = 0,
+                        'upper bound is exclusive, lower bound inclusive');
+
+    -- same rows a stranger can see via get_module_matches (published tournament, live module)
+    perform tt_test.as_user('stranger');
+    perform tt_test.chk((select count(*) from public.get_tournament_schedule(v_t, v_from, v_to)) = 2,
+                        'a non-admin sees the same scheduled matches');
+
+    -- a draft module is hidden from non-admins
+    perform tt_test.as_user('admin');
+    v_c := public.create_tournament_module(v_t, 'Hidden', 'table_tennis', null, null, null, null, null, false, 'manual');
+    perform tt_test.as_user('stranger');
+    perform tt_test.chk((select count(*) from public.get_tournament_schedule(v_t, v_from, v_to) where module_id = v_c) = 0,
+                        'modules the caller cannot view never appear');
+
+    -- window rules
+    perform tt_test.expect_err(format('select * from public.get_tournament_schedule(%L, %L, %L)', v_t, v_to, v_from),
+                               'INVALID_WINDOW', 'to must be after from');
+    perform tt_test.expect_err(format('select * from public.get_tournament_schedule(%L, %L, %L)', v_t, v_from, v_from + interval '8 days'),
+                               'INVALID_WINDOW', 'window is capped at 7 days');
+    perform set_config('request.jwt.claims', '', true);
+    perform tt_test.expect_err(format('select * from public.get_tournament_schedule(%L, %L, %L)', v_t, v_from, v_to),
+                               'NOT_ALLOWED', 'signed-out callers are rejected');
+  end;
+
   -- @@END (new steps insert their test sections above this line)
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
