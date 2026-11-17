@@ -17,15 +17,9 @@ import { Duration, RM } from '@/lib/motion';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius } from '@/constants/theme';
 import { NODE_H, NODE_W } from '@/lib/bracketLayout';
-import { formatMatchTime, slotPlaceholder } from '@/lib/tournamentFormat';
+import { formatMatchTime, isTodayLocal, slotPlaceholder } from '@/lib/tournamentFormat';
 import { useTheme } from '@/hooks/use-theme';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
-
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  return !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
-}
 
 function Row({
   entry,
@@ -120,7 +114,7 @@ export function BracketMatchNode({
   const decided = match.status === 'completed' || match.status === 'walkover';
   const bye = match.status === 'bye';
   const wo = match.status === 'walkover';
-  const live = match.status === 'scheduled' && isToday(match.scheduled_at);
+  const live = match.status === 'scheduled' && isTodayLocal(match.scheduled_at);
   const cancelled = match.status === 'cancelled';
   const time = formatMatchTime(match.scheduled_at);
   const caption = cancelled
