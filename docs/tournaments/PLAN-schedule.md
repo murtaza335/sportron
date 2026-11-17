@@ -1,6 +1,6 @@
 # Tournament match schedule — plan
 
-Status: **draft, not started** · Owner decisions needed: see §8
+Status: **Phase 1 implemented (JS-only, ships OTA — no native or dependency changes); needs on-device check (§7). Phase 2 not started** · Owner decisions: see §8
 
 ## 1. Problem
 
