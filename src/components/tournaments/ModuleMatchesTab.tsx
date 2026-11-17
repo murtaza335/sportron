@@ -1,4 +1,4 @@
-import { Swords } from 'lucide-react-native';
+import { CalendarClock, Swords } from 'lucide-react-native';
 import { useMemo, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
@@ -6,14 +6,24 @@ import { TournamentMatchRow } from '@/components/tournaments/TournamentMatchRow'
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { matchSectionKey, matchSectionOrder, matchSectionTitle } from '@/lib/tournamentFormat';
+import { Collapsible } from '@/components/motion/Collapsible';
+import {
+  compareByTime,
+  dayHeader,
+  localDayKey,
+  matchSectionKey,
+  matchSectionOrder,
+  matchSectionTitle,
+} from '@/lib/tournamentFormat';
 import type { TournamentMatch } from '@/types';
 import { HScrollView } from '@/components/HScrollView';
 
-type Filter = 'all' | 'upcoming' | 'results';
+type Filter = 'all' | 'today' | 'schedule' | 'upcoming' | 'results';
 
 const FILTERS: { value: Filter; label: string }[] = [
   { value: 'all', label: 'All' },
+  { value: 'today', label: 'Today' },
+  { value: 'schedule', label: 'Schedule' },
   { value: 'upcoming', label: 'Upcoming' },
   { value: 'results', label: 'Results' },
 ];
@@ -34,6 +44,55 @@ export function ModuleMatchesTab({
     () => [...new Set(matches.map((m) => m.group_letter).filter((l): l is string => !!l))].sort(),
     [matches],
   );
+
+  const [now] = useState(() => new Date());
+  const todayKey = localDayKey(now.toISOString());
+  const [showEarlier, setShowEarlier] = useState(false);
+
+  /** Time-ordered matches that are neither byes nor cancelled, honouring the group filter. */
+  const playable = useMemo(
+    () =>
+      matches.filter(
+        (m) =>
+          m.status !== 'bye' &&
+          m.status !== 'cancelled' &&
+          (groupFilter === 'all' || m.group_letter === groupFilter),
+      ),
+    [matches, groupFilter],
+  );
+
+  const multiVenue = useMemo(
+    () => new Set(playable.map((m) => m.venue).filter(Boolean)).size > 1,
+    [playable],
+  );
+
+  const timeView = useMemo(() => {
+    const scheduled = playable.filter((m) => localDayKey(m.scheduled_at) != null);
+    const byDay = new Map<string, TournamentMatch[]>();
+    for (const m of scheduled) {
+      const k = localDayKey(m.scheduled_at) as string;
+      byDay.set(k, [...(byDay.get(k) ?? []), m]);
+    }
+    const days = [...byDay.keys()].sort().map((key) => ({
+      key,
+      items: (byDay.get(key) as TournamentMatch[]).sort(compareByTime),
+    }));
+    const unscheduled = playable
+      .filter(
+        (m) =>
+          localDayKey(m.scheduled_at) == null && m.status !== 'completed' && m.status !== 'walkover',
+      )
+      .sort(
+        (a, b) => matchSectionOrder(a) - matchSectionOrder(b) || a.match_number - b.match_number,
+      );
+    return {
+      today: todayKey ? (byDay.get(todayKey) ?? []).slice().sort(compareByTime) : [],
+      earlier: days.filter((d) => todayKey != null && d.key < todayKey),
+      upcoming: days.filter((d) => todayKey == null || d.key >= todayKey),
+      nextDay: days.find((d) => todayKey != null && d.key > todayKey) ?? null,
+      unscheduled,
+    };
+  }, [playable, todayKey]);
 
   const sections = useMemo(() => {
     const visible = matches.filter((m) => {
@@ -61,9 +120,27 @@ export function ModuleMatchesTab({
       .map((g) => ({ ...g, items: g.items.sort((a, b) => a.match_number - b.match_number) }));
   }, [matches, filter, groupFilter]);
 
+  const timeRow = (m: TournamentMatch) => (
+    <TournamentMatchRow
+      key={m.id}
+      match={m}
+      mode="time"
+      contextExtra={multiVenue ? m.venue : null}
+      onPress={() => onSelect(m)}
+      viewerId={viewerId}
+    />
+  );
+  const daySection = (d: { key: string; items: TournamentMatch[] }) => (
+    <View key={d.key} style={{ gap: Spacing.sm }}>
+      <ThemedText variant="label" muted>{dayHeader(d.key, now)}</ThemedText>
+      {d.items.map(timeRow)}
+    </View>
+  );
+  const earlierCount = timeView.earlier.reduce((n, d) => n + d.items.length, 0);
+
   return (
     <View style={{ gap: Spacing.md }}>
-      <View style={styles.chips}>
+      <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
         {FILTERS.map((f) => {
           const sel = f.value === filter;
           return (
@@ -84,7 +161,7 @@ export function ModuleMatchesTab({
             </Pressable>
           );
         })}
-      </View>
+      </HScrollView>
 
       {groupLetters.length > 1 && (
         <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
@@ -111,7 +188,71 @@ export function ModuleMatchesTab({
         </HScrollView>
       )}
 
-      {sections.length === 0 ? (
+      {filter === 'today' ? (
+        timeView.today.length > 0 ? (
+          <View style={{ gap: Spacing.sm }}>{timeView.today.map(timeRow)}</View>
+        ) : (
+          <View style={styles.empty}>
+            <CalendarClock size={48} color={theme.textSecondary} strokeWidth={1.5} />
+            <ThemedText variant="heading">No matches scheduled today</ThemedText>
+            {timeView.nextDay && (
+              <>
+                <ThemedText muted style={{ textAlign: 'center' }}>
+                  Next: {dayHeader(timeView.nextDay.key, now)} · {timeView.nextDay.items.length}{' '}
+                  {timeView.nextDay.items.length === 1 ? 'match' : 'matches'}
+                </ThemedText>
+                <Pressable
+                  onPress={() => setFilter('schedule')}
+                  style={[styles.chip, { borderColor: theme.border }]}
+                  accessibilityRole="button"
+                >
+                  <ThemedText variant="caption" style={{ fontWeight: '700' }}>View schedule</ThemedText>
+                </Pressable>
+              </>
+            )}
+          </View>
+        )
+      ) : filter === 'schedule' ? (
+        timeView.upcoming.length === 0 && earlierCount === 0 && timeView.unscheduled.length === 0 ? (
+          <View style={styles.empty}>
+            <CalendarClock size={48} color={theme.textSecondary} strokeWidth={1.5} />
+            <ThemedText variant="heading">{matches.length === 0 ? 'No matches yet' : 'Nothing here'}</ThemedText>
+            <ThemedText muted style={{ textAlign: 'center' }}>
+              {matches.length === 0 ? 'Matches appear once the fixtures are generated.' : 'Try another filter.'}
+            </ThemedText>
+          </View>
+        ) : (
+          <View style={{ gap: Spacing.md }}>
+            {earlierCount > 0 && (
+              <View style={{ gap: Spacing.md }}>
+                <Pressable
+                  onPress={() => setShowEarlier((v) => !v)}
+                  style={[styles.chip, { borderColor: theme.border, alignSelf: 'flex-start' }]}
+                  accessibilityRole="button"
+                  accessibilityState={{ expanded: showEarlier }}
+                >
+                  <ThemedText variant="caption" style={{ fontWeight: '700' }}>
+                    {showEarlier ? 'Hide' : 'Show'} earlier days ({earlierCount}{' '}
+                    {earlierCount === 1 ? 'match' : 'matches'})
+                  </ThemedText>
+                </Pressable>
+                <Collapsible open={showEarlier}>
+                  <View style={{ gap: Spacing.md }}>{timeView.earlier.map(daySection)}</View>
+                </Collapsible>
+              </View>
+            )}
+            {timeView.upcoming.map(daySection)}
+            {timeView.unscheduled.length > 0 && (
+              <View style={{ gap: Spacing.sm }}>
+                <ThemedText variant="label" muted>Not scheduled yet</ThemedText>
+                {timeView.unscheduled.map((m) => (
+                  <TournamentMatchRow key={m.id} match={m} onPress={() => onSelect(m)} viewerId={viewerId} />
+                ))}
+              </View>
+            )}
+          </View>
+        )
+      ) : sections.length === 0 ? (
         <View style={styles.empty}>
           <Swords size={48} color={theme.textSecondary} strokeWidth={1.5} />
           <ThemedText variant="heading">{matches.length === 0 ? 'No matches yet' : 'Nothing here'}</ThemedText>
