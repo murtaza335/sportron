@@ -47,7 +47,6 @@ export function ModuleMatchesTab({
   const theme = useTheme();
   const [userFilter, setFilter] = useState<Filter | null>(null);
   const [groupFilter, setGroupFilter] = useState<string>('all');
-  const [mineOnly, setMineOnly] = useState(false);
   const groupLetters = useMemo(
     () => [...new Set(matches.map((m) => m.group_letter).filter((l): l is string => !!l))].sort(),
     [matches],
@@ -79,23 +78,15 @@ export function ModuleMatchesTab({
   const [showEarlier, setShowEarlier] = useState(false);
 
   /** Time-ordered matches that are neither byes nor cancelled, honouring the group filter. */
-  const isMine = useCallback(
-    (m: TournamentMatch) =>
-      !!viewerId &&
-      (!!m.entry_a?.profile_ids.includes(viewerId) || !!m.entry_b?.profile_ids.includes(viewerId)),
-    [viewerId],
-  );
-  const viewerPlays = useMemo(() => matches.some(isMine), [matches, isMine]);
   const playable = useMemo(
     () =>
       matches.filter(
         (m) =>
           m.status !== 'bye' &&
           m.status !== 'cancelled' &&
-          (groupFilter === 'all' || m.group_letter === groupFilter) &&
-          (!mineOnly || isMine(m)),
+          (groupFilter === 'all' || m.group_letter === groupFilter),
       ),
-    [matches, groupFilter, mineOnly, isMine],
+    [matches, groupFilter],
   );
 
   const multiVenue = useMemo(
@@ -199,31 +190,6 @@ export function ModuleMatchesTab({
           );
         })}
       </HScrollView>
-
-      {(filter === 'today' || filter === 'schedule') && viewerPlays && (
-        <View style={styles.chips}>
-          {[false, true].map((mine) => {
-            const sel = mineOnly === mine;
-            return (
-              <Pressable
-                key={String(mine)}
-                onPress={() => setMineOnly(mine)}
-                style={[
-                  styles.chip,
-                  { borderColor: theme.border },
-                  sel && { backgroundColor: theme.text, borderColor: theme.text },
-                ]}
-                accessibilityRole="button"
-                accessibilityState={{ selected: sel }}
-              >
-                <ThemedText variant="caption" style={{ fontWeight: '700', color: sel ? theme.background : theme.text }}>
-                  {mine ? 'My matches' : 'Everyone'}
-                </ThemedText>
-              </Pressable>
-            );
-          })}
-        </View>
-      )}
 
       {groupLetters.length > 1 && (
         <HScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>

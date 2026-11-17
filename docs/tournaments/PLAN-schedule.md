@@ -1,6 +1,6 @@
 # Tournament match schedule — plan
 
-Status: **Phase 1 + Phase 2 implemented** (Phase 1 JS-only/OTA; Phase 2 adds additive migration 132 — apply it, the client hides the section until then). Needs on-device check (§7). Owner decisions taken: new RPC (B), default-to-Today, "My matches" toggle added.
+Status: **Phase 1 + Phase 2 implemented** (Phase 1 JS-only/OTA; Phase 2 adds additive migration 132 — apply it, the client hides the section until then). Needs on-device check (§7). Owner decisions taken: new RPC (B), default-to-Today. A "My matches" toggle was built and then removed at the owner's request.
 
 ## 1. Problem
 
@@ -169,8 +169,7 @@ Phase 2
 
 1. Default chip: open on **Today** automatically when there are matches today (proposed), or always **All**?
 2. Phase 2 data source: **new RPC (recommended)** or client fan-out?
-3. Should Today/Schedule also offer a **"My matches"** toggle (only matches the viewer is in)?
-   Cheap to add — `TournamentMatchRow` already knows `viewerId`.
+3. ~~"My matches" toggle~~ — decided against; removed.
 
 ## 9. Follow-ups (not in this plan)
 
