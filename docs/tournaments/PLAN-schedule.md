@@ -1,6 +1,6 @@
 # Tournament match schedule — plan
 
-Status: **Phase 1 implemented (JS-only, ships OTA — no native or dependency changes); needs on-device check (§7). Phase 2 not started** · Owner decisions: see §8
+Status: **Phase 1 + Phase 2 implemented** (Phase 1 JS-only/OTA; Phase 2 adds additive migration 132 — apply it, the client hides the section until then). Needs on-device check (§7). Owner decisions taken: new RPC (B), default-to-Today, "My matches" toggle added.
 
 ## 1. Problem
 

@@ -99,7 +99,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 131 (next = 132) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 132 (next = 133) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -220,6 +220,7 @@ supabase/
 - **Walkover requires both entries present** (deviation from the original plan, see PROGRESS). Module auto-completes (final ranks + `completed`) when the final / 3rd-place match is decided
 - **Realtime**: `useTournamentModule` subscribes to `tournament_matches` (module filter, 400 ms debounce) so the bracket updates live
 - **Notifications** (088): 6 `tournament_*` types created by triggers (only while the tournament is `published`, except admin-assigned); push via the existing `trg_fcm_push`; tap → module/tournament screen. Optional pref `tournament_updates`
+- **Schedule views** (132; plan [`PLAN-schedule.md`](docs/tournaments/PLAN-schedule.md)): module Matches tab has **Today** / **Schedule** chips (device-local days, "My matches" toggle, `?tab=matches&view=today|schedule` deep link) and the tournament screen shows a *Today's matches* section from `get_tournament_schedule(p_tournament, p_from, p_to)` (additive RPC, ≤ 7-day window; the client hides the section if the RPC is missing, so the OTA can ship before the migration)
 - **Admin UI**: gear on tournament/module pages → manage screens (entry-form editor, module form, seeding, rounds); results via the match sheet (Enter/Edit result, Schedule, Reset)
 
 ### 11. Admin panel (migrations 122–124; plan in [`docs/admin-panel/PLAN.md`](docs/admin-panel/PLAN.md))
@@ -388,7 +389,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **132**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **133**
 
 ### Server-side hardening (migrations 098–119 — see `bugreport.md`)
 - **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.
