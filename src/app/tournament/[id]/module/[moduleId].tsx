@@ -64,7 +64,12 @@ function tabsFor(format: TournamentFormat | undefined): { value: Tab; label: str
 }
 
 export default function ModuleScreen() {
-  const { id, moduleId, tab: tabParam } = useLocalSearchParams<{ id: string; moduleId: string; tab?: string }>();
+  const { id, moduleId, tab: tabParam, view: viewParam } = useLocalSearchParams<{
+    id: string;
+    moduleId: string;
+    tab?: string;
+    view?: string;
+  }>();
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -397,7 +402,13 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'matches' && (
-            <ModuleMatchesTab matches={m.matches} viewerId={user?.id} onSelect={(match) => setSelectedMatchId(match.id)} />
+            <ModuleMatchesTab
+              matches={m.matches}
+              viewerId={user?.id}
+              moduleLive={mod.status === 'in_progress'}
+              initialView={viewParam}
+              onSelect={(match) => setSelectedMatchId(match.id)}
+            />
           )}
           </Animated.View>
         </ScrollView>

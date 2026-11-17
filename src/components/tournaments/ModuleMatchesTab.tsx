@@ -1,6 +1,7 @@
 import { CalendarClock, Swords } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { Pressable, StyleSheet, View } from 'react-native';
+import { useFocusEffect } from 'expo-router';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { AppState, Pressable, StyleSheet, View } from 'react-native';
 
 import { TournamentMatchRow } from '@/components/tournaments/TournamentMatchRow';
 import { ThemedText } from '@/components/ui/Text';
@@ -32,21 +33,48 @@ export function ModuleMatchesTab({
   matches,
   onSelect,
   viewerId,
+  moduleLive = false,
+  initialView,
 }: {
   matches: TournamentMatch[];
   onSelect: (m: TournamentMatch) => void;
   viewerId?: string;
+  /** Module is in progress: open on Today when something is scheduled today. */
+  moduleLive?: boolean;
+  /** From the `?view=` deep link. */
+  initialView?: string;
 }) {
   const theme = useTheme();
-  const [filter, setFilter] = useState<Filter>('all');
+  const [userFilter, setFilter] = useState<Filter | null>(null);
   const [groupFilter, setGroupFilter] = useState<string>('all');
   const groupLetters = useMemo(
     () => [...new Set(matches.map((m) => m.group_letter).filter((l): l is string => !!l))].sort(),
     [matches],
   );
 
-  const [now] = useState(() => new Date());
+  // "Today" must follow the clock: refresh when the app returns to the foreground or the screen
+  // regains focus (no timers).
+  const [now, setNow] = useState(() => new Date());
+  useFocusEffect(useCallback(() => setNow(new Date()), []));
+  useEffect(() => {
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st === 'active') setNow(new Date());
+    });
+    return () => sub.remove();
+  }, []);
   const todayKey = localDayKey(now.toISOString());
+
+  // Default chip is derived during render (no wrong-chip first frame): the deep-linked view, else
+  // Today for a live module that has matches today, else All. A tap sticks for the session.
+  const hasMatchesToday = useMemo(
+    () =>
+      matches.some(
+        (m) => m.status !== 'bye' && m.status !== 'cancelled' && localDayKey(m.scheduled_at) === todayKey,
+      ),
+    [matches, todayKey],
+  );
+  const requested = initialView === 'today' || initialView === 'schedule' ? initialView : null;
+  const filter: Filter = userFilter ?? requested ?? (moduleLive && hasMatchesToday ? 'today' : 'all');
   const [showEarlier, setShowEarlier] = useState(false);
 
   /** Time-ordered matches that are neither byes nor cancelled, honouring the group filter. */
