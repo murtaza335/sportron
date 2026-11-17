@@ -183,6 +183,35 @@ export type TournamentMatch = {
   can_draw: boolean;
 };
 
+/** One row of `get_tournament_schedule` (migration 132): a scheduled match + its module. */
+export type TournamentScheduleMatch = {
+  module_id: string;
+  module_name: string;
+  module_sport: Sport;
+  module_custom_sport_name: string | null;
+  module_sort_order: number;
+  id: string;
+  round_number: number;
+  match_number: number;
+  is_third_place: boolean;
+  round_name: string;
+  group_letter: string | null;
+  code: string | null;
+  bracket_side: BracketSide;
+  entry_a: BracketEntryRef | null;
+  entry_b: BracketEntryRef | null;
+  entry_a_label: string | null;
+  entry_b_label: string | null;
+  status: TournamentMatchStatus;
+  scheduled_at: string;
+  venue: string | null;
+  court: string | null;
+  score_a: number | null;
+  score_b: number | null;
+  winner_entry_id: string | null;
+  is_draw: boolean;
+};
+
 export type TournamentStanding = {
   rank: number;
   rank_label: string;
