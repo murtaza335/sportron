@@ -5,6 +5,7 @@ import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'reac
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { ModuleRulesSection } from '@/components/live/RulesEditor';
 import { SectionLabel } from '@/components/tournaments/form';
 import { ProfilePickerSheet } from '@/components/tournaments/ProfilePickerSheet';
 import { StatusPill } from '@/components/tournaments/StatusPill';
@@ -227,6 +228,8 @@ export default function ModuleManageScreen() {
         {link('Rounds & schedule', null, () => router.push(tournamentRoutes.rounds(id, moduleId)))}
         {link(mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Seeding & bracket' : 'Seeding & fixtures', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
       </View>
+
+      <ModuleRulesSection module={mod} onSaved={m.refresh} />
 
       <View style={{ gap: Spacing.sm }}>
         <SectionLabel>Module admins</SectionLabel>
