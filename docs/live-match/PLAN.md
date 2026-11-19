@@ -918,3 +918,14 @@ entry ✔.
     in under a minute.
 14. Set `live_realtime = false` → all clients keep working by polling.
 15. Web: hard reload of `/tournament/<id>/live/<matchId>` works; keyboard shortcuts work.
+
+---
+
+## 18. Build log — deviations from the plan
+
+**Step 2 (migration 133 + tests) — done.**
+- Board / settings reads return **one jsonb document** (`active`, `server_now`, `tournament`, `display`, `app_link`, `live`, `recent`, `up_next`) instead of `RETURNS TABLE` — one round trip and additive growth. `get_live_board` returns `{active:false}` for unknown/off/draft (no existence leak).
+- **Rules are resolved by the client engine** (single source of truth for presets). The server validates only the envelope (object, ≤ 4 KB, known `family`) and `family ↔ scoring mode`: a `games` module must use `sets`/`tennis`; a `score` module may use any family (volleyball keeps `scoring_mode = 'score'` and uses sets rules). `live_start_match` therefore needs `p_rules` (or the module's saved `live_rules`) and also takes the initial `p_snapshot` / `p_summary`.
+- `live_push_score` accepts snapshot `state` ∈ `live | break | decided`; the row state is `live`/`break` (`decided` = engine says the match is won, still live until **Finish**). When two pushes land < 50 ms apart the second is **not applied and not an error**: the response carries the old `seq`, so the **outbox must resend when the returned `seq` < the `seq` it sent** (after ~250 ms).
+- One broadcast topic `live:<code>` for app **and** projector (D5); deletes broadcast `{match_id, removed:true}`; `config` events go to the old and new code.
+- Local test stand-in for Realtime added to `docs/tournaments/local-db/stubs.sql`; `docs/live-match/sql-tests.sql` is wired into `run.sh`.

@@ -62,3 +62,13 @@ insert into public.site_config (key, value) values
   ('maintenance', '{"enabled": false, "message": "We are currently down for maintenance. Please check back soon."}'),
   ('min_app_version', '{"min_version": "1.0.0", "store_url": "", "message": "A newer version of this app is required."}');
 insert into public.profiles (username) select 'user' || g from generate_series(1,6) g;
+
+-- live-match (133): minimal Realtime stand-in so the migration's realtime policy + broadcast can be tested locally
+create schema realtime;
+grant usage on schema realtime to anon, authenticated, service_role;
+create table realtime.messages (id bigserial primary key, topic text, extension text default 'broadcast', event text, payload jsonb, private boolean);
+alter table realtime.messages enable row level security;
+grant select on realtime.messages to anon, authenticated;
+create function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
+create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
+  language sql security definer as $$ insert into realtime.messages(topic, event, payload, private) values (topic, event, payload, private) $$;
