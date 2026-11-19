@@ -964,3 +964,18 @@ entry ✔.
 - Checked with headless Chrome on `/demo` at 1920×1080 and 1280×720 and with `?court=` filtering (screenshots reviewed): four courts side by side, set chips, clocks counting down / up, break label, QR.
 - **Known limit:** if the organiser switches **Court** off, the server omits the court from every match, so tiles can no longer be keyed by court (each match gets its own tile) — pinned courts then show as idle. Leave Court on when using pinned courts.
 - Not yet done: the Vercel project + DNS (owner), and a test against the real realtime channel (needs migration 133 applied).
+
+**Step 12 — OTA fingerprint verified.** `@expo/fingerprint` on the base commit (`6bbfa36`) and on `dev` after all steps: both **`5b0237f8ee7d7ff2dce54643a9cba0f3a036f829`**, 0 differing sources → the app part can ship with `eas update`. (Compare in place — a worktree with a symlinked `node_modules` gives a false difference.) Re-run before publishing: `npx @expo/fingerprint .` must still print that hash.
+
+**Step 13 — docs done.** AGENTS.md §15 + structure / next-migration lines (134). No What's New entry yet on purpose: the feature is flagged off — add the announcement (draft: "Live match scoring: referees score point by point, everyone follows live in the app, and venues get a big-screen link") when the flag is switched on.
+
+---
+
+## 19. Owner checklist (in this order)
+1. **Supabase**: confirm Realtime *private channels* work on the project (Realtime settings; do **not** enable "private channels only"); read the Free-plan Realtime quotas (§10).
+2. **Apply migration 133** (SQL editor). Optionally run `docs/live-match/sql-tests.sql` first in a staging copy (`docs/tournaments/local-db/run.sh` runs everything locally).
+3. **Projector site**: new Vercel project, root `live/` (enable "include source files outside the root directory"), env `VITE_SUPABASE_URL` + `VITE_SUPABASE_ANON_KEY`, domain `live.sportron.app` (DNS `CNAME live → cname.vercel-dns.com`). Check `https://live.sportron.app/demo`.
+4. **Main web build**: redeploy (`web-deploy-commands.txt`) so the new routes (`/tournament/<id>/live…`, `…/score/…`) have their rewrites.
+5. **OTA**: `npx @expo/fingerprint .` = `5b0237f8…`; `eas update --channel preview` → test on a preview build → `eas update --channel production`.
+6. **Hall test** (§17) with `live_scoring` switched on for yourself only (feature flag rollout %/admin list), then for the event.
+7. Announce (What's New) once the flag is on for everyone.
