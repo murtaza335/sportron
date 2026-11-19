@@ -20,6 +20,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
 import { useTournamentSchedule } from '@/hooks/useTournamentSchedule';
 import { TodayMatchesSection } from '@/components/tournaments/TodayMatchesSection';
+import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
 import { useTournamentPromos } from '@/hooks/useTournamentPromos';
 import { PromoCodeCard } from '@/components/tournaments/PromoCodeCard';
 import { haptics } from '@/lib/haptics';
@@ -158,6 +159,8 @@ export default function TournamentScreen() {
               />
             </View>
           )}
+
+          <ResumeScoringBanner tournamentId={t.id} />
 
           <TodayMatchesSection tournamentId={t.id} matches={todayMatches} />
 

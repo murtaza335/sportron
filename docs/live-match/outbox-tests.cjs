@@ -159,6 +159,16 @@ const tap = (ob, id, tl) => {
     eq([re.timeline.present.cur.a, re.resumedLocal], [7, true], 'open() keeps newer local state');
     ok(L.canUndo(re.timeline), 'undo history survived');
   }
+  // 9b ── peek(): resume offline from storage alone
+  {
+    const st = memStorage(); const srv1 = fakeServer({ hang: true }); const ob1 = mk(srv1, st);
+    let { timeline: tl } = await openSlot(ob1, 'm', 1); for (let i = 0; i < 4; i++) tl = tap(ob1, 'm', tl);
+    await sleep(20);
+    const ob2 = mk(fakeServer({ hang: true }), st);
+    const p = await ob2.peek('m');
+    eq([p.timeline.present.cur.a, p.rules.preset, p.seq], [4, 'badminton_21', 5], 'peek restores rules + timeline + seq without the network');
+    eq(await ob2.peek('nope'), null, 'peek of an unknown match is null');
+  }
   // 10 ── open(): server newer than local → server wins
   {
     const st = memStorage(); const srv = fakeServer(); const ob = mk(srv, st);

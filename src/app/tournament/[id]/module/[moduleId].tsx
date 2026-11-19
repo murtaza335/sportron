@@ -27,7 +27,9 @@ import { Duration, RM } from '@/lib/motion';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
@@ -131,6 +133,8 @@ export default function ModuleScreen() {
     };
   }, [isChampion, mod?.status, celebrateKey]);
 
+  const liveScoringOn = useFlag('live_scoring', false);
+
   const matchActions = (match: TournamentMatch) => {
     if (!m.isModuleAdmin || !mod) return null;
     const decided = match.status === 'completed' || match.status === 'walkover';
@@ -160,8 +164,18 @@ export default function ModuleScreen() {
       ]);
     return (
       <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+        {canResult && !decided && liveScoringOn && (
+          <Button
+            label="Live scoring"
+            onPress={() => {
+              setSelectedMatchId(null);
+              router.push(tournamentRoutes.score(id, moduleId, match.id));
+            }}
+          />
+        )}
         {canResult && (
           <Button
+            variant={!decided && liveScoringOn ? 'secondary' : 'primary'}
             label={decided ? 'Edit result' : 'Enter result'}
             onPress={() => {
               setSelectedMatchId(null);
@@ -290,6 +304,7 @@ export default function ModuleScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
           refreshControl={<ThemedRefreshControl refreshing={m.refreshing} onRefresh={m.refresh} />}
         >
+          <ResumeScoringBanner tournamentId={id} />
           <View style={styles.header}>
             <View style={styles.pills}>
               <InfoPill label={sportLabel(mod.sport, mod.custom_sport_name)} />

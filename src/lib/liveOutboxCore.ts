@@ -490,6 +490,23 @@ export function createOutbox(deps: OutboxDeps) {
       return n;
     },
 
+    /** Load a stored slot without the network (app restarted offline mid-match). */
+    async peek(matchId: string): Promise<{ rules: LiveRules; timeline: Timeline; summary: Summary; seq: number } | null> {
+      const live = slots.get(matchId);
+      if (live) return { rules: live.rules, timeline: live.timeline, summary: live.summary, seq: live.seq };
+      try {
+        const raw = await deps.storage.get(KEY + matchId);
+        if (!raw) return null;
+        const p = JSON.parse(raw) as Persisted;
+        if (p.v !== 1 || p.finish) return null;
+        const s = adopt(p);
+        if (s.seq > s.sentSeq) wake(s);
+        return { rules: s.rules, timeline: s.timeline, summary: s.summary, seq: s.seq };
+      } catch {
+        return null;
+      }
+    },
+
     /** Current in-memory view (used by the screen after open()). */
     timelineOf(matchId: string): Timeline | null {
       return slots.get(matchId)?.timeline ?? null;

@@ -70,6 +70,8 @@ export type TournamentModule = {
   custom_sport_name?: string | null;
   sport_key?: string | null;
   scoring_mode?: ScoringMode | null;
+  /** Live scoring rules saved for this module (migration 133): `{family, preset, …overrides}`; null = sport default. */
+  live_rules?: Record<string, unknown> | null;
   description: string | null;
   rules_text: string | null;
   venue: string | null;
