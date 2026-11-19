@@ -15,3 +15,4 @@ export * from './display';
 export * from './resultForm';
 export * from './boardTypes';
 export * from './boardState';
+export * from './layout';

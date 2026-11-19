@@ -594,4 +594,43 @@ const scoreTo = (a, b) => {
   eq(L.isStale({ ...board.live[0], summary: { ...sum('1'), clock: { running: true, elapsed_ms: 0, dir: 'down', limit_ms: 1 } } }, now), false, 'a running clock is never stale');
 }
 
+
+// ── Projector layout ─────────────────────────────────────────────────────────
+{
+  const wide = 16 / 9;
+  const g = (n, mode = 'auto', aspect = wide) => { const r = L.gridFor(n, mode, aspect); return [r.cols, r.rows]; };
+  eq(g(1), [1, 1], '1 tile = full screen');
+  eq(g(2), [2, 1], '2 tiles side by side');
+  eq(g(3), [3, 1], '3 tiles side by side in ONE row');
+  eq(g(4), [2, 2], '4 tiles on 16:9 = 2x2');
+  eq(g(4, 'auto', 2.1), [4, 1], '4 tiles on a very wide screen = one row');
+  eq(g(5), [3, 2], '5 tiles = 3x2');
+  eq(g(6), [3, 2], '6 tiles = 3x2');
+  eq(g(7), [4, 2], '7 tiles = 4x2');
+  eq(g(8), [4, 2], '8 tiles = 4x2');
+  eq(g(3, 'grid'), [2, 2], 'grid mode forces rows and columns');
+  eq(g(4, 'row'), [4, 1], 'row mode puts 4 in one row');
+  eq(g(6, 'row'), [4, 2], 'row mode wraps beyond 4');
+  eq(g(3, 'auto', 0.6), [1, 3], 'portrait stacks up to 3');
+  eq(g(5, 'auto', 0.6), [2, 3], 'portrait uses 2 columns above 3');
+  const pg = L.paginate([1, 2, 3, 4, 5, 6, 7, 8, 9, 10], 4);
+  eq([pg.pages.length, pg.pages[2], pg.perPage], [3, [9, 10], 4], 'paginate keeps order');
+  eq(L.paginate([], 6).pages, [[]], 'empty = one empty page');
+  eq(L.paginate([1, 2], 99).perPage, 8, 'per page capped at 8');
+
+  const ck = L.courtKey; const cmp = L.compareCourts;
+  const mm = (id, court, t) => ({ match_id: id, court, started_at: t });
+  let tiles = L.buildTiles([mm('a', 'Court 2', '2'), mm('b', 'Court 1', '1'), mm('c', 'court 10', '3')], [], ck, cmp);
+  eq(tiles.map((t) => t.court), ['Court 1', 'Court 2', 'court 10'], 'unpinned courts in natural order');
+  tiles = L.buildTiles([mm('a', 'Court 2', '2')], ['Court 1', 'Court 2', 'Court 3'], ck, cmp);
+  eq(tiles.map((t) => [t.court, t.matches.length, t.pinned]), [['Court 1', 0, true], ['Court 2', 1, true], ['Court 3', 0, true]], 'pinned courts keep a tile even when idle');
+  tiles = L.buildTiles([mm('a', ' court 2 ', '2'), mm('x', 'Court 9', '5')], ['Court 2'], ck, cmp);
+  eq(tiles.map((t) => [t.court, t.pinned]), [['Court 2', true], ['Court 9', false]], 'pinned order first, case-insensitive match, extras after');
+  tiles = L.buildTiles([mm('a', null, '9'), mm('b', null, '3'), mm('c', 'Court 1', '1')], [], ck, cmp);
+  eq(tiles.map((t) => t.key), ['court 1', 'match:b', 'match:a'], 'court-less matches come last by start time');
+  tiles = L.buildTiles([mm('old', 'Court 1', '1'), mm('new', 'Court 1', '2')], [], ck, cmp);
+  eq(tiles[0].matches.map((m) => m.match_id), ['new', 'old'], 'two matches on one court: newest first, none hidden');
+  eq(L.buildTiles([mm('a', 'Court 1', '1')], ['Court 1', 'court 1'], ck, cmp).length, 1, 'duplicate pinned court ignored');
+}
+
 console.log(`engine tests: ${passed} checks passed`);

@@ -6,6 +6,7 @@ import { ActivityIndicator, Image, Pressable, ScrollView, StyleSheet, View } fro
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
+import { ProjectorCard } from '@/components/live/ProjectorCard';
 import { FormField, PillSelect, SectionLabel, TextField } from '@/components/tournaments/form';
 import { PromoManageSection } from '@/components/tournaments/PromoManageSection';
 import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
@@ -221,6 +222,8 @@ export default function TournamentManageScreen() {
       </View>
 
       <PromoManageSection tournamentId={id} />
+
+      <ProjectorCard tournamentId={id} tournamentName={t.name} />
 
       <View style={{ gap: Spacing.sm }}>
         <SectionLabel>Tournament admins</SectionLabel>
