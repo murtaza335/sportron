@@ -12,7 +12,7 @@ import {
 
 const emptyCounters = (): CounterSet => ({ fouls: 0, timeouts: 0, yellow: 0, red: 0, corners: 0 });
 
-export function initTimed(rules: TimedRules, at = 0): TimedSnapshot {
+export function initTimed(_rules: TimedRules, at = 0): TimedSnapshot {
   return {
     family: 'timed',
     state: 'live',
