@@ -8,6 +8,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { CricketPanel } from '@/components/live/CricketPanel';
 import { FinishSheet } from '@/components/live/FinishSheet';
 import { RallyPanel } from '@/components/live/RallyPanel';
+import { ResultEntry } from '@/components/live/ResultEntry';
 import { SimplePanel } from '@/components/live/SimplePanel';
 import { StartSheet, type StartChoice } from '@/components/live/StartSheet';
 import { TimedPanel } from '@/components/live/TimedPanel';
@@ -82,7 +83,7 @@ type Boot =
 
 // ─── Screen ──────────────────────────────────────────────────────────────────────────────────────────────────
 
-export default function ScoreScreen() {
+function LiveRoute() {
   const { id, moduleId, matchId } = useLocalSearchParams<{ id: string; moduleId: string; matchId: string }>();
   const theme = useTheme();
   const router = useRouter();
@@ -261,6 +262,71 @@ export default function ScoreScreen() {
       )}
     </View>
   );
+}
+
+// ─── Full-screen result entry (?mode=result) — replaces the small result popup ───────────────────────────────
+
+function ResultRoute() {
+  const { id, moduleId, matchId } = useLocalSearchParams<{ id: string; moduleId: string; matchId: string }>();
+  const theme = useTheme();
+  const router = useRouter();
+  const enabled = useFlag('live_scoring', false);
+  const ctx = useScoreContext(moduleId, matchId);
+  const mod = ctx.detail?.module ?? null;
+  const match = ctx.match;
+  const isAdmin = ctx.detail?.my_role === 'module_admin' || ctx.detail?.my_role === 'tournament_admin';
+
+  const goBack = useCallback(() => {
+    if (router.canGoBack()) router.back();
+    else router.replace(tournamentRoutes.module(id, moduleId));
+  }, [router, id, moduleId]);
+
+  const rules = useMemo(
+    () =>
+      mod && match
+        ? resolveRules({ sport: mod.sport, sportKey: mod.sport_key, liveRules: mod.live_rules ?? null, matchBestOf: match.best_of, drawAllowed: !!match.can_draw })
+        : null,
+    [mod, match],
+  );
+  const names: Names = { a: match?.entry_a?.name ?? 'Side A', b: match?.entry_b?.name ?? 'Side B' };
+
+  const blocked =
+    ctx.loading ? null
+    : ctx.error || !mod || !match ? ctx.error ?? 'We couldn’t find that match.'
+    : !enabled ? 'This screen isn’t available yet.'
+    : !isAdmin ? 'Only tournament or module admins can enter results.'
+    : mod.status !== 'in_progress' ? 'The module has to be in progress to enter results.'
+    : !match.entry_a || !match.entry_b ? 'Both sides must be set before a result can be entered.'
+    : match.status === 'bye' || match.status === 'cancelled' ? 'This match has no result to enter.'
+    : null;
+
+  return (
+    <View style={[styles.flex, { backgroundColor: theme.background }]}>
+      <Stack.Screen options={{ headerShown: false, gestureEnabled: false }} />
+      {ctx.loading ? (
+        <View style={styles.center}>
+          <ActivityIndicator color={theme.accent} size="large" />
+        </View>
+      ) : blocked ? (
+        <View style={styles.center}>
+          <View style={styles.blocked}>
+            <ThemedText variant="heading" style={{ textAlign: 'center' }}>
+              {blocked}
+            </ThemedText>
+            <BarButton label="Back" onPress={goBack} />
+          </View>
+        </View>
+      ) : match && rules ? (
+        <ResultEntry match={match} rules={rules} names={names} onDone={goBack} onClose={goBack} />
+      ) : null}
+    </View>
+  );
+}
+
+/** `?mode=result` = the full-screen result entry; otherwise live scoring. */
+export default function ScoreRoute() {
+  const { mode } = useLocalSearchParams<{ mode?: string }>();
+  return mode === 'result' ? <ResultRoute /> : <LiveRoute />;
 }
 
 // ─── Scoring (mounted once the match is live) ────────────────────────────────────────────────────────────────

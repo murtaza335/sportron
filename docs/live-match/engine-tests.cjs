@@ -476,4 +476,95 @@ const scoreTo = (a, b) => {
   }
 }
 
+
+// ── Result form (full-screen Enter result) ───────────────────────────────────
+{
+  const names = { a: 'Ali', b: 'Bilal' };
+  const ev = (f, r, drawAllowed = false) => L.evaluateForm(f, r, { names, drawAllowed });
+  const form = (r, patch) => ({ ...L.emptyForm(r), ...patch });
+
+  // badminton best of 3
+  const bd = rules('badminton_21');
+  eq(L.emptyForm(bd).rows.length, 2, 'best of 3 starts with 2 rows');
+  eq(L.maxRows(bd), 3, 'best of 3 allows 3 rows');
+  let e = ev(form(bd, { rows: [{ a: 21, b: 18 }, { a: 15, b: 21 }, { a: 21, b: 19 }] }), bd);
+  eq([e.scoreA, e.scoreB, e.winner, e.errors.length, e.hints.length], [2, 1, 'a', 0, 0], 'badminton 2-1 clean');
+  eq(e.outcome, 'Ali wins 2–1', 'outcome text');
+  eq(e.detail.length, 3, 'detail = played games');
+  e = ev(form(bd, { rows: [{ a: 21, b: 21 }, { a: 0, b: 0 }] }), bd);
+  ok(e.errors[0].includes('Game 1 can’t end level'), 'level game blocks');
+  eq(L.saveBlocker(e, form(bd, {})), e.errors[0], 'save blocker shows the first error');
+  e = ev(form(bd, {}), bd);
+  eq(e.errors, ['Add at least one game score.'], 'empty form needs a game');
+  e = ev(form(bd, { rows: [{ a: 21, b: 20 }, { a: 21, b: 10 }] }), bd);
+  eq([e.errors.length, e.hints.length, e.hints[0].row], [0, 1, 0], '21-20 is unusual (amber), not blocked');
+  e = ev(form(bd, { rows: [{ a: 21, b: 10 }, { a: 21, b: 12 }, { a: 5, b: 3 }] }), bd);
+  ok(e.hints.some((h) => h.row === 2 && h.text.includes('already decided')), 'extra game after the match was decided is flagged');
+  e = ev(form(bd, { rows: [{ a: 21, b: 10 }, { a: 0, b: 0 }] }), bd);
+  ok(e.hints.some((h) => h.text.includes('Nobody has won 2 games')), 'shortened match hint');
+  e = ev(form(bd, { rows: [{ a: 21, b: 10 }, { a: 10, b: 21 }] }), bd);
+  eq([e.needsWinner, L.saveBlocker(e, form(bd, {}))], [true, 'Scores are level — pick the winner.'], '1-1 in a knockout needs a winner');
+  eq(L.saveBlocker(e, form(bd, { winner: 'b' })), null, 'winner picked → can save');
+  eq(ev(form(bd, { rows: [{ a: 21, b: 10 }, { a: 10, b: 21 }] }), bd, true).draw, true, '1-1 with draws allowed = draw');
+
+  // tennis
+  const tn = rules('tennis_bo3');
+  e = ev(form(tn, { rows: [{ a: 6, b: 4 }, { a: 7, b: 6 }] }), tn);
+  eq([e.scoreA, e.scoreB, e.errors.length, e.hints.length], [2, 0, 0, 0], 'tennis 6-4 7-6 clean');
+  e = ev(form(tn, { rows: [{ a: 6, b: 5 }, { a: 6, b: 0 }] }), tn);
+  eq(e.hints.length, 1, 'tennis 6-5 is not a finished set');
+
+  // football / timed
+  const fb = rules('football_11');
+  e = ev(form(fb, { a: 2, b: 1 }), fb);
+  eq([e.scoreA, e.scoreB, e.winner, e.needsWinner], [2, 1, 'a', false], 'football 2-1');
+  e = ev(form(fb, { a: 1, b: 1 }), fb);
+  eq(e.needsWinner, true, 'football level in a knockout needs a winner');
+  e = ev(form(fb, { a: 1, b: 1, pensA: 4, pensB: 3 }), fb);
+  eq([e.needsWinner, e.winner, e.autoNote], [false, 'a', 'Pens 4–3'], 'penalties decide a level football match');
+  eq(L.composeNote(e, form(fb, { note: 'Great game' })), 'Pens 4–3 · Great game', 'note composed');
+  e = ev(form(fb, { a: 1, b: 1 }), fb, true);
+  eq([e.draw, e.needsWinner], [true, false], 'football draw allowed');
+  e = ev(form(fb, { periodBreakdown: true, rows: [{ a: 1, b: 0 }, { a: 0, b: 2 }] }), fb);
+  eq([e.scoreA, e.scoreB, e.winner, e.detail.length], [1, 2, 'b', 2], 'period breakdown sums to the totals');
+  const bb = rules('basketball_fiba');
+  e = ev(form(bb, { periodBreakdown: true, rows: [{ a: 20, b: 18 }, { a: 22, b: 25 }, { a: 15, b: 15 }, { a: 18, b: 17 }] }), bb);
+  eq([e.scoreA, e.scoreB], [75, 75], 'basketball quarters sum');
+  eq(L.maxRows(bb), 5, 'basketball: 4 quarters + overtime rows');
+
+  // cricket
+  const ck = rules('cricket_t20');
+  e = ev(form(ck, { a: 145, b: 140, wktA: 6, wktB: 9, oversA: '20', oversB: '20' }), ck);
+  eq([e.winner, e.autoNote], ['a', 'Ali 145/6 (20) · Bilal 140/9 (20)'], 'cricket result + auto note');
+  e = ev(form(ck, { a: 100, b: 90, wktA: 11 }), ck);
+  ok(e.errors[0].includes('at most 10 wickets'), 'too many wickets blocks');
+  e = ev(form(ck, { a: 100, b: 90, oversA: 'abc' }), ck);
+  ok(e.errors[0].includes('Overs look like'), 'bad overs block');
+  eq(ev(form(ck, { a: 100, b: 100 }), ck).needsWinner, true, 'cricket tie in a knockout needs a winner');
+
+  // simple
+  const sm = rules('simple');
+  eq(ev(form(sm, { a: 3, b: 3 }), sm, true).draw, true, 'simple draw');
+
+  // edit prefill
+  const f = L.formFromMatch(bd, { score_a: 2, score_b: 1, score_detail: [{ a: 21, b: 18 }, { a: 15, b: 21 }, { a: 21, b: 19 }], result_note: 'Walkover', winnerSide: 'a' });
+  eq([f.rows.length, f.note, f.winner], [3, '', 'a'], 'prefill from an existing result (walkover note ignored)');
+  const f2 = L.formFromMatch(fb, { score_a: 2, score_b: 1, score_detail: [{ a: 1, b: 0 }, { a: 1, b: 1 }], result_note: null, winnerSide: null });
+  eq([f2.periodBreakdown, f2.a, f2.b], [true, 2, 1], 'timed prefill with a period breakdown');
+
+  // history
+  let h = L.newFormHistory(L.emptyForm(bd));
+  h = L.pushForm(h, { ...h.present, rows: [{ a: 1, b: 0 }, { a: 0, b: 0 }] });
+  h = L.pushForm(h, { ...h.present, rows: [{ a: 2, b: 0 }, { a: 0, b: 0 }] });
+  h = L.undoForm(h);
+  eq(h.present.rows[0].a, 1, 'form undo');
+  h = L.redoForm(h);
+  eq(h.present.rows[0].a, 2, 'form redo');
+  h = L.undoForm(L.undoForm(h));
+  h = L.pushForm(h, { ...h.present, rows: [{ a: 9, b: 0 }, { a: 0, b: 0 }] });
+  eq(h.future.length, 0, 'a new edit clears redo');
+  const kept = L.replaceForm(h, { ...h.present, note: 'x' });
+  eq(kept.past.length, h.past.length, 'note edits are not undo steps');
+}
+
 console.log(`engine tests: ${passed} checks passed`);

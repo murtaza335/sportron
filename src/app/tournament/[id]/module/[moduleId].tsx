@@ -179,7 +179,8 @@ export default function ModuleScreen() {
             label={decided ? 'Edit result' : 'Enter result'}
             onPress={() => {
               setSelectedMatchId(null);
-              setResultMatchId(match.id);
+              if (liveScoringOn) router.push(tournamentRoutes.score(id, moduleId, match.id, 'result'));
+              else setResultMatchId(match.id);
             }}
           />
         )}
