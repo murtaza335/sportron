@@ -6,7 +6,7 @@ import { BottomSheet } from '@/components/tournaments/BottomSheet';
 import { SheetScrollView } from '@/components/motion/Sheet';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import { useTheme } from '@/hooks/use-theme';
 import { describeRules, presetsForSport, type LiveRules, type Side } from '@/lib/live';
 import type { TournamentMatch, TournamentModule } from '@/types';
@@ -128,8 +128,8 @@ export function StartSheet({
               Who serves first
             </ThemedText>
             <View style={styles.wrapRow}>
-              <Chip label={a} selected={firstServer === 'a'} color={LiveSide.a.fg} onPress={() => setFirstServer('a')} />
-              <Chip label={b} selected={firstServer === 'b'} color={LiveSide.b.fg} onPress={() => setFirstServer('b')} />
+              <Chip label={a} selected={firstServer === 'a'} color={SideColors.a.fg} onPress={() => setFirstServer('a')} />
+              <Chip label={b} selected={firstServer === 'b'} color={SideColors.b.fg} onPress={() => setFirstServer('b')} />
             </View>
           </View>
         )}
@@ -139,8 +139,8 @@ export function StartSheet({
               Who bats first
             </ThemedText>
             <View style={styles.wrapRow}>
-              <Chip label={a} selected={firstBat === 'a'} color={LiveSide.a.fg} onPress={() => setFirstBat('a')} />
-              <Chip label={b} selected={firstBat === 'b'} color={LiveSide.b.fg} onPress={() => setFirstBat('b')} />
+              <Chip label={a} selected={firstBat === 'a'} color={SideColors.a.fg} onPress={() => setFirstBat('a')} />
+              <Chip label={b} selected={firstBat === 'b'} color={SideColors.b.fg} onPress={() => setFirstBat('b')} />
             </View>
           </View>
         )}

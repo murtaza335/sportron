@@ -5,7 +5,7 @@ import Animated, { useAnimatedStyle, useReducedMotion, useSharedValue, withSeque
 
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide, LiveStatus } from '@/constants/liveColors';
+import { SideColors, LiveStatus } from '@/constants/liveColors';
 import { useLiveSync } from '@/hooks/useLiveSync';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
@@ -88,7 +88,7 @@ export function ScoreHalf({
   disabled?: boolean;
   accessibilityLabel: string;
 }) {
-  const c = LiveSide[side];
+  const c = SideColors[side];
   const reduced = useReducedMotion();
   const [box, setBox] = useState({ w: 0, h: 0 });
   const guard = useBounceGuard();

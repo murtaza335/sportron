@@ -8,7 +8,7 @@ import { toast } from '@/components/motion/Toast';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
 import {
@@ -69,7 +69,7 @@ function Stepper({ value, onChange, label, side, max = 999 }: { value: number; o
       {...holdProps(d)}
       accessibilityRole="button"
       accessibilityLabel={`${name} ${label}`}
-      style={({ pressed }) => [styles.stepBtn, { backgroundColor: LiveSide[side].fg, opacity: pressed ? 0.8 : 1 }]}
+      style={({ pressed }) => [styles.stepBtn, { backgroundColor: SideColors[side].fg, opacity: pressed ? 0.8 : 1 }]}
     >
       {icon}
     </Pressable>
@@ -175,8 +175,8 @@ export function ResultEntry({
   const nameHeader = (
     <View style={styles.row}>
       {(['a', 'b'] as Side[]).map((s) => (
-        <View key={s} style={[styles.nameTag, { backgroundColor: LiveSide[s].soft, borderColor: LiveSide[s].fg }]}>
-          <ThemedText numberOfLines={1} style={{ fontWeight: '800', color: LiveSide[s].fg, textAlign: 'center' }}>
+        <View key={s} style={[styles.nameTag, { backgroundColor: SideColors[s].soft, borderColor: SideColors[s].fg }]}>
+          <ThemedText numberOfLines={1} style={{ fontWeight: '800', color: SideColors[s].fg, textAlign: 'center' }}>
             {names[s]}
           </ThemedText>
         </View>

@@ -3,7 +3,7 @@ import { StyleSheet, View } from 'react-native';
 import { ClockCard } from '@/components/live/TimedPanel';
 import { ScoreHalf, ValueButton } from '@/components/live/parts';
 import { Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import type { LiveScorer } from '@/hooks/useLiveScorer';
 import type { Names, Side, SimpleRules } from '@/lib/live';
 
@@ -40,7 +40,7 @@ export function SimplePanel({ scorer, rules, names, swapped, disabled }: { score
           {order.map((side) => (
             <View key={side} style={styles.extraCol}>
               {extra.map((v) => (
-                <ValueButton key={v} label={`+${v}`} color={LiveSide[side].fg} size={56} disabled={disabled || done} onPress={() => act({ t: 'score', side, value: v, at: Date.now() })} />
+                <ValueButton key={v} label={`+${v}`} color={SideColors[side].fg} size={56} disabled={disabled || done} onPress={() => act({ t: 'score', side, value: v, at: Date.now() })} />
               ))}
             </View>
           ))}

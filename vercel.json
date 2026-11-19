@@ -42,6 +42,14 @@
       "destination": "/tournament/[id]/module/[moduleId]"
     },
     {
+      "source": "/tournament/:id/live/:matchId",
+      "destination": "/tournament/[id]/live/[matchId]"
+    },
+    {
+      "source": "/tournament/:id/live",
+      "destination": "/tournament/[id]/live"
+    },
+    {
       "source": "/tournament/:id/fields",
       "destination": "/tournament/[id]/fields"
     },

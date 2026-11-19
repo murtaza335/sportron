@@ -6,7 +6,7 @@ import { SheetScrollView } from '@/components/motion/Sheet';
 import { BottomSheet } from '@/components/tournaments/BottomSheet';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import type { OutboxStatus } from '@/lib/liveOutboxCore';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { useTheme } from '@/hooks/use-theme';
@@ -46,7 +46,7 @@ export function FinishSheet({
         <View style={[styles.box, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
           {(['a', 'b'] as Side[]).map((s) => (
             <View key={s} style={styles.line}>
-              <View style={[styles.dot, { backgroundColor: LiveSide[s].fg }]} />
+              <View style={[styles.dot, { backgroundColor: SideColors[s].fg }]} />
               <ThemedText numberOfLines={1} style={{ flex: 1, fontWeight: winner === s ? '800' : '500' }}>
                 {names[s]}
                 {winner === s ? '  ✓' : ''}

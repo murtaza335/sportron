@@ -13,3 +13,5 @@ export { periodName, periodLimitMs, shootoutNext, shootoutWinner, shootoutScore,
 export { runsNeeded, ballsLeft, maxBalls, inningsScore, inningsOvers, sideRuns } from './families/cricket';
 export * from './display';
 export * from './resultForm';
+export * from './boardTypes';
+export * from './boardState';

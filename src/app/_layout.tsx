@@ -218,6 +218,8 @@ function RootNavigator() {
         <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
         <Stack.Screen name="tournament/[id]/manage" options={{ ...pushOptions, title: 'Manage tournament' }} />
+        <Stack.Screen name="tournament/[id]/live/index" options={{ ...pushOptions, title: 'Live' }} />
+        <Stack.Screen name="tournament/[id]/live/[matchId]" options={{ ...pushOptions, title: 'Live match' }} />
         <Stack.Screen name="tournament/[id]/fields" options={{ ...pushOptions, title: 'Entry form' }} />
         <Stack.Screen name="tournament/[id]/module-form" options={modalOptions} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Module' }} />

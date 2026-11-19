@@ -14,11 +14,13 @@ import Animated, {
 import { PressableScale } from '@/components/motion/PressableScale';
 import { Duration, RM } from '@/lib/motion';
 
+import { LivePill } from '@/components/live/LivePill';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius } from '@/constants/theme';
 import { NODE_H, NODE_W } from '@/lib/bracketLayout';
 import { formatMatchTime, isTodayLocal, slotPlaceholder } from '@/lib/tournamentFormat';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsLive } from '@/lib/liveStatusStore';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
 function Row({
@@ -116,6 +118,7 @@ export function BracketMatchNode({
   const wo = match.status === 'walkover';
   const live = match.status === 'scheduled' && isTodayLocal(match.scheduled_at);
   const cancelled = match.status === 'cancelled';
+  const liveNow = useIsLive(match.id);
   const time = formatMatchTime(match.scheduled_at);
   const caption = cancelled
     ? 'Not needed'
@@ -170,9 +173,9 @@ export function BracketMatchNode({
         bye={bye}
         placeholder={slotPlaceholder(match.entry_b_label, bye && !match.entry_b)}
       />
-      {(caption || live) && (
+      {(caption || live || liveNow) && (
         <View style={styles.captionRow}>
-          {live && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
+          {liveNow ? <LivePill compact /> : live && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
           {caption && (
             <ThemedText variant="caption" muted style={styles.caption} numberOfLines={1}>{caption}</ThemedText>
           )}

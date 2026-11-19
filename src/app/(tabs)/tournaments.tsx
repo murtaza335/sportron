@@ -11,6 +11,7 @@ import { Duration, RM } from '@/lib/motion';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
+import { LiveTournamentsStrip } from '@/components/live/LiveNowSection';
 import { TournamentCard } from '@/components/tournaments/TournamentCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { TipCard } from '@/components/TipCard';
@@ -63,6 +64,7 @@ export default function TournamentsScreen() {
         ListHeaderComponent={
           <>
             <AnnouncementHost placement="tournaments_banner" />
+            <LiveTournamentsStrip />
             <TipCard id="tournaments" />
             {scope === 'mine' && (
               <Card style={styles.hostInfo} onPress={() => Linking.openURL(`mailto:${HOST_EMAIL}`).catch(() => {})}>

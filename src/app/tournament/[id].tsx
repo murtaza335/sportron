@@ -21,6 +21,7 @@ import { useTournament } from '@/hooks/useTournament';
 import { useTournamentSchedule } from '@/hooks/useTournamentSchedule';
 import { TodayMatchesSection } from '@/components/tournaments/TodayMatchesSection';
 import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
+import { LiveNowSection } from '@/components/live/LiveNowSection';
 import { useTournamentPromos } from '@/hooks/useTournamentPromos';
 import { PromoCodeCard } from '@/components/tournaments/PromoCodeCard';
 import { haptics } from '@/lib/haptics';
@@ -161,6 +162,8 @@ export default function TournamentScreen() {
           )}
 
           <ResumeScoringBanner tournamentId={t.id} />
+
+          <LiveNowSection tournamentId={t.id} />
 
           <TodayMatchesSection tournamentId={t.id} matches={todayMatches} />
 

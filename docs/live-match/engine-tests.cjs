@@ -567,4 +567,31 @@ const scoreTo = (a, b) => {
   eq(kept.past.length, h.past.length, 'note edits are not undo steps');
 }
 
+
+// ── Board state (applying broadcasts) ────────────────────────────────────────
+{
+  const sum = (a) => ({ a, b: '0', a_sub: [], b_sub: [], line: '', server: null, clock: null, state_label: 'LIVE' });
+  const row = (id, seq, court) => ({ match_id: id, state: 'live', seq, court, summary: sum('1'), updated_at: '2026-11-20T10:00:00Z' });
+  const board = { active: true, server_now: '2026-11-20T10:00:05Z', live: [row('m1', 5, 'Court 1'), row('m2', 3, 'Court 2')], recent: [], up_next: [] };
+  let r = L.applyScoreEvent(board, { match_id: 'm1', seq: 6, state: 'live', summary: sum('2'), updated_at: '2026-11-20T10:00:06Z' });
+  eq([r.refetch, r.board.live[0].summary.a, r.board.live[0].seq, r.board.live[1].seq], [false, '2', 6, 3], 'newer seq applied to its own row only');
+  r = L.applyScoreEvent(board, { match_id: 'm1', seq: 5, summary: sum('9') });
+  ok(r.board === board && !r.refetch, 'duplicate seq ignored (same object, no re-render)');
+  r = L.applyScoreEvent(board, { match_id: 'm1', seq: 4, summary: sum('9') });
+  ok(r.board === board, 'older seq ignored');
+  eq(L.applyScoreEvent(board, { match_id: 'new', seq: 1 }).refetch, true, 'unknown match → refetch');
+  eq(L.applyScoreEvent(board, { match_id: 'm1', seq: 9, state: 'finished' }).refetch, true, 'finished → refetch (it moves lists)');
+  eq(L.applyScoreEvent(board, { match_id: 'm2', removed: true }).refetch, true, 'removed → refetch');
+  r = L.applyScoreEvent(board, { match_id: 'm2', seq: 4, state: 'break', summary: sum('0') });
+  eq([r.board.live[1].state, r.refetch], ['break', false], 'live → break applied in place');
+  const one = L.applyScoreToMatch(board.live[0], { match_id: 'm1', seq: 8, state: 'finished', updated_at: 'x' });
+  eq([one.match.state, one.match.finished_at], ['finished', 'x'], 'single match: finished is applied and stamped');
+  eq(L.applyScoreToMatch(board.live[0], { match_id: 'other', seq: 99 }).match, board.live[0], 'events for other matches ignored');
+  eq(L.courtKey('  Court 2 '), L.courtKey('court 2'), 'court keys are case/space insensitive');
+  eq(['Court 10', 'Court 2', 'Court 1'].sort(L.compareCourts), ['Court 1', 'Court 2', 'Court 10'], 'natural court order');
+  const now = Date.parse('2026-11-20T10:05:00Z');
+  eq([L.isStale(board.live[0], now), L.isStale(board.live[0], Date.parse('2026-11-20T10:00:30Z'))], [true, false], 'stale after 90 s without an update');
+  eq(L.isStale({ ...board.live[0], summary: { ...sum('1'), clock: { running: true, elapsed_ms: 0, dir: 'down', limit_ms: 1 } } }, now), false, 'a running clock is never stale');
+}
+
 console.log(`engine tests: ${passed} checks passed`);

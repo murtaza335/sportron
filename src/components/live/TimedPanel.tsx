@@ -1,12 +1,12 @@
-import { useEffect, useState } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner, BarButton, ValueButton } from '@/components/live/parts';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import type { LiveScorer } from '@/hooks/useLiveScorer';
 import { useTheme } from '@/hooks/use-theme';
+import { useTicker } from '@/hooks/useTicker';
 import { haptics } from '@/lib/haptics';
 import {
   formatClock,
@@ -22,22 +22,6 @@ import {
   type SimpleRules,
   type TimedRules,
 } from '@/lib/live';
-
-/** Wall-clock ticker (4×/s) while `active` — drives the on-screen clock only; nothing is sent per tick. */
-export function useTicker(active: boolean): number {
-  const [now, setNow] = useState(0);
-  useEffect(() => {
-    if (!active) return;
-    const tick = () => setNow(Date.now());
-    const first = setTimeout(tick, 0);
-    const id = setInterval(tick, 250);
-    return () => {
-      clearTimeout(first);
-      clearInterval(id);
-    };
-  }, [active]);
-  return now;
-}
 
 // ─── Clock card ──────────────────────────────────────────────────────────────
 
@@ -195,7 +179,7 @@ export function TimedPanel({ scorer, rules, names, swapped, disabled }: { scorer
           </ThemedText>
           {(['a', 'b'] as Side[]).map((s) => (
             <View key={s} style={styles.kickRow}>
-              <View style={[styles.kickDot, { backgroundColor: LiveSide[s].fg }]} />
+              <View style={[styles.kickDot, { backgroundColor: SideColors[s].fg }]} />
               <ThemedText numberOfLines={1} style={{ width: 110, fontWeight: '700' }}>
                 {names[s]}
               </ThemedText>
@@ -224,8 +208,8 @@ export function TimedPanel({ scorer, rules, names, swapped, disabled }: { scorer
       {!shootout && (
         <View style={styles.cols}>
           {order.map((side) => (
-            <View key={side} style={[styles.col, { backgroundColor: LiveSide[side].soft, borderColor: LiveSide[side].fg }]}>
-              <ThemedText numberOfLines={2} style={{ fontWeight: '800', fontSize: 18, textAlign: 'center', color: LiveSide[side].fg }}>
+            <View key={side} style={[styles.col, { backgroundColor: SideColors[side].soft, borderColor: SideColors[side].fg }]}>
+              <ThemedText numberOfLines={2} style={{ fontWeight: '800', fontSize: 18, textAlign: 'center', color: SideColors[side].fg }}>
                 {names[side]}
               </ThemedText>
               <ThemedText allowFontScaling={false} style={styles.score} accessibilityLabel={`${names[side]} ${side === 'a' ? summary.a : summary.b}`}>
@@ -236,7 +220,7 @@ export function TimedPanel({ scorer, rules, names, swapped, disabled }: { scorer
                   <ValueButton
                     key={v}
                     label={`+${v}`}
-                    color={LiveSide[side].fg}
+                    color={SideColors[side].fg}
                     size={68}
                     disabled={disabled || snap.state === 'decided'}
                     accessibilityLabel={`${v} ${v === 1 ? rules.label.toLowerCase() : rules.label.toLowerCase() + 's'} to ${names[side]}`}

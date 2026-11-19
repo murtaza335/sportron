@@ -1,9 +1,11 @@
 import { Check } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { LivePill } from '@/components/live/LivePill';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsLive } from '@/lib/liveStatusStore';
 import { formatClock, formatMatchTime, matchContextLabel, matchStatusLabel, slotPlaceholder } from '@/lib/tournamentFormat';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
@@ -64,6 +66,7 @@ export function TournamentMatchRow({
   contextExtra?: string | null;
 }) {
   const theme = useTheme();
+  const liveNow = useIsLive(match.id);
   const decided = match.status === 'completed' || match.status === 'walkover';
   const bye = match.status === 'bye';
   const time = mode === 'time' ? formatClock(match.scheduled_at) : formatMatchTime(match.scheduled_at);
@@ -109,6 +112,7 @@ export function TournamentMatchRow({
           own={mine(match.entry_b)}
         />
       </View>
+      {liveNow && <LivePill compact />}
       <ThemedText variant="caption" muted style={styles.right} numberOfLines={2}>
         {mode === 'time'
           ? right

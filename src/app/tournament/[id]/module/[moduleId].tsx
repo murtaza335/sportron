@@ -28,6 +28,8 @@ import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
+import { useLiveBoard } from '@/hooks/useLiveBoard';
+import { useIsLive } from '@/lib/liveStatusStore';
 import { useAuth } from '@/contexts/AuthContext';
 import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -134,6 +136,9 @@ export default function ModuleScreen() {
   }, [isChampion, mod?.status, celebrateKey]);
 
   const liveScoringOn = useFlag('live_scoring', false);
+  const selectedIsLive = useIsLive(selectedMatchId ?? '');
+  // keeps the LIVE pills on rows / bracket nodes up to date (polls every 20 s while this screen is focused)
+  useLiveBoard(id, { realtime: false, pollMs: 20_000 });
 
   const matchActions = (match: TournamentMatch) => {
     if (!m.isModuleAdmin || !mod) return null;
@@ -436,7 +441,22 @@ export default function ModuleScreen() {
         onClose={() => setSelectedMatchId(null)}
         footer={(() => {
           const sel = m.matches.find((x) => x.id === selectedMatchId);
-          return sel ? matchActions(sel) : null;
+          if (!sel) return null;
+          return (
+            <>
+              {selectedIsLive && (
+                <Button
+                  label="Watch live"
+                  onPress={() => {
+                    setSelectedMatchId(null);
+                    router.push(tournamentRoutes.liveMatch(id, sel.id));
+                  }}
+                  buttonStyle={{ marginTop: Spacing.md }}
+                />
+              )}
+              {matchActions(sel)}
+            </>
+          );
         })()}
       />
       <ResultEntrySheet

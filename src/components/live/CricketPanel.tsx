@@ -4,7 +4,7 @@ import { StyleSheet, View } from 'react-native';
 import { Banner, BarButton, ValueButton } from '@/components/live/parts';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
-import { LiveSide } from '@/constants/liveColors';
+import { SideColors } from '@/constants/liveColors';
 import type { LiveScorer } from '@/hooks/useLiveScorer';
 import { useTheme } from '@/hooks/use-theme';
 import { haptics } from '@/lib/haptics';
@@ -35,7 +35,7 @@ export function CricketPanel({ scorer, rules, names, disabled }: { scorer: LiveS
   if (snap.family !== 'cricket') return null;
   const inn = snap.innings[snap.current];
   const batting = inn.batting;
-  const color = LiveSide[batting].fg;
+  const color = SideColors[batting].fg;
   const live = snap.state === 'live';
 
   const apply = (p: NonNullable<Pending>, runs: number) => {
@@ -47,7 +47,7 @@ export function CricketPanel({ scorer, rules, names, disabled }: { scorer: LiveS
 
   return (
     <View style={styles.flex}>
-      <View style={[styles.head, { backgroundColor: LiveSide[batting].soft, borderColor: color }]}>
+      <View style={[styles.head, { backgroundColor: SideColors[batting].soft, borderColor: color }]}>
         <ThemedText variant="label" style={{ color }}>
           {names[batting]} batting
         </ThemedText>
