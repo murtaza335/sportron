@@ -934,3 +934,5 @@ entry ✔.
 - `Summary` gained optional `a_mid` / `b_mid` (sets won · games in the current set · overs · shootout goals) next to `a_sub` / `b_sub`.
 - Clock: the snapshot holds `{running, elapsedMs, ref}` (local epoch); `summarize(snap, rules, {at})` freezes it into `summary.clock.elapsed_ms`, and viewers add `server_now − updated_at` (`viewerElapsed`). The row's `updated_at` plays the role of `synced_at` — no extra column.
 - Swap-ends is a pure UI concern (not an engine action). Round `best_of` is authoritative for sets/tennis, exactly like the existing result sheet.
+
+**Step 4 (types + services) — done.** `src/types/live.ts` (board / match / settings shapes, exported from `@/types`), `src/services/tournamentsLive.ts` (one wrapper per RPC + `isLiveUnavailable()` for the "migration not applied yet" case), friendly copy for `LIVE_TAKEN`, `LIVE_CODE_TAKEN`, `RATE_LIMITED` and the new `FIELD_INVALID:*` keys in `lib/tournamentErrors.ts`, projector display defaults in `src/lib/live/display.ts`. `setModuleLiveRules` takes the **full resolved rules object** (the server requires `family`).

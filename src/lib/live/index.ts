@@ -11,3 +11,4 @@ export { isGamePoint, isMatchPoint, setsNotices, setsNeeded, gameTarget } from '
 export { tennisSetsNeeded } from './families/tennis';
 export { periodName, periodLimitMs, shootoutNext, shootoutWinner, shootoutScore, inBonus, timedElapsed } from './families/timed';
 export { runsNeeded, ballsLeft, maxBalls, inningsScore, inningsOvers, sideRuns } from './families/cricket';
+export * from './display';

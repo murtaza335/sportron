@@ -11,6 +11,17 @@ const FIELD_LABELS: Record<string, string> = {
   custom_sport_name: 'Sport name',
   sport_key: 'Sport',
   scoring_mode: 'Scoring',
+  live_code: 'Link',
+  live_rules: 'Scoring rules',
+  live_state: 'Live score',
+  live_display: 'Screen settings',
+  show_fields: 'Extra field',
+  courts: 'Courts',
+  layout: 'Layout',
+  max_per_page: 'Tiles per screen',
+  final_hold_seconds: 'Keep FINAL for',
+  title: 'Title',
+  court: 'Court',
 };
 
 /** "@2" → "Player 3: " (the server index is 0-based). */
@@ -57,6 +68,10 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (fieldRequired) {
     return `${playerPrefix(fieldRequired[2])}${prettyKey(fieldRequired[1], labels)} is required.`;
   }
+  if (message.includes('FIELD_INVALID:live_rules_family')) return "Those scoring rules don't fit this sport's scoring.";
+  if (message.includes('LIVE_TAKEN')) return 'Another admin is scoring this match.';
+  if (message.includes('LIVE_CODE_TAKEN')) return 'That link is already used by another tournament. Try a different one.';
+  if (message.includes('RATE_LIMITED')) return 'Too many changes for now. Please try again later.';
   const fieldInvalid = message.match(/FIELD_INVALID:([a-z0-9_]+)(?:@(\d+))?/);
   if (fieldInvalid) {
     return `${playerPrefix(fieldInvalid[2])}${prettyKey(fieldInvalid[1], labels)} looks invalid.`;
