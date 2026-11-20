@@ -87,6 +87,8 @@ export default function ModuleScreen() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
+  // The bracket pans/pinch-zooms in all directions: stop the page scroll (and pull-to-refresh) while it is touched.
+  const [scrollLocked, setScrollLocked] = useState(false);
 
   // Stable references: BracketView/its memoized nodes only re-render when the data really changes.
   const format = m.module?.format;
@@ -320,6 +322,7 @@ export default function ModuleScreen() {
         </View>
       ) : (
         <ScrollView
+          scrollEnabled={!scrollLocked}
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
           refreshControl={<ThemedRefreshControl refreshing={m.refreshing} onRefresh={m.refresh} />}
         >
@@ -374,6 +377,7 @@ export default function ModuleScreen() {
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
               onSelectMatch={onSelectBracketMatch}
+              onTouchLock={setScrollLocked}
             />
           )}
           {tab === 'table' && (

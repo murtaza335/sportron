@@ -20,12 +20,15 @@ export function BracketView({
   viewerId,
   isAdmin,
   onSelectMatch,
+  onTouchLock,
 }: {
   matches: TournamentMatch[];
   moduleStatus: ModuleStatus;
   viewerId: string | undefined;
   isAdmin: boolean;
   onSelectMatch: (match: TournamentMatch) => void;
+  /** Parent page scroll lock while the bracket is touched. */
+  onTouchLock?: (locked: boolean) => void;
 }) {
   const theme = useTheme();
   const canvasRef = useRef<BracketCanvasHandle>(null);
@@ -160,7 +163,7 @@ export function BracketView({
       </HScrollView>
 
       {/* Pinch to zoom, drag in any direction (incl. diagonal). Remount per section so each starts at its own origin. */}
-      <BracketCanvas key={isDouble ? section : 'main'} ref={canvasRef} contentWidth={Math.max(layout.width, 1)} contentHeight={Math.max(layout.height, 1)}>
+      <BracketCanvas onTouchLock={onTouchLock} key={isDouble ? section : 'main'} ref={canvasRef} contentWidth={Math.max(layout.width, 1)} contentHeight={Math.max(layout.height, 1)}>
         {layout.columns.map((c) => {
           const info = roundInfo.get(c.round);
           return (

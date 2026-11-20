@@ -1,9 +1,10 @@
 import { Maximize2, ZoomIn, ZoomOut } from 'lucide-react-native';
-import { forwardRef, useCallback, useImperativeHandle, useMemo, useState, type ReactNode } from 'react';
+import { forwardRef, useCallback, useEffect, useImperativeHandle, useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, useWindowDimensions, View } from 'react-native';
 import { Gesture, GestureDetector, GestureHandlerRootView } from 'react-native-gesture-handler';
 import Animated, {
   useAnimatedStyle,
+  runOnJS,
   useSharedValue,
   withDecay,
   withTiming,
@@ -31,10 +32,15 @@ export const BracketCanvas = forwardRef<BracketCanvasHandle, {
   contentWidth: number;
   contentHeight: number;
   children: ReactNode;
-}>(function BracketCanvas({ contentWidth, contentHeight, children }, ref) {
+  /** true while a finger is on the canvas — the parent page scroll must not steal the gesture. */
+  onTouchLock?: (locked: boolean) => void;
+}>(function BracketCanvas({ contentWidth, contentHeight, children, onTouchLock }, ref) {
   const theme = useTheme();
   const { height: windowH } = useWindowDimensions();
   const [vw, setVw] = useState(0);
+
+  // Never leave the page scroll locked if the bracket goes away mid-touch (tab switch).
+  useEffect(() => () => onTouchLock?.(false), [onTouchLock]);
 
   const vh = Math.round(Math.min(Math.max(contentHeight * 0.6 + PAD * 2, 300), windowH * 0.68));
   const minScale = useMemo(() => {
@@ -95,7 +101,20 @@ export const BracketCanvas = forwardRef<BracketCanvasHandle, {
       lastFocalY.set(e.focalY);
     });
 
-  const gesture = Gesture.Simultaneous(pan, pinch);
+  // Never activates; only reports finger down/up so the page's vertical scroll (and pull-to-refresh)
+  // can be switched off while the bracket is being touched.
+  const touchLock = Gesture.Manual()
+    .onTouchesDown(() => {
+      if (onTouchLock) runOnJS(onTouchLock)(true);
+    })
+    .onTouchesUp((e) => {
+      if (onTouchLock && e.numberOfTouches === 0) runOnJS(onTouchLock)(false);
+    })
+    .onTouchesCancelled(() => {
+      if (onTouchLock) runOnJS(onTouchLock)(false);
+    });
+
+  const gesture = Gesture.Simultaneous(touchLock, pan, pinch);
 
   const animatedStyle = useAnimatedStyle(() => ({
     transform: [{ translateX: tx.get() }, { translateY: ty.get() }, { scale: scale.get() }],
@@ -136,33 +155,43 @@ export const BracketCanvas = forwardRef<BracketCanvasHandle, {
 
   const btn = [styles.btn, { backgroundColor: theme.backgroundElement, borderColor: theme.border }];
   return (
-    <GestureHandlerRootView
+    // overflow:hidden lives on a plain View: the gesture root view does not clip on Android, which let the
+    // bracket paint over the header and tabs above it.
+    <View
       style={[styles.viewport, { height: vh, borderColor: theme.border }]}
       onLayout={(e) => setVw(e.nativeEvent.layout.width)}
+      collapsable={false}
     >
-      <GestureDetector gesture={gesture}>
-        <Animated.View
-          style={[{ width: contentWidth, height: contentHeight, transformOrigin: 'top left' }, animatedStyle]}
-        >
-          {children}
-        </Animated.View>
-      </GestureDetector>
-      <View style={styles.controls} pointerEvents="box-none">
-        <Pressable style={btn} onPress={() => zoomTo(scale.get() * ZOOM_STEP)} accessibilityRole="button" accessibilityLabel="Zoom in" hitSlop={4}>
-          <ZoomIn size={18} color={theme.text} strokeWidth={2} />
-        </Pressable>
-        <Pressable style={btn} onPress={() => zoomTo(scale.get() / ZOOM_STEP)} accessibilityRole="button" accessibilityLabel="Zoom out" hitSlop={4}>
-          <ZoomOut size={18} color={theme.text} strokeWidth={2} />
-        </Pressable>
-        <Pressable style={btn} onPress={() => zoomTo(minScale)} accessibilityRole="button" accessibilityLabel="Fit whole bracket" hitSlop={4}>
-          <Maximize2 size={16} color={theme.text} strokeWidth={2} />
-        </Pressable>
-      </View>
-    </GestureHandlerRootView>
+      <GestureHandlerRootView style={styles.fill}>
+        {/* The detector wraps the FULL viewport (not the scaled content) so touches register on empty
+            space too, e.g. after zooming out. */}
+        <GestureDetector gesture={gesture}>
+          <View style={styles.fill} collapsable={false}>
+            <Animated.View
+              style={[{ width: contentWidth, height: contentHeight, transformOrigin: 'top left' }, animatedStyle]}
+            >
+              {children}
+            </Animated.View>
+          </View>
+        </GestureDetector>
+        <View style={styles.controls} pointerEvents="box-none">
+          <Pressable style={btn} onPress={() => zoomTo(scale.get() * ZOOM_STEP)} accessibilityRole="button" accessibilityLabel="Zoom in" hitSlop={4}>
+            <ZoomIn size={18} color={theme.text} strokeWidth={2} />
+          </Pressable>
+          <Pressable style={btn} onPress={() => zoomTo(scale.get() / ZOOM_STEP)} accessibilityRole="button" accessibilityLabel="Zoom out" hitSlop={4}>
+            <ZoomOut size={18} color={theme.text} strokeWidth={2} />
+          </Pressable>
+          <Pressable style={btn} onPress={() => zoomTo(minScale)} accessibilityRole="button" accessibilityLabel="Fit whole bracket" hitSlop={4}>
+            <Maximize2 size={16} color={theme.text} strokeWidth={2} />
+          </Pressable>
+        </View>
+      </GestureHandlerRootView>
+    </View>
   );
 });
 
 const styles = StyleSheet.create({
+  fill: { flex: 1, overflow: 'hidden' },
   viewport: { overflow: 'hidden', borderWidth: StyleSheet.hairlineWidth, borderRadius: Radius.md },
   controls: { position: 'absolute', right: 8, bottom: 8, gap: 6 },
   btn: {
