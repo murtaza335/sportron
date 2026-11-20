@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
 import { supabase } from '@/lib/supabase';
@@ -21,6 +21,19 @@ import type {
 const REALTIME_DEBOUNCE_MS = 400;
 
 const NO_STANDINGS: TournamentStanding[] = [];
+
+/**
+ * setState that keeps the previous reference when a refetch returns identical data, so a realtime
+ * event that changed nothing visible (or only another screen's data) doesn't re-render the bracket.
+ */
+function keepIfEqual<T>(prev: T, next: T): T {
+  if (prev === next) return prev;
+  try {
+    return JSON.stringify(prev) === JSON.stringify(next) ? prev : next;
+  } catch {
+    return next;
+  }
+}
 
 /**
  * Module detail + entries + matches + standings (v2: any format).
@@ -65,11 +78,11 @@ export function useTournamentModule(moduleId: string | undefined) {
     try {
       const r = await fetchAll();
       if (r) {
-        setDetail(r.d);
-        setEntries(r.e);
-        setMatches(r.mt);
-        setStandingsV2(r.st);
-        setGroups(r.g);
+        setDetail((p) => keepIfEqual(p, r.d));
+        setEntries((p) => keepIfEqual(p, r.e));
+        setMatches((p) => keepIfEqual(p, r.mt));
+        setStandingsV2((p) => keepIfEqual(p, r.st));
+        setGroups((p) => keepIfEqual(p, r.g));
       }
       setError(null);
     } catch (e) {
@@ -85,11 +98,11 @@ export function useTournamentModule(moduleId: string | undefined) {
     try {
       const r = await fetchAll();
       if (r) {
-        setDetail(r.d);
-        setEntries(r.e);
-        setMatches(r.mt);
-        setStandingsV2(r.st);
-        setGroups(r.g);
+        setDetail((p) => keepIfEqual(p, r.d));
+        setEntries((p) => keepIfEqual(p, r.e));
+        setMatches((p) => keepIfEqual(p, r.mt));
+        setStandingsV2((p) => keepIfEqual(p, r.st));
+        setGroups((p) => keepIfEqual(p, r.g));
       }
     } catch (e) {
       console.error('Failed to refresh tournament module:', e);
@@ -142,7 +155,8 @@ export function useTournamentModule(moduleId: string | undefined) {
   }, [loadAll]);
 
   const myRole = detail?.my_role ?? null;
-  const bracket = matches.filter((x) => x.bracket_side === 'main');
+  // Memoized: a fresh array every render defeated every memo downstream (bracket layout, nodes).
+  const bracket = useMemo(() => matches.filter((x) => x.bracket_side === 'main'), [matches]);
   const standings = standingsV2?.kind === 'knockout' ? (standingsV2.rows ?? NO_STANDINGS) : NO_STANDINGS;
   return {
     module: detail?.module ?? null,

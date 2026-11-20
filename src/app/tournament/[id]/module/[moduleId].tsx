@@ -2,7 +2,7 @@ import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { celebrate } from '@/components/motion/Confetti';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -87,6 +87,19 @@ export default function ModuleScreen() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
+
+  // Stable references: BracketView/its memoized nodes only re-render when the data really changes.
+  const format = m.module?.format;
+  const bracketMatches = useMemo(
+    () =>
+      format === 'groups_knockout'
+        ? m.bracket.filter((x) => x.stage_number === 2)
+        : format === 'double_elimination'
+          ? m.matches.filter((x) => x.bracket_side !== 'main')
+          : m.bracket,
+    [format, m.bracket, m.matches],
+  );
+  const onSelectBracketMatch = useCallback((match: TournamentMatch) => setSelectedMatchId(match.id), []);
 
 
   const mod = m.module;
@@ -356,17 +369,11 @@ export default function ModuleScreen() {
           {tab === 'info' && <ModuleInfoTab module={mod} rounds={m.rounds} admins={m.admins} />}
           {tab === 'bracket' && (
             <BracketView
-              matches={
-                mod.format === 'groups_knockout'
-                  ? m.bracket.filter((x) => x.stage_number === 2)
-                  : mod.format === 'double_elimination'
-                    ? m.matches.filter((x) => x.bracket_side !== 'main')
-                    : m.bracket
-              }
+              matches={bracketMatches}
               moduleStatus={mod.status}
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
-              onSelectMatch={(match: TournamentMatch) => setSelectedMatchId(match.id)}
+              onSelectMatch={onSelectBracketMatch}
             />
           )}
           {tab === 'table' && (
