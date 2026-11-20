@@ -2,7 +2,7 @@ import { MapPin, Settings, Trophy } from 'lucide-react-native';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { celebrate } from '@/components/motion/Confetti';
 import { Pressable, ScrollView, StyleSheet, useWindowDimensions, View } from 'react-native';
@@ -27,7 +27,11 @@ import { Duration, RM } from '@/lib/motion';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
+import { useLiveBoard } from '@/hooks/useLiveBoard';
+import { useIsLive } from '@/lib/liveStatusStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
@@ -64,7 +68,12 @@ function tabsFor(format: TournamentFormat | undefined): { value: Tab; label: str
 }
 
 export default function ModuleScreen() {
-  const { id, moduleId, tab: tabParam } = useLocalSearchParams<{ id: string; moduleId: string; tab?: string }>();
+  const { id, moduleId, tab: tabParam, view: viewParam } = useLocalSearchParams<{
+    id: string;
+    moduleId: string;
+    tab?: string;
+    view?: string;
+  }>();
   const theme = useTheme();
   const { user } = useAuth();
   const router = useRouter();
@@ -78,6 +87,19 @@ export default function ModuleScreen() {
   const [selectedMatchId, setSelectedMatchId] = useState<string | null>(null);
   const [resultMatchId, setResultMatchId] = useState<string | null>(null);
   const [scheduleMatchId, setScheduleMatchId] = useState<string | null>(null);
+
+  // Stable references: BracketView/its memoized nodes only re-render when the data really changes.
+  const format = m.module?.format;
+  const bracketMatches = useMemo(
+    () =>
+      format === 'groups_knockout'
+        ? m.bracket.filter((x) => x.stage_number === 2)
+        : format === 'double_elimination'
+          ? m.matches.filter((x) => x.bracket_side !== 'main')
+          : m.bracket,
+    [format, m.bracket, m.matches],
+  );
+  const onSelectBracketMatch = useCallback((match: TournamentMatch) => setSelectedMatchId(match.id), []);
 
 
   const mod = m.module;
@@ -126,6 +148,11 @@ export default function ModuleScreen() {
     };
   }, [isChampion, mod?.status, celebrateKey]);
 
+  const liveScoringOn = useFlag('live_scoring', false);
+  const selectedIsLive = useIsLive(selectedMatchId ?? '');
+  // keeps the LIVE pills on rows / bracket nodes up to date (polls every 20 s while this screen is focused)
+  useLiveBoard(id, { realtime: false, pollMs: 20_000 });
+
   const matchActions = (match: TournamentMatch) => {
     if (!m.isModuleAdmin || !mod) return null;
     const decided = match.status === 'completed' || match.status === 'walkover';
@@ -155,12 +182,23 @@ export default function ModuleScreen() {
       ]);
     return (
       <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+        {canResult && !decided && liveScoringOn && (
+          <Button
+            label="Live scoring"
+            onPress={() => {
+              setSelectedMatchId(null);
+              router.push(tournamentRoutes.score(id, moduleId, match.id));
+            }}
+          />
+        )}
         {canResult && (
           <Button
+            variant={!decided && liveScoringOn ? 'secondary' : 'primary'}
             label={decided ? 'Edit result' : 'Enter result'}
             onPress={() => {
               setSelectedMatchId(null);
-              setResultMatchId(match.id);
+              if (liveScoringOn) router.push(tournamentRoutes.score(id, moduleId, match.id, 'result'));
+              else setResultMatchId(match.id);
             }}
           />
         )}
@@ -285,6 +323,7 @@ export default function ModuleScreen() {
           contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
           refreshControl={<ThemedRefreshControl refreshing={m.refreshing} onRefresh={m.refresh} />}
         >
+          <ResumeScoringBanner tournamentId={id} />
           <View style={styles.header}>
             <View style={styles.pills}>
               <InfoPill label={sportLabel(mod.sport, mod.custom_sport_name)} />
@@ -330,17 +369,11 @@ export default function ModuleScreen() {
           {tab === 'info' && <ModuleInfoTab module={mod} rounds={m.rounds} admins={m.admins} />}
           {tab === 'bracket' && (
             <BracketView
-              matches={
-                mod.format === 'groups_knockout'
-                  ? m.bracket.filter((x) => x.stage_number === 2)
-                  : mod.format === 'double_elimination'
-                    ? m.matches.filter((x) => x.bracket_side !== 'main')
-                    : m.bracket
-              }
+              matches={bracketMatches}
               moduleStatus={mod.status}
               viewerId={user?.id}
               isAdmin={m.isModuleAdmin}
-              onSelectMatch={(match: TournamentMatch) => setSelectedMatchId(match.id)}
+              onSelectMatch={onSelectBracketMatch}
             />
           )}
           {tab === 'table' && (
@@ -397,7 +430,13 @@ export default function ModuleScreen() {
             />
           )}
           {tab === 'matches' && (
-            <ModuleMatchesTab matches={m.matches} viewerId={user?.id} onSelect={(match) => setSelectedMatchId(match.id)} />
+            <ModuleMatchesTab
+              matches={m.matches}
+              viewerId={user?.id}
+              moduleLive={mod.status === 'in_progress'}
+              initialView={viewParam}
+              onSelect={(match) => setSelectedMatchId(match.id)}
+            />
           )}
           </Animated.View>
         </ScrollView>
@@ -409,7 +448,22 @@ export default function ModuleScreen() {
         onClose={() => setSelectedMatchId(null)}
         footer={(() => {
           const sel = m.matches.find((x) => x.id === selectedMatchId);
-          return sel ? matchActions(sel) : null;
+          if (!sel) return null;
+          return (
+            <>
+              {selectedIsLive && (
+                <Button
+                  label="Watch live"
+                  onPress={() => {
+                    setSelectedMatchId(null);
+                    router.push(tournamentRoutes.liveMatch(id, sel.id));
+                  }}
+                  buttonStyle={{ marginTop: Spacing.md }}
+                />
+              )}
+              {matchActions(sel)}
+            </>
+          );
         })()}
       />
       <ResultEntrySheet

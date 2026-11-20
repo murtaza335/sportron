@@ -18,6 +18,10 @@ import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
+import { useTournamentSchedule } from '@/hooks/useTournamentSchedule';
+import { TodayMatchesSection } from '@/components/tournaments/TodayMatchesSection';
+import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
+import { LiveNowSection } from '@/components/live/LiveNowSection';
 import { useTournamentPromos } from '@/hooks/useTournamentPromos';
 import { PromoCodeCard } from '@/components/tournaments/PromoCodeCard';
 import { haptics } from '@/lib/haptics';
@@ -33,6 +37,7 @@ export default function TournamentScreen() {
   const { detail, loading, refreshing, refresh, isTournamentAdmin } = useTournament(id);
   const [expanded, setExpanded] = useState(false);
   const { promos, reveal } = useTournamentPromos(id);
+  const { matches: todayMatches } = useTournamentSchedule(id);
   // 'hidden' promos stay out of sight until the cover is long-pressed (easter egg)
   const [unlocked, setUnlocked] = useState(false);
   const visiblePromos = promos.filter((p) => p.display_mode !== 'hidden' || p.code || unlocked);
@@ -155,6 +160,12 @@ export default function TournamentScreen() {
               />
             </View>
           )}
+
+          <ResumeScoringBanner tournamentId={t.id} />
+
+          <LiveNowSection tournamentId={t.id} />
+
+          <TodayMatchesSection tournamentId={t.id} matches={todayMatches} />
 
           <View style={styles.section}>
             <View style={styles.sectionHead}>

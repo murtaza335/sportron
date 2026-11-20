@@ -183,6 +183,70 @@ export function formatMatchTime(iso: string | null): string | null {
   return `${day} · ${time}`;
 }
 
+// ─── Schedule helpers (device-local time) ────────────────────────────────────
+
+function pad2(n: number): string {
+  return n < 10 ? `0${n}` : String(n);
+}
+
+function dateKey(d: Date): string {
+  return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+}
+
+/** '2026-11-17' in the device's local time; null for null/invalid input. */
+export function localDayKey(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  return Number.isNaN(d.getTime()) ? null : dateKey(d);
+}
+
+/** True when `iso` falls on the device's local "today". */
+export function isTodayLocal(iso: string | null | undefined, now: Date = new Date()): boolean {
+  const k = localDayKey(iso);
+  return k != null && k === dateKey(now);
+}
+
+/** 'Today · Tue 17 Nov', 'Tomorrow · …', 'Yesterday · …', else 'Sat 21 Nov' (+ year if not this year). */
+export function dayHeader(dayKey: string, now: Date = new Date()): string {
+  const [y, m, d] = dayKey.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const base = date.toLocaleDateString(undefined, {
+    weekday: 'short',
+    day: 'numeric',
+    month: 'short',
+    ...(y !== now.getFullYear() ? { year: 'numeric' as const } : {}),
+  });
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const diff = Math.round((date.getTime() - today.getTime()) / 86_400_000);
+  if (diff === 0) return `Today · ${base}`;
+  if (diff === 1) return `Tomorrow · ${base}`;
+  if (diff === -1) return `Yesterday · ${base}`;
+  return base;
+}
+
+/** '5:00 PM' */
+export function formatClock(iso: string | null | undefined): string | null {
+  if (!iso) return null;
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+}
+
+/** Which stage a match belongs to: 'Group A · Round 2' / 'Quarter-final' / 'W-R1 · M3'. */
+export function matchContextLabel(m: TournamentMatch): string {
+  const title = matchSectionTitle(m);
+  return m.code ? `${m.code} · ${title}` : title;
+}
+
+/** Sort for schedule lists: time, then court, then match number. */
+export function compareByTime(a: TournamentMatch, b: TournamentMatch): number {
+  const ta = a.scheduled_at ? new Date(a.scheduled_at).getTime() : Infinity;
+  const tb = b.scheduled_at ? new Date(b.scheduled_at).getTime() : Infinity;
+  if (ta !== tb) return ta - tb;
+  const c = (a.court ?? '').localeCompare(b.court ?? '', undefined, { numeric: true });
+  return c !== 0 ? c : a.match_number - b.match_number;
+}
+
 export function listSportsLabel(t: Pick<TournamentListItem, 'sports'>): string {
   return t.sports.map((s) => sportLabel(s)).join(', ');
 }

@@ -21,6 +21,7 @@ import type {
   TournamentEntryField,
   TournamentListItem,
   TournamentMatch,
+  TournamentScheduleMatch,
   TournamentScope,
   TournamentRole,
   ModuleStatus,
@@ -110,6 +111,24 @@ export async function fetchModuleMatches(moduleId: string): Promise<TournamentMa
   return (rows ?? []).map((r) => ({
     ...r,
     score_detail: (r.score_detail ?? null) as ScoreDetailRow[] | null,
+    entry_a: r.entry_a ? { ...r.entry_a, profile_ids: r.entry_a.profile_ids ?? [] } : null,
+    entry_b: r.entry_b ? { ...r.entry_b, profile_ids: r.entry_b.profile_ids ?? [] } : null,
+  }));
+}
+
+/** Scheduled matches of a tournament in [from, to) across the modules the caller can see (max 7 days). */
+export async function fetchTournamentSchedule(
+  tournamentId: string,
+  from: Date,
+  to: Date,
+): Promise<TournamentScheduleMatch[]> {
+  const rows = await rpc<TournamentScheduleMatch[] | null>('get_tournament_schedule', {
+    p_tournament: tournamentId,
+    p_from: from.toISOString(),
+    p_to: to.toISOString(),
+  });
+  return (rows ?? []).map((r) => ({
+    ...r,
     entry_a: r.entry_a ? { ...r.entry_a, profile_ids: r.entry_a.profile_ids ?? [] } : null,
     entry_b: r.entry_b ? { ...r.entry_b, profile_ids: r.entry_b.profile_ids ?? [] } : null,
   }));

@@ -13,11 +13,19 @@ export const tournamentRoutes = {
   moduleForm: (id: string, moduleId?: string) =>
     h(`/tournament/${id}/module-form${moduleId ? `?moduleId=${moduleId}` : ''}`),
   module: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}`),
+  /** Module screen opened on its Matches tab, on the Today or Schedule view. */
+  moduleMatches: (id: string, moduleId: string, view: 'today' | 'schedule' = 'today') =>
+    h(`/tournament/${id}/module/${moduleId}?tab=matches&view=${view}`),
   moduleManage: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/manage`),
   entryForm: (id: string, moduleId: string, entryId?: string) =>
     h(`/tournament/${id}/module/${moduleId}/entry-form${entryId ? `?entryId=${entryId}` : ''}`),
   seeding: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/seeding`),
   knockout: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/knockout`),
   rounds: (id: string, moduleId: string) => h(`/tournament/${id}/module/${moduleId}/rounds`),
+  /** Full-screen live scoring (or `?mode=result` for the full-screen result entry). */
+  score: (id: string, moduleId: string, matchId: string, mode?: 'result') =>
+    h(`/tournament/${id}/module/${moduleId}/score/${matchId}${mode ? `?mode=${mode}` : ''}`),
+  liveBoard: (id: string) => h(`/tournament/${id}/live`),
+  liveMatch: (id: string, matchId: string) => h(`/tournament/${id}/live/${matchId}`),
   profile: (id: string) => h(`/profile/${id}`),
 };

@@ -1,9 +1,10 @@
 import { GitBranch } from 'lucide-react-native';
-import { useMemo, useRef, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
+import { BracketCanvas, type BracketCanvasHandle } from '@/components/tournaments/BracketCanvas';
 import { BracketConnectors } from '@/components/tournaments/BracketConnectors';
-import { BracketMatchNode } from '@/components/tournaments/BracketMatchNode';
+import { BracketMatchNode, type BracketColors } from '@/components/tournaments/BracketMatchNode';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
@@ -27,8 +28,30 @@ export function BracketView({
   onSelectMatch: (match: TournamentMatch) => void;
 }) {
   const theme = useTheme();
-  const scrollRef = useRef<ScrollView>(null);
+  const canvasRef = useRef<BracketCanvasHandle>(null);
   const [section, setSection] = useState<Section>('winners');
+
+  // Primitive colours + one stable press handler keep the memoized nodes from re-rendering.
+  const colors = useMemo<BracketColors>(
+    () => ({
+      card: theme.backgroundElement,
+      border: theme.border,
+      accent: theme.accent,
+      success: theme.success,
+      muted: theme.textSecondary,
+    }),
+    [theme.backgroundElement, theme.border, theme.accent, theme.success, theme.textSecondary],
+  );
+  const matchesRef = useRef(matches);
+  const onSelectRef = useRef(onSelectMatch);
+  useEffect(() => {
+    matchesRef.current = matches;
+    onSelectRef.current = onSelectMatch;
+  }, [matches, onSelectMatch]);
+  const handleSelect = useCallback((matchId: string) => {
+    const m = matchesRef.current.find((x) => x.id === matchId);
+    if (m) onSelectRef.current(m);
+  }, []);
 
   // Double elimination shows one section at a time: winners bracket · losers bracket · grand final.
   const isDouble = matches.some((m) => m.bracket_side === 'losers');
@@ -126,7 +149,7 @@ export function BracketView({
           return (
             <Pressable
               key={c.round}
-              onPress={() => scrollRef.current?.scrollTo({ x: Math.max(c.x - Spacing.md, 0), animated: true })}
+              onPress={() => canvasRef.current?.focusX(c.x)}
               style={({ pressed }) => [styles.pill, { borderColor: theme.border }, pressed && { opacity: 0.6 }]}
               accessibilityRole="button"
             >
@@ -136,49 +159,47 @@ export function BracketView({
         })}
       </HScrollView>
 
-      <HScrollView ref={scrollRef} horizontal showsHorizontalScrollIndicator>
-        <ScrollView nestedScrollEnabled showsVerticalScrollIndicator={false}>
-          <View style={{ width: layout.width, height: layout.height, marginRight: Spacing.md }}>
-            {layout.columns.map((c) => {
-              const info = roundInfo.get(c.round);
-              return (
-                <ThemedText
-                  key={c.round}
-                  variant="caption"
-                  muted
-                  numberOfLines={1}
-                  style={{ position: 'absolute', left: c.x, top: 0, width: NODE_W, height: HEADER_H, fontWeight: '600' }}
-                >
-                  {info ? roundHeader(info.name, info.bestOf) : ''}
-                </ThemedText>
-              );
-            })}
-            <BracketConnectors
-              connectors={layout.connectors}
-              highlighted={highlightedConnectors}
-              width={layout.width}
-              height={layout.height}
+      {/* Pinch to zoom, drag in any direction (incl. diagonal). Remount per section so each starts at its own origin. */}
+      <BracketCanvas key={isDouble ? section : 'main'} ref={canvasRef} contentWidth={Math.max(layout.width, 1)} contentHeight={Math.max(layout.height, 1)}>
+        {layout.columns.map((c) => {
+          const info = roundInfo.get(c.round);
+          return (
+            <ThemedText
+              key={c.round}
+              variant="caption"
+              muted
+              numberOfLines={1}
+              style={{ position: 'absolute', left: c.x, top: 0, width: NODE_W, height: HEADER_H, fontWeight: '600' }}
+            >
+              {info ? roundHeader(info.name, info.bestOf) : ''}
+            </ThemedText>
+          );
+        })}
+        <BracketConnectors
+          connectors={layout.connectors}
+          highlighted={highlightedConnectors}
+          width={layout.width}
+          height={layout.height}
+        />
+        {layout.nodes.map((n) => {
+          const match = byId.get(n.matchId);
+          if (!match) return null;
+          return (
+            <BracketMatchNode
+              key={n.matchId}
+              match={match}
+              x={n.x}
+              y={n.y}
+              highlighted={highlightedMatches.has(n.matchId)}
+              mineA={!!match.entry_a && myEntryIds.has(match.entry_a.id)}
+              mineB={!!match.entry_b && myEntryIds.has(match.entry_b.id)}
+              label={n.isThird ? '3rd Place' : undefined}
+              onSelect={handleSelect}
+              colors={colors}
             />
-            {layout.nodes.map((n) => {
-              const match = byId.get(n.matchId);
-              if (!match) return null;
-              return (
-                <BracketMatchNode
-                  key={n.matchId}
-                  match={match}
-                  x={n.x}
-                  y={n.y}
-                  highlighted={highlightedMatches.has(n.matchId)}
-                  myEntryIds={myEntryIds}
-                  label={n.isThird ? '3rd Place' : undefined}
-                  onPress={() => onSelectMatch(match)}
-                  enterDelay={Math.max(0, match.round_number - 1) * 80}
-                />
-              );
-            })}
-          </View>
-        </ScrollView>
-      </HScrollView>
+          );
+        })}
+      </BracketCanvas>
     </View>
   );
 }

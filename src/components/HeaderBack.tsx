@@ -27,6 +27,8 @@ function parentOf(pathname: string): Href {
   parts.pop();
   // `/tournament/<id>/module` is not a screen (modules live at `/module/<moduleId>`): skip it.
   if (parts[parts.length - 1] === 'module') parts.pop();
+  // `/tournament/<id>/module/<mid>/score` (live scoring) is not a screen either: Back goes to the module.
+  if (parts[parts.length - 1] === 'score') parts.pop();
   const parent = parts.length ? `/${parts.join('/')}` : '/';
   return (NON_SCREEN_PARENTS[parent] ?? parent) as Href;
 }

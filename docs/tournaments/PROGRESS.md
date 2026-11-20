@@ -264,6 +264,13 @@ listed per step. No edge-function change was needed (no redeploy).
 - **Open questions:** confirm A2/A3/A4/A6 (cheap to change now, before step 2+).
 - **Next action:** owner applies 084 and reports result; then Step 2 (085 read RPCs).
 
+### 2026-11-17 — Schedule views (PLAN-schedule.md, Phases 1–2)
+- **Done:** module Matches tab Today/Schedule views (+ default-to-Today, midnight refresh, `?view=`); tournament-screen *Today's matches* section; migration 132 `get_tournament_schedule`.
+- **Files:** `lib/tournamentFormat.ts`, `ModuleMatchesTab`, `TournamentMatchRow`, `TodayMatchesSection`, `useTournamentSchedule`, `services/tournaments.ts`, `132_add_tournament_schedule_rpc.sql`, `sql-tests-v2.sql` (section S1).
+- **Verified:** `npx tsc --noEmit` ✅ · `npm run lint` ✅ · local-db SQL tests (all files) ✅ · device/web: needs owner (PLAN-schedule §7).
+- **Needs owner:** apply migration 132 to Supabase. The client ships OTA-only; until 132 is live the section is hidden.
+- **Next action:** manual test on Android + web.
+
 <!--
 Template — copy for each session, newest on top:
 

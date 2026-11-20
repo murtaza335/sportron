@@ -1,33 +1,29 @@
 import { Check } from 'lucide-react-native';
-import { useEffect, useRef } from 'react';
-import { StyleSheet, View } from 'react-native';
-import Animated, {
-  FadeIn,
-  useAnimatedStyle,
-  useReducedMotion,
-  useSharedValue,
-  withSequence,
-  withTiming,
-  ZoomIn,
-} from 'react-native-reanimated';
+import { memo, useCallback, useMemo } from 'react';
+import { Pressable, StyleSheet, View } from 'react-native';
 
-import { PressableScale } from '@/components/motion/PressableScale';
-import { Duration, RM } from '@/lib/motion';
-
+import { LivePill } from '@/components/live/LivePill';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius } from '@/constants/theme';
 import { NODE_H, NODE_W } from '@/lib/bracketLayout';
-import { formatMatchTime, slotPlaceholder } from '@/lib/tournamentFormat';
-import { useTheme } from '@/hooks/use-theme';
+import { useIsLive } from '@/lib/liveStatusStore';
+import { formatMatchTime, isTodayLocal, slotPlaceholder } from '@/lib/tournamentFormat';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
-function isToday(iso: string | null): boolean {
-  if (!iso) return false;
-  const d = new Date(iso);
-  return !Number.isNaN(d.getTime()) && d.toDateString() === new Date().toDateString();
-}
+/**
+ * Bracket nodes are deliberately plain: a bracket can have 60+ of them mounted at once, so each
+ * one is memoized, takes only primitive colour props (no per-node theme context subscription) and
+ * has no per-node animation hooks (those made the first render and tab switches janky).
+ */
+export type BracketColors = {
+  card: string;
+  border: string;
+  accent: string;
+  success: string;
+  muted: string;
+};
 
-function Row({
+const Row = memo(function Row({
   entry,
   score,
   winner,
@@ -35,6 +31,7 @@ function Row({
   mine,
   bye,
   placeholder,
+  colors,
 }: {
   entry: BracketEntryRef | null;
   score: number | null;
@@ -43,8 +40,8 @@ function Row({
   mine: boolean;
   bye: boolean;
   placeholder: string;
+  colors: BracketColors;
 }) {
-  const theme = useTheme();
   const loser = decided && !winner;
   return (
     <View style={styles.row}>
@@ -59,19 +56,15 @@ function Row({
             style={[
               styles.name,
               winner && { fontWeight: '700' },
-              loser && { color: theme.textSecondary },
-              mine && { color: theme.accent },
+              loser && { color: colors.muted },
+              mine && { color: colors.accent },
             ]}
           >
             {entry.name}
           </ThemedText>
-          {winner && !bye && (
-            <Animated.View entering={ZoomIn.duration(Duration.fast).reduceMotion(RM)}>
-              <Check size={12} color={theme.success} strokeWidth={3} />
-            </Animated.View>
-          )}
+          {winner && !bye && <Check size={12} color={colors.success} strokeWidth={3} />}
           {score != null && (
-            <ThemedText variant="caption" style={[styles.score, winner && { fontWeight: '700' }, loser && { color: theme.textSecondary }]}>
+            <ThemedText variant="caption" style={[styles.score, winner && { fontWeight: '700' }, loser && { color: colors.muted }]}>
               {score}
             </ThemedText>
           )}
@@ -83,46 +76,38 @@ function Row({
       )}
     </View>
   );
-}
+});
 
-export function BracketMatchNode({
+export const BracketMatchNode = memo(function BracketMatchNode({
   match,
   x,
   y,
   highlighted,
-  myEntryIds,
+  mineA,
+  mineB,
   label,
-  onPress,
-  enterDelay = 0,
+  onSelect,
+  colors,
 }: {
   match: TournamentMatch;
   x: number;
   y: number;
   highlighted: boolean;
-  myEntryIds: Set<string>;
+  /** Entry A / B belongs to the viewer. */
+  mineA: boolean;
+  mineB: boolean;
   label?: string;
-  onPress: () => void;
-  /** Stagger for the first render (round index × 80ms). */
-  enterDelay?: number;
+  /** One stable callback shared by all nodes; receives the match id. */
+  onSelect: (matchId: string) => void;
+  colors: BracketColors;
 }) {
-  const theme = useTheme();
-  const reduced = useReducedMotion();
-  const flash = useSharedValue(0);
-  const prevWinner = useRef(match.winner_entry_id);
-  // A realtime result arriving flashes the accent border once (never on the initial render).
-  useEffect(() => {
-    if (prevWinner.current !== match.winner_entry_id && match.winner_entry_id && !reduced) {
-      flash.set(withSequence(withTiming(1, { duration: 150 }), withTiming(0, { duration: 650 })));
-    }
-    prevWinner.current = match.winner_entry_id;
-  }, [match.winner_entry_id, reduced, flash]);
-  const flashStyle = useAnimatedStyle(() => ({ opacity: flash.value }));
   const decided = match.status === 'completed' || match.status === 'walkover';
   const bye = match.status === 'bye';
   const wo = match.status === 'walkover';
-  const live = match.status === 'scheduled' && isToday(match.scheduled_at);
+  const live = match.status === 'scheduled' && isTodayLocal(match.scheduled_at);
   const cancelled = match.status === 'cancelled';
-  const time = formatMatchTime(match.scheduled_at);
+  const liveNow = useIsLive(match.id);
+  const time = useMemo(() => formatMatchTime(match.scheduled_at), [match.scheduled_at]);
   const caption = cancelled
     ? 'Not needed'
     : wo
@@ -135,59 +120,59 @@ export function BracketMatchNode({
 
   const scoreA = wo || bye ? null : match.score_a;
   const scoreB = wo || bye ? null : match.score_b;
+  const onPress = useCallback(() => onSelect(match.id), [onSelect, match.id]);
 
   return (
-    <Animated.View
-      entering={FadeIn.delay(enterDelay).duration(Duration.base).reduceMotion(RM)}
-      style={[styles.node, { left: x, top: y, opacity: cancelled ? 0.5 : 1 }]}>
-    <PressableScale
-      onPress={onPress}
-      scaleTo={0.97}
-      style={[
-        styles.inner,
-        {
-          backgroundColor: theme.backgroundElement,
-          borderColor: highlighted ? theme.accent : theme.border,
-          borderWidth: highlighted ? 2 : 1,
-        },
-      ]}
-      accessibilityRole="button"
-      accessibilityLabel={`${label ?? match.round_name} match ${match.match_number}`}
-    >
-      <Animated.View pointerEvents="none" style={[styles.flash, { borderColor: theme.accent }, flashStyle]} />
-      {label && (
-        <ThemedText variant="caption" muted style={styles.label}>{label}</ThemedText>
-      )}
-      <Row
-        entry={match.entry_a}
-        score={scoreA}
-        winner={decided || bye ? match.winner_entry_id === match.entry_a?.id && !!match.entry_a : false}
-        decided={decided}
-        mine={!!match.entry_a && myEntryIds.has(match.entry_a.id)}
-        bye={bye}
-        placeholder={slotPlaceholder(match.entry_a_label, bye && !match.entry_a)}
-      />
-      <Row
-        entry={match.entry_b}
-        score={scoreB}
-        winner={decided || bye ? match.winner_entry_id === match.entry_b?.id && !!match.entry_b : false}
-        decided={decided}
-        mine={!!match.entry_b && myEntryIds.has(match.entry_b.id)}
-        bye={bye}
-        placeholder={slotPlaceholder(match.entry_b_label, bye && !match.entry_b)}
-      />
-      {(caption || live) && (
-        <View style={styles.captionRow}>
-          {live && <View style={[styles.dot, { backgroundColor: theme.success }]} />}
-          {caption && (
-            <ThemedText variant="caption" muted style={styles.caption} numberOfLines={1}>{caption}</ThemedText>
-          )}
-        </View>
-      )}
-    </PressableScale>
-    </Animated.View>
+    <View style={[styles.node, { left: x, top: y, opacity: cancelled ? 0.5 : 1 }]}>
+      <Pressable
+        onPress={onPress}
+        style={({ pressed }) => [
+          styles.inner,
+          {
+            backgroundColor: colors.card,
+            borderColor: highlighted ? colors.accent : colors.border,
+            borderWidth: highlighted ? 2 : 1,
+            opacity: pressed ? 0.7 : 1,
+          },
+        ]}
+        accessibilityRole="button"
+        accessibilityLabel={`${label ?? match.round_name} match ${match.match_number}`}
+      >
+        {label && (
+          <ThemedText variant="caption" muted style={styles.label}>{label}</ThemedText>
+        )}
+        <Row
+          entry={match.entry_a}
+          score={scoreA}
+          winner={decided || bye ? match.winner_entry_id === match.entry_a?.id && !!match.entry_a : false}
+          decided={decided}
+          mine={mineA}
+          bye={bye}
+          placeholder={slotPlaceholder(match.entry_a_label, bye && !match.entry_a)}
+          colors={colors}
+        />
+        <Row
+          entry={match.entry_b}
+          score={scoreB}
+          winner={decided || bye ? match.winner_entry_id === match.entry_b?.id && !!match.entry_b : false}
+          decided={decided}
+          mine={mineB}
+          bye={bye}
+          placeholder={slotPlaceholder(match.entry_b_label, bye && !match.entry_b)}
+          colors={colors}
+        />
+        {(caption || live || liveNow) && (
+          <View style={styles.captionRow}>
+            {liveNow ? <LivePill compact /> : live && <View style={[styles.dot, { backgroundColor: colors.success }]} />}
+            {caption && (
+              <ThemedText variant="caption" muted style={styles.caption} numberOfLines={1}>{caption}</ThemedText>
+            )}
+          </View>
+        )}
+      </Pressable>
+    </View>
   );
-}
+});
 
 const styles = StyleSheet.create({
   node: {
@@ -202,11 +187,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 8,
     paddingVertical: 4,
     justifyContent: 'center',
-  },
-  flash: {
-    ...StyleSheet.absoluteFill as object,
-    borderWidth: 3,
-    borderRadius: Radius.md,
   },
   label: { position: 'absolute', top: -18, left: 0, fontSize: 11, fontWeight: '700' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 4, height: 24 },

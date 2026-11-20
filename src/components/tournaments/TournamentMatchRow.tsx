@@ -1,10 +1,12 @@
 import { Check } from 'lucide-react-native';
 import { Pressable, StyleSheet, View } from 'react-native';
 
+import { LivePill } from '@/components/live/LivePill';
 import { ThemedText } from '@/components/ui/Text';
 import { Radius, Spacing } from '@/constants/theme';
 import { useTheme } from '@/hooks/use-theme';
-import { formatMatchTime, matchStatusLabel, slotPlaceholder } from '@/lib/tournamentFormat';
+import { useIsLive } from '@/lib/liveStatusStore';
+import { formatClock, formatMatchTime, matchContextLabel, matchStatusLabel, slotPlaceholder } from '@/lib/tournamentFormat';
 import type { BracketEntryRef, TournamentMatch } from '@/types';
 
 function Side({
@@ -52,15 +54,22 @@ export function TournamentMatchRow({
   match,
   onPress,
   viewerId,
+  mode = 'round',
+  contextExtra,
 }: {
   match: TournamentMatch;
   onPress: () => void;
   viewerId?: string;
+  /** 'time' = shown under a day header: clock time on the right + stage label on top. */
+  mode?: 'round' | 'time';
+  /** Extra muted text for the context line in time mode (e.g. the venue). */
+  contextExtra?: string | null;
 }) {
   const theme = useTheme();
+  const liveNow = useIsLive(match.id);
   const decided = match.status === 'completed' || match.status === 'walkover';
   const bye = match.status === 'bye';
-  const time = formatMatchTime(match.scheduled_at);
+  const time = mode === 'time' ? formatClock(match.scheduled_at) : formatMatchTime(match.scheduled_at);
   const right = match.is_draw
     ? 'Draw'
     : decided || bye
@@ -81,6 +90,11 @@ export function TournamentMatchRow({
       accessibilityLabel={`${match.group_letter ? `Group ${match.group_letter} ` : ''}${match.round_name} match ${match.match_number}`}
     >
       <View style={{ flex: 1, gap: 2 }}>
+        {mode === 'time' && (
+          <ThemedText variant="caption" muted numberOfLines={1}>
+            {[matchContextLabel(match), contextExtra].filter(Boolean).join(' · ')}
+          </ThemedText>
+        )}
         <Side
           entry={match.entry_a}
           score={showScores ? match.score_a : null}
@@ -98,8 +112,15 @@ export function TournamentMatchRow({
           own={mine(match.entry_b)}
         />
       </View>
+      {liveNow && <LivePill compact />}
       <ThemedText variant="caption" muted style={styles.right} numberOfLines={2}>
-        {match.code ? `${match.code}\n${right}` : match.is_third_place && !decided ? `3rd place\n${right}` : right}
+        {mode === 'time'
+          ? right
+          : match.code
+            ? `${match.code}\n${right}`
+            : match.is_third_place && !decided
+              ? `3rd place\n${right}`
+              : right}
       </ThemedText>
     </Pressable>
   );

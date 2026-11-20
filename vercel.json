@@ -34,8 +34,20 @@
       "destination": "/tournament/[id]/module/[moduleId]/seeding"
     },
     {
+      "source": "/tournament/:id/module/:moduleId/score/:matchId",
+      "destination": "/tournament/[id]/module/[moduleId]/score/[matchId]"
+    },
+    {
       "source": "/tournament/:id/module/:moduleId",
       "destination": "/tournament/[id]/module/[moduleId]"
+    },
+    {
+      "source": "/tournament/:id/live/:matchId",
+      "destination": "/tournament/[id]/live/[matchId]"
+    },
+    {
+      "source": "/tournament/:id/live",
+      "destination": "/tournament/[id]/live"
     },
     {
       "source": "/tournament/:id/fields",

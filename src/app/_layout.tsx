@@ -34,6 +34,7 @@ import { HeaderBack } from '@/components/HeaderBack';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { isVersionSatisfied } from '@/services/config';
 import { supabase } from '@/lib/supabase';
+import { startLiveOutbox } from '@/lib/liveOutbox';
 
 SplashScreen.preventAutoHideAsync();
 
@@ -44,6 +45,11 @@ function RootNavigator() {
   const pathname = usePathname();
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
+
+  // Live scoring: re-upload anything this phone still holds (e.g. after the app was killed mid-match).
+  useEffect(() => {
+    if (session) startLiveOutbox();
+  }, [session]);
 
   // Navigation + native window backgrounds must match the theme, otherwise the default (white) shows
   // through during screen/tab transitions in dark mode.
@@ -212,6 +218,8 @@ function RootNavigator() {
         <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
         <Stack.Screen name="tournament/[id]/manage" options={{ ...pushOptions, title: 'Manage tournament' }} />
+        <Stack.Screen name="tournament/[id]/live/index" options={{ ...pushOptions, title: 'Live' }} />
+        <Stack.Screen name="tournament/[id]/live/[matchId]" options={{ ...pushOptions, title: 'Live match' }} />
         <Stack.Screen name="tournament/[id]/fields" options={{ ...pushOptions, title: 'Entry form' }} />
         <Stack.Screen name="tournament/[id]/module-form" options={modalOptions} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Module' }} />
@@ -220,6 +228,7 @@ function RootNavigator() {
         <Stack.Screen name="tournament/[id]/module/[moduleId]/seeding" options={{ ...pushOptions, title: 'Seeding & bracket' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/knockout" options={{ ...pushOptions, title: 'Build knockout' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/score/[matchId]" options={{ ...modalOptions, gestureEnabled: false }} />
         <Stack.Screen name="profile/[id]" options={pushOptions} />
       </Stack>
       {session && profile && !showSplash && <AnnouncementHost placement="app_open_modal" />}
