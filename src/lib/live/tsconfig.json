@@ -1,0 +1,13 @@
+{
+  "//": "Standalone on purpose: the projector site (live/) bundles this folder, and its Vercel build does not have the app's node_modules, so the root tsconfig (extends expo/tsconfig.base) must not be picked up here.",
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "skipLibCheck": true,
+    "isolatedModules": true,
+    "noEmit": true
+  },
+  "include": ["."]
+}
