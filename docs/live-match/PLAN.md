@@ -979,3 +979,5 @@ entry ✔.
 5. **OTA**: `npx @expo/fingerprint .` = `5b0237f8…`; `eas update --channel preview` → test on a preview build → `eas update --channel production`.
 6. **Hall test** (§17) with `live_scoring` switched on for yourself only (feature flag rollout %/admin list), then for the event.
 7. Announce (What's New) once the flag is on for everyone.
+
+**Address update:** the projector is deployed at `https://sportron-live-sigma.vercel.app/<code>` (migration 133 seeds that as `live_projector_base_url`). A custom domain can replace it later by changing that one remote-config value — no app update needed.

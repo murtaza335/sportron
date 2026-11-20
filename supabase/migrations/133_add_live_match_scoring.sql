@@ -711,7 +711,7 @@ begin
     'live_public', v_t.live_public,
     'live_code', v_t.live_code,
     'live_display', public._live_display_resolved(v_t.live_display),
-    'base_url', coalesce(v_base, 'https://live.sportron.app')
+    'base_url', coalesce(v_base, 'https://sportron-live-sigma.vercel.app')
   );
 end;
 $$;
@@ -1107,7 +1107,7 @@ values ('live_scoring', false, 'Live match scoring: Start live scoring, projecto
 on conflict (key) do nothing;
 
 insert into public.remote_config (key, value) values
-  ('live_projector_base_url', '"https://live.sportron.app"'::jsonb),
+  ('live_projector_base_url', '"https://sportron-live-sigma.vercel.app"'::jsonb),
   ('live_app_link', '"https://sportron.app/get"'::jsonb),
   ('live_realtime', 'true'::jsonb),
   ('live_poll_seconds', '10'::jsonb)

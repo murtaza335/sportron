@@ -100,7 +100,7 @@ begin
   perform lv_test.chk((select live_code from public.tournaments where id = v_t) is null, 'no live_code until first needed');
   perform lv_test.chk((select live_display from public.tournaments where id = v_t) = '{}'::jsonb, 'live_display defaults to {}');
   perform lv_test.chk((select enabled from public.feature_flags where key = 'live_scoring') = false, 'live_scoring flag seeded OFF');
-  perform lv_test.chk((select value #>> '{}' from public.remote_config where key = 'live_projector_base_url') = 'https://live.sportron.app',
+  perform lv_test.chk((select value #>> '{}' from public.remote_config where key = 'live_projector_base_url') = 'https://sportron-live-sigma.vercel.app',
                       'base url seeded in remote_config');
 
   -- ── anon before anything exists
@@ -317,7 +317,7 @@ begin
 
   -- ── settings read + rate limit
   perform lv_test.as_user('admin');
-  perform lv_test.chk(public.get_tournament_live_settings(v_t) ->> 'base_url' = 'https://live.sportron.app', 'settings include base_url from remote_config');
+  perform lv_test.chk(public.get_tournament_live_settings(v_t) ->> 'base_url' = 'https://sportron-live-sigma.vercel.app', 'settings include base_url from remote_config');
   perform lv_test.as_user('stranger');
   perform lv_test.expect_err(format('select public.get_tournament_live_settings(%L)', v_t), 'NOT_ALLOWED', 'settings are admin-only');
   perform lv_test.as_user('admin');
