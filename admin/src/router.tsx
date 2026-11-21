@@ -16,6 +16,8 @@ import { TournamentDetail } from './pages/TournamentDetail';
 import { Reports } from './pages/Reports';
 import { UsageLayout } from './pages/usage/UsageLayout';
 import { UsageOverview } from './pages/usage/UsageOverview';
+import { UsageCommunities } from './pages/usage/UsageCommunities';
+import { UsageCommunityDetail } from './pages/usage/UsageCommunityDetail';
 import { HomeRedirect } from './pages/HomeRedirect';
 
 export const router = createBrowserRouter([
@@ -83,6 +85,8 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <UsageOverview /> },
+          { path: 'communities', element: <UsageCommunities /> },
+          { path: 'communities/:id', element: <UsageCommunityDetail /> },
         ],
       },
       {
