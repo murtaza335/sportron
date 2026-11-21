@@ -87,5 +87,30 @@ begin
     raise exception 'FAIL: web session not recorded'; end if;
   raise notice 'PASS: sessions snapshot with platform detection';
 
+  -- 5. migration 136: read RPCs are wrapped (same signature, volatile) and count a visit
+  if not exists (select 1 from pg_proc where proname = '_usage_inner_get_tournaments') then
+    raise exception 'FAIL: get_tournaments was not instrumented'; end if;
+  if (select provolatile from pg_proc where proname = 'get_tournaments') <> 'v' then
+    raise exception 'FAIL: wrapper must be volatile'; end if;
+  if pg_get_function_result((select oid from pg_proc where proname = 'get_tournaments'))
+     is distinct from pg_get_function_result((select oid from pg_proc where proname = '_usage_inner_get_tournaments')) then
+    raise exception 'FAIL: wrapper result type differs from the original'; end if;
+  raise notice 'PASS: get_tournaments wrapped, volatile, same result type';
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u1)::text, true);
+  set local role authenticated;
+  perform * from public.get_tournaments('all');
+  begin perform * from public._usage_inner_get_tournaments('all'); raise exception 'FAIL: inner callable by authenticated';
+  exception when insufficient_privilege then raise notice 'PASS: inner function not callable by clients'; end;
+  reset role;
+  if not exists (select 1 from public.usage_views where user_id = v_u1 and view = 'tournaments_list') then
+    raise exception 'FAIL: get_tournaments did not record a visit'; end if;
+  raise notice 'PASS: get_tournaments records a visit';
+
+  set local role anon;
+  begin perform * from public.get_tournaments('all'); raise exception 'FAIL: anon ran get_tournaments';
+  exception when insufficient_privilege then raise notice 'PASS: anon still cannot run get_tournaments'; end;
+  reset role;
+
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
