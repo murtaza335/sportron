@@ -34,6 +34,7 @@ export function Layout() {
               Reports{openReports > 0 && <span className="nav-badge">{openReports > 99 ? '99+' : openReports}</span>}
             </NavLink>
           )}
+          {isSuper && <NavLink to="/usage">Usage</NavLink>}
           {isSuper && <NavLink to="/announcements">Announcements</NavLink>}
           {isSuper && <NavLink to="/broadcasts">Broadcasts</NavLink>}
           {isSuper && <NavLink to="/config">Flags &amp; config</NavLink>}

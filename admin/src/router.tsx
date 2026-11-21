@@ -14,6 +14,14 @@ import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
 import { Reports } from './pages/Reports';
+import { UsageLayout } from './pages/usage/UsageLayout';
+import { UsageOverview } from './pages/usage/UsageOverview';
+import { UsageCommunities } from './pages/usage/UsageCommunities';
+import { UsageCommunityDetail } from './pages/usage/UsageCommunityDetail';
+import { UsageChat } from './pages/usage/UsageChat';
+import { UsageScreens } from './pages/usage/UsageScreens';
+import { UsageUsers } from './pages/usage/UsageUsers';
+import { UsageSessionsTournaments } from './pages/usage/UsageSessionsTournaments';
 import { HomeRedirect } from './pages/HomeRedirect';
 
 export const router = createBrowserRouter([
@@ -72,6 +80,23 @@ export const router = createBrowserRouter([
       { path: 'tournaments', element: <RequireRole roles={['super_admin', 'tournament_manager']}><Tournaments /></RequireRole> },
       { path: 'tournaments/new', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentNew /></RequireRole> },
       { path: 'tournaments/:id', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentDetail /></RequireRole> },
+      {
+        path: 'usage',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <UsageLayout />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <UsageOverview /> },
+          { path: 'users', element: <UsageUsers /> },
+          { path: 'sessions', element: <UsageSessionsTournaments /> },
+          { path: 'chat', element: <UsageChat /> },
+          { path: 'screens', element: <UsageScreens /> },
+          { path: 'communities', element: <UsageCommunities /> },
+          { path: 'communities/:id', element: <UsageCommunityDetail /> },
+        ],
+      },
       {
         path: 'staff',
         element: (

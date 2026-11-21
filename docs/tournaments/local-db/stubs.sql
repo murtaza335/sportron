@@ -72,3 +72,18 @@ grant select on realtime.messages to anon, authenticated;
 create function realtime.topic() returns text language sql stable as $$ select nullif(current_setting('realtime.topic', true), '') $$;
 create function realtime.send(payload jsonb, event text, topic text, private boolean default true) returns void
   language sql security definer as $$ insert into realtime.messages(topic, event, payload, private) values (topic, event, payload, private) $$;
+
+-- usage analytics (135): tables/columns the rollups read that the stubs above do not have
+alter table public.community_messages add column reply_to_id uuid;
+alter table public.session_messages add column reply_to_id uuid;
+alter table public.commitments add column created_at timestamptz default now();
+alter table public.sessions add column created_at timestamptz default now();
+alter table public.community_members add column joined_at timestamptz default now();
+create table public.pings (id uuid primary key default gen_random_uuid(), community_id uuid, sender_id uuid,
+  message text, created_at timestamptz default now());
+create table public.community_post_likes (post_id uuid references public.community_posts(id) on delete cascade,
+  profile_id uuid, created_at timestamptz default now());
+create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid, created_at timestamptz default now(),
+  updated_at timestamptz, refreshed_at timestamp, user_agent text);
+alter table public.profiles add column fcm_tokens text[], add column streak_count int default 0;
+alter table public.commitments add column feedback_status text;
