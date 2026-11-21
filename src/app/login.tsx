@@ -10,9 +10,12 @@ import { alert } from '@/lib/alert';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { isSupabaseConfigured } from '@/lib/supabase';
 import { signInWithGoogle } from '@/services/auth';
+import { useGuestBrowsingEnabled } from '@/lib/guestMode';
+import { router } from 'expo-router';
 
 export default function LoginScreen() {
   const [loading, setLoading] = useState(false);
+  const guestBrowsing = useGuestBrowsingEnabled();
 
   const handleGoogleSignIn = async () => {
     if (!isSupabaseConfigured) {
@@ -82,7 +85,13 @@ export default function LoginScreen() {
                   </>
                 )}
               </PressableScale>
-              
+
+              {guestBrowsing && (
+                <TouchableOpacity onPress={() => router.replace('/tournaments')} hitSlop={10} accessibilityRole="button">
+                  <Text style={styles.browseText}>Just looking? Browse tournaments first</Text>
+                </TouchableOpacity>
+              )}
+
 <View style={styles.linksRow}>
               <Text style={styles.footnoteText}>
                 By continuing, you agree to our{' '}
@@ -214,6 +223,12 @@ const styles = StyleSheet.create({
     color: 'rgba(255, 255, 255, 0.85)',
     textDecorationLine: 'underline',
     fontWeight: '600',
+  },
+  browseText: {
+    color: 'rgba(255, 255, 255, 0.85)',
+    fontSize: 14,
+    fontWeight: '600',
+    paddingVertical: 4,
   },
   linksRow: {
     flexDirection: 'row',

@@ -31,6 +31,7 @@ import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
 import { ReportHost } from '@/components/ReportSheet';
+import { SignInHost } from '@/components/SignInSheet';
 import { HeaderBack } from '@/components/HeaderBack';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { isVersionSatisfied } from '@/services/config';
@@ -252,6 +253,7 @@ function RootNavigator() {
       {session && profile && !showSplash && <AnnouncementHost placement="app_open_modal" />}
       <ConfettiHost />
       {session && profile && <ReportHost />}
+      {!session && guestBrowsing && <SignInHost />}
       <ToastHost />
       {Platform.OS === 'web' && <AlertHost />}
       {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
