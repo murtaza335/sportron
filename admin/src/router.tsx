@@ -20,6 +20,8 @@ import { UsageCommunities } from './pages/usage/UsageCommunities';
 import { UsageCommunityDetail } from './pages/usage/UsageCommunityDetail';
 import { UsageChat } from './pages/usage/UsageChat';
 import { UsageScreens } from './pages/usage/UsageScreens';
+import { UsageUsers } from './pages/usage/UsageUsers';
+import { UsageSessionsTournaments } from './pages/usage/UsageSessionsTournaments';
 import { HomeRedirect } from './pages/HomeRedirect';
 
 export const router = createBrowserRouter([
@@ -87,6 +89,8 @@ export const router = createBrowserRouter([
         ),
         children: [
           { index: true, element: <UsageOverview /> },
+          { path: 'users', element: <UsageUsers /> },
+          { path: 'sessions', element: <UsageSessionsTournaments /> },
           { path: 'chat', element: <UsageChat /> },
           { path: 'screens', element: <UsageScreens /> },
           { path: 'communities', element: <UsageCommunities /> },
