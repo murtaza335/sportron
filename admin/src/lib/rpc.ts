@@ -140,7 +140,77 @@ export type AnnouncementPatch = Partial<
 >;
 
 // ── Calls ────────────────────────────────────────────────────────────────────
+
+// ── Usage analytics (migrations 135-137) ─────────────────────────────────────
+export type UsageRange = { from: string; to: string };
+export interface UsageOverview {
+  range: UsageRange;
+  tracking_enabled: boolean;
+  tiles: { dau: number; wau: number; mau: number; online_now: number; new_users_7d: number; total_users: number };
+  series: { day: string; dau: number; new_users: number; messages: number; posts: number; matches: number; views: number }[];
+  heatmap: { dow: number; hour: number; users: number }[];
+  platforms: Record<string, number>;
+  top_communities: { id: string; name: string; sport: string | null; score: number; views: number; messages: number; posts: number }[];
+  top_chats: { type: 'community' | 'session'; id: string; name: string; messages: number; senders: number }[];
+}
+export interface UsageCommunityRow {
+  id: string; name: string; sport: string | null; visibility: string; created_at: string; members: number;
+  views: number; viewer_days: number; messages: number; chatter_days: number; posts: number; reactions: number;
+  matches: number; pings: number; joins: number; score: number; prev_score: number; last_activity: string | null; dead: boolean;
+}
+export interface UsageCommunityDetail {
+  community: { id: string; name: string; sport: string | null; visibility: string; created_at: string; members: number };
+  range: UsageRange;
+  series: { day: string; views: number; viewers: number; messages: number; chatters: number; posts: number; reactions: number; matches: number; pings: number; joins: number }[];
+  chat_hours: { hour: number; messages: number }[];
+  top_chatters: { username: string; messages: number }[];
+}
+export interface UsageChat {
+  range: UsageRange;
+  totals: { messages: number; community: number; session: number; active_chats: number; replies: number };
+  series: { day: string; community: number; session: number; chatters: number }[];
+  hours: { hour: number; messages: number }[];
+  busiest: { type: 'community' | 'session'; id: string; name: string; messages: number; peak_senders: number; replies: number }[];
+  edited: number;
+}
+export interface UsageScreens {
+  range: UsageRange;
+  retention_days: number;
+  screens: { view: string; hits: number; viewers: number; guest_hits: number; native_hits: number; web_hits: number }[];
+  daily: { day: string; view: string; hits: number }[];
+}
+export interface UsageRetention {
+  range: UsageRange;
+  funnel: { signed_up: number; joined_community: number; did_action: number; came_back: number };
+  cohorts: { week: string; size: number; active: number[] }[];
+  push: { users: number; with_token: number; notifications: number; notifications_read: number };
+  streaks: { ge_1: number; ge_3: number; ge_7: number; ge_30: number };
+  per_user: { median_active_days: number; users: number };
+}
+export interface UsageSessionsTournaments {
+  range: UsageRange;
+  sessions_series: { day: string; created: number; applications: number }[];
+  sessions_by_sport: { purpose: string; created: number; filled: number }[];
+  feedback: { showed_up: number; no_show: number };
+  tournament_series: { day: string; views: number; live: number }[];
+  top_tournaments: { id: string; name: string; views: number; viewers: number; live_views: number }[];
+}
+export interface UsageStatus {
+  enabled: boolean; timezone: string; last_view_hour: string | null; last_seen: string | null; first_day: string | null;
+  rows: Record<string, number>;
+}
+
 export const rpc = {
+  usageStatus: () => call<UsageStatus>('admin_usage_status'),
+  usageSetTracking: (enabled: boolean, note?: string) => call<void>('admin_set_usage_tracking', { p_enabled: enabled, p_note: note ?? null }),
+  usageBackfill: (from: string) => call<number>('admin_usage_backfill', { p_from: from }),
+  usageOverview: (r: UsageRange) => call<UsageOverview>('admin_usage_overview', { p_from: r.from, p_to: r.to }),
+  usageCommunities: (r: UsageRange) => call<UsageCommunityRow[]>('admin_usage_communities', { p_from: r.from, p_to: r.to }),
+  usageCommunity: (id: string, r: UsageRange) => call<UsageCommunityDetail>('admin_usage_community', { p_id: id, p_from: r.from, p_to: r.to }),
+  usageChat: (r: UsageRange) => call<UsageChat>('admin_usage_chat', { p_from: r.from, p_to: r.to }),
+  usageScreens: (r: UsageRange) => call<UsageScreens>('admin_usage_screens', { p_from: r.from, p_to: r.to }),
+  usageRetention: (r: UsageRange, weeks = 8) => call<UsageRetention>('admin_usage_retention', { p_weeks: weeks, p_from: r.from, p_to: r.to }),
+  usageSessionsTournaments: (r: UsageRange) => call<UsageSessionsTournaments>('admin_usage_sessions_tournaments', { p_from: r.from, p_to: r.to }),
   myRole: () => call<PlatformRole | null>('get_my_platform_role'),
   overview: async () => (await call<Overview[]>('admin_get_overview'))[0],
   searchProfiles: (query: string, limit = 10) =>

@@ -14,6 +14,8 @@ import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
 import { Reports } from './pages/Reports';
+import { UsageLayout } from './pages/usage/UsageLayout';
+import { UsageOverview } from './pages/usage/UsageOverview';
 import { HomeRedirect } from './pages/HomeRedirect';
 
 export const router = createBrowserRouter([
@@ -72,6 +74,17 @@ export const router = createBrowserRouter([
       { path: 'tournaments', element: <RequireRole roles={['super_admin', 'tournament_manager']}><Tournaments /></RequireRole> },
       { path: 'tournaments/new', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentNew /></RequireRole> },
       { path: 'tournaments/:id', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentDetail /></RequireRole> },
+      {
+        path: 'usage',
+        element: (
+          <RequireRole roles={['super_admin']}>
+            <UsageLayout />
+          </RequireRole>
+        ),
+        children: [
+          { index: true, element: <UsageOverview /> },
+        ],
+      },
       {
         path: 'staff',
         element: (
