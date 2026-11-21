@@ -256,6 +256,18 @@ begin
   );
 end $$;
 
+create or replace function public.admin_get_guest_mode()
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+begin
+  perform public.assert_platform_role(array['super_admin']);
+  return jsonb_build_object('enabled', public._guest_mode_enabled());
+end $$;
+
 -- ── 7. Grants. Explicit allow-list; everything else keeps the 109 lock-down.
 do $$
 declare
@@ -290,6 +302,8 @@ begin
     execute format('grant execute on function public.%s to anon, authenticated, service_role', f);
   end loop;
 
-  execute 'revoke all on function public.admin_set_guest_mode(boolean, text) from public, anon';
-  execute 'grant execute on function public.admin_set_guest_mode(boolean, text) to authenticated';
+  foreach f in array array['admin_set_guest_mode(boolean, text)', 'admin_get_guest_mode()'] loop
+    execute format('revoke all on function public.%s from public, anon', f);
+    execute format('grant execute on function public.%s to authenticated', f);
+  end loop;
 end $$;

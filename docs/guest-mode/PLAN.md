@@ -1,6 +1,6 @@
 # Guest mode: removing the mandatory sign-up
 
-**Status:** study + proposal (nothing built yet) · **Date:** 2026-11-21 · **Next migration:** 134
+**Status:** implemented in code (steps 1-5 below), **switch OFF by default, migration 134 not yet applied** · **Date:** 2026-11-21 · **Migration:** 134 (next = 135)
 
 ## 1. Verdict
 
@@ -135,9 +135,40 @@ Cheap, but it doesn't remove the resistance. Users still can't see real content.
 | 4. Onboarding polish | ~0.5 day |
 | 5–6. Switch, rollout, device check, metrics | ~1 day |
 
-## 8. Decisions needed from you
+## 8. Decisions (taken while building)
 
-1. Community preview for guests: header + recent posts/matches (recommended), or header only?
-2. Sessions feed for guests: reduced list (recommended), fully hidden, or full?
-3. Guest landing tab: Tournaments (recommended) or Communities/Discover?
-4. Roll out on web first, then Android (recommended), or both at once?
+1. **Community preview = the card only** (cover, sport, members, description, creator) plus a locked "what joining unlocks" list. *Not* recent posts/matches. Reason: a signed-in non-member cannot read that content today (migrations 102/107), so showing it to a guest would widen what the app reveals. Revisit only as a deliberate product decision.
+2. **Sessions for guests = reduced list**: sport, title, time, spots. Venue, description and creator are hidden server-side and shown as "Sign in to see the venue".
+3. **Guest landing tab = Tournaments** (first screen of a guest visit).
+4. **Roll out web first, then Android**, behind the server switch. Since the switch is server-side and read at launch, both get it the moment it is turned on *and* the new build/web deploy is live; old builds ignore it.
+
+## 9. What was built (one commit per step)
+
+| Step | What | Where |
+|---|---|---|
+| 1 | Database: `guest_get_*` read-only wrappers, `site_config.guest_mode` switch (OFF), `admin_set/get_guest_mode` | `supabase/migrations/134_guest_read_access.sql`, `docs/guest-mode/sql-tests.sql` |
+| 2a | App plumbing: guest store, route allow-list, rpc routing that fails closed | `src/lib/guestMode.ts`, `AuthContext`, `_layout.tsx`, services, `docs/guest-mode/route-tests.cjs` |
+| 3 | The "sign in to continue" prompt (sheet + inline card), `requireAuth()` | `src/lib/requireAuth.ts`, `src/lib/signInReasons.ts`, `src/components/SignInSheet.tsx` |
+| 2b | Guest screens: Communities, community card, Sessions, Chats / Activity cards, header Sign-in pill | `src/components/GuestViews.tsx`, tabs |
+| 4 | Lighter onboarding (username pre-filled), keeps the return-to destination | `src/lib/suggestUsername.ts`, `src/app/onboarding.tsx` |
+| 5 | Admin panel switch + this write-up | `admin/src/pages/Settings.tsx` |
+
+### Security model in one paragraph
+Migration 109 is untouched, so `anon` still cannot run any existing function. Each `guest_get_*` function runs the existing, reviewed read function as a **stranger** (all-zero user id: no profile, memberships, admin or entry rows), so a guest sees at most what a random signed-in stranger already sees; private entry fields stay stripped server-side. Writes are never wrapped. Every guest function first checks the `guest_mode` switch, so turning it off is a real kill switch. `docs/guest-mode/sql-tests.sql` proves this under the real `anon` role, including an allow-list assertion that `anon` can execute nothing but `guest_get_*` and `get_live_board`.
+
+## 10. Owner rollout checklist (nothing below has been done yet)
+
+1. **Apply migration 134** to Supabase (SQL editor or `supabase db push`). Safe: the switch seeds OFF, nothing changes for anyone.
+2. Run the checks in `docs/guest-mode/sql-tests.sql` (or via `docs/tournaments/local-db/run.sh`) - each ends with `ALL TESTS PASSED`.
+3. **Ship the app change**: web (`npx expo export -p web` + `vercel ./dist --prod`, see `web-deploy-commands.txt`) and/or an OTA update (client-only + SQL, no native modules; verify the fingerprint is unchanged first, as for live scoring). Deploy the admin panel if you want the toggle.
+4. **Test with the switch still OFF**: behaviour must be exactly as before (everyone lands on Login).
+5. **Turn it on**: Admin panel > Settings > *Guest browsing*, or `select public.admin_set_guest_mode(true);` as a super admin. Takes effect at each app launch.
+6. **Walk through as a guest** (fresh browser / signed-out): lands on Tournaments; open a tournament, a module, live courts; Communities > a community card > Join opens the sign-in sheet naming the community; Chats / Activity show the inline card; header shows *Sign in*; sign in with a **new** Google account: onboarding shows a suggested username, finishing returns to the community page you were on.
+7. If anything looks wrong: **turn the switch off** (instant for new launches, no deploy).
+8. Measure (Phase 6): Play Console / Vercel funnel vs the Phase 0 baseline; consider logging which `requireAuth` reason led to a sign-in.
+
+### Known limits / follow-ups
+- Guests have no realtime: the bracket polls every 30 s; the live-courts screen falls back to its polling path.
+- Tournament promo codes are signed-in only (a natural reason to sign in).
+- Push notifications need an account by nature; consider an in-app nudge on tournament pages later.
+- Pending-action resume (auto-running the join after sign-in) is intentionally not done: the person lands back on the same page and taps once.

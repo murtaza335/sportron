@@ -126,7 +126,8 @@ begin
         and p.proname <> 'get_live_board'
         and p.proname not like 'guest\_get\_%'),
     'anon can execute nothing but guest_get_* and get_live_board (writes, admin and regular reads stay closed)');
-  perform gt_test.chk(not has_function_privilege('anon', 'public.admin_set_guest_mode(boolean,text)', 'execute'), 'anon cannot flip the switch');
+  perform gt_test.chk(not has_function_privilege('anon', 'public.admin_set_guest_mode(boolean,text)', 'execute')
+                      and not has_function_privilege('anon', 'public.admin_get_guest_mode()', 'execute'), 'anon cannot read or flip the switch');
   perform gt_test.chk(not has_function_privilege('anon', 'public._guest_begin()', 'execute')
                       and not has_function_privilege('authenticated', 'public._guest_begin()', 'execute')
                       and not has_function_privilege('anon', 'public._guest_end()', 'execute')
@@ -137,6 +138,7 @@ begin
   perform gt_test.as_user('stranger');
   set local role authenticated;
   perform gt_test.expect_err('select public.admin_set_guest_mode(true)', 'NOT_ALLOWED', 'normal user cannot turn guest mode on');
+  perform gt_test.expect_err('select public.admin_get_guest_mode()', 'NOT_ALLOWED', 'normal user cannot read the admin switch view');
   reset role;
 
   -- ── 4. turn it on (as the table owner, standing in for a super admin) and browse as a real anon role
