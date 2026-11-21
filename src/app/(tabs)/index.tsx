@@ -1,3 +1,5 @@
+import { GuestCommunitiesList } from '@/components/GuestViews';
+import { useIsGuest } from '@/lib/guestMode';
 import { useCallback } from 'react';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { UpdateBanner } from '@/components/UpdateBanner';
@@ -31,7 +33,7 @@ import { useMyCommunities } from '@/hooks/useCommunities';
 import { router, useFocusEffect } from 'expo-router';
 import { Plus, Users } from 'lucide-react-native';
 
-export default function CommunitiesScreen() {
+function CommunitiesInner() {
   const theme = useTheme();
   const { user } = useAuth();
   const insets = useSafeAreaInsets();
@@ -189,3 +191,10 @@ const styles = StyleSheet.create({
     borderRadius: 28,
   },
 });
+
+
+export default function CommunitiesScreen() {
+  const guest = useIsGuest();
+  if (guest) return <GuestCommunitiesList />;
+  return <CommunitiesInner />;
+}

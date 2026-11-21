@@ -1,3 +1,5 @@
+import { GuestBanner } from '@/components/GuestViews';
+import { useIsGuest } from '@/lib/guestMode';
 import { Info, Trophy } from 'lucide-react-native';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { useState } from 'react';
@@ -42,6 +44,7 @@ const HOST_EMAIL = 'support.sportron@gmail.com';
 export default function TournamentsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
+  const guest = useIsGuest();
   const [scope, setScope] = useState<TournamentScope>('live');
   const { tournaments, loading, refreshing, error, refresh } = useTournaments(scope);
   const empty = EMPTY[scope];
@@ -50,7 +53,7 @@ export default function TournamentsScreen() {
   return (
     <View style={[styles.safe, { backgroundColor: theme.background }]}>
       <View style={styles.controls}>
-        <SegmentedControl options={SCOPES} value={scope} onChange={setScope} compact />
+        <SegmentedControl options={guest ? SCOPES.filter((o) => o.value !== 'mine') : SCOPES} value={scope} onChange={setScope} compact />
       </View>
       <Animated.View key={scope} style={{ flex: 1 }} entering={FadeIn.duration(Duration.base).reduceMotion(RM)}>
       <FlatList
@@ -64,6 +67,14 @@ export default function TournamentsScreen() {
         ListHeaderComponent={
           <>
             <AnnouncementHost placement="tournaments_banner" />
+            {guest && (
+              <GuestBanner
+                dismissible
+                title="Want in on the action?"
+                body="Sign in to join communities and find people to play with."
+                reason="generic"
+              />
+            )}
             <LiveTournamentsStrip />
             <TipCard id="tournaments" />
             {scope === 'mine' && (

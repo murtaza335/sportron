@@ -12,7 +12,7 @@ import { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from 
 import { FlatList, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Calendar, ChevronDown, Clock, MapPin, Timer, Users } from 'lucide-react-native';
+import { Calendar, ChevronDown, Clock, Lock, MapPin, Timer, Users } from 'lucide-react-native';
 
 import { SessionDetailPopup } from '@/components/SessionDetailPopup';
 import { SessionFeedbackPopup } from '@/components/SessionFeedbackPopup';
@@ -24,6 +24,8 @@ import { useTheme } from '@/hooks/use-theme';
 import { useSessionFeed, useSessionHistory } from '@/hooks/useSessions';
 import type { SessionScope } from '@/hooks/useSessions';
 import { getSessionsView, subscribeSessionsView } from '@/lib/sessionsView';
+import { useIsGuest } from '@/lib/guestMode';
+import { requireAuth } from '@/lib/requireAuth';
 import type { Session, SessionStatus } from '@/types';
 import { formatSessionPurpose, SESSION_PURPOSES, SESSION_PURPOSE_LABELS } from '@/types';
 import { fetchPendingFeedbackSessions, getRemainingTime } from '@/services/sessions';
@@ -77,7 +79,7 @@ function getStatusStyles(theme: ReturnType<typeof useTheme>): Record<SessionStat
   };
 }
 
-function SessionCard({ session, onPress }: { session: Session; onPress: () => void }) {
+function SessionCard({ session, onPress, guest }: { session: Session; onPress: () => void; guest?: boolean }) {
   const theme = useTheme();
   const isDark = theme.resolvedColorScheme === 'dark';
   const statusStyle = getStatusStyles(theme)[session.status] ?? getStatusStyles(theme).closed;
@@ -118,12 +120,16 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
 
         <View style={styles.cardDetails}>
           <View style={styles.detailRow}>
-            <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
+            {guest ? (
+              <Lock size={14} color={theme.accent} strokeWidth={2} />
+            ) : (
+              <MapPin size={14} color={theme.textSecondary} strokeWidth={2} />
+            )}
             <ThemedText
               variant="caption"
-              style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
+              style={{ color: guest ? theme.accent : theme.textSecondary, fontWeight: guest ? '700' : '500', fontSize: 12 }}
             >
-              {session.location}
+              {guest ? 'Sign in to see the venue' : session.location}
             </ThemedText>
           </View>
           <View style={styles.detailRow}>
@@ -171,7 +177,7 @@ function SessionCard({ session, onPress }: { session: Session; onPress: () => vo
             variant="caption"
             style={{ color: theme.textSecondary, fontWeight: '500', fontSize: 12 }}
           >
-            by {session.creator?.username ?? 'Unknown'}
+            {guest ? 'Tap to ask to join' : `by ${session.creator?.username ?? 'Unknown'}`}
           </ThemedText>
         </View>
       </Card>
@@ -214,6 +220,7 @@ function FilterChip({
 export default function SessionsScreen() {
   const theme = useTheme();
   const { user, profile } = useAuth();
+  const guest = useIsGuest();
   const insets = useSafeAreaInsets();
   const [scope, setScope] = useState<SessionScope>('all');
   const [purposeFilter, setPurposeFilter] = useState<string | null>(null);
@@ -304,9 +311,17 @@ export default function SessionsScreen() {
               <FilterChip
                 label="Joined"
                 selected={scope === 'joined'}
-                onPress={() => setScope('joined')}
+                onPress={() => {
+                  if (requireAuth('apply_session')) setScope('joined');
+                }}
               />
-              <FilterChip label="My" selected={scope === 'my'} onPress={() => setScope('my')} />
+              <FilterChip
+                label="My"
+                selected={scope === 'my'}
+                onPress={() => {
+                  if (requireAuth('create_session')) setScope('my');
+                }}
+              />
               <Pressable
                 onPress={() => setShowPurposeModal(true)}
                 style={[
@@ -355,7 +370,7 @@ export default function SessionsScreen() {
               <>
               <AnnouncementHost placement="sessions_banner" />
               <TipCard id="sessions" />
-              {(isHistory || scope === 'all') ? (
+              {!guest && (isHistory || scope === 'all') ? (
                 <View style={[styles.statsRow, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
                   <View style={styles.statItem}>
                     <ThemedText variant="heading" style={{ fontWeight: '700' }}>
@@ -436,7 +451,10 @@ export default function SessionsScreen() {
               <FadeInItem index={index} animate={firstLoad}>
                 <SessionCard
                   session={item}
+                  guest={guest}
                   onPress={() => {
+                    // Guests can see that a session exists; asking to join needs an account.
+                    if (!requireAuth('apply_session', { name: item.title ?? formatSessionPurpose(item.purpose) })) return;
                     setSelectedSessionId(item.id);
                     setSelectedSessionData(item);
                   }}

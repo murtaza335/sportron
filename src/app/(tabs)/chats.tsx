@@ -1,3 +1,5 @@
+import { GuestTab } from '@/components/GuestViews';
+import { useIsGuest } from '@/lib/guestMode';
 import { TipCard } from '@/components/TipCard';
 import { useEffect, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
@@ -117,7 +119,7 @@ function ChatRowCard({ row, onPress }: { row: ChatRow; onPress: () => void }) {
   );
 }
 
-export default function ChatsScreen() {
+function ChatsInner() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { user, profile } = useAuth();
@@ -400,3 +402,9 @@ const styles = StyleSheet.create({
     maxWidth: 280,
   },
 });
+
+export default function ChatsScreen() {
+  const guest = useIsGuest();
+  if (guest) return <GuestTab reason="chat" />;
+  return <ChatsInner />;
+}
