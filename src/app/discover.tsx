@@ -1,3 +1,4 @@
+import { requireAuth } from '@/lib/requireAuth';
 import Animated from 'react-native-reanimated';
 import { FadeInItem } from '@/components/motion/FadeInItem';
 import { PressableScale } from '@/components/motion/PressableScale';
@@ -90,7 +91,9 @@ export default function DiscoverScreen() {
           headerTintColor: theme.text,
           headerRight: () => (
             <Pressable
-              onPress={() => router.push('/create-community')}
+              onPress={() => {
+                if (requireAuth('create_community')) router.push('/create-community');
+              }}
               style={({ pressed }) => ({
                 marginRight: Spacing.md,
                 paddingTop: Platform.OS === 'ios' ? 2 : 0,

@@ -3,7 +3,7 @@ import { Stack, ThemeProvider as NavThemeProvider, usePathname, useRouter, useSe
 import * as SystemUI from 'expo-system-ui';
 import * as SplashScreen from 'expo-splash-screen';
 import { StatusBar } from 'expo-status-bar';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SplashScreen as AnimatedSplashScreen } from '@/components/SplashScreen';
@@ -23,6 +23,7 @@ import { InstallPrompt } from '@/components/InstallPrompt';
 import { WebFrame } from '@/components/WebFrame';
 import { WebRefreshButton } from '@/components/WebRefreshButton';
 import { consumeReturnTo, clearReturnTo, saveReturnTo } from '@/lib/returnTo';
+import { isGuestRoute, setGuestModeEnabled, useGuestBrowsingEnabled } from '@/lib/guestMode';
 import { removeFCMToken } from '@/services/profiles';
 import { removeWebPushToken } from '@/utils/pushNotifications';
 import { Duration } from '@/lib/motion';
@@ -30,6 +31,7 @@ import { AlertHost } from '@/components/motion/AlertHost';
 import { ConfettiHost } from '@/components/motion/Confetti';
 import { ToastHost } from '@/components/motion/Toast';
 import { ReportHost } from '@/components/ReportSheet';
+import { SignInHost } from '@/components/SignInSheet';
 import { HeaderBack } from '@/components/HeaderBack';
 import { AnnouncementHost } from '@/components/AnnouncementHost';
 import { isVersionSatisfied } from '@/services/config';
@@ -45,6 +47,8 @@ function RootNavigator() {
   const pathname = usePathname();
   const { session, profile, loading, profileLoading, profileError, refreshProfile } = useAuth();
   const [fontsLoaded, setFontsLoaded] = useState(false);
+  const guestBrowsing = useGuestBrowsingEnabled();
+  const guestLandedRef = useRef(false);
 
   // Live scoring: re-upload anything this phone still holds (e.g. after the app was killed mid-match).
   useEffect(() => {
@@ -129,6 +133,21 @@ function RootNavigator() {
     const firstSegment = segments[0] as string;
     const inAuthGroup = firstSegment === 'login' || firstSegment === 'onboarding' || firstSegment === 'auth';
 
+    // Guest mode (server switch): a visitor may browse the allow-listed screens without an account.
+    // Everything else still goes to /login and is remembered, exactly as before.
+    const guestOk = !session && guestBrowsing && isGuestRoute(segments as string[]);
+
+    if (guestOk) {
+      // First screen of a guest visit = Tournaments (the most useful thing to see with no account).
+      if (!guestLandedRef.current && pathname === '/') {
+        guestLandedRef.current = true;
+        router.replace('/tournaments');
+      } else {
+        guestLandedRef.current = true;
+      }
+      return;
+    }
+
     if (!session && !inAuthGroup) {
       const search = Platform.OS === 'web' && typeof window !== 'undefined' ? window.location.search : '';
       saveReturnTo(pathname + search);
@@ -149,7 +168,7 @@ function RootNavigator() {
       // settled in the app: a leftover saved link must not hijack a later sign-in
       clearReturnTo();
     }
-  }, [session, profile, loading, profileLoading, profileError, segments, pathname, router]);
+  }, [session, profile, loading, profileLoading, profileError, segments, pathname, router, guestBrowsing]);
 
   // Web push is turned off (W5): once per browser, remove any push token saved by an earlier version
   // so a shared computer never keeps receiving a previous user's notifications.
@@ -234,6 +253,7 @@ function RootNavigator() {
       {session && profile && !showSplash && <AnnouncementHost placement="app_open_modal" />}
       <ConfettiHost />
       {session && profile && <ReportHost />}
+      {!session && guestBrowsing && <SignInHost />}
       <ToastHost />
       {Platform.OS === 'web' && <AlertHost />}
       {Platform.OS === 'web' && session && profile && <WebRefreshButton />}
@@ -277,7 +297,7 @@ export default function RootLayout() {
           supabase
             .from('site_config')
             .select('key, value')
-            .in('key', ['maintenance', 'min_app_version']),
+            .in('key', ['maintenance', 'min_app_version', 'guest_mode']),
           new Promise<null>((resolve) => setTimeout(() => resolve(null), 5000)),
         ]);
         rows = (result?.data ?? []) as { key: string; value: unknown }[];
@@ -286,6 +306,10 @@ export default function RootLayout() {
       }
 
       if (!active) return;
+
+      // Guest browsing switch (migration 134). Missing row / failed request = OFF = old behaviour.
+      const guestRow = rows.find((r) => r.key === 'guest_mode');
+      setGuestModeEnabled(Boolean(((guestRow?.value ?? {}) as Record<string, unknown>).enabled));
 
       const maintenanceRow = rows.find((r) => r.key === 'maintenance');
       const maintenanceValue = (maintenanceRow?.value ?? {}) as Record<string, unknown>;

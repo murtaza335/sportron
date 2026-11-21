@@ -1,3 +1,5 @@
+import { GuestTab } from '@/components/GuestViews';
+import { useIsGuest } from '@/lib/guestMode';
 import { useCallback, useDeferredValue, useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
@@ -31,7 +33,7 @@ const INVITE_TYPES: NotificationType[] = [
 const ROW_LAYOUT = LayoutShift;
 const ROW_EXIT = FadeOutRight.duration(Duration.base).reduceMotion(RM);
 
-export default function UpdatesScreen() {
+function UpdatesInner() {
   const theme = useTheme();
   const { notifications, fetchNotifications, loading, markAllAsRead, unreadCount } = useNotifications();
   const [activeTab, setActiveTab] = useState<'action' | 'invites' | 'past'>('action');
@@ -276,3 +278,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.xxxl,
   },
 });
+
+
+export default function UpdatesScreen() {
+  const guest = useIsGuest();
+  if (guest) return <GuestTab reason="activity" />;
+  return <UpdatesInner />;
+}

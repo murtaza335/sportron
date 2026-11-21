@@ -40,6 +40,8 @@ import {
   subscribeSessionsView,
 } from '@/lib/sessionsView';
 import { haptics } from '@/lib/haptics';
+import { useIsGuest } from '@/lib/guestMode';
+import { requireAuth } from '@/lib/requireAuth';
 import { Duration, Springs } from '@/lib/motion';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
@@ -109,7 +111,10 @@ function SessionsHeaderRight() {
 
   return (
     <Pressable
-      onPress={() => setSessionsView(isHistory ? 'new' : 'history')}
+      onPress={() => {
+        if (!requireAuth('profile')) return;
+        setSessionsView(isHistory ? 'new' : 'history');
+      }}
       style={({ pressed }) => [{ marginRight: Spacing.md, paddingTop: Platform.OS === 'ios' ? 8 : 0 }, pressed && { opacity: 0.6 }]}
       hitSlop={12}
       accessibilityLabel={isHistory ? 'Show open sessions' : 'Show session history'}
@@ -137,6 +142,33 @@ function SessionsHeaderRight() {
 
 function CommunitiesHeaderProfile() {
   const { profile } = useAuth();
+  const guest = useIsGuest();
+  const theme = useTheme();
+
+  if (guest) {
+    return (
+      <PressableScale
+        scaleTo={0.94}
+        onPress={() => requireAuth('profile')}
+        style={{
+          marginRight: Spacing.md,
+          paddingTop: Platform.OS === 'ios' ? 4 : 0,
+          paddingHorizontal: 14,
+          height: 34,
+          borderRadius: Radius.full,
+          backgroundColor: theme.text,
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}
+        hitSlop={10}
+        accessibilityLabel="Sign in"
+        accessibilityRole="button"
+      >
+        <Text style={{ color: theme.background, fontSize: 14, fontWeight: '700' }}>Sign in</Text>
+      </PressableScale>
+    );
+  }
+
 
   return (
     <PressableScale
@@ -188,7 +220,9 @@ function CreateSessionButton() {
         ]}
       >
         <PressableScale
-          onPress={() => router.navigate('/create-session')}
+          onPress={() => {
+            if (requireAuth('create_session')) router.navigate('/create-session');
+          }}
           scaleTo={0.88}
           haptic="light"
           style={{
@@ -227,7 +261,9 @@ function CommunitiesHeaderStreak() {
   return (
     <>
       <PressableScale
-        onPress={() => setModalVisible(true)}
+        onPress={() => {
+          if (requireAuth('streak')) setModalVisible(true);
+        }}
         scaleTo={0.94}
         style={({ pressed }) => ({
           flexDirection: 'row',

@@ -1,3 +1,5 @@
+import { GuestCommunityView } from '@/components/GuestViews';
+import { useIsGuest } from '@/lib/guestMode';
 import { TipCard } from '@/components/TipCard';
 import { ShareButton } from '@/components/ShareButton';
 import { shareCopy } from '@/lib/share';
@@ -67,7 +69,7 @@ import type {
 import { communitySportLabel } from '@/types';
 import { goBack } from '@/lib/nav';
 
-export default function CommunityDetailScreen() {
+function CommunityDetailInner() {
   const { id, communityName, matchId: matchIdParam, postId: postIdParam } = useLocalSearchParams<{
     id: string;
     communityName?: string;
@@ -1547,3 +1549,10 @@ const styles = StyleSheet.create({
     marginTop: Spacing.sm,
   },
 });
+
+export default function CommunityDetailScreen() {
+  const guest = useIsGuest();
+  const { id } = useLocalSearchParams<{ id: string }>();
+  if (guest) return <GuestCommunityView id={id ?? ''} />;
+  return <CommunityDetailInner />;
+}

@@ -31,6 +31,9 @@ export function Settings() {
   const [vMsg, setVMsg] = useState('');
   const [vSavedMin, setVSavedMin] = useState('');
 
+  const [gEnabled, setGEnabled] = useState(false);
+  const [gSaved, setGSaved] = useState(false);
+
   const [busy, setBusy] = useState(false);
 
   const load = useCallback(async () => {
@@ -48,6 +51,13 @@ export function Settings() {
       setVSavedMin(minV);
       setVUrl(typeof v.store_url === 'string' ? v.store_url : '');
       setVMsg(typeof v.message === 'string' ? v.message : '');
+      try {
+        const g = await rpc.getGuestMode();
+        setGEnabled(g.enabled === true);
+        setGSaved(g.enabled === true);
+      } catch {
+        // migration 134 not applied yet: the guest-browsing card simply shows OFF and saving reports the error
+      }
       setLoadError(null);
     } catch (e) {
       setLoadError(errorText(e));
@@ -78,6 +88,29 @@ export function Settings() {
     try {
       await rpc.setMaintenance(mEnabled, mMessage, res.note);
       toast.success(mEnabled ? 'Maintenance is on.' : 'Maintenance is off.');
+      await load();
+    } catch (err) {
+      toast.error(errorText(err));
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function saveGuestMode(e: FormEvent) {
+    e.preventDefault();
+    const res = await confirm({
+      title: gEnabled ? 'Turn guest browsing ON?' : 'Turn guest browsing OFF?',
+      body: gEnabled
+        ? 'People who are not signed in can browse tournaments, communities and open sessions. They are asked to sign in only when they try to do something. Takes effect on each app launch.'
+        : 'Everyone must sign in before seeing anything again (the old behaviour). Takes effect on each app launch.',
+      confirmLabel: gEnabled ? 'Turn on' : 'Turn off',
+      askNote: true,
+    });
+    if (!res) return;
+    setBusy(true);
+    try {
+      await rpc.setGuestMode(gEnabled, res.note);
+      toast.success(gEnabled ? 'Guest browsing is on.' : 'Guest browsing is off.');
       await load();
     } catch (err) {
       toast.error(errorText(err));
@@ -154,6 +187,29 @@ export function Settings() {
           disabled={busy || (mEnabled === mSaved.enabled && mMessage === mSaved.message) || (mEnabled && !mMessage.trim())}
         >
           Save maintenance
+        </button>
+      </form>
+
+      <h2>Guest browsing</h2>
+      <form className="card" onSubmit={saveGuestMode}>
+        <label className="field">
+          <span>
+            <input
+              type="checkbox"
+              checked={gEnabled}
+              onChange={(e) => setGEnabled(e.target.checked)}
+              style={{ width: 'auto', marginRight: 8 }}
+            />
+            Guest browsing is {gEnabled ? 'ON' : 'off'}
+          </span>
+        </label>
+        <p className="muted" style={{ marginTop: 0 }}>
+          When on, visitors can look at tournaments, communities and open sessions without an account. Private
+          details (entry phone / email / CMS ID, community posts, chats, session venues) stay hidden. This is also the
+          emergency switch: turn it off to require sign-in again.
+        </p>
+        <button className="btn btn-primary" disabled={busy || gEnabled === gSaved}>
+          Save guest browsing
         </button>
       </form>
 

@@ -1,7 +1,6 @@
 import Animated, { FadeInDown } from 'react-native-reanimated';
 import { Duration, RM, STAGGER_MS } from '@/lib/motion';
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
-import { useRouter } from 'expo-router';
 import { useState } from 'react';
 import { Platform, ScrollView, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -9,6 +8,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { alert } from '@/lib/alert';
 import { ProfileForm } from '@/components/ProfileForm';
 import { ThemedText } from '@/components/ui/Text';
+import { suggestUsername } from '@/lib/suggestUsername';
 import { MaxContentWidth, Spacing } from '@/constants/theme';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -16,7 +16,6 @@ import { createProfile } from '@/services/profiles';
 
 export default function OnboardingScreen() {
   const theme = useTheme();
-  const router = useRouter();
   const { user, refreshProfile } = useAuth();
   const [loading, setLoading] = useState(false);
 
@@ -32,8 +31,9 @@ export default function OnboardingScreen() {
         bio: data.bio,
         avatarUrl: data.avatarUrl ?? undefined,
       });
+      // The root layout sends a freshly created account to the screen it came from (guest sign-in) or Home,
+      // as soon as the profile exists. Navigating here as well would overwrite that destination.
       await refreshProfile();
-      router.replace('/');
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Could not save profile';
       alert('Setup failed', message);
@@ -56,10 +56,10 @@ export default function OnboardingScreen() {
           {/* Minimal Header */}
           <Animated.View entering={FadeInDown.duration(Duration.base).reduceMotion(RM)} style={styles.header}>
             <ThemedText variant="title" style={styles.title}>
-              Create Profile
+              Almost there
             </ThemedText>
             <ThemedText variant="body" muted style={styles.subtitle}>
-              Set up your information to get started with matches and leaderboards.
+              Pick a username and you are in. Photo and bio are optional, and you can add them any time.
             </ThemedText>
           </Animated.View>
 
@@ -68,7 +68,7 @@ export default function OnboardingScreen() {
             <ProfileForm
               submitLabel="Get Started"
               loading={loading}
-              usernameHint="Choose carefully: after this you can change your username once every 30 days."
+              initialName={suggestUsername({ ...user?.user_metadata, email: user?.email })}
               onSubmit={handleSubmit}
             />
           </Animated.View>

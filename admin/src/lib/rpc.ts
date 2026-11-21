@@ -154,6 +154,9 @@ export const rpc = {
   getSiteConfig: () => call<SiteConfigRow[]>('admin_get_site_config'),
   setMaintenance: (enabled: boolean, message: string, note?: string) =>
     call<void>('admin_set_maintenance', { p_enabled: enabled, p_message: message, p_note: note || null }),
+  getGuestMode: () => call<{ enabled: boolean }>('admin_get_guest_mode'),
+  setGuestMode: (enabled: boolean, note?: string) =>
+    call<void>('admin_set_guest_mode', { p_enabled: enabled, p_note: note || null }),
   setMinAppVersion: (minVersion: string, storeUrl: string, message: string, note?: string) =>
     call<void>('admin_set_min_app_version', {
       p_min_version: minVersion,

@@ -1,3 +1,4 @@
+import { isGuestSession } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import type { Session, Commitment, CreateSessionInput, FeedbackStatus } from '@/types';
 import { MAX_SESSION_TITLE_LENGTH } from '@/types';
@@ -121,6 +122,20 @@ let lastCloseExpiredAt = 0;
 const CLOSE_EXPIRED_MIN_INTERVAL_MS = 15_000;
 
 export async function fetchOpenSessions(currentUserId?: string): Promise<Session[]> {
+  if (isGuestSession()) {
+    // Guests get a reduced list (migration 134): no creator, venue or description; the server drops ended ones.
+    const { data, error } = await supabase.rpc('guest_get_open_sessions');
+    if (error) throw error;
+    return ((data ?? []) as Partial<SessionRpcRow>[]).map((r) =>
+      rowToSession(
+        {
+          created_by: '', location: null, description: null, creator_username: null, creator_avatar_url: null,
+          created_at: r.date_time ?? '', updated_at: r.date_time ?? '', ...r,
+        } as SessionRpcRow,
+        undefined,
+      ),
+    );
+  }
   await closeExpiredSessions(currentUserId);
   const { data, error } = await supabase.rpc('get_open_sessions');
   if (error) throw error;

@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#14201c">
+<title>Seecs Smash Wrapped</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+/* Layout: one phone-sized stage, one story per screen. Tap right to advance, left to go back. Committed single look: four flat colour screens. */
+:root{
+  --ink:#14201c; --ivory:#f6efdc; --green:#0b6b57; --orange:#ee6a1d;
+  --font-display:"Space Grotesk","Inter",system-ui,sans-serif; --font-body:"Inter",system-ui,sans-serif;
+  color-scheme:dark;
+}
+html,body{height:100%}
+body{background:var(--ink);color:var(--ivory);font:16px/1.5 var(--font-body);overflow:hidden;-webkit-tap-highlight-color:transparent}
+.stage{position:relative;height:100%;max-width:480px;margin:0 auto;overflow:hidden;user-select:none}
+.slide{position:absolute;inset:0;display:flex;flex-direction:column;justify-content:center;gap:18px;
+  padding:72px 28px 56px;opacity:0;visibility:hidden;transition:opacity .35s ease,visibility 0s .35s}
+.slide.on{opacity:1;visibility:visible;transition:opacity .35s ease}
+.ink{background:var(--ink);color:var(--ivory);--acc:var(--orange)}
+.green{background:var(--green);color:var(--ivory);--acc:#ffd9a8}
+.orange{background:var(--orange);color:var(--ink);--acc:var(--ivory)}
+.ivory{background:var(--ivory);color:var(--ink);--acc:var(--green)}
+h1,h2,.big{font-family:var(--font-display);margin:0;text-wrap:balance}
+h1{font-size:clamp(2.6rem,13vw,4rem);line-height:1;letter-spacing:-.03em;font-weight:700}
+h2{font-size:clamp(1.5rem,7vw,2rem);line-height:1.15;font-weight:700;letter-spacing:-.01em}
+.big{font-size:clamp(4.5rem,26vw,7.5rem);line-height:.9;font-weight:700;letter-spacing:-.04em;color:var(--acc);font-variant-numeric:tabular-nums}
+.kick{font:600 .75rem/1 var(--font-body);letter-spacing:.14em;text-transform:uppercase;opacity:.75}
+p{margin:0;font-size:1.05rem;max-width:30ch}
+.small{font-size:.8rem;opacity:.7;max-width:34ch}
+.rows{display:flex;flex-direction:column;gap:12px;margin-top:6px}
+.r{display:grid;grid-template-columns:96px 1fr 44px;align-items:center;gap:10px;font-size:.9rem}
+.r .t{height:18px;background:rgba(0,0,0,.18);border-radius:4px;overflow:hidden}
+.ink .r .t,.green .r .t{background:rgba(255,255,255,.14)}
+.r .f{height:100%;width:0;background:var(--acc);border-radius:4px;transition:width .9s cubic-bezier(.2,.8,.2,1) .25s}
+.on .r .f{width:var(--w)}
+.r b{text-align:right;font-variant-numeric:tabular-nums}
+.score{font-family:var(--font-display);font-size:clamp(3.2rem,18vw,5rem);font-weight:700;line-height:1;letter-spacing:-.03em;color:var(--acc)}
+.chips{display:flex;gap:8px;flex-wrap:wrap}
+.chip{font-variant-numeric:tabular-nums;font-size:.85rem;padding:5px 12px;border-radius:999px;border:1.5px solid currentColor}
+.rise{opacity:0;transform:translateY(14px);transition:opacity .5s ease,transform .5s ease}
+.on .rise{opacity:1;transform:none}
+.on .rise:nth-child(2){transition-delay:.12s}.on .rise:nth-child(3){transition-delay:.24s}
+.on .rise:nth-child(4){transition-delay:.36s}.on .rise:nth-child(5){transition-delay:.48s}
+.bars{position:absolute;top:calc(14px);left:16px;right:16px;display:flex;gap:4px;z-index:5}
+.bars i{flex:1;height:3px;border-radius:2px;background:rgba(127,127,127,.4);overflow:hidden}
+.bars i.d b,.bars i.c b{display:block;height:100%;background:currentColor}
+.bars i.c b{opacity:.95}
+.bars i:not(.d):not(.c) b{display:none}
+.bar-wrap{color:inherit}
+.hint{position:absolute;bottom:22px;left:0;right:0;text-align:center;font-size:.75rem;opacity:.6;letter-spacing:.06em}
+.nav{position:absolute;top:0;bottom:0;z-index:4;border:0;background:none;padding:0;cursor:pointer}
+.nav.prev{left:0;width:30%}.nav.next{right:0;width:70%}
+.nav:focus-visible{outline:2px solid var(--orange);outline-offset:-4px}
+.again{align-self:flex-start;font:600 1rem var(--font-body);padding:12px 22px;border-radius:999px;border:0;background:var(--ink);color:var(--ivory);cursor:pointer;position:relative;z-index:6}
+@media (prefers-reduced-motion:reduce){.slide,.rise,.r .f{transition:none!important}.rise{opacity:1;transform:none}.on .r .f{width:var(--w)}}
+</style>
+</head>
+<body>
+
+<div class="stage" id="stage">
+  <div class="bars" id="bars" aria-hidden="true"></div>
+
+  <section class="slide ink">
+    <div class="kick rise">Sportron · SEECS table tennis</div>
+    <h1 class="rise">Seecs Smash<br><span style="color:var(--acc)">Wrapped</span></h1>
+    <p class="rise">The tournament in a few taps.</p>
+    <div class="hint">Tap to continue</div>
+  </section>
+
+  <section class="slide orange">
+    <div class="kick rise">Everyone together</div>
+    <div class="big rise" data-count="2351">0</div>
+    <h2 class="rise">points scored across 131 games.</h2>
+    <p class="rise">That is about 18 points a game from 56 recorded matches.</p>
+  </section>
+
+  <section class="slide green">
+    <div class="kick rise">Men's champion</div>
+    <h2 class="rise">Fahad Abbas won</h2>
+    <div class="big rise" data-count="60.5" data-dec="1" data-suffix="%">0</div>
+    <p class="rise">of all the points he played, 147 of 243.</p>
+    <p class="rise">He won 12 of his 13 games.</p>
+  </section>
+
+  <section class="slide ivory">
+    <div class="kick rise">Women's champion</div>
+    <h2 class="rise">Areej Fatima won</h2>
+    <div class="big rise" data-count="66.3" data-dec="1" data-suffix="%">0</div>
+    <p class="rise">of her points, 55 of 83, without losing a single game.</p>
+    <div class="small rise">Knockout rounds only. Group games were not recorded.</div>
+  </section>
+
+  <section class="slide ink">
+    <div class="kick rise">The surprise</div>
+    <h2 class="rise">Champions don't need to dominate.</h2>
+    <p class="rise">Share of points won in a match, by the winner:</p>
+    <div class="rows rise">
+      <div class="r"><span>Women's champ</span><div class="t"><div class="f" style="--w:66.3%"></div></div><b>66%</b></div>
+      <div class="r"><span>Average winner</span><div class="t"><div class="f" style="--w:62%"></div></div><b>62%</b></div>
+      <div class="r"><span>Men's champ</span><div class="t"><div class="f" style="--w:60.5%"></div></div><b>61%</b></div>
+    </div>
+    <p class="rise">Win about 3 of every 5 points and you win the match.</p>
+  </section>
+
+  <section class="slide orange">
+    <div class="kick rise">Fahad's road</div>
+    <h2 class="rise">Share of points won, round by round</h2>
+    <div class="rows rise">
+      <div class="r"><span>Round of 32</span><div class="t"><div class="f" style="--w:69%"></div></div><b>69%</b></div>
+      <div class="r"><span>Round of 16</span><div class="t"><div class="f" style="--w:73%"></div></div><b>73%</b></div>
+      <div class="r"><span>Quarter-final</span><div class="t"><div class="f" style="--w:59%"></div></div><b>59%</b></div>
+      <div class="r"><span>Semi-final</span><div class="t"><div class="f" style="--w:55%"></div></div><b>55%</b></div>
+      <div class="r"><span>Final</span><div class="t"><div class="f" style="--w:57%"></div></div><b>57%</b></div>
+    </div>
+    <p class="rise">The further he went, the tighter it got.</p>
+  </section>
+
+  <section class="slide green">
+    <div class="kick rise">The final</div>
+    <h2 class="rise">Fahad Abbas v Muhammad Abdullah Rana</h2>
+    <div class="score rise">3–1</div>
+    <div class="chips rise"><span class="chip">12–14</span><span class="chip">11–5</span><span class="chip">11–7</span><span class="chip">11–8</span></div>
+    <p class="rise">Down a game, then three straight wins.</p>
+  </section>
+
+  <section class="slide ivory">
+    <div class="kick rise">Pace</div>
+    <div class="big rise" data-count="73" data-suffix="%">0</div>
+    <h2 class="rise">of matches ended in straight games.</h2>
+    <p class="rise">Only 14 of 56 needed a deciding game.</p>
+  </section>
+
+  <section class="slide ink">
+    <div class="kick rise">Longest game</div>
+    <div class="score rise">14–16</div>
+    <h2 class="rise">Aiza Hanif v Aliza Batool, women's semi-final.</h2>
+    <p class="rise">One of 16 games that went past 11 points. Aiza took the match 2–1.</p>
+  </section>
+
+  <section class="slide orange">
+    <div class="kick rise">Comebacks</div>
+    <div class="big rise" data-count="10">0</div>
+    <h2 class="rise">winners lost the first game and still won.</h2>
+    <p class="rise">That is 1 match in 5. One of them was the men's final.</p>
+  </section>
+
+  <section class="slide green">
+    <div class="kick rise">Busiest day</div>
+    <div class="big rise" data-count="38">0</div>
+    <h2 class="rise">of 56 results came in on Wednesday.</h2>
+    <p class="rise">The peak ran from 3 to 6 pm. Thursday had 12 and Friday had 6.</p>
+  </section>
+
+  <section class="slide ivory">
+    <div class="kick rise">That's a wrap</div>
+    <h1 class="rise">See you at the next Smash.</h1>
+    <p class="rise">69 players. 131 games. 2,351 points.</p>
+    <button class="again rise" id="again" type="button">Watch again</button>
+    <div class="small rise">Source: Sportron tournament data, 21 Nov 2026. Counts use matches with recorded game scores, so walkovers, byes and the unplayed 3rd-place match are left out.</div>
+  </section>
+
+  <button class="nav prev" id="prev" type="button" aria-label="Previous screen"></button>
+  <button class="nav next" id="next" type="button" aria-label="Next screen"></button>
+</div>
+
+<script>
+(function(){
+  var slides=[].slice.call(document.querySelectorAll('.slide'));
+  var barsEl=document.getElementById('bars'), i=0, timer=null, DUR=7000;
+  var reduce=window.matchMedia&&window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  slides.forEach(function(){var s=document.createElement('i');s.innerHTML='<b></b>';barsEl.appendChild(s)});
+  function count(el){
+    var to=parseFloat(el.dataset.count),dec=+el.dataset.dec||0,suf=el.dataset.suffix||'';
+    function fmt(v){return (dec?v.toFixed(dec):Math.round(v).toLocaleString('en-US'))+suf}
+    if(reduce){el.textContent=fmt(to);return}
+    var t0=performance.now(),d=900;
+    (function step(t){var p=Math.min(1,(t-t0)/d);p=1-Math.pow(1-p,3);el.textContent=fmt(to*p);if(p<1&&el._on)requestAnimationFrame(step)})(t0);
+  }
+  function show(n){
+    i=Math.max(0,Math.min(slides.length-1,n));
+    slides.forEach(function(s,k){
+      var on=k===i;s.classList.toggle('on',on);
+      [].forEach.call(s.querySelectorAll('[data-count]'),function(el){el._on=on;if(on)count(el);else el.textContent=el.dataset.count&&'0'});
+    });
+    var segs=barsEl.children;
+    slides.forEach(function(s,k){
+      segs[k].className=k<i?'d':k===i?'c':'';
+      var b=segs[k].firstChild;b.style.transition='none';
+      b.style.width=k<i?'100%':'0%';
+      if(k===i&&!reduce&&i<slides.length-1){void b.offsetWidth;b.style.transition='width '+DUR+'ms linear';b.style.width='100%'}
+      else if(k===i){b.style.width='100%'}
+    });
+    var last=i===slides.length-1;
+    document.getElementById('stage').style.color=slides[i].classList.contains('ivory')?'#14201c':slides[i].classList.contains('orange')?'#14201c':'#f6efdc';
+    clearTimeout(timer);
+    if(!last&&!reduce)timer=setTimeout(function(){show(i+1)},DUR);
+  }
+  document.getElementById('next').addEventListener('click',function(){show(i+1)});
+  document.getElementById('prev').addEventListener('click',function(){show(i-1)});
+  document.getElementById('again').addEventListener('click',function(){show(0)});
+  document.addEventListener('keydown',function(e){
+    if(e.key==='ArrowRight'||e.key===' ')show(i+1);
+    if(e.key==='ArrowLeft')show(i-1);
+  });
+  var x0=null;
+  document.addEventListener('touchstart',function(e){x0=e.touches[0].clientX},{passive:true});
+  document.addEventListener('touchend',function(e){
+    if(x0===null)return;var dx=e.changedTouches[0].clientX-x0;x0=null;
+    if(Math.abs(dx)>50){e.preventDefault&&0;show(dx<0?i+1:i-1)}
+  },{passive:true});
+  show(0);
+})();
+</script>
+</body>
+</html>

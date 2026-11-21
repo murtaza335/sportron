@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
+import { useIsGuest } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import {
   fetchOpenSessions,
@@ -31,6 +32,9 @@ let sessionHistoryCache: SessionHistoryCache | null = null;
 const SESSIONS_CACHE_TTL_MS = 30_000;
 
 export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
+  // Guests (no user id) may load the open-sessions feed only; every other scope needs an account.
+  const guest = useIsGuest() && !userId;
+  const cacheId = userId ?? (guest ? 'guest' : undefined);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -38,7 +42,7 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
 
   const load = useCallback(
     async (opts?: { silent?: boolean }) => {
-      if (!userId) {
+      if (!cacheId || (guest && scope !== 'all')) {
         setSessions([]);
         setLoading(false);
         return;
@@ -50,12 +54,12 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
         if (scope === 'all') {
           data = await fetchOpenSessions(userId);
         } else if (scope === 'joined') {
-          data = await fetchJoinedSessions(userId);
+          data = await fetchJoinedSessions(userId!);
         } else {
-          data = await fetchMySessions(userId);
+          data = await fetchMySessions(userId!);
         }
         setSessions(data);
-        sessionFeedCache = { userId, scope, sessions: data, fetchedAt: Date.now() };
+        sessionFeedCache = { userId: cacheId, scope, sessions: data, fetchedAt: Date.now() };
       } catch (e) {
         console.error('Failed to load sessions:', e);
       } finally {
@@ -63,17 +67,17 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
         loadInFlight.current = false;
       }
     },
-    [userId, scope],
+    [userId, scope, cacheId, guest],
   );
 
   useFocusEffect(
     useCallback(() => {
-      if (!userId) {
+      if (!cacheId || (guest && scope !== 'all')) {
         setSessions([]);
         setLoading(false);
         return;
       }
-      const cached = sessionFeedCache && sessionFeedCache.userId === userId && sessionFeedCache.scope === scope ? sessionFeedCache : null;
+      const cached = sessionFeedCache && sessionFeedCache.userId === cacheId && sessionFeedCache.scope === scope ? sessionFeedCache : null;
       if (cached) {
         setSessions(cached.sessions);
         setLoading(false);
@@ -84,7 +88,7 @@ export function useSessionFeed(userId?: string, scope: SessionScope = 'all') {
         setLoading(true);
         load();
       }
-    }, [userId, scope, load]),
+    }, [cacheId, guest, scope, load]),
   );
 
   // Realtime: listen for session changes (new sessions, status updates, commitment count changes)
