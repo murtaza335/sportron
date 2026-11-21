@@ -1,3 +1,4 @@
+import { isGuestSession } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import type {
   Community,
@@ -152,6 +153,7 @@ function rowToMatch(r: MatchRpcRow): CommunityMatch {
 }
 
 export async function fetchPublicCommunities(): Promise<Community[]> {
+  if (isGuestSession()) return fetchGuestCommunities();
   const { data, error } = await supabase.rpc('get_public_communities');
   if (error) throw error;
   return (data ?? []).map(rowToCommunity);
@@ -162,6 +164,7 @@ export async function fetchPublicCommunities(): Promise<Community[]> {
  * Falls back to the legacy RPC when the server hasn't been migrated yet.
  */
 export async function fetchDiscoverCommunities(): Promise<Community[]> {
+  if (isGuestSession()) return fetchGuestCommunities();
   const { data, error } = await supabase.rpc('get_discover_communities');
   if (!error) return (data ?? []).map(rowToCommunity);
   return fetchPublicCommunities();
@@ -186,7 +189,19 @@ export async function fetchMyCommunityMemberships(
   return data ?? [];
 }
 
+/** Guests see community CARDS only (migration 134): never posts, matches, members or chat. */
+async function fetchGuestCommunities(): Promise<Community[]> {
+  const { data, error } = await supabase.rpc('guest_get_discover_communities');
+  if (error) throw error;
+  return ((data ?? []) as CommunityRpcRow[]).map(rowToCommunity);
+}
+
 export async function fetchCommunityById(id: string): Promise<Community | null> {
+  if (isGuestSession()) {
+    const { data, error } = await supabase.rpc('guest_get_community', { p_community: id });
+    if (error) throw error;
+    return data ? rowToCommunity(data as CommunityRpcRow) : null;
+  }
   const { data, error } = await supabase.rpc('get_community_by_id', { p_community_id: id });
   if (error) throw error;
   const row = data?.[0];

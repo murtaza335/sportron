@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useFocusEffect } from 'expo-router';
 
+import { useIsGuest } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import {
   fetchModuleDetail,
@@ -19,6 +20,8 @@ import type {
 } from '@/types';
 
 const REALTIME_DEBOUNCE_MS = 400;
+/** Guests have no realtime access to the tables (migration 109): poll while the screen is open. */
+const GUEST_POLL_MS = 30_000;
 
 const NO_STANDINGS: TournamentStanding[] = [];
 
@@ -44,6 +47,7 @@ function keepIfEqual<T>(prev: T, next: T): T {
  * (what the v1 bracket components expect); `standings` = the knockout rows (v1 shape).
  */
 export function useTournamentModule(moduleId: string | undefined) {
+  const isGuest = useIsGuest();
   const [detail, setDetail] = useState<ModuleDetail | null>(null);
   const [entries, setEntries] = useState<TournamentEntry[]>([]);
   const [matches, setMatches] = useState<TournamentMatch[]>([]);
@@ -122,6 +126,10 @@ export function useTournamentModule(moduleId: string | undefined) {
 
   useEffect(() => {
     if (!moduleId) return;
+    if (isGuest) {
+      const id = setInterval(() => liveRef.current(), GUEST_POLL_MS);
+      return () => clearInterval(id);
+    }
     let timer: ReturnType<typeof setTimeout> | null = null;
     // Unique topic per hook instance: the module screen and its manage/seeding/rounds screens are
     // mounted simultaneously in the stack, and supabase.channel() returns the SAME (already
@@ -146,7 +154,7 @@ export function useTournamentModule(moduleId: string | undefined) {
       if (timer) clearTimeout(timer);
       supabase.removeChannel(channel);
     };
-  }, [moduleId]);
+  }, [moduleId, isGuest]);
 
   const refresh = useCallback(async () => {
     setRefreshing(true);

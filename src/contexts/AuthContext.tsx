@@ -1,6 +1,7 @@
 import { Session, User } from '@supabase/supabase-js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 
+import { setSignedIn } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import { fetchOwnProfile, reEnableAccount } from '@/services/profiles';
 import type { Profile } from '@/types';
@@ -58,12 +59,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     supabase.auth.getSession().then(({ data: { session: currentSession } }) => {
       currentUserIdRef.current = currentSession?.user.id ?? null;
+      // before `loading` flips, so no screen can fetch with the wrong (guest vs signed-in) functions
+      setSignedIn(!!currentSession);
       setSession(currentSession);
       setLoading(false);
     });
 
     const { data: authListener } = supabase.auth.onAuthStateChange((event, nextSession) => {
       currentUserIdRef.current = nextSession?.user.id ?? null;
+      setSignedIn(!!nextSession);
       setSession(nextSession);
 
       if (nextSession?.user.id) {

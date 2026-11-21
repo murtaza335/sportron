@@ -1,3 +1,4 @@
+import { isGuestSession, resolveRpc } from '@/lib/guestMode';
 import { supabase } from '@/lib/supabase';
 import type {
   EntryFieldInput,
@@ -34,7 +35,7 @@ function fail(error: { message: string } | null): never {
 }
 
 async function rpc<T>(fn: string, args?: Record<string, unknown>): Promise<T> {
-  const { data, error } = await supabase.rpc(fn, args);
+  const { data, error } = await supabase.rpc(resolveRpc(fn), args);
   if (error) fail(error);
   return data as T;
 }
@@ -387,6 +388,7 @@ export type { Tournament };
 // ─── Discount codes (A8) ─────────────────────────────────────────────────────
 
 export async function fetchTournamentPromos(tournamentId: string): Promise<TournamentPromo[]> {
+  if (isGuestSession()) return []; // codes are a signed-in perk (and a reason to sign in)
   const rows = await rpc<TournamentPromo[] | null>('get_tournament_promos', { p_tournament: tournamentId });
   return rows ?? [];
 }
