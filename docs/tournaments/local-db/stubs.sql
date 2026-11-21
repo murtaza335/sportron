@@ -85,3 +85,5 @@ create table public.community_post_likes (post_id uuid references public.communi
   profile_id uuid, created_at timestamptz default now());
 create table auth.sessions (id uuid primary key default gen_random_uuid(), user_id uuid, created_at timestamptz default now(),
   updated_at timestamptz, refreshed_at timestamp, user_agent text);
+alter table public.profiles add column fcm_tokens text[], add column streak_count int default 0;
+alter table public.commitments add column feedback_status text;

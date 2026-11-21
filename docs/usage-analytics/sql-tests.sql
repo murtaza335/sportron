@@ -112,5 +112,60 @@ begin
   exception when insufficient_privilege then raise notice 'PASS: anon still cannot run get_tournaments'; end;
   reset role;
 
+  -- 6. migration 137: admin_usage_* are super_admin only and return the expected shapes
+  insert into public.platform_admins (profile_id, role) values (v_u1, 'super_admin');
+  -- v_u2 is a plain user; a tournament_manager must not get in either
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u2)::text, true);
+  begin perform public.admin_usage_overview(); raise exception 'FAIL: plain user ran admin_usage_overview';
+  exception when others then if sqlerrm <> 'NOT_ALLOWED' then raise; end if; raise notice 'PASS: user cannot read usage overview'; end;
+  begin perform public.admin_usage_chat(); raise exception 'FAIL: plain user ran admin_usage_chat';
+  exception when others then if sqlerrm <> 'NOT_ALLOWED' then raise; end if; raise notice 'PASS: user cannot read usage chat'; end;
+  begin perform public.admin_set_usage_tracking(false); raise exception 'FAIL: plain user flipped the switch';
+  exception when others then if sqlerrm <> 'NOT_ALLOWED' then raise; end if; raise notice 'PASS: user cannot change the switch'; end;
+  set local role anon;
+  begin perform public.admin_usage_status(); raise exception 'FAIL: anon ran admin_usage_status';
+  exception when insufficient_privilege then raise notice 'PASS: anon cannot run admin_usage_status'; end;
+  reset role;
+
+  perform set_config('request.jwt.claims', json_build_object('sub', v_u1)::text, true);
+  declare o jsonb; begin
+    o := public.admin_usage_overview();
+    if (o->'tiles'->>'dau')::int < 1 or jsonb_array_length(o->'series') <> 30 then
+      raise exception 'FAIL: overview shape %', o; end if;
+    if jsonb_array_length(o->'top_communities') < 1 then raise exception 'FAIL: top community missing: %', o->'top_communities'; end if;
+    raise notice 'PASS: overview (tiles, 30-day series, top communities)';
+    o := public.admin_usage_communities();
+    if not exists (select 1 from jsonb_array_elements(o) e where e->>'id' = v_c::text and (e->>'messages')::int = 3) then
+      raise exception 'FAIL: communities list missing the test community'; end if;
+    raise notice 'PASS: communities table';
+    o := public.admin_usage_community(v_c);
+    if jsonb_array_length(o->'series') <> 30 or jsonb_array_length(o->'chat_hours') <> 24 then
+      raise exception 'FAIL: community detail shape'; end if;
+    raise notice 'PASS: community detail';
+    o := public.admin_usage_chat();
+    if (o->'totals'->>'messages')::int < 3 or jsonb_array_length(o->'busiest') < 1 then raise exception 'FAIL: chat page: %', o->'totals'; end if;
+    raise notice 'PASS: chat page';
+    o := public.admin_usage_screens();
+    if jsonb_array_length(o->'screens') < 1 then raise exception 'FAIL: screens page'; end if;
+    o := public.admin_usage_retention();
+    if o->'funnel' is null or o->'cohorts' is null then raise exception 'FAIL: retention page'; end if;
+    o := public.admin_usage_sessions_tournaments();
+    if o->'sessions_series' is null then raise exception 'FAIL: sessions/tournaments page'; end if;
+    o := public.admin_usage_status();
+    if (o->>'enabled')::boolean is not true then raise exception 'FAIL: status'; end if;
+    raise notice 'PASS: screens, retention, sessions/tournaments, status';
+    begin perform public.admin_usage_overview(current_date, current_date - 5); raise exception 'FAIL: bad range accepted';
+    exception when others then if sqlerrm <> 'FIELD_INVALID:range' then raise; end if; raise notice 'PASS: bad range rejected'; end;
+  end;
+
+  perform public.admin_set_usage_tracking(false, 'test');
+  if public._usage_enabled() then raise exception 'FAIL: switch off did not stick'; end if;
+  perform public.admin_set_usage_tracking(true, 'test');
+  if not exists (select 1 from public.audit_logs where action = 'SET_USAGE_TRACKING') then
+    raise exception 'FAIL: switch change not audited'; end if;
+  raise notice 'PASS: switch set + audited';
+  if public.admin_usage_backfill(v_d - 3) <> 4 then raise exception 'FAIL: backfill day count'; end if;
+  raise notice 'PASS: backfill';
+
   raise exception 'ALL TESTS PASSED — rolled back, nothing saved';
 end $$;
