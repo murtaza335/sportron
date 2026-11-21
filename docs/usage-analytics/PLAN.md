@@ -1,6 +1,24 @@
 # Sportron Usage Analytics — Plan (draft)
 
-Status: **draft, not built.** Next migration number: **135**.
+Status: **implemented in code (migrations 135–137 + `admin/src/pages/usage/*`); not yet applied to the live project or deployed.** Next migration number: **138**.
+
+### As built — differences from the draft below
+- **Open questions decided**: tracking seeded **ON**; **super_admin only** (no analyst role); **no per-user lookup page**; API-log cron (§5) **skipped**.
+- **Rollups run hourly** (today + yesterday + last 48 h of chat) from one pg_cron job `usage-tick` every 15 min, not nightly — so "today" needs no live merge.
+- **Wrapping method (§4)**: original RPCs are renamed to `_usage_inner_<name>` and wrapped by a same-signature VOLATILE function (done in a DO block that works for any language / whichever migration defined the function last), instead of re-creating each body.
+- **Leaves** are not tracked (no record of them besides audit logs); communities show joins only.
+- **Charts** are dependency-free SVG (`admin/src/components/charts.tsx`), no Recharts (no lock-file change).
+- Sessions: filled rate and no-show rate come from `sessions.status` / `commitments.feedback_status`.
+- Not built: §6.7 user lookup, §5 API logs, §9 app-version header.
+
+### Rollout checklist
+1. Apply migrations 135, 136, 137 (SQL editor, in order). Check `select * from cron.job where jobname = 'usage-tick'`.
+2. Smoke test the app: Communities / Sessions / Tournaments / Chats tabs still load (wrapped RPCs).
+3. Deploy the admin site, open **Usage**, press *Rebuild history from …* once (messages, posts, matches, sessions back to day one). Screen visits and active users start from the day of step 1.
+4. If anything looks wrong: *Usage → Tracking → Turn tracking off* (or `update site_config set value='{"enabled": false}' where key='usage_tracking'`).
+
+---
+
 
 Goal: see real usage of the app on the admin panel — who is active, when, which communities are
 alive, how much people chat, which screens get opened — **without adding any new API call to the

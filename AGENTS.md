@@ -100,7 +100,7 @@ src/
 └── constants/theme.ts          # Design tokens (colors, spacing, radius)
 
 supabase/
-├── migrations/                 # 002 … 134 (next = 135) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
+├── migrations/                 # 002 … 137 (next = 138) + a few un-numbered early files. schema.sql is STALE (only a few tables) — migrations are the source of truth
 └── functions/                  # send-notification, send-chat-notification, streak-cron, community-engagement-cron, _shared/fcm.ts (cloudinary-destroy is an empty folder)
 ```
 
@@ -391,6 +391,14 @@ tournament_entries / tournament_rounds / tournament_matches   -- migration 084 (
 - Screens: `components/GuestViews.tsx` (`GuestTab`, `GuestBanner`, `GuestCommunitiesList`, `GuestCommunityView`); Communities / Chats / Activity / community-detail screens are thin wrappers that render the guest view or the real screen (`...Inner`)
 - Tests: `docs/guest-mode/sql-tests.sql` (via `docs/tournaments/local-db/run.sh`), `route-tests.cjs`, `username-tests.cjs` (compile commands in their headers)
 
+### 17. Usage analytics (migrations 135–137; plan in [`docs/usage-analytics/PLAN.md`](docs/usage-analytics/PLAN.md))
+- **Server-side only: no app change, no new API call.** Admin panel *Usage* section (super admin) shows active users, communities, chat frequency, screen visits, retention, sessions/tournaments. Kill switch: `site_config.usage_tracking {enabled}` (seeded ON; `admin_set_usage_tracking`)
+- **Sources**: existing rows (messages/posts/matches/sessions…), `auth.sessions` (snapshot every 15 min → `usage_user_days`, platform from user agent) and **screen-visit counters** inside the existing read RPCs. Migration 136 renames each target to `_usage_inner_<name>` (service_role only) and creates a same-name/same-signature **VOLATILE** wrapper that calls `_usage_track()` (never raises) — needed because STABLE RPCs run read-only in PostgREST. Guests are counted as the all-zero user. **When a wrapped RPC changes later, edit `_usage_inner_<name>`, not the wrapper**
+- **Tables** (no client access): `usage_user_days`, `usage_views` (hourly, 90 d), `usage_daily`, `usage_community_daily`, `usage_chat_hourly`. `usage_tick()` (pg_cron every 15 min) snapshots, rebuilds today + yesterday hourly, prunes at 03:00 PKT. Days/hours are **Asia/Karachi** (`_usage_tz()`)
+- **Reads**: `admin_usage_overview/communities/community/chat/screens/retention/sessions_tournaments/status/backfill`, all `assert_platform_role(['super_admin'])`, one jsonb document each. Counts only, never message text. Client: `admin/src/pages/usage/*`, dependency-free SVG charts in `admin/src/components/charts.tsx`
+- **Rules to keep**: a NEW screen that should count → add its read RPC to the target list (a new migration repeating the wrapper step for that name); never log content, IPs or exact locations; new `usage_*` tables get RLS on + all privileges revoked
+- Tests: `docs/usage-analytics/sql-tests.sql` (via `docs/tournaments/local-db/run.sh`)
+
 ### Notification Types
 See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `tournament_module_completed`; `session_chat_message`/`session_chat_reply`/`community_chat_message`/`community_chat_reply` are FCM-only and never stored in `in_app_notifications`). The DB `in_app_notifications.type` check constraint (migrations 008/014/034/071/077/079/082/088) is the source of truth for stored types and also allows `member_joined`, `community_engagement` and `new_community`, which are **not** in the TS union yet — **adding any new notification type requires a migration extending that check constraint** (a past bug: streak types were inserted before the constraint allowed them, fixed in 071).
 
@@ -409,7 +417,7 @@ See `NotificationType` in `src/types/index.ts` (43 types, `match_pending` … `t
 - Every `SECURITY DEFINER` function must start with an `auth.uid()` guard (049). New RPCs: `RETURNS TABLE (...)` with explicit columns, not `SETOF RECORD` (074/076 fixed "materialize mode required")
 - Defense in depth lives in DB triggers/RLS, not just UI (e.g. 044 closed a self-promote-to-admin hole, 061 validates match participants, 063 forces session `expires_at`). Don't rely on client checks
 - Migration `056_future_restrict_community_members_rls.sql` is intentionally **not applied** until all installed builds use `get_community_admin_ids`
-- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **135**
+- `supabase/schema.sql` is stale — use the numbered migrations as the schema history. Next migration number: **138**
 
 ### Server-side hardening (migrations 098–119 — see `bugreport.md`)
 - **Guards live in the DB, silently or loudly**: `guard_commitment_write` (100: state machine + capacity + feedback rules, error codes `SESSION_FULL`/`NOT_ALLOWED`/…), `guard_community_match_update` + forced-pending inserts (101), `guard_session_write` (110: date/participant limits, no delete with accepted participants), `guard_profile_protected_columns` (105: streak/completed counters are **trigger-owned**, client writes are silently reverted — `updateStreak()` now just calls `record_streak_activity`), `guard_community_member_stats` (112), chat sender snapshot/identity triggers (106) and reply/length rules (111), username/bio rules (116) and Cloudinary-only image URLs (113) validated **on change only** — never add a `CHECK` (even `NOT VALID`) on legacy-capable columns: it is evaluated on every UPDATE of the row and would block unrelated updates.
