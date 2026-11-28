@@ -41,7 +41,7 @@ export default function LiveScreen() {
   const live = useMemo(() => board?.live ?? [], [board]);
   const modules = useMemo(() => {
     const seen = new Map<string, string>();
-    [...live, ...(board?.recent ?? [])].forEach((m) => seen.set(m.module_id, m.module_name ?? 'Module'));
+    [...live, ...(board?.recent ?? [])].forEach((m) => seen.set(m.module_id, m.module_name ?? 'Sport'));
     return [...seen.entries()];
   }, [live, board]);
   const courts = useMemo(() => {

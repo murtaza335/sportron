@@ -249,10 +249,10 @@ function RootNavigator() {
         <Stack.Screen name="tournament/[id]/live/[matchId]" options={{ ...pushOptions, title: 'Live match' }} />
         <Stack.Screen name="tournament/[id]/fields" options={{ ...pushOptions, title: 'Entry form' }} />
         <Stack.Screen name="tournament/[id]/module-form" options={modalOptions} />
-        <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Module' }} />
-        <Stack.Screen name="tournament/[id]/module/[moduleId]/manage" options={{ ...pushOptions, title: 'Manage module' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]" options={{ ...pushOptions, title: 'Sport' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/manage" options={{ ...pushOptions, title: 'Manage sport' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/entry-form" options={modalOptions} />
-        <Stack.Screen name="tournament/[id]/module/[moduleId]/seeding" options={{ ...pushOptions, title: 'Seeding & bracket' }} />
+        <Stack.Screen name="tournament/[id]/module/[moduleId]/seeding" options={{ ...pushOptions, title: 'Draw & bracket' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/knockout" options={{ ...pushOptions, title: 'Build knockout' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/rounds" options={{ ...pushOptions, title: 'Rounds' }} />
         <Stack.Screen name="tournament/[id]/module/[moduleId]/score/[matchId]" options={{ ...modalOptions, gestureEnabled: false }} />

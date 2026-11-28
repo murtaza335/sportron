@@ -72,7 +72,7 @@ export function ModuleInfoTab({
 
       {admins.length > 0 && (
         <View style={styles.block}>
-          <ThemedText variant="label" muted>Module admins</ThemedText>
+          <ThemedText variant="label" muted>Sport managers</ThemedText>
           <View style={styles.admins}>
             {admins.map((a) => (
               <View key={a.id} style={styles.admin}>

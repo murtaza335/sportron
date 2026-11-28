@@ -314,7 +314,7 @@ export default function ModuleScreen() {
     <View style={[styles.flex, { backgroundColor: theme.background }]}>
       <Stack.Screen
         options={{
-          title: mod?.name ?? 'Module',
+          title: mod?.name ?? 'Sport',
           headerRight: () => (
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
               {mod && <ShareButton payload={shareCopy.module({ tournamentId: id, moduleId, name: mod.name })} />}
@@ -324,7 +324,7 @@ export default function ModuleScreen() {
                 hitSlop={12}
                 style={({ pressed }) => pressed && { opacity: 0.6 }}
                 accessibilityRole="button"
-                accessibilityLabel="Manage module"
+                accessibilityLabel="Manage sport"
               >
                 <Settings size={22} color={theme.text} strokeWidth={2} />
               </Pressable>
@@ -338,7 +338,7 @@ export default function ModuleScreen() {
       ) : !mod ? (
         <View style={styles.empty}>
           <Trophy size={48} color={theme.textSecondary} strokeWidth={1.5} />
-          <ThemedText variant="heading">Module not found</ThemedText>
+          <ThemedText variant="heading">Sport not found</ThemedText>
           <ThemedText muted>It may be private or no longer available.</ThemedText>
         </View>
       ) : (

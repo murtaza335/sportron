@@ -181,7 +181,7 @@ function LiveRoute() {
       if (match.status === 'completed' || match.status === 'walkover' || match.status === 'bye' || match.status === 'cancelled') {
         return setBoot({ phase: 'blocked', reason: 'This match is already finished.' });
       }
-      if (mod.status !== 'in_progress') return setBoot({ phase: 'blocked', reason: 'The module has to be in progress to score matches.' });
+      if (mod.status !== 'in_progress') return setBoot({ phase: 'blocked', reason: 'The sport has to be in progress to score matches.' });
       if (!match.entry_a || !match.entry_b) return setBoot({ phase: 'blocked', reason: 'Both sides must be set before the match can start.' });
       // 2. a live row on the server?
       let row: LiveMatchDetail | null = null;
@@ -314,8 +314,8 @@ function ResultRoute() {
     ctx.loading ? null
     : ctx.error || !mod || !match ? ctx.error ?? 'We couldn’t find that match.'
     : !enabled ? 'This screen isn’t available yet.'
-    : !isAdmin ? 'Only tournament or module admins can enter results.'
-    : mod.status !== 'in_progress' ? 'The module has to be in progress to enter results.'
+    : !isAdmin ? 'Only organizers or sport managers can enter results.'
+    : mod.status !== 'in_progress' ? 'The sport has to be in progress to enter results.'
     : !match.entry_a || !match.entry_b ? 'Both sides must be set before a result can be entered.'
     : match.status === 'bye' || match.status === 'cancelled' ? 'This match has no result to enter.'
     : null;

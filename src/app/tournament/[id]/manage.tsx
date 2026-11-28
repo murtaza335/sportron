@@ -216,7 +216,7 @@ export default function TournamentManageScreen() {
 
       <View style={{ gap: Spacing.sm }}>
         <View style={styles.sectionHead}>
-          <SectionLabel>Modules</SectionLabel>
+          <SectionLabel>Sports</SectionLabel>
           <SectionLabel>{String(detail.modules.length)}</SectionLabel>
         </View>
         {detail.modules.map((m) => (
@@ -233,7 +233,7 @@ export default function TournamentManageScreen() {
           </Pressable>
         ))}
         {writable && (
-          <Button label="Add module" variant="secondary" onPress={() => router.push(tournamentRoutes.moduleForm(id))} />
+          <Button label="Add sport" variant="secondary" onPress={() => router.push(tournamentRoutes.moduleForm(id))} />
         )}
       </View>
 

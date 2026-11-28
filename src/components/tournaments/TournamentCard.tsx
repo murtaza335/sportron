@@ -80,7 +80,7 @@ export function TournamentCard({ tournament }: { tournament: TournamentListItem 
             ))}
             {extra > 0 && <InfoPill label={`+${extra}`} />}
             <ThemedText variant="caption" muted style={styles.metaText}>
-              {tournament.module_count} {tournament.module_count === 1 ? 'module' : 'modules'}
+              {tournament.module_count} {tournament.module_count === 1 ? 'sport' : 'sports'}
             </ThemedText>
           </View>
 

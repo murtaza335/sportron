@@ -262,7 +262,7 @@ export function ProjectorCard({ tournamentId, tournamentName }: { tournamentId: 
                 />
               );
             })}
-            <SwitchRow label="Module name" value={display.show_module} onChange={(v) => void patch({ show_module: v })} />
+            <SwitchRow label="Sport name" value={display.show_module} onChange={(v) => void patch({ show_module: v })} />
             <SwitchRow label="Court" value={display.show_court} onChange={(v) => void patch({ show_court: v })} />
             <SwitchRow label="Up next" value={display.show_up_next} onChange={(v) => void patch({ show_up_next: v })} />
             <SwitchRow label="Recent results" value={display.show_recent} onChange={(v) => void patch({ show_recent: v })} />

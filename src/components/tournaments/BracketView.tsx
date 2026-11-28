@@ -102,7 +102,7 @@ export function BracketView({
       <View style={styles.empty}>
         <GitBranch size={48} color={theme.textSecondary} strokeWidth={1.5} />
         <ThemedText variant="heading">Bracket not generated yet</ThemedText>
-        {isAdmin && <ThemedText muted style={{ textAlign: 'center' }}>Generate it from Manage → Seeding.</ThemedText>}
+        {isAdmin && <ThemedText muted style={{ textAlign: 'center' }}>Generate it from Manage → Draw.</ThemedText>}
       </View>
     );
   }

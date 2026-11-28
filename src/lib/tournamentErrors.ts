@@ -101,14 +101,14 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   }
   const dupCms = message.match(/DUPLICATE_MEMBER_CMS_ID(?:@(\d+))?/);
   if (dupCms) {
-    return `${playerPrefix(dupCms[1])}A player with this CMS ID is already on a team in this module.`;
+    return `${playerPrefix(dupCms[1])}A player with this CMS ID is already on a team in this competition.`;
   }
   const dupProfile = message.match(/DUPLICATE_MEMBER_PROFILE(?:@(\d+))?/);
   if (dupProfile) {
-    return `${playerPrefix(dupProfile[1])}This user is already on a team in this module.`;
+    return `${playerPrefix(dupProfile[1])}This user is already on a team in this competition.`;
   }
   if (message.includes('WRONG_PARTICIPANT_TYPE'))
-    return "This module's players don't match that entry type (teams vs individuals).";
+    return "This sport's players don't match that entry type (teams vs individuals).";
   if (message.includes('ROSTER_INCOMPLETE')) return "Some teams don't have enough players yet.";
   if (message.includes('ROSTER_TOO_LARGE')) return 'This team has more players than allowed.';
   if (message.includes('DUPLICATE_SQUAD_NUMBER')) return 'Two players have the same squad number.';
@@ -118,10 +118,10 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('NOT_ALLOWED')) return "You don't have permission to do that.";
   if (message.includes('INVALID_STATUS')) return "That isn't possible at this stage.";
   if (message.includes('DUPLICATE_CMS_ID'))
-    return 'An entry with this CMS ID already exists in this module.';
-  if (message.includes('DUPLICATE_PROFILE')) return 'This user already has an entry in this module.';
+    return 'An entry with this CMS ID already exists in this sport.';
+  if (message.includes('DUPLICATE_PROFILE')) return 'This user already has an entry in this sport.';
   if (message.includes('DUPLICATE_FIELD_KEY')) return 'A field with this name already exists.';
-  if (message.includes('MAX_ENTRIES')) return 'This module is full.';
+  if (message.includes('MAX_ENTRIES')) return 'This sport is full.';
   if (message.includes('TIE_NEEDS_WINNER')) return 'Scores are level — pick the winner.';
   if (message.includes('DOWNSTREAM_PLAYED'))
     return 'The next match has already been played. Reset it first.';

@@ -21,7 +21,7 @@ export const TIPS: Record<TipId, { title: string; body: string }> = {
   },
   tournaments: {
     title: 'How tournaments work',
-    body: 'A tournament has modules (one per sport). Open a module to see entries, the bracket or table, and live results.',
+    body: 'A tournament has one page per competition. Open it to see entries, the bracket or table, and live results.',
   },
   chats: {
     title: 'Your chats in one place',

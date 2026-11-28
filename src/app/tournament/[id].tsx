@@ -184,13 +184,13 @@ export default function TournamentScreen() {
 
           <View style={styles.section}>
             <View style={styles.sectionHead}>
-              <ThemedText variant="label" muted>Modules</ThemedText>
+              <ThemedText variant="label" muted>Sports</ThemedText>
               <ThemedText variant="label" muted>{detail.modules.length}</ThemedText>
             </View>
             {detail.modules.length === 0 ? (
               <View style={styles.modulesEmpty}>
                 <ThemedText variant="body" style={{ fontWeight: '600' }}>
-                  {isTournamentAdmin ? 'Add your first module' : 'Modules coming soon'}
+                  {isTournamentAdmin ? 'Add your first sport' : 'Sports coming soon'}
                 </ThemedText>
               </View>
             ) : (
@@ -202,7 +202,7 @@ export default function TournamentScreen() {
             )}
             {isTournamentAdmin && t.status !== 'completed' && t.status !== 'cancelled' && (
               <Button
-                label="Add module"
+                label="Add sport"
                 variant="secondary"
                 onPress={() => router.push(tournamentRoutes.moduleForm(t.id))}
               />

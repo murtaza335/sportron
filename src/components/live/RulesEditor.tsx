@@ -239,7 +239,7 @@ export function ModuleRulesSection({ module, onSaved }: { module: TournamentModu
       <View style={[styles.box, { borderColor: theme.border, backgroundColor: theme.backgroundElement }]}>
         <ThemedText style={{ fontWeight: '700' }}>{describeRules(current)}</ThemedText>
         <ThemedText variant="caption" muted>
-          {module.live_rules ? 'Custom rules for this module.' : 'Standard rules for this sport.'} “Best of” comes from each round. Changes apply to matches started afterwards.
+          {module.live_rules ? 'Custom rules for this sport.' : 'Standard rules.'} “Best of” comes from each round. Changes apply to matches started afterwards.
         </ThemedText>
         <BarButton
           label="Change rules"
