@@ -262,6 +262,55 @@ begin
   perform og_test.chk(exists (select 1 from public.organization_activity where organization_id = v_nust), 'activity recorded');
   perform og_test.chk(not has_function_privilege('anon', 'public.admin_list_organizations()', 'execute'), 'anon cannot call admin functions');
 
+  -- ═══ B4: organizers, activity, my work, notifications ═══
+  delete from public.in_app_notifications where type = 'organization_role_assigned';
+  perform og_test.as_user('nadmin');
+  perform public.org_add_organizer(v_nust, og_test.id('stranger'));
+  perform public.org_add_organizer(v_nust, og_test.id('stranger'));
+  perform og_test.chk(exists (select 1 from public.org_list_members(v_nust) m where m.profile_id = og_test.id('stranger') and m.role = 'organizer'), 'admin adds an organizer');
+  perform og_test.chk((select count(*) from public.in_app_notifications where type = 'organization_role_assigned' and user_id = og_test.id('stranger')) = 1, 'one notification');
+  perform public.org_add_organizer(v_nust, og_test.id('nadmin2'));
+  perform og_test.chk((select role from public.org_list_members(v_nust) m where m.profile_id = og_test.id('nadmin2')) = 'admin', 'adding an admin never downgrades');
+  perform og_test.expect_err(format('select public.org_remove_member(%L, %L)', v_nust, og_test.id('nadmin2')), 'NOT_ALLOWED', 'admin cannot remove an admin');
+  perform og_test.expect_err(format('select public.org_remove_member(%L, %L)', v_nust, og_test.id('nadmin')), 'CANNOT_REMOVE_SELF', 'no self removal');
+  perform og_test.as_user('norg2');
+  perform og_test.expect_err(format('select public.org_add_organizer(%L, %L)', v_nust, og_test.id('mgr')), 'NOT_ALLOWED', 'organizer cannot add organizers');
+  perform og_test.expect_err(format('select * from public.org_get_activity(%L)', v_nust), 'NOT_ALLOWED', 'organizer cannot read activity');
+  perform og_test.chk(jsonb_array_length(public.org_list_tournaments(v_nust)) = 1
+                      and public.org_list_tournaments(v_nust) -> 0 ->> 'name' = 'NUST Cup Two', 'organizer lists only their own');
+  perform og_test.as_user('borg');
+  perform og_test.expect_err(format('select public.org_list_tournaments(%L)', v_nust), 'NOT_ALLOWED', 'other org: no list');
+  perform og_test.expect_err(format('select * from public.org_list_members(%L)', v_nust), 'NOT_ALLOWED', 'other org: no members');
+  perform og_test.as_user('badmin');
+  perform og_test.expect_err(format('select public.org_add_organizer(%L, %L)', v_nust, og_test.id('badmin')), 'NOT_ALLOWED', 'other org admin cannot add');
+  perform og_test.expect_err(format('select * from public.org_get_activity(%L)', v_nust), 'NOT_ALLOWED', 'other org admin: no activity');
+  perform og_test.as_user('nadmin');
+  perform og_test.chk(jsonb_array_length(public.org_list_tournaments(v_nust)) >= 3, 'admin lists all');
+  perform public.org_remove_member(v_nust, og_test.id('stranger'));
+  perform og_test.chk(exists (select 1 from public.org_get_activity(v_nust) a where a.summary = 'added @og_stranger as an organizer' and a.actor = '@og_nadmin'), 'activity: who did what');
+  perform og_test.chk(exists (select 1 from public.org_get_activity(v_nust) a where a.actor = 'Sportron'), 'activity: staff shown as Sportron');
+  perform public.add_module_scorer(v_m, og_test.id('stranger'));
+  perform og_test.chk(exists (select 1 from public.org_get_activity(v_nust) a where a.summary like 'added scorer @og_stranger%'), 'activity: scorer added');
+  perform og_test.chk(not exists (select 1 from public.org_get_activity(v_nust) a where a.summary ~* '0300|@example'), 'activity has no contact details');
+
+  v_json := public.get_my_work();
+  perform og_test.chk(v_json -> 'orgs' -> 0 ->> 'role' = 'admin' and (v_json -> 'orgs' -> 0 ->> 'tournament_count')::int >= 3, 'my work: admin');
+  perform og_test.as_user('mgr');
+  perform public.schedule_tournament_match(v_m1, now(), null, 'Court 9');
+  v_json := public.get_my_work(date_trunc('day', now()));
+  perform og_test.chk(jsonb_array_length(v_json -> 'orgs') = 0 and jsonb_array_length(v_json -> 'sports') = 1
+                      and jsonb_array_length(v_json -> 'sports' -> 0 -> 'today') = 1
+                      and (v_json -> 'sports' -> 0 ->> 'scorer_count')::int = 2, 'my work: sport manager with today''s match');
+  perform og_test.as_user('stranger');
+  v_json := public.get_my_work();
+  perform og_test.chk(v_json = '{"orgs":[],"sports":[]}'::jsonb, 'my work: normal users get nothing');
+  update public.organizations set status = 'suspended' where id = v_nust;
+  perform og_test.as_user('nadmin');
+  perform og_test.chk((public.get_my_work() -> 'orgs' -> 0 ->> 'suspended')::boolean, 'my work: suspension visible');
+  perform og_test.expect_err(format('select * from public.org_list_members(%L)', v_nust), 'ORG_SUSPENDED', 'suspended: organize calls explain');
+  update public.organizations set status = 'active' where id = v_nust;
+  perform og_test.chk(not has_function_privilege('anon', 'public.get_my_work(timestamptz)', 'execute'), 'anon: no my work');
+
   -- more checks are appended below by later migrations
   perform og_test.put('t', v_t::text);
 

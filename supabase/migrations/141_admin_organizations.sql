@@ -119,7 +119,7 @@ begin
   end;
   perform public.log_admin_action('CREATE_ORGANIZATION', 'organizations', v_id, null,
                                   jsonb_build_object('name', v_name), p_note);
-  perform public._org_log(v_id, 'created', null, 'Organization created');
+  perform public._org_log(v_id, 'created', null, 'created the organization');
   return v_id;
 end;
 $$;
@@ -207,7 +207,7 @@ begin
   perform public.log_admin_action('SET_ORGANIZATION_STATUS', 'organizations', p_org,
     jsonb_build_object('status', v_old), jsonb_build_object('status', p_status), v_reason);
   perform public._org_log(p_org, p_status, null,
-    case when p_status = 'suspended' then 'Organization paused by Sportron' else 'Organization reactivated by Sportron' end);
+    case when p_status = 'suspended' then 'paused the organization' else 'reactivated the organization' end);
 end;
 $$;
 
@@ -252,7 +252,7 @@ begin
     jsonb_build_object('profile', p_profile, 'role', v_old),
     jsonb_build_object('profile', p_profile, 'role', p_role), p_note);
   perform public._org_log(p_org, 'member_added', null,
-    'Sportron made @' || coalesce(v_username, '?') || ' ' ||
+    'made @' || coalesce(v_username, '?') || ' ' ||
     case when p_role = 'admin' then 'an organization admin' else 'an organizer' end);
 end;
 $$;
@@ -271,7 +271,7 @@ begin
   end if;
   perform public.log_admin_action('REMOVE_ORG_MEMBER', 'organizations', p_org,
     jsonb_build_object('profile', p_profile), null, p_note);
-  perform public._org_log(p_org, 'member_removed', null, 'Sportron removed @' ||
+  perform public._org_log(p_org, 'member_removed', null, 'removed @' ||
     coalesce((select username from public.public_profiles where id = p_profile), '?'));
   return (select count(*)::int from public.organization_members
            where organization_id = p_org and removed_at is null and role = 'admin');
@@ -308,10 +308,10 @@ begin
   perform public.log_admin_action('SET_TOURNAMENT_ORGANIZATION', 'tournaments', p_tournament,
     jsonb_build_object('organization_id', v_t.organization_id),
     jsonb_build_object('organization_id', p_org), p_note);
-  perform public._org_log(p_org, 'tournament_attached', p_tournament, 'Sportron added "' || v_t.name || '"');
+  perform public._org_log(p_org, 'tournament_attached', p_tournament, 'added “' || v_t.name || '” to the organization');
   if v_t.organization_id is distinct from p_org then
     perform public._org_log(v_t.organization_id, 'tournament_detached', p_tournament,
-                            'Sportron moved out "' || v_t.name || '"');
+                            'moved “' || v_t.name || '” out of the organization');
   end if;
 end;
 $$;
@@ -381,7 +381,6 @@ begin
     'CREATE_TOURNAMENT', 'tournaments', v_id, null,
     jsonb_build_object('name', v.name, 'organization_id', v_org), p_note
   );
-  perform public._org_log(v_org, 'tournament_created', v_id, 'Sportron created "' || v.name || '"');
   return v_id;
 end;
 $$;
