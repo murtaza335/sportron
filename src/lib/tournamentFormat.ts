@@ -46,7 +46,7 @@ export function moduleStatusTone(status: ModuleStatus): StatusTone {
     case 'open':
       return { label: 'OPEN', token: 'info' };
     case 'seeding':
-      return { label: 'SEEDING', token: 'warning' };
+      return { label: 'DRAW', token: 'warning' };
     case 'in_progress':
       return { label: '● LIVE', token: 'success' };
     case 'completed':
@@ -64,6 +64,7 @@ export function tint(color: string): string {
 
 export function roleTag(role: TournamentRole): string | null {
   if (role === 'tournament_admin' || role === 'module_admin') return 'ADMIN';
+  if (role === 'scorer') return 'SCORER';
   if (role === 'entrant') return 'PLAYING';
   return null;
 }
@@ -475,7 +476,7 @@ export function previewTab(format: TournamentFormat): string {
 
 /** Primary button on the manage screen when the module is in seeding. */
 export function startLabel(format: TournamentFormat): string {
-  return format === 'round_robin' ? 'Start league' : format === 'groups_knockout' ? 'Start group stage' : 'Start tournament';
+  return format === 'round_robin' ? 'Start league' : format === 'groups_knockout' ? 'Start group stage' : 'Start matches';
 }
 
 // ─── Knockout builder (groups + knockout) ────────────────────────────────────

@@ -30,11 +30,14 @@ export function PromoManageSection({ tournamentId }: { tournamentId: string }) {
   const [code, setCode] = useState('');
   const [mode, setMode] = useState<PromoDisplayMode>('reveal');
   const [saving, setSaving] = useState(false);
+  // organizations can switch discount codes off (migration 145): the section then disappears
+  const [disabled, setDisabled] = useState(false);
 
   const load = useCallback(async () => {
     try {
       setPromos(await fetchTournamentPromosManage(tournamentId));
-    } catch {
+    } catch (e) {
+      if (e instanceof Error && e.message.includes('PROMOS_DISABLED')) setDisabled(true);
       setPromos([]);
     }
   }, [tournamentId]);
@@ -89,6 +92,8 @@ export function PromoManageSection({ tournamentId }: { tournamentId: string }) {
   };
 
   const active = promos.filter((p) => p.is_active);
+
+  if (disabled) return null;
 
   return (
     <View style={{ gap: Spacing.sm }}>

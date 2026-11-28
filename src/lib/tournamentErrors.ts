@@ -21,6 +21,14 @@ const FIELD_LABELS: Record<string, string> = {
   max_per_page: 'Tiles per screen',
   final_hold_seconds: 'Keep FINAL for',
   title: 'Title',
+  modules: 'Sports',
+  starts_at: 'Start date',
+  ends_at: 'End date',
+  location: 'Location',
+  reason: 'Reason',
+  mode: 'Setting',
+  code: 'Link',
+  venue: 'Venue',
   court: 'Court',
 };
 
@@ -69,7 +77,22 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
     return `${playerPrefix(fieldRequired[2])}${prettyKey(fieldRequired[1], labels)} is required.`;
   }
   if (message.includes('FIELD_INVALID:live_rules_family')) return "Those scoring rules don't fit this sport's scoring.";
-  if (message.includes('LIVE_TAKEN')) return 'Another admin is scoring this match.';
+  if (message.includes('LIVE_TAKEN')) return 'Someone else is scoring this match.';
+  if (message.includes('ORG_SUSPENDED'))
+    return 'This organization’s account is paused. Contact Sportron.';
+  if (message.includes('SCREEN_BUSY')) return 'That screen is showing another tournament.';
+  if (message.includes('SCREEN_CODE_TAKEN')) return 'That link is already used by another screen. Try a different one.';
+  if (message.includes('LIVE_NOT_PUBLIC')) return 'Turn on the projector link for this tournament first.';
+  if (message.includes('PROMOS_DISABLED')) return 'Discount codes are switched off for this organization.';
+  if (message.includes('NOT_ORG_MEMBER')) return 'Only people in this organization can be co-organizers.';
+  if (message.includes('CANNOT_REMOVE_SELF')) return 'You can’t remove yourself.';
+  if (message.includes('LAST_ADMIN')) return 'A tournament needs at least one person who can run it.';
+  if (message.includes('NOT_READY')) return 'Set a start date and add a sport before publishing.';
+  if (message.includes('CONFIRM_MISMATCH')) return 'The name you typed doesn’t match.';
+  if (message.includes('NOT_COMPLETED')) return 'Only a finished sport can be reopened.';
+  if (message.includes('TOURNAMENT_FINISHED')) return 'The tournament is finished or cancelled.';
+  if (message.includes('RULES_LOCKED'))
+    return 'Only a sport manager can change the match rules. Update the app or ask a manager, then try again.';
   if (message.includes('LIVE_CODE_TAKEN')) return 'That link is already used by another tournament. Try a different one.';
   if (message.includes('RATE_LIMITED')) return 'Too many changes for now. Please try again later.';
   const fieldInvalid = message.match(/FIELD_INVALID:([a-z0-9_]+)(?:@(\d+))?/);
@@ -78,14 +101,14 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   }
   const dupCms = message.match(/DUPLICATE_MEMBER_CMS_ID(?:@(\d+))?/);
   if (dupCms) {
-    return `${playerPrefix(dupCms[1])}A player with this CMS ID is already on a team in this module.`;
+    return `${playerPrefix(dupCms[1])}A player with this CMS ID is already on a team in this competition.`;
   }
   const dupProfile = message.match(/DUPLICATE_MEMBER_PROFILE(?:@(\d+))?/);
   if (dupProfile) {
-    return `${playerPrefix(dupProfile[1])}This user is already on a team in this module.`;
+    return `${playerPrefix(dupProfile[1])}This user is already on a team in this competition.`;
   }
   if (message.includes('WRONG_PARTICIPANT_TYPE'))
-    return "This module's players don't match that entry type (teams vs individuals).";
+    return "This sport's players don't match that entry type (teams vs individuals).";
   if (message.includes('ROSTER_INCOMPLETE')) return "Some teams don't have enough players yet.";
   if (message.includes('ROSTER_TOO_LARGE')) return 'This team has more players than allowed.';
   if (message.includes('DUPLICATE_SQUAD_NUMBER')) return 'Two players have the same squad number.';
@@ -95,10 +118,10 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('NOT_ALLOWED')) return "You don't have permission to do that.";
   if (message.includes('INVALID_STATUS')) return "That isn't possible at this stage.";
   if (message.includes('DUPLICATE_CMS_ID'))
-    return 'An entry with this CMS ID already exists in this module.';
-  if (message.includes('DUPLICATE_PROFILE')) return 'This user already has an entry in this module.';
+    return 'An entry with this CMS ID already exists in this sport.';
+  if (message.includes('DUPLICATE_PROFILE')) return 'This user already has an entry in this sport.';
   if (message.includes('DUPLICATE_FIELD_KEY')) return 'A field with this name already exists.';
-  if (message.includes('MAX_ENTRIES')) return 'This module is full.';
+  if (message.includes('MAX_ENTRIES')) return 'This sport is full.';
   if (message.includes('TIE_NEEDS_WINNER')) return 'Scores are level — pick the winner.';
   if (message.includes('DOWNSTREAM_PLAYED'))
     return 'The next match has already been played. Reset it first.';

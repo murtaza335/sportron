@@ -1,7 +1,7 @@
 import { KeyboardAvoider } from '@/components/KeyboardAvoider';
 import { useLocalSearchParams, useRouter } from 'expo-router';
 import { useEffect, useState } from 'react';
-import { ActivityIndicator, Platform, ScrollView, StyleSheet, View } from 'react-native';
+import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
@@ -61,7 +61,7 @@ export default function ModuleFormScreen() {
 
   return (
     <SafeAreaView style={[styles.flex, { backgroundColor: theme.background }]} edges={['top']}>
-      <ModalHeader title={editing ? 'Edit Module' : 'New Module'} onClose={close} />
+      <ModalHeader title={editing ? 'Edit sport' : 'New sport'} onClose={close} />
       {loading ? (
         <ActivityIndicator color={theme.text} style={{ marginTop: Spacing.xxl }} />
       ) : (
@@ -99,7 +99,10 @@ function ModuleFormBody({
   const [moreKey, setMoreKey] = useState<string | null>(m?.sport_key ?? null);
   const [customName, setCustomName] = useState(m?.custom_sport_name ?? '');
   const [scoringMode, setScoringMode] = useState<ScoringMode>(m?.scoring_mode ?? 'score');
+  const theme = useTheme();
   const [showMore, setShowMore] = useState(false);
+  // creating: only the essentials; editing: everything
+  const [advanced, setAdvanced] = useState(!!m);
   const [venue, setVenue] = useState(m?.venue ?? '');
   const [startsAt, setStartsAt] = useState<Date | null>(m?.starts_at ? new Date(m.starts_at) : null);
   const [maxEntries, setMaxEntries] = useState(m?.max_entries != null ? String(m.max_entries) : '');
@@ -339,7 +342,7 @@ function ModuleFormBody({
           />
         </FormField>
 
-        {isLeagueLike && (
+        {advanced && isLeagueLike && (
           <View style={{ gap: Spacing.md }}>
             <FormField label="Legs" hint={format === 'groups_knockout' ? 'Applies inside every group.' : undefined}>
               <PillSelect
@@ -405,7 +408,7 @@ function ModuleFormBody({
           </View>
         )}
 
-        {format === 'double_elimination' && (
+        {advanced && format === 'double_elimination' && (
           <SwitchRow
             label="Grand final reset"
             hint="If the losers-bracket team wins the final, play once more."
@@ -508,47 +511,59 @@ function ModuleFormBody({
           <DateTimeField value={startsAt} onChange={setStartsAt} />
         </FormField>
 
-        <FormField label="Max entries" error={maxInvalid ? 'Enter a number from 2 to 128.' : null}>
-          <TextField value={maxEntries} onChangeText={(v) => setMaxEntries(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="No limit" maxLength={3} />
-        </FormField>
-
-        <FormField label="Description">
-          <TextField value={description} onChangeText={setDescription} multiline maxLength={1000} placeholder="What is this event about?" />
-        </FormField>
-
-        <FormField label="Rules">
-          <TextField value={rules} onChangeText={setRules} multiline maxLength={2000} placeholder="Match rules, tie-breaks, dress code…" />
-        </FormField>
-
-        <View style={{ gap: Spacing.md }}>
-          {(format === 'single_elimination' || format === 'groups_knockout') && (
-          <SwitchRow
-            label="3rd-place match"
-            hint={settingsLocked ? 'Locked once the bracket is generated.' : 'Adds a match between the semi-final losers.'}
-            value={third}
-            onChange={setThird}
-            disabled={settingsLocked}
-          />
-          )}
-          <FormField label="Seeding">
-            <PillSelect
-              options={[
-                { value: 'manual' as SeedingMethod, label: 'Manual' },
-                { value: 'random' as SeedingMethod, label: 'Random' },
-              ]}
-              value={seeding}
-              onChange={setSeeding}
-              disabled={!!m && ['in_progress', 'completed', 'cancelled'].includes(m.status)}
-            />
-            <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
-              {isLeagueLike
-                ? 'Seeding decides the fixture order and the last tiebreak. Random shuffles entries you haven’t seeded.'
-                : 'Random shuffles entries you haven’t seeded when the bracket is generated.'}
+        {!m && (
+          <Pressable onPress={() => setAdvanced((v) => !v)} accessibilityRole="button" hitSlop={8}>
+            <ThemedText style={{ color: theme.accent, fontWeight: '700' }}>
+              {advanced ? 'Hide options' : 'More options (the usual settings are already chosen)'}
             </ThemedText>
-          </FormField>
-        </View>
+          </Pressable>
+        )}
 
-        <Button label={m ? 'Save changes' : 'Create module'} onPress={submit} loading={saving} disabled={!canSave} />
+        {advanced && (
+          <>
+            <FormField label="Max entries" error={maxInvalid ? 'Enter a number from 2 to 128.' : null}>
+              <TextField value={maxEntries} onChangeText={(v) => setMaxEntries(v.replace(/[^0-9]/g, ''))} keyboardType="number-pad" placeholder="No limit" maxLength={3} />
+            </FormField>
+
+            <FormField label="Description">
+              <TextField value={description} onChangeText={setDescription} multiline maxLength={1000} placeholder="What is this event about?" />
+            </FormField>
+
+            <FormField label="Rules">
+              <TextField value={rules} onChangeText={setRules} multiline maxLength={2000} placeholder="Match rules, tie-breaks, dress code…" />
+            </FormField>
+
+            <View style={{ gap: Spacing.md }}>
+              {(format === 'single_elimination' || format === 'groups_knockout') && (
+              <SwitchRow
+                label="3rd-place match"
+                hint={settingsLocked ? 'Locked once the bracket is generated.' : 'Adds a match between the semi-final losers.'}
+                value={third}
+                onChange={setThird}
+                disabled={settingsLocked}
+              />
+              )}
+              <FormField label="Draw order">
+                <PillSelect
+                  options={[
+                    { value: 'manual' as SeedingMethod, label: 'Manual' },
+                    { value: 'random' as SeedingMethod, label: 'Random' },
+                  ]}
+                  value={seeding}
+                  onChange={setSeeding}
+                  disabled={!!m && ['in_progress', 'completed', 'cancelled'].includes(m.status)}
+                />
+                <ThemedText variant="caption" muted style={{ marginLeft: Spacing.xs }}>
+                  {isLeagueLike
+                    ? 'The order decides the fixtures and the last tiebreak. Random shuffles entries you haven’t placed.'
+                    : 'Random shuffles entries you haven’t placed when the draw is made.'}
+                </ThemedText>
+              </FormField>
+            </View>
+          </>
+        )}
+
+        <Button label={m ? 'Save changes' : 'Create sport'} onPress={submit} loading={saving} disabled={!canSave} />
       </ScrollView>
     </KeyboardAvoider>
   );

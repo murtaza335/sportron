@@ -11,6 +11,7 @@ import {
 } from '@live-engine';
 import { useEffect, useMemo, useState } from 'react';
 import { useAspect, useIdleCursor, useNow, useWakeLock } from './hooks';
+import { Mark } from './Mark';
 import { Qr } from './Qr';
 import { Tile } from './Tile';
 
@@ -79,7 +80,7 @@ export function Wall({ board, offset, status, params }: { board: LiveBoard; offs
   const title = board.tournament?.name ?? 'Live';
   const upNext = display.show_up_next ? board.up_next.slice(0, 4) : [];
   const results = display.show_recent ? board.recent.slice(0, 3) : [];
-  const promo = display.show_app_promo && board.app_link;
+  const promo = (display.show_app_promo || board.brand?.locked) && board.app_link;
   const compact = tiles.length >= 5;
 
   return (
@@ -87,6 +88,7 @@ export function Wall({ board, offset, status, params }: { board: LiveBoard; offs
       <header>
         <h1>{title}</h1>
         <div className="head-right">
+          <Mark />
           {pageCount > 1 ? (
             <span className="dots" aria-label={`Page ${page + 1} of ${pageCount}`}>
               {pages.map((_, i) => (

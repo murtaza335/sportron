@@ -45,6 +45,12 @@ const FIELD_LABELS: Record<string, string> = {
   community: 'Enter the id of an existing community.',
   note: 'Note is too long (max 1000).',
   session_purposes: 'Session purposes must be a JSON array.',
+  short_name: 'Short name is too long (max 20).',
+  reason: 'Reason is too long (max 200).',
+  entry_fields: 'Sign-up fields are not valid.',
+  promos_enabled: 'Invalid value.',
+  brand_locked: 'Invalid value.',
+  organization_id: 'Pick a valid organization.',
 };
 
 const CODES: Record<string, string> = {
@@ -61,6 +67,7 @@ const CODES: Record<string, string> = {
   CONFIRM_MISMATCH: 'The name you typed does not match.',
   NOT_REMOVABLE: 'This kind of content cannot be removed from here. Use Mark actioned after dealing with it.',
   INVALID_ACTION: 'Invalid action.',
+  DUPLICATE_ORGANIZATION: 'An organization with that name already exists.',
 };
 
 export function messageFor(code: string, field?: string): string {

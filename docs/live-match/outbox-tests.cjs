@@ -114,7 +114,7 @@ const tap = (ob, id, tl) => {
     await until(() => ob.status('m').phase === 'taken', 'taken detected');
     srv.failWith = null; tap(ob, 'm', tl); await sleep(40);
     eq(srv.pushes.length, 0, 'nothing is sent after being taken over');
-    eq(ob.status('m').message, 'Another admin took over scoring.', 'taken message');
+    eq(ob.status('m').message, 'Someone else took over scoring.', 'taken message');
   }
   // 5 ── server ahead of us (someone else scored): stop instead of overwriting
   {

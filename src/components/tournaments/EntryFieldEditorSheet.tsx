@@ -17,8 +17,15 @@ const TYPE_OPTIONS = (Object.keys(FIELD_TYPE_LABELS) as EntryFieldType[]).map((t
 }));
 
 /** Bottom sheet to add / edit an entry-form field (PLAN §12.7). Core fields: label + placeholder only. */
+export type CoreFieldMode = 'required' | 'optional' | 'off';
+
+export function coreFieldMode(f: TournamentEntryField): CoreFieldMode {
+  return f.archived_at ? 'off' : f.is_required ? 'required' : 'optional';
+}
+
 export function EntryFieldEditorSheet({
   visible,
+  canSetCoreMode,
   field,
   existingKeys,
   saving,
@@ -26,11 +33,13 @@ export function EntryFieldEditorSheet({
   onSave,
 }: {
   visible: boolean;
+  /** Offer Required / Optional / Off on core fields other than Name. */
+  canSetCoreMode?: boolean;
   field: TournamentEntryField | null;
   existingKeys: string[];
   saving: boolean;
   onClose: () => void;
-  onSave: (input: EntryFieldInput) => void;
+  onSave: (input: EntryFieldInput, coreMode: CoreFieldMode | null) => void;
 }) {
   return (
     <BottomSheet visible={visible} onClose={onClose}>
@@ -38,6 +47,7 @@ export function EntryFieldEditorSheet({
         <EditorBody
           key={field?.id ?? 'new'}
           field={field}
+          canSetCoreMode={canSetCoreMode}
           existingKeys={existingKeys}
           saving={saving}
           onSave={onSave}
@@ -49,15 +59,17 @@ export function EntryFieldEditorSheet({
 
 function EditorBody({
   field,
+  canSetCoreMode,
   existingKeys,
   saving,
   onSave,
 }: {
   /** null → create a new custom field */
   field: TournamentEntryField | null;
+  canSetCoreMode?: boolean;
   existingKeys: string[];
   saving: boolean;
-  onSave: (input: EntryFieldInput) => void;
+  onSave: (input: EntryFieldInput, coreMode: CoreFieldMode | null) => void;
 }) {
   const theme = useTheme();
   const [label, setLabel] = useState(field?.label ?? '');
@@ -70,6 +82,8 @@ function EditorBody({
   const [error, setError] = useState<string | null>(null);
 
   const core = !!field?.is_core;
+  const flexible = core && field?.key !== 'name' && !!canSetCoreMode;
+  const [mode, setMode] = useState<CoreFieldMode>(field ? coreFieldMode(field) : 'required');
 
   const addOption = () => {
     const v = newOption.trim();
@@ -110,7 +124,7 @@ function EditorBody({
       is_required: core ? true : required,
       is_public: core ? field!.is_public : isPublic,
       sort_order: null,
-    });
+    }, flexible ? mode : null);
   };
 
   return (
@@ -158,6 +172,26 @@ function EditorBody({
         <FormField label="Placeholder (optional)">
           <TextField value={placeholder} onChangeText={setPlaceholder} maxLength={60} />
         </FormField>
+
+        {flexible && (
+          <FormField
+            label="On the sign-up form"
+            hint={field!.is_public ? 'Visible to everyone.' : 'Private: only managers and the player see it.'}
+          >
+            <PillSelect<CoreFieldMode>
+              options={[
+                { value: 'required', label: 'Required' },
+                { value: 'optional', label: 'Optional' },
+                { value: 'off', label: 'Off' },
+              ]}
+              value={mode}
+              onChange={setMode}
+            />
+          </FormField>
+        )}
+        {core && field?.key === 'name' && (
+          <ThemedText variant="caption" muted>Name is always required.</ThemedText>
+        )}
 
         {!core && (
           <>

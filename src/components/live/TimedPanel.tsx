@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { Banner, BarButton, ValueButton } from '@/components/live/parts';
@@ -16,6 +17,7 @@ import {
   shootoutNext,
   shootoutScore,
   timedElapsed,
+  timeoutLimit,
   type CounterSet,
   type Names,
   type Side,
@@ -30,6 +32,15 @@ export function ClockCard({ scorer, rules, disabled }: { scorer: LiveScorer; rul
   const { snap, act } = scorer;
   const running = (snap.family === 'timed' || snap.family === 'simple') && snap.clock.running;
   const now = useTicker(running);
+  // A countdown stops itself at 0:00 (the reducer keeps the elapsed time at the period length).
+  const expired =
+    running && snap.family === 'timed' && rules.family === 'timed' && rules.clock === 'down' &&
+    periodLimitMs(rules, snap.period) != null && timedElapsed(snap, now) >= periodLimitMs(rules, snap.period)!;
+  useEffect(() => {
+    if (!expired || disabled) return;
+    haptics.warning();
+    act({ t: 'clockStop', at: Date.now() });
+  }, [expired, disabled, act]);
   if ((snap.family !== 'timed' && snap.family !== 'simple') || rules.clock === 'none') return null;
 
   const timed = snap.family === 'timed' && rules.family === 'timed';
@@ -38,6 +49,7 @@ export function ClockCard({ scorer, rules, disabled }: { scorer: LiveScorer; rul
   const dir = rules.clock === 'down' ? 'down' : 'up';
   const timeUp = limit != null && (dir === 'down' ? elapsed >= limit : elapsed >= limit);
   const text = formatClock(elapsed, dir, limit);
+  const untimed = timed && snap.family === 'timed' && snap.period > (rules as TimedRules).periods && !!(rules as TimedRules).otTarget;
   const added = timed && snap.family === 'timed' && snap.addedMinutes > 0 ? ` +${snap.addedMinutes}'` : '';
 
   return (
@@ -67,7 +79,7 @@ export function ClockCard({ scorer, rules, disabled }: { scorer: LiveScorer; rul
             act(running ? { t: 'clockStop', at: Date.now() } : { t: 'clockStart', at: Date.now() });
           }}
         />
-        {timed && (
+        {timed && !untimed && (
           <BarButton
             label="End period"
             tone={timeUp ? 'primary' : 'default'}
@@ -94,7 +106,7 @@ export function ClockCard({ scorer, rules, disabled }: { scorer: LiveScorer; rul
 
 // ─── Counters (team fouls, timeouts, cards) ──────────────────────────────────
 
-function CounterChip({
+export function CounterChip({
   label,
   value,
   limit,
@@ -152,7 +164,7 @@ export function TimedPanel({ scorer, rules, names, swapped, disabled }: { scorer
     if (rules.counters.includes('team_fouls'))
       chips.push(<CounterChip key="f" label="Fouls" value={c.fouls} warn={inBonus(snap, rules, side === 'a' ? 'b' : 'a')} onChange={(d) => set('fouls', d)} />);
     if (rules.counters.includes('timeouts'))
-      chips.push(<CounterChip key="t" label="Timeouts" value={c.timeouts} limit={rules.timeoutsPerHalf} onChange={(d) => set('timeouts', d)} />);
+      chips.push(<CounterChip key="t" label="Timeouts" value={c.timeouts} limit={timeoutLimit(rules, snap.period)} onChange={(d) => set('timeouts', d)} />);
     if (rules.counters.includes('cards')) {
       chips.push(<CounterChip key="y" label="Yellow" value={c.yellow} onChange={(d) => set('yellow', d)} />);
       chips.push(<CounterChip key="r" label="Red" value={c.red} onChange={(d) => set('red', d)} />);

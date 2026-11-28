@@ -6,6 +6,7 @@ import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModuleRulesSection } from '@/components/live/RulesEditor';
+import { ScorersSection } from '@/components/organize/ScorersSection';
 import { SectionLabel } from '@/components/tournaments/form';
 import { ProfilePickerSheet } from '@/components/tournaments/ProfilePickerSheet';
 import { StatusPill } from '@/components/tournaments/StatusPill';
@@ -13,6 +14,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
@@ -27,6 +29,7 @@ import {
   removeModuleAdmin,
   setModuleStatus,
 } from '@/services/tournaments';
+import { reopenModule } from '@/services/organizations';
 import type { ModuleStatus, ProfileLite } from '@/types';
 
 export default function ModuleManageScreen() {
@@ -35,7 +38,8 @@ export default function ModuleManageScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const m = useTournamentModule(moduleId);
-  const { isTournamentAdmin } = useTournament(id);
+  const scorerUi = useFlag('organizations', false);
+  const { detail: tournamentDetail, isTournamentAdmin } = useTournament(id);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -45,7 +49,7 @@ export default function ModuleManageScreen() {
     return (
       <View style={styles.denied}>
         <ThemedText variant="heading">No access</ThemedText>
-        <ThemedText muted>Only module admins can manage a module.</ThemedText>
+        <ThemedText muted>Only sport managers can manage this sport.</ThemedText>
       </View>
     );
   }
@@ -85,9 +89,9 @@ export default function ModuleManageScreen() {
     tournamentLocked
       ? null
       : mod.status === 'draft'
-        ? { label: 'Publish module', onPress: () => changeStatus('open') }
+        ? { label: 'Open this sport', onPress: () => changeStatus('open') }
         : mod.status === 'open'
-          ? { label: 'Close entries & start seeding', onPress: () => changeStatus('seeding'), disabled: incompleteRosters > 0 }
+          ? { label: 'Close entries & make the draw', onPress: () => changeStatus('seeding'), disabled: incompleteRosters > 0 }
           : mod.status === 'seeding'
             ? { label: startLabel(mod.format), onPress: () => changeStatus('in_progress'), disabled: !bracketGenerated }
             : null;
@@ -95,7 +99,7 @@ export default function ModuleManageScreen() {
   const reopen = () =>
     alert(
       'Reopen entries?',
-      'The generated bracket will be deleted. Seeds are kept.',
+      'The draw will be deleted. Seed numbers are kept.',
       [
         { text: 'Cancel', style: 'cancel' },
         { text: 'Reopen', style: 'destructive', onPress: () => changeStatus('open') },
@@ -103,13 +107,13 @@ export default function ModuleManageScreen() {
     );
 
   const cancelModule = () =>
-    alert('Cancel this module?', 'This stops the module. It can’t be undone from the app.', [
+    alert('Cancel this sport?', 'This stops the sport. It can’t be undone from the app.', [
       { text: 'Keep', style: 'cancel' },
-      { text: 'Cancel module', style: 'destructive', onPress: () => changeStatus('cancelled') },
+      { text: 'Cancel sport', style: 'destructive', onPress: () => changeStatus('cancelled') },
     ]);
 
   const del = () =>
-    alert('Delete this module?', 'All its entries and matches will be removed.', [
+    alert('Delete this sport?', 'All its entries and matches will be removed.', [
       { text: 'Keep', style: 'cancel' },
       {
         text: 'Delete',
@@ -119,13 +123,19 @@ export default function ModuleManageScreen() {
       },
     ]);
 
+  const reopenFinished = () =>
+    alert('Reopen this sport?', 'Final ranks and the champion are cleared until the final is decided again.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reopen', style: 'destructive', onPress: () => run(() => reopenModule(moduleId, true)) },
+    ]);
+
   const pickAdmin = (p: ProfileLite) => {
     setPickerOpen(false);
     run(() => addModuleAdmin(moduleId, p.id));
   };
 
   const removeAdmin = (p: ProfileLite) =>
-    alert('Remove admin?', `@${p.username} will lose access to this module.`, [
+    alert('Remove manager?', `@${p.username} will lose access to this sport.`, [
       { text: 'Cancel', style: 'cancel' },
       { text: 'Remove', style: 'destructive', onPress: () => run(() => removeModuleAdmin(moduleId, p.id)) },
     ]);
@@ -180,7 +190,7 @@ export default function ModuleManageScreen() {
           <ThemedText variant="caption" muted>Completes automatically after the final.</ThemedText>
         )}
         {mod.status === 'seeding' && !bracketGenerated && (
-          <ThemedText variant="caption" muted>Generate the fixtures from Seeding first.</ThemedText>
+          <ThemedText variant="caption" muted>Make the draw first.</ThemedText>
         )}
         {mod.status === 'open' && !tournamentLocked && (
           <Button label="Back to draft" variant="ghost" onPress={() => changeStatus('draft')} disabled={busy} />
@@ -226,14 +236,16 @@ export default function ModuleManageScreen() {
             mod.current_stage !== 2 && !groupsDone,
           )}
         {link('Rounds & schedule', null, () => router.push(tournamentRoutes.rounds(id, moduleId)))}
-        {link(mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Seeding & bracket' : 'Seeding & fixtures', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
+        {link(mod.format === 'single_elimination' || mod.format === 'double_elimination' ? 'Draw & bracket' : 'Draw & fixtures', null, () => router.push(tournamentRoutes.seeding(id, moduleId)))}
       </View>
 
       <ModuleRulesSection module={mod} onSaved={m.refresh} />
 
+      {scorerUi && <ScorersSection tournamentId={id} moduleId={moduleId} locked={tournamentLocked || finished} />}
+
       <View style={{ gap: Spacing.sm }}>
-        <SectionLabel>Module admins</SectionLabel>
-        {m.admins.length === 0 && <ThemedText variant="caption" muted>No module admins yet.</ThemedText>}
+        <SectionLabel>Sport managers</SectionLabel>
+        {m.admins.length === 0 && <ThemedText variant="caption" muted>No sport managers yet.</ThemedText>}
         {m.admins.map((a) => (
           <View key={a.id} style={styles.adminRow}>
             <UserAvatar avatarUrl={a.avatar_url} size={32} />
@@ -246,28 +258,36 @@ export default function ModuleManageScreen() {
           </View>
         ))}
         {isTournamentAdmin && !tournamentLocked && (
-          <Button label="Add admin" variant="secondary" onPress={() => setPickerOpen(true)} disabled={busy} />
+          <Button label="Add manager" variant="secondary" onPress={() => setPickerOpen(true)} disabled={busy} />
         )}
         {!isTournamentAdmin && (
-          <ThemedText variant="caption" muted>Only tournament admins can change module admins.</ThemedText>
+          <ThemedText variant="caption" muted>Only organizers can change sport managers.</ThemedText>
         )}
       </View>
+
+      {scorerUi && tournamentDetail?.tournament.organization_id && isTournamentAdmin && mod.status === 'completed' && !tournamentLocked && (
+        <View style={{ gap: Spacing.sm }}>
+          <SectionLabel>Finished</SectionLabel>
+          <ThemedText variant="caption" muted>Reopen to correct a result. The champion is decided again afterwards.</ThemedText>
+          <Button label="Reopen sport" variant="secondary" onPress={reopenFinished} disabled={busy} />
+        </View>
+      )}
 
       {!tournamentLocked && (!finished || isTournamentAdmin) && (
         <View style={{ gap: Spacing.sm }}>
           <SectionLabel>Danger zone</SectionLabel>
           {!finished && (
-            <Button label="Cancel module" variant="ghost" onPress={cancelModule} disabled={busy} buttonStyle={{ borderColor: theme.error }} />
+            <Button label="Cancel sport" variant="ghost" onPress={cancelModule} disabled={busy} buttonStyle={{ borderColor: theme.error }} />
           )}
           {isTournamentAdmin && ['draft', 'open', 'cancelled'].includes(mod.status) && (
-            <Button label="Delete module" variant="ghost" onPress={del} disabled={busy} buttonStyle={{ borderColor: theme.error }} />
+            <Button label="Delete sport" variant="ghost" onPress={del} disabled={busy} buttonStyle={{ borderColor: theme.error }} />
           )}
         </View>
       )}
 
       <ProfilePickerSheet
         visible={pickerOpen}
-        title="Add module admin"
+        title="Add sport manager"
         onClose={() => setPickerOpen(false)}
         onSelect={pickAdmin}
       />

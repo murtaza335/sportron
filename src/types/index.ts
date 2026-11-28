@@ -260,6 +260,8 @@ export type NotificationType =
   | 'tournament_match_scheduled'
   | 'tournament_match_result'
   | 'tournament_module_completed'
+  | 'tournament_scorer_assigned'
+  | 'organization_role_assigned'
   // DB-only types (allowed by the in_app_notifications check constraint, migrations 080/081/083)
   | 'member_joined'
   | 'community_engagement'
@@ -545,3 +547,4 @@ export type AuditLog = {
 
 export * from './tournaments';
 export * from './live';
+export * from './organizations';

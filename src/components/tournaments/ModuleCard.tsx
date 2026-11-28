@@ -34,7 +34,7 @@ export function ModuleCard({
       onPress={() => router.push(tournamentRoutes.module(tournamentId, module.id))}
       style={({ pressed }) => [{ opacity: pressed ? 0.8 : 1 }]}
       accessibilityRole="button"
-      accessibilityLabel={`Open module ${module.name}`}
+      accessibilityLabel={`Open ${module.name}`}
     >
       <Card style={styles.card}>
         <View style={styles.top}>

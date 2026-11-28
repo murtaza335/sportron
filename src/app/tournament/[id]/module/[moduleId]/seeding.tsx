@@ -55,7 +55,7 @@ export default function SeedingScreen() {
     return (
       <View style={styles.denied}>
         <ThemedText variant="heading">No access</ThemedText>
-        <ThemedText muted>Only module admins can manage seeding.</ThemedText>
+        <ThemedText muted>Only sport managers can make the draw.</ThemedText>
       </View>
     );
   }
@@ -161,15 +161,15 @@ export default function SeedingScreen() {
         </ThemedText>
         {summary.detail && <ThemedText variant="caption" muted>{summary.detail}</ThemedText>}
         {mod.seeding_method === 'random' && (
-          <ThemedText variant="caption" muted>Random seeding: unseeded entries are shuffled when you generate.</ThemedText>
+          <ThemedText variant="caption" muted>Random draw: entries without a seed number are shuffled when you generate.</ThemedText>
         )}
         {!editable && (
           <ThemedText variant="caption" style={{ color: theme.warning }}>
-            Seeds can only be changed while the module is Open or in Seeding.
+            Seed numbers can only be changed before the matches start.
           </ThemedText>
         )}
         {mod.status === 'open' && (
-          <ThemedText variant="caption" muted>Close entries & start seeding from Manage to generate the fixtures.</ThemedText>
+          <ThemedText variant="caption" muted>Close entries from Manage, then generate the fixtures here.</ThemedText>
         )}
       </View>
 

@@ -40,7 +40,7 @@ function Chip({ label, selected, onPress }: { label: string; selected: boolean; 
   );
 }
 
-function SwitchRow({ label, hint, value, onChange }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void }) {
+function SwitchRow({ label, hint, value, onChange, disabled }: { label: string; hint?: string; value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   const theme = useTheme();
   return (
     <View style={styles.switchRow}>
@@ -52,7 +52,7 @@ function SwitchRow({ label, hint, value, onChange }: { label: string; hint?: str
           </ThemedText>
         ) : null}
       </View>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: theme.accent }} accessibilityLabel={label} />
+      <Switch value={value} onValueChange={onChange} disabled={disabled} trackColor={{ true: theme.accent }} accessibilityLabel={label} />
     </View>
   );
 }
@@ -262,11 +262,17 @@ export function ProjectorCard({ tournamentId, tournamentName }: { tournamentId: 
                 />
               );
             })}
-            <SwitchRow label="Module name" value={display.show_module} onChange={(v) => void patch({ show_module: v })} />
+            <SwitchRow label="Sport name" value={display.show_module} onChange={(v) => void patch({ show_module: v })} />
             <SwitchRow label="Court" value={display.show_court} onChange={(v) => void patch({ show_court: v })} />
             <SwitchRow label="Up next" value={display.show_up_next} onChange={(v) => void patch({ show_up_next: v })} />
             <SwitchRow label="Recent results" value={display.show_recent} onChange={(v) => void patch({ show_recent: v })} />
-            <SwitchRow label="“Follow live in the app” footer" value={display.show_app_promo} onChange={(v) => void patch({ show_app_promo: v })} />
+            <SwitchRow
+              label="“Follow live in the app” footer"
+              hint={settings.promo_locked ? 'Always on for this organization’s events' : undefined}
+              value={settings.promo_locked || display.show_app_promo}
+              disabled={settings.promo_locked}
+              onChange={(v) => void patch({ show_app_promo: v })}
+            />
             <ThemedText variant="caption" muted>
               Private details like phone, email and CMS ID are never shown.
             </ThemedText>

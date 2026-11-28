@@ -1,8 +1,9 @@
 import { StyleSheet, View } from 'react-native';
 
 import { Banner, ScoreHalf } from '@/components/live/parts';
+import { CounterChip } from '@/components/live/TimedPanel';
 import type { LiveScorer } from '@/hooks/useLiveScorer';
-import { setsNotices, type Names, type SetsRules, type Side, type TennisRules } from '@/lib/live';
+import { serviceCall, setsNotices, type Names, type SetsRules, type Side, type TennisRules } from '@/lib/live';
 import { Spacing } from '@/constants/theme';
 
 /** Rally sports (table tennis, badminton, squash, pickleball, volleyball) and tennis: two big halves, tap = point. */
@@ -48,6 +49,15 @@ export function RallyPanel({
   };
 
   const banners: { text: string; tone?: 'info' | 'warn'; action?: boolean }[] = [];
+  if (snap.family === 'sets' && rules.family === 'sets') {
+    const call = serviceCall(snap, rules);
+    if (call) {
+      const who = call.server ? `${names[call.side]} player ${call.server}` : names[call.side];
+      const from = call.court ? ` from the ${call.court} court` : '';
+      const to = call.receiver ? ` to ${names[call.side === 'a' ? 'b' : 'a']} player ${call.receiver}` : '';
+      banners.push({ text: `${who} serves${from}${to}` });
+    }
+  }
   if (snap.state === 'break') {
     const last = snap.family === 'sets' ? snap.games[snap.games.length - 1] : snap.sets[snap.sets.length - 1];
     if (last) {
@@ -68,6 +78,20 @@ export function RallyPanel({
   return (
     <View style={styles.flex}>
       <View style={styles.row}>{order.map(half)}</View>
+      {snap.family === 'sets' && rules.family === 'sets' && rules.timeoutsPerSet != null && (
+        <View style={styles.timeouts}>
+          {order.map((side) => (
+            <CounterChip
+              key={side}
+              label={`Timeouts ${names[side]}`}
+              value={snap.timeouts?.[side] ?? 0}
+              limit={rules.timeoutsPerSet}
+              warn={(snap.timeouts?.[side] ?? 0) >= (rules.timeoutsPerSet ?? 0)}
+              onChange={(delta) => !disabled && act({ t: 'timeout', side, delta })}
+            />
+          ))}
+        </View>
+      )}
       {banners.length > 0 && (
         <View style={styles.banners}>
           {banners.map((b, i) => (
@@ -83,4 +107,5 @@ const styles = StyleSheet.create({
   flex: { flex: 1 },
   row: { flex: 1, flexDirection: 'row' },
   banners: { gap: Spacing.xs, padding: Spacing.sm },
+  timeouts: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-around', gap: Spacing.sm, paddingTop: Spacing.xs },
 });

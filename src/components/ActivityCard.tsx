@@ -52,6 +52,8 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
     case 'tournament_admin_assigned':
     case 'tournament_module_admin_assigned':
+    case 'tournament_scorer_assigned':
+    case 'organization_role_assigned':
     case 'tournament_entry_added':
     case 'tournament_match_scheduled':
     case 'tournament_match_result':
@@ -329,6 +331,11 @@ export function ActivityCard({ notification, onComplete }: ActivityCardProps) {
           router.push({ pathname: '/community/[id]', params: { id: cId } });
         } else if (notification.type.startsWith('streak_')) {
           router.navigate('/');
+        } else if (notification.type === 'tournament_scorer_assigned') {
+          router.push(tournamentRoutes.toScore());
+        } else if (notification.type === 'organization_role_assigned') {
+          const oId = notification.data?.organizationId;
+          router.push(tournamentRoutes.organize(typeof oId === 'string' ? oId : undefined));
         } else if (notification.type.startsWith('tournament_')) {
           const tId = notification.data?.tournamentId;
           const mId = notification.data?.moduleId;

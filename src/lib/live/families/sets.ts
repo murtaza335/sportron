@@ -14,6 +14,16 @@ export function initSets(rules: SetsRules, opts: { firstServer?: Side | null } =
     server: first,
     serverNumber: rules.serve === 'side_out' && rules.doubles ? 2 : 1,
     lastGameWinner: null,
+    ...perGameState(rules),
+  };
+}
+
+/** State that starts afresh in every game. */
+function perGameState(rules: SetsRules): Partial<SetsSnapshot> {
+  return {
+    ...(rules.doubles && rules.serveOrder === 'badminton' ? { rightPlayer: { a: 1 as const, b: 1 as const } } : {}),
+    ...(rules.doubles && rules.serveOrder === 'table_tennis' ? { swappedPair: null } : {}),
+    ...(rules.timeoutsPerSet != null ? { timeouts: { a: 0, b: 0 } } : {}),
   };
 }
 
@@ -59,8 +69,8 @@ export function setsNotices(s: SetsSnapshot, rules: SetsRules): { changeEnds: bo
   };
 }
 
-/** Table-tennis style serving derived from the score so undo / manual edits stay consistent. */
-function derivedServer(s: SetsSnapshot, rules: SetsRules, cur: Pair, firstServer: Side): Side {
+/** How many times the serve has changed hands in this game. */
+function serveTurn(s: SetsSnapshot, rules: SetsRules, cur: Pair): number {
   const every = rules.serve === 'alternate_5' ? 5 : 2;
   const n = cur.a + cur.b;
   const deuceAt = gameTarget(rules, s.gameIndex) - 1;
@@ -71,7 +81,58 @@ function derivedServer(s: SetsSnapshot, rules: SetsRules, cur: Pair, firstServer
   } else {
     flips = Math.floor(n / every);
   }
-  return flips % 2 === 0 ? firstServer : other(firstServer);
+  return flips;
+}
+
+/** Table-tennis style serving derived from the score so undo / manual edits stay consistent. */
+function derivedServer(s: SetsSnapshot, rules: SetsRules, cur: Pair, firstServer: Side): Side {
+  return serveTurn(s, rules, cur) % 2 === 0 ? firstServer : other(firstServer);
+}
+
+export type ServiceCall = {
+  /** Serving side. */
+  side: Side;
+  /** Badminton: the service court, from the server's score (even = right). */
+  court: 'right' | 'left' | null;
+  /** Doubles only: which player of the serving pair serves, and which player receives. */
+  server: 1 | 2 | null;
+  receiver: 1 | 2 | null;
+};
+
+const partner = (p: 1 | 2): 1 | 2 => (p === 1 ? 2 : 1);
+
+/**
+ * Who serves, from where, to whom. Player 1 of a pair is whoever serves (or receives) first for that pair.
+ * Badminton: even score = right court; partners swap courts only when their own side scores.
+ * Table-tennis doubles: A1 → B1 → A2 → B2, and in the deciding game the receiving pair swaps at the change of ends.
+ */
+export function serviceCall(s: SetsSnapshot, rules: SetsRules): ServiceCall | null {
+  if (s.state !== 'live' || !s.server) return null;
+  const side = s.server;
+  if (rules.serveOrder === 'badminton') {
+    const court = s.cur[side] % 2 === 0 ? 'right' : 'left';
+    if (!rules.doubles) return { side, court, server: null, receiver: null };
+    const right = s.rightPlayer ?? { a: 1, b: 1 };
+    const standing = (x: Side) => (court === 'right' ? right[x] : partner(right[x]));
+    return { side, court, server: standing(side), receiver: standing(other(side)) };
+  }
+  if (rules.serveOrder === 'table_tennis' && rules.doubles && s.firstServer) {
+    const turn = serveTurn(s, rules, s.cur) % 4;
+    let server = ([1, 1, 2, 2] as const)[turn] as 1 | 2;
+    let receiver = ([1, 2, 2, 1] as const)[turn] as 1 | 2;
+    if (s.swappedPair === side) server = partner(server);
+    if (s.swappedPair === other(side)) receiver = partner(receiver);
+    return { side, court: null, server, receiver };
+  }
+  return null;
+}
+
+/** Deciding game of table-tennis doubles: the first time a side reaches the change-of-ends score. */
+function swapPairAtChange(s: SetsSnapshot, rules: SetsRules): SetsSnapshot {
+  if (rules.serveOrder !== 'table_tennis' || !rules.doubles || rules.changeEndsAt == null || !s.server) return s;
+  const reached = isDecidingGame(rules, s.gameIndex) && Math.max(s.cur.a, s.cur.b) >= rules.changeEndsAt;
+  if (!reached) return s.swappedPair ? { ...s, swappedPair: null } : s;
+  return s.swappedPair ? s : { ...s, swappedPair: other(s.server) };
 }
 
 function withServer(s: SetsSnapshot, rules: SetsRules): SetsSnapshot {
@@ -98,6 +159,7 @@ function startNextGame(s: SetsSnapshot, rules: SetsRules): SetsSnapshot {
       firstServer: first,
       server: first,
       serverNumber: rules.serve === 'side_out' && rules.doubles ? 2 : 1,
+      ...perGameState(rules),
     },
     rules,
   );
@@ -155,16 +217,32 @@ export function reduceSets(s: SetsSnapshot, action: SetsAction, rules: SetsRules
         return finishGameIfWon(st, rules);
       }
 
+      // Badminton doubles: the serving pair swaps courts when it wins the rally.
+      if (st.rightPlayer && st.server === side) {
+        st = { ...st, rightPlayer: { ...st.rightPlayer, [side]: partner(st.rightPlayer[side]) } };
+      }
       st = { ...st, cur: { ...st.cur, [side]: st.cur[side] + 1 } };
       if (rules.serve === 'rally_winner') st = { ...st, server: side };
-      st = withServer(st, rules);
+      st = swapPairAtChange(withServer(st, rules), rules);
       return finishGameIfWon(st, rules);
     }
 
     case 'unpoint': {
       // Manual correction of the running game only (Undo is the normal way to take a point back).
       if (s.state !== 'live' || s.cur[action.side] <= 0) return s;
-      return withServer({ ...s, cur: { ...s.cur, [action.side]: s.cur[action.side] - 1 } }, rules);
+      let st: SetsSnapshot = { ...s, cur: { ...s.cur, [action.side]: s.cur[action.side] - 1 } };
+      if (st.rightPlayer && st.server === action.side) {
+        st = { ...st, rightPlayer: { ...st.rightPlayer, [action.side]: partner(st.rightPlayer[action.side]) } };
+      }
+      return swapPairAtChange(withServer(st, rules), rules);
+    }
+
+    case 'timeout': {
+      const max = rules.timeoutsPerSet;
+      if (max == null || s.state !== 'live') return s;
+      const taken = s.timeouts ?? { a: 0, b: 0 };
+      const next = Math.max(0, Math.min(max, taken[action.side] + action.delta));
+      return next === taken[action.side] ? s : { ...s, timeouts: { ...taken, [action.side]: next } };
     }
   }
 }

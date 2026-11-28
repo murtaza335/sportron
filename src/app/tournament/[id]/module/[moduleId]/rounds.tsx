@@ -32,7 +32,7 @@ export default function RoundsScreen() {
     return (
       <View style={styles.denied}>
         <ThemedText variant="heading">No access</ThemedText>
-        <ThemedText muted>Only module admins can edit rounds.</ThemedText>
+        <ThemedText muted>Only sport managers can edit rounds.</ThemedText>
       </View>
     );
   }

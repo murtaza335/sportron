@@ -28,8 +28,12 @@ export interface SetsRules {
   changeEndsAt: number | null;
   /** Reminder only: interval when a side reaches this many points (badminton 11). */
   intervalAt: number | null;
-  /** Pickleball side-out scoring: doubles has server 1 / 2. */
+  /** Pickleball side-out scoring: doubles has server 1 / 2. Badminton / table tennis: track who serves. */
   doubles: boolean;
+  /** Which service-order rules to show: badminton service courts, or the table-tennis doubles rotation. */
+  serveOrder?: 'badminton' | 'table_tennis' | null;
+  /** Timeouts each side may take per set (volleyball 2). null = not counted. */
+  timeoutsPerSet?: number | null;
 }
 
 export interface TennisRules {
@@ -70,6 +74,10 @@ export interface TimedRules {
   foulsReset: 'period' | 'half' | 'never';
   bonusAt: number | null;
   timeoutsPerHalf: number | null;
+  /** Timeouts that differ by half (FIBA: 2, then 3, then 1 per overtime). Wins over timeoutsPerHalf. */
+  timeoutLimits?: { firstHalf: number; secondHalf: number; overtime: number } | null;
+  /** Overtime is untimed and ends when a side scores this many points in it (3x3 basketball: 2). */
+  otTarget?: number | null;
 }
 
 export interface CricketRules {
@@ -120,6 +128,13 @@ export interface SetsSnapshot {
   /** Pickleball doubles: 1 or 2. */
   serverNumber: 1 | 2;
   lastGameWinner: Side | null;
+  // The next three are optional so snapshots from older app builds still load.
+  /** Badminton doubles: which player (1 or 2) of each pair stands in the right service court. */
+  rightPlayer?: { a: 1 | 2; b: 1 | 2 };
+  /** Table-tennis doubles, deciding game: the pair that swapped its order at the change of ends. */
+  swappedPair?: Side | null;
+  /** Timeouts taken in the current set. */
+  timeouts?: Pair;
 }
 
 export interface TennisSet extends Pair {
@@ -218,7 +233,8 @@ export type SetsAction =
   | { t: 'point'; side: Side }
   | { t: 'unpoint'; side: Side }
   | { t: 'nextGame' }
-  | { t: 'setServer'; side: Side };
+  | { t: 'setServer'; side: Side }
+  | { t: 'timeout'; side: Side; delta: number };
 
 export type TennisAction = { t: 'point'; side: Side } | { t: 'nextSet' } | { t: 'setServer'; side: Side };
 

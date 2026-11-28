@@ -26,6 +26,8 @@ import type {
   TournamentScope,
   TournamentRole,
   ModuleStatus,
+  ScoringMatch,
+  MatchScorer,
   TournamentRound,
 } from '@/types';
 
@@ -201,6 +203,11 @@ export async function upsertEntryField(
   });
 }
 
+/** Name is always required; the other core fields can be required, optional or off (migration 144). */
+export async function setCoreFieldMode(fieldId: string, mode: 'required' | 'optional' | 'off'): Promise<void> {
+  await rpc<null>('set_core_field_mode', { p_field: fieldId, p_mode: mode });
+}
+
 export async function archiveEntryField(fieldId: string): Promise<void> {
   await rpc<null>('archive_tournament_entry_field', { p_field: fieldId });
 }
@@ -260,6 +267,30 @@ export async function removeModuleAdmin(moduleId: string, profileId: string): Pr
 }
 
 // ─── Module admin writes ─────────────────────────────────────────────────────
+
+// ─── Scorers ─────────────────────────────────────────────────────────────────
+
+export async function fetchModuleScorers(moduleId: string): Promise<ProfileLite[]> {
+  return (await rpc<ProfileLite[] | null>('get_module_scorers', { p_module: moduleId })) ?? [];
+}
+
+export async function addModuleScorer(moduleId: string, profileId: string): Promise<void> {
+  await rpc<null>('add_module_scorer', { p_module: moduleId, p_profile: profileId });
+}
+
+export async function removeModuleScorer(moduleId: string, profileId: string): Promise<void> {
+  await rpc<null>('remove_module_scorer', { p_module: moduleId, p_profile: profileId });
+}
+
+export async function fetchMyScoringMatches(): Promise<ScoringMatch[]> {
+  const r = await rpc<{ matches?: ScoringMatch[] } | null>('get_my_scoring_matches');
+  return r?.matches ?? [];
+}
+
+/** Managers only: who recorded the result / who is scoring right now. */
+export async function fetchMatchScorer(matchId: string): Promise<MatchScorer> {
+  return rpc<MatchScorer>('get_match_scorer', { p_match: matchId });
+}
 
 export async function setModuleStatus(moduleId: string, status: ModuleStatus): Promise<void> {
   await rpc<null>('set_module_status', { p_module: moduleId, p_status: status });

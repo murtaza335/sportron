@@ -74,10 +74,27 @@ export interface LiveBoard {
   server_now: string;
   tournament?: { id: string; name: string; location: string | null; live_code: string | null; status: string };
   display?: LiveDisplay;
+  /** The organization requires the Sportron promo (migration 145). */
+  brand?: { locked: boolean };
   app_link?: string;
   live: LiveMatch[];
   recent: LiveMatch[];
   up_next: LiveMatch[];
+}
+
+/** `get_screen_board(code)`: a permanent screen link shows whichever tournament is assigned to it. */
+export interface ScreenBoard {
+  /** false = unknown or removed screen code. */
+  found: boolean;
+  /** true = show the waiting page (nothing assigned, finished, hidden, paused, or not started yet). */
+  waiting: boolean;
+  server_now: string;
+  screen?: { name: string; venue: string | null; courts: string[] | null; layout: string | null };
+  org?: { name: string; short_name: string | null };
+  /** The assigned tournament's live code (its channel), when it can be shown. */
+  live_code?: string | null;
+  board?: LiveBoard | null;
+  next?: { name: string; starts_at: string } | null;
 }
 
 export interface LiveMatchDetail extends LiveMatch {
@@ -114,6 +131,8 @@ export interface LiveTournamentChip {
 }
 
 export interface LiveSettings {
+  /** The organization requires the "Follow live in the app" footer (migration 145). */
+  promo_locked?: boolean;
   live_public: boolean;
   live_code: string;
   live_display: LiveDisplay;

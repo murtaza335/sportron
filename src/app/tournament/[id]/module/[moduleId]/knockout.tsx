@@ -59,7 +59,7 @@ export default function KnockoutScreen() {
     return (
       <View style={styles.denied}>
         <ThemedText variant="heading">No access</ThemedText>
-        <ThemedText muted>Only module admins can build the knockout.</ThemedText>
+        <ThemedText muted>Only sport managers can build the knockout.</ThemedText>
       </View>
     );
   }

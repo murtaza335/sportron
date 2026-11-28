@@ -14,6 +14,8 @@ const sets = (preset: string, o: Partial<SetsRules>): SetsRules => ({
   changeEndsAt: null,
   intervalAt: null,
   doubles: false,
+  serveOrder: null,
+  timeoutsPerSet: null,
   ...o,
 });
 
@@ -48,6 +50,8 @@ const timed = (preset: string, o: Partial<TimedRules>): TimedRules => ({
   foulsReset: 'never',
   bonusAt: null,
   timeoutsPerHalf: null,
+  timeoutLimits: null,
+  otTarget: null,
   ...o,
 });
 
@@ -77,19 +81,19 @@ const simple = (preset: string, o: Partial<SimpleRules>): SimpleRules => ({
 
 export const PRESET_LIST: { id: string; label: string; sports: string[]; rules: LiveRules }[] = [
   // rally sets
-  { id: 'table_tennis_11', label: 'Table tennis · 11 points', sports: ['table_tennis'], rules: sets('table_tennis_11', { pointsToWin: 11, bestOf: 5, serve: 'alternate_2', changeEndsAt: 5 }) },
-  { id: 'table_tennis_21', label: 'Table tennis · 21 points', sports: ['table_tennis'], rules: sets('table_tennis_21', { pointsToWin: 21, bestOf: 3, serve: 'alternate_5' }) },
-  { id: 'badminton_21', label: 'Badminton · 21 points', sports: ['badminton'], rules: sets('badminton_21', { pointsToWin: 21, cap: 30, bestOf: 3, intervalAt: 11, changeEndsAt: 11 }) },
-  { id: 'badminton_15', label: 'Badminton · 15 points', sports: ['badminton'], rules: sets('badminton_15', { pointsToWin: 15, cap: 21, bestOf: 3, intervalAt: 8, changeEndsAt: 8 }) },
+  { id: 'table_tennis_11', label: 'Table tennis · 11 points', sports: ['table_tennis'], rules: sets('table_tennis_11', { serveOrder: 'table_tennis', pointsToWin: 11, bestOf: 5, serve: 'alternate_2', changeEndsAt: 5 }) },
+  { id: 'table_tennis_21', label: 'Table tennis · 21 points', sports: ['table_tennis'], rules: sets('table_tennis_21', { serveOrder: 'table_tennis', pointsToWin: 21, bestOf: 3, serve: 'alternate_5' }) },
+  { id: 'badminton_21', label: 'Badminton · 21 points', sports: ['badminton'], rules: sets('badminton_21', { serveOrder: 'badminton', pointsToWin: 21, cap: 30, bestOf: 3, intervalAt: 11, changeEndsAt: 11 }) },
+  { id: 'badminton_15', label: 'Badminton · 15 points', sports: ['badminton'], rules: sets('badminton_15', { serveOrder: 'badminton', pointsToWin: 15, cap: 21, bestOf: 3, intervalAt: 8, changeEndsAt: 8 }) },
   { id: 'squash_11', label: 'Squash · 11 points', sports: ['squash'], rules: sets('squash_11', { pointsToWin: 11, bestOf: 5 }) },
   { id: 'squash_15', label: 'Squash · 15 points', sports: ['squash'], rules: sets('squash_15', { pointsToWin: 15, bestOf: 5 }) },
   { id: 'pickleball_11_sideout', label: 'Pickleball · side-out, 11', sports: ['pickleball'], rules: sets('pickleball_11_sideout', { pointsToWin: 11, bestOf: 3, serve: 'side_out', doubles: true }) },
   { id: 'pickleball_rally_11', label: 'Pickleball · rally, 11', sports: ['pickleball'], rules: sets('pickleball_rally_11', { pointsToWin: 11, bestOf: 3 }) },
   { id: 'pickleball_rally_15', label: 'Pickleball · rally, 15', sports: ['pickleball'], rules: sets('pickleball_rally_15', { pointsToWin: 15, bestOf: 1 }) },
   { id: 'pickleball_rally_21', label: 'Pickleball · rally, 21', sports: ['pickleball'], rules: sets('pickleball_rally_21', { pointsToWin: 21, bestOf: 1 }) },
-  { id: 'volleyball_25', label: 'Volleyball · best of 5', sports: ['volleyball'], rules: sets('volleyball_25', { pointsToWin: 25, bestOf: 5, deciderPoints: 15, changeEndsAt: 8 }) },
-  { id: 'volleyball_25_bo3', label: 'Volleyball · best of 3', sports: ['volleyball'], rules: sets('volleyball_25_bo3', { pointsToWin: 25, bestOf: 3, deciderPoints: 15, changeEndsAt: 8 }) },
-  { id: 'beach_volleyball_21', label: 'Beach volleyball · 21', sports: ['volleyball', 'beach_volleyball'], rules: sets('beach_volleyball_21', { pointsToWin: 21, bestOf: 3, deciderPoints: 15, changeEndsAt: 7 }) },
+  { id: 'volleyball_25', label: 'Volleyball · best of 5', sports: ['volleyball'], rules: sets('volleyball_25', { timeoutsPerSet: 2, pointsToWin: 25, bestOf: 5, deciderPoints: 15, changeEndsAt: 8 }) },
+  { id: 'volleyball_25_bo3', label: 'Volleyball · best of 3', sports: ['volleyball'], rules: sets('volleyball_25_bo3', { timeoutsPerSet: 2, pointsToWin: 25, bestOf: 3, deciderPoints: 15, changeEndsAt: 8 }) },
+  { id: 'beach_volleyball_21', label: 'Beach volleyball · 21', sports: ['volleyball', 'beach_volleyball'], rules: sets('beach_volleyball_21', { timeoutsPerSet: 1, pointsToWin: 21, bestOf: 3, deciderPoints: 15, changeEndsAt: 7 }) },
   // tennis
   { id: 'tennis_bo3', label: 'Tennis · best of 3', sports: ['tennis', 'padel'], rules: tennis('tennis_bo3', {}) },
   { id: 'tennis_bo3_stb', label: 'Tennis · best of 3, super tiebreak', sports: ['tennis', 'padel'], rules: tennis('tennis_bo3_stb', { finalSet: 'super_tiebreak' }) },
@@ -97,10 +101,10 @@ export const PRESET_LIST: { id: string; label: string; sports: string[]; rules: 
   { id: 'tennis_pro_set_8', label: 'Tennis · pro set to 8', sports: ['tennis', 'padel'], rules: tennis('tennis_pro_set_8', { bestOf: 1, gamesPerSet: 8 }) },
   { id: 'tennis_bo5', label: 'Tennis · best of 5', sports: ['tennis'], rules: tennis('tennis_bo5', { bestOf: 5 }) },
   // timed
-  { id: 'basketball_fiba', label: 'Basketball · FIBA 4 × 10', sports: ['basketball'], rules: timed('basketball_fiba', { periods: 4, periodSeconds: 600, clock: 'down', buttons: [1, 2, 3], label: 'Point', overtime: 'repeat_until_winner', otPeriods: 1, otSeconds: 300, counters: ['team_fouls', 'timeouts'], foulsReset: 'period', bonusAt: 5, timeoutsPerHalf: 3 }) },
+  { id: 'basketball_fiba', label: 'Basketball · FIBA 4 × 10', sports: ['basketball'], rules: timed('basketball_fiba', { periods: 4, periodSeconds: 600, clock: 'down', buttons: [1, 2, 3], label: 'Point', overtime: 'repeat_until_winner', otPeriods: 1, otSeconds: 300, counters: ['team_fouls', 'timeouts'], foulsReset: 'period', bonusAt: 5, timeoutsPerHalf: 3, timeoutLimits: { firstHalf: 2, secondHalf: 3, overtime: 1 } }) },
   { id: 'basketball_nba', label: 'Basketball · NBA 4 × 12', sports: ['basketball'], rules: timed('basketball_nba', { periods: 4, periodSeconds: 720, clock: 'down', buttons: [1, 2, 3], label: 'Point', overtime: 'repeat_until_winner', otPeriods: 1, otSeconds: 300, counters: ['team_fouls', 'timeouts'], foulsReset: 'period', bonusAt: 5, timeoutsPerHalf: 3 }) },
   { id: 'basketball_school', label: 'Basketball · school 4 × 8', sports: ['basketball'], rules: timed('basketball_school', { periods: 4, periodSeconds: 480, clock: 'down', buttons: [1, 2, 3], label: 'Point', overtime: 'repeat_until_winner', otPeriods: 1, otSeconds: 180, counters: ['team_fouls'], foulsReset: 'period', bonusAt: 5 }) },
-  { id: 'basketball_3x3', label: 'Basketball · 3x3 to 21', sports: ['basketball'], rules: timed('basketball_3x3', { periods: 1, periodSeconds: 600, clock: 'down', buttons: [1, 2], label: 'Point', target: 21, overtime: 'golden_goal', otPeriods: 1, otSeconds: 120, counters: ['team_fouls'], foulsReset: 'never' }) },
+  { id: 'basketball_3x3', label: 'Basketball · 3x3 to 21', sports: ['basketball'], rules: timed('basketball_3x3', { periods: 1, periodSeconds: 600, clock: 'down', buttons: [1, 2], label: 'Point', target: 21, overtime: 'golden_goal', otPeriods: 1, otSeconds: 120, otTarget: 2, counters: ['team_fouls'], foulsReset: 'never' }) },
   { id: 'football_11', label: 'Football · 2 × 45', sports: ['football'], rules: timed('football_11', { periods: 2, periodSeconds: 2700, clock: 'up', overtime: 'extra_time', otPeriods: 2, otSeconds: 900, shootout: 'penalties', counters: ['cards'] }) },
   { id: 'football_school', label: 'Football · 2 × 30', sports: ['football'], rules: timed('football_school', { periods: 2, periodSeconds: 1800, clock: 'up', shootout: 'penalties', counters: ['cards'] }) },
   { id: 'football_7', label: 'Football · 7-a-side 2 × 25', sports: ['football'], rules: timed('football_7', { periods: 2, periodSeconds: 1500, clock: 'up', shootout: 'penalties' }) },
@@ -161,6 +165,8 @@ export interface ResolveOptions {
   matchBestOf?: number | null;
   /** The match may end level (module allows draws and this is a league / group match). */
   drawAllowed?: boolean;
+  /** The module is a doubles competition (teams of two): show who serves. A saved `doubles` setting wins. */
+  doublesModule?: boolean;
 }
 
 const sameKind = (a: unknown, b: unknown): boolean =>
@@ -180,6 +186,9 @@ export function resolveRules(opts: ResolveOptions): LiveRules {
   if (rules.family === 'sets' || rules.family === 'tennis') {
     const n = opts.matchBestOf;
     if (n != null && n >= 1 && n % 2 === 1) rules.bestOf = rules.family === 'tennis' ? Math.min(n, 5) : n;
+  }
+  if (rules.family === 'sets' && rules.serveOrder && opts.doublesModule && !('doubles' in saved)) {
+    rules.doubles = true;
   }
   if (rules.family === 'timed' || rules.family === 'simple') {
     rules.drawAllowed = !!opts.drawAllowed;
@@ -210,7 +219,7 @@ export function describeRules(r: LiveRules): string {
       if (r.target) bits.push(`first to ${r.target}`);
       if (r.overtime === 'repeat_until_winner') bits.push(`overtime ${mins(r.otSeconds)}`);
       else if (r.overtime === 'extra_time') bits.push(`extra time ${r.otPeriods} × ${mins(r.otSeconds)}`);
-      else if (r.overtime === 'golden_goal') bits.push('golden goal');
+      else if (r.overtime === 'golden_goal') bits.push(r.otTarget ? `overtime: first to ${r.otTarget}` : 'golden goal');
       if (r.shootout !== 'none') bits.push(r.shootout === 'seven_metre' ? '7 m throws' : r.shootout === 'shootout' ? 'shoot-out' : 'penalties');
       return bits.join(' · ');
     }

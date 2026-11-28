@@ -123,7 +123,7 @@ begin
              or p.proname like 'reveal\_%' or p.proname like 'generate\_%' or p.proname like 'reset\_%' or p.proname like 'update\_%'
              or p.proname like 'delete\_%' or p.proname like 'build\_%' or p.proname like 'schedule\_%')
         and has_function_privilege('anon', p.oid, 'execute')
-        and p.proname <> 'get_live_board'
+        and p.proname not in ('get_live_board', 'get_screen_board')   -- the two public screen reads (133, 145)
         and p.proname not like 'guest\_get\_%'),
     'anon can execute nothing but guest_get_* and get_live_board (writes, admin and regular reads stay closed)');
   perform gt_test.chk(not has_function_privilege('anon', 'public.admin_set_guest_mode(boolean,text)', 'execute')

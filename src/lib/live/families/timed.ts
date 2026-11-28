@@ -1,6 +1,7 @@
 import { clockElapsed, clockStart, clockStop, clockSync, clockSet, newClock } from '../clock';
 import {
   other,
+  type ClockState,
   type CounterSet,
   type Pair,
   type Shootout,
@@ -31,6 +32,7 @@ export function initTimed(_rules: TimedRules, at = 0): TimedSnapshot {
 /** Length of a period in ms (regular or overtime); null when the format has no clock. */
 export function periodLimitMs(rules: TimedRules, period: number): number | null {
   if (rules.clock === 'none') return null;
+  if (period > rules.periods && rules.otTarget) return null;          // untimed "first to N" overtime
   return (period > rules.periods ? rules.otSeconds : rules.periodSeconds) * 1000;
 }
 
@@ -46,6 +48,14 @@ export function periodName(rules: TimedRules, period: number): string {
   if (rules.periods === 3) return `P${period}`;
   if (rules.periods === 1) return 'Match';
   return `Period ${period}`;
+}
+
+/** Timeouts allowed in the current half (or overtime period). null = no limit shown. */
+export function timeoutLimit(rules: TimedRules, period: number): number | null {
+  const l = rules.timeoutLimits;
+  if (!l) return rules.timeoutsPerHalf;
+  if (period > rules.periods) return l.overtime;
+  return period > rules.periods / 2 ? l.secondHalf : l.firstHalf;
 }
 
 // ─── Shootout maths ──────────────────────────────────────────────────────────
@@ -78,7 +88,9 @@ const isHalfBoundary = (rules: TimedRules, period: number): boolean => rules.per
 function periodStartCounters(s: TimedSnapshot, rules: TimedRules, newPeriod: number): TimedSnapshot['counters'] {
   const resetFouls =
     rules.foulsReset === 'period' || (rules.foulsReset === 'half' && (isHalfBoundary(rules, newPeriod) || newPeriod > rules.periods));
-  const resetTimeouts = rules.timeoutsPerHalf != null && (isHalfBoundary(rules, newPeriod) || newPeriod === rules.periods + 1);
+  const resetTimeouts = rules.timeoutLimits
+    ? isHalfBoundary(rules, newPeriod) || newPeriod > rules.periods       // each overtime has its own
+    : rules.timeoutsPerHalf != null && (isHalfBoundary(rules, newPeriod) || newPeriod === rules.periods + 1);
   const next = (c: CounterSet): CounterSet => ({
     ...c,
     fouls: resetFouls ? 0 : c.fouls,
@@ -122,14 +134,23 @@ function applyScore(s: TimedSnapshot, rules: TimedRules, side: Side, value: numb
   const byPeriod = s.byPeriod.map((p, i) => (i === s.period - 1 ? { ...p, [side]: Math.max(0, p[side] + (next - s.scores[side])) } : p));
   let st: TimedSnapshot = { ...s, scores, byPeriod };
   if (value > 0) {
+    const overtime = st.period > rules.periods;
+    const inOvertime = st.byPeriod.slice(rules.periods).reduce((n, p) => n + p[side], 0);
     const decided =
-      (rules.target != null && next >= rules.target) ||
-      (rules.overtime === 'golden_goal' && st.period > rules.periods);
+      overtime && rules.otTarget
+        ? inOvertime >= rules.otTarget                                      // replaces the regular target
+        : (rules.target != null && next >= rules.target) || (rules.overtime === 'golden_goal' && overtime);
     if (decided) {
       st = { ...st, state: 'decided', winner: side, clock: clockStop(st.clock, at ?? st.clock.ref) };
     }
   }
   return st;
+}
+
+/** A countdown never runs past 0:00, however late the stop arrives. */
+function stopAtZero(c: ClockState, rules: TimedRules, period: number): ClockState {
+  const limit = periodLimitMs(rules, period);
+  return rules.clock === 'down' && limit != null && c.elapsedMs > limit ? { ...c, elapsedMs: limit } : c;
 }
 
 export function reduceTimed(s: TimedSnapshot, action: TimedAction, rules: TimedRules): TimedSnapshot {
@@ -138,7 +159,7 @@ export function reduceTimed(s: TimedSnapshot, action: TimedAction, rules: TimedR
       if (s.state !== 'live' || s.phase === 'shootout') return s;
       return { ...s, clock: clockStart(s.clock, action.at) };
     case 'clockStop':
-      return { ...s, clock: clockStop(s.clock, action.at) };
+      return { ...s, clock: stopAtZero(clockStop(s.clock, action.at), rules, s.period) };
     case 'clockSync':
       return { ...s, clock: clockSync(s.clock, action.at) };
     case 'clockSet':
@@ -149,7 +170,8 @@ export function reduceTimed(s: TimedSnapshot, action: TimedAction, rules: TimedR
 
     case 'endPeriod': {
       if (s.state !== 'live' || s.phase === 'shootout') return s;
-      const stopped: TimedSnapshot = { ...s, clock: clockStop(s.clock, action.at) };
+      if (s.period > rules.periods && rules.otTarget) return s;           // ends by score only
+      const stopped: TimedSnapshot = { ...s, clock: stopAtZero(clockStop(s.clock, action.at), rules, s.period) };
       return afterTime(stopped, rules);
     }
 

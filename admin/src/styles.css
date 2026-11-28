@@ -100,6 +100,8 @@ td.wrap { white-space: normal; }
 .badge-draft { color: var(--muted); }
 .badge-completed { color: var(--primary); border-color: var(--primary); }
 .badge-cancelled { color: var(--danger); border-color: var(--danger); }
+.badge-active { color: var(--ok); border-color: var(--ok); }
+.badge-suspended { color: var(--danger); border-color: var(--danger); }
 
 .tiles { display: grid; grid-template-columns: repeat(auto-fit, minmax(130px, 1fr)); gap: 12px; }
 .tile { background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius); padding: 14px; text-decoration: none; color: var(--text); display: flex; flex-direction: column; }

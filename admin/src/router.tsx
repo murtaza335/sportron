@@ -14,6 +14,8 @@ import { Tournaments } from './pages/Tournaments';
 import { TournamentNew } from './pages/TournamentNew';
 import { TournamentDetail } from './pages/TournamentDetail';
 import { Reports } from './pages/Reports';
+import { Organizations } from './pages/Organizations';
+import { OrganizationDetail } from './pages/OrganizationDetail';
 import { UsageLayout } from './pages/usage/UsageLayout';
 import { UsageOverview } from './pages/usage/UsageOverview';
 import { UsageCommunities } from './pages/usage/UsageCommunities';
@@ -77,6 +79,8 @@ export const router = createBrowserRouter([
           </RequireRole>
         ),
       },
+      { path: 'organizations', element: <RequireRole roles={['super_admin']}><Organizations /></RequireRole> },
+      { path: 'organizations/:id', element: <RequireRole roles={['super_admin']}><OrganizationDetail /></RequireRole> },
       { path: 'tournaments', element: <RequireRole roles={['super_admin', 'tournament_manager']}><Tournaments /></RequireRole> },
       { path: 'tournaments/new', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentNew /></RequireRole> },
       { path: 'tournaments/:id', element: <RequireRole roles={['super_admin', 'tournament_manager']}><TournamentDetail /></RequireRole> },

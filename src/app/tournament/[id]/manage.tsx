@@ -7,6 +7,10 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { ProjectorCard } from '@/components/live/ProjectorCard';
+import { CoOrganizers } from '@/components/organize/CoOrganizers';
+import { OrgLifecycle } from '@/components/organize/OrgLifecycle';
+import { ShowOnScreen } from '@/components/organize/ShowOnScreen';
+import { SuspendedBanner } from '@/components/organize/parts';
 import { FormField, PillSelect, SectionLabel, TextField } from '@/components/tournaments/form';
 import { PromoManageSection } from '@/components/tournaments/PromoManageSection';
 import { InfoPill, StatusPill } from '@/components/tournaments/StatusPill';
@@ -14,6 +18,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { invalidateTournamentsCache } from '@/hooks/useTournaments';
 import { useTournament } from '@/hooks/useTournament';
@@ -40,6 +45,8 @@ export default function TournamentManageScreen() {
   const [endsAt, setEndsAt] = useState<Date | null>(null);
   const [status, setStatus] = useState<TournamentStatus>('draft');
   const [saving, setSaving] = useState(false);
+
+  const orgUi = useFlag('organizations', false);
 
   const tournament = detail?.tournament;
   const updatedAt = tournament?.updated_at;
@@ -70,6 +77,8 @@ export default function TournamentManageScreen() {
   }
 
   const t = detail.tournament;
+  // Organization tournaments: status has its own actions, the organization label is fixed.
+  const orgMode = orgUi && !!t.organization_id;
   const writable = t.status !== 'completed' && t.status !== 'cancelled';
   const nameOk = name.trim().length >= 3;
   const datesOk = !startsAt || !endsAt || endsAt >= startsAt;
@@ -105,12 +114,11 @@ export default function TournamentManageScreen() {
       await updateTournament(id, {
         name: name.trim(),
         description: description.trim() || null,
-        organization: organization.trim() || null,
         location: location.trim() || null,
         image_url: imageUrl,
         starts_at: iso(startsAt),
         ends_at: iso(endsAt),
-        status,
+        ...(orgMode ? {} : { organization: organization.trim() || null, status }),
       });
       invalidateTournamentsCache();
       await refresh();
@@ -127,6 +135,10 @@ export default function TournamentManageScreen() {
       contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}
       keyboardShouldPersistTaps="handled"
     >
+      {orgMode && t.organization_suspended && <SuspendedBanner />}
+      {orgMode && (
+        <OrgLifecycle detail={detail} onChanged={refresh} onDeleted={() => router.replace(tournamentRoutes.organize(t.organization_id!))} />
+      )}
       <FormField label="Cover image">
         {imageUri ? (
           <View>
@@ -154,9 +166,11 @@ export default function TournamentManageScreen() {
         <TextField value={description} onChangeText={setDescription} maxLength={2000} multiline style={{ minHeight: 96, textAlignVertical: 'top' }} />
       </FormField>
 
-      <FormField label="Organization">
-        <TextField value={organization} onChangeText={setOrganization} maxLength={80} />
-      </FormField>
+      {!orgMode && (
+        <FormField label="Organization">
+          <TextField value={organization} onChangeText={setOrganization} maxLength={80} />
+        </FormField>
+      )}
 
       <FormField label="Location">
         <TextField value={location} onChangeText={setLocation} maxLength={120} />
@@ -170,21 +184,23 @@ export default function TournamentManageScreen() {
         <DateTimeField value={endsAt} onChange={setEndsAt} placeholder="Select end" />
       </FormField>
 
-      <FormField
-        label="Status"
-        hint="Draft is hidden. Published is visible to everyone. Completed and cancelled make the tournament read-only (you can switch back here)."
-      >
-        <PillSelect<TournamentStatus>
-          options={[
-            { value: 'draft', label: 'Draft' },
-            { value: 'published', label: 'Published' },
-            { value: 'completed', label: 'Completed' },
-            { value: 'cancelled', label: 'Cancelled' },
-          ]}
-          value={status}
-          onChange={setStatus}
-        />
-      </FormField>
+      {!orgMode && (
+        <FormField
+          label="Status"
+          hint="Draft is hidden. Published is visible to everyone. Completed and cancelled make the tournament read-only (you can switch back here)."
+        >
+          <PillSelect<TournamentStatus>
+            options={[
+              { value: 'draft', label: 'Draft' },
+              { value: 'published', label: 'Published' },
+              { value: 'completed', label: 'Completed' },
+              { value: 'cancelled', label: 'Cancelled' },
+            ]}
+            value={status}
+            onChange={setStatus}
+          />
+        </FormField>
+      )}
 
       <Button label="Save changes" onPress={save} disabled={!canSave} loading={saving} />
 
@@ -200,7 +216,7 @@ export default function TournamentManageScreen() {
 
       <View style={{ gap: Spacing.sm }}>
         <View style={styles.sectionHead}>
-          <SectionLabel>Modules</SectionLabel>
+          <SectionLabel>Sports</SectionLabel>
           <SectionLabel>{String(detail.modules.length)}</SectionLabel>
         </View>
         {detail.modules.map((m) => (
@@ -217,14 +233,19 @@ export default function TournamentManageScreen() {
           </Pressable>
         ))}
         {writable && (
-          <Button label="Add module" variant="secondary" onPress={() => router.push(tournamentRoutes.moduleForm(id))} />
+          <Button label="Add sport" variant="secondary" onPress={() => router.push(tournamentRoutes.moduleForm(id))} />
         )}
       </View>
 
       <PromoManageSection tournamentId={id} />
 
+      {orgMode && <ShowOnScreen detail={detail} />}
+
       <ProjectorCard tournamentId={id} tournamentName={t.name} />
 
+      {orgMode ? (
+        <CoOrganizers detail={detail} onChanged={refresh} />
+      ) : (
       <View style={{ gap: Spacing.sm }}>
         <SectionLabel>Tournament admins</SectionLabel>
         <View style={styles.admins}>
@@ -237,6 +258,7 @@ export default function TournamentManageScreen() {
         </View>
         <ThemedText variant="caption" muted>Tournament admins are assigned by the Sportron team.</ThemedText>
       </View>
+      )}
     </ScrollView>
   );
 }

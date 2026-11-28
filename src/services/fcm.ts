@@ -42,6 +42,8 @@ export type NotificationType =
   | 'tournament_match_scheduled'
   | 'tournament_match_result'
   | 'tournament_module_completed'
+  | 'tournament_scorer_assigned'
+  | 'organization_role_assigned'
   | 'community_post_created'
   | 'community_post_liked'
   | 'community_post_commented'
@@ -65,6 +67,7 @@ export interface NotificationData {
   postId?: string;
   tournamentId?: string;
   moduleId?: string;
+  organizationId?: string;
   message?: string;
 }
 
@@ -265,6 +268,7 @@ export function parseRemoteMessageForLocal(remoteMessage: FirebaseMessagingTypes
     communityId: data?.communityId,
     tournamentId: data?.tournamentId,
     moduleId: data?.moduleId,
+    organizationId: data?.organizationId,
     message: data?.message,
   };
 

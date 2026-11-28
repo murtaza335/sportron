@@ -4,18 +4,19 @@ import { useState } from 'react';
 import { ActivityIndicator, Pressable, ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-import { EntryFieldEditorSheet } from '@/components/tournaments/EntryFieldEditorSheet';
+import { coreFieldMode, EntryFieldEditorSheet, type CoreFieldMode } from '@/components/tournaments/EntryFieldEditorSheet';
 import { SectionLabel } from '@/components/tournaments/form';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
 import { alert } from '@/lib/alert';
 import { friendlyTournamentError } from '@/lib/tournamentErrors';
 import { FIELD_TYPE_LABELS } from '@/lib/tournamentFormat';
-import { archiveEntryField, reorderEntryFields, upsertEntryField } from '@/services/tournaments';
+import { archiveEntryField, reorderEntryFields, setCoreFieldMode, upsertEntryField } from '@/services/tournaments';
 import type { EntryFieldInput, TournamentEntryField } from '@/types';
 
 export default function TournamentFieldsScreen() {
@@ -23,13 +24,15 @@ export default function TournamentFieldsScreen() {
   const theme = useTheme();
   const insets = useSafeAreaInsets();
   const { loading: tLoading, isTournamentAdmin, detail } = useTournament(id);
-  const { fields, loading, reload } = useTournamentFields(id);
+  const flexibleCore = useFlag('organizations', false);
+  // archived fields included: a switched-off core field must stay reachable to switch it on again
+  const { fields, loading, reload } = useTournamentFields(id, true);
   const [editorOpen, setEditorOpen] = useState(false);
   const [editing, setEditing] = useState<TournamentEntryField | null>(null);
   const [saving, setSaving] = useState(false);
 
   const core = fields.filter((f) => f.is_core);
-  const custom = fields.filter((f) => !f.is_core);
+  const custom = fields.filter((f) => !f.is_core && !f.archived_at);
   const writable = detail?.tournament.status !== 'completed' && detail?.tournament.status !== 'cancelled';
 
   const openEditor = (f: TournamentEntryField | null) => {
@@ -37,10 +40,22 @@ export default function TournamentFieldsScreen() {
     setEditorOpen(true);
   };
 
-  const save = async (input: EntryFieldInput) => {
+  const save = async (input: EntryFieldInput, coreMode: CoreFieldMode | null) => {
     setSaving(true);
     try {
-      await upsertEntryField(id, input);
+      if (coreMode && input.id) {
+        // a switched-off field can't be renamed: switch it on before saving, off after
+        const wasOff = editing ? coreFieldMode(editing) === 'off' : false;
+        if (coreMode !== 'off') {
+          await setCoreFieldMode(input.id, coreMode);
+          await upsertEntryField(id, input);
+        } else {
+          if (!wasOff) await upsertEntryField(id, input);
+          await setCoreFieldMode(input.id, 'off');
+        }
+      } else {
+        await upsertEntryField(id, input);
+      }
       setEditorOpen(false);
       await reload();
     } catch (e) {
@@ -95,14 +110,20 @@ export default function TournamentFieldsScreen() {
   }
 
   const meta = (f: TournamentEntryField) =>
-    [FIELD_TYPE_LABELS[f.field_type], f.is_public ? 'Public' : 'Private', f.is_required && !f.is_core ? 'Required' : null]
+    [
+      FIELD_TYPE_LABELS[f.field_type],
+      f.is_public ? 'Public' : 'Private',
+      f.is_core
+        ? coreFieldMode(f) === 'off' ? 'Off' : f.is_required ? 'Required' : 'Optional'
+        : f.is_required ? 'Required' : null,
+    ]
       .filter(Boolean)
       .join(' · ');
 
   return (
     <View style={[styles.flex, { backgroundColor: theme.background }]}>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: Spacing.xl + insets.bottom }]}>
-        <SectionLabel>Core fields (required for all)</SectionLabel>
+        <SectionLabel>{flexibleCore ? 'Standard fields' : 'Core fields (required for all)'}</SectionLabel>
         <View style={[styles.card, { backgroundColor: theme.backgroundElement, borderColor: theme.border }]}>
           {core.map((f, i) => (
             <Pressable
@@ -163,6 +184,7 @@ export default function TournamentFieldsScreen() {
       <EntryFieldEditorSheet
         visible={editorOpen}
         field={editing}
+        canSetCoreMode={flexibleCore}
         existingKeys={fields.map((f) => f.key)}
         saving={saving}
         onClose={() => setEditorOpen(false)}

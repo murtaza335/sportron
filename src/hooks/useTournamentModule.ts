@@ -180,6 +180,8 @@ export function useTournamentModule(moduleId: string | undefined) {
     groups,
     myRole,
     isModuleAdmin: myRole === 'module_admin' || myRole === 'tournament_admin',
+    /** Scorer only (not a manager): may start / score / finish live matches, nothing else. */
+    isScorer: myRole === 'scorer',
     loading,
     refreshing,
     error,

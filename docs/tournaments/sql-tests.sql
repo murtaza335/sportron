@@ -125,9 +125,13 @@ begin
     perform tt_test.expect_err(format('select public.archive_tournament_entry_field(%L)', v_cms),
       'CORE_FIELD_LOCKED', 'core field cannot be archived');
   
+    -- migration 144: other core fields may be optional; Name stays required and public flags stay locked
     perform tt_test.expect_err(
-      format('update public.tournament_entry_fields set is_required = false where id = %L', v_cms),
-      'CORE_FIELD_LOCKED', 'core field required-flag is locked (trigger)');
+      format('update public.tournament_entry_fields set is_required = false where tournament_id = %L and key = ''name''', v_t),
+      'CORE_FIELD_LOCKED', 'name required-flag is locked (trigger)');
+    perform tt_test.expect_err(
+      format('update public.tournament_entry_fields set is_public = true where id = %L', v_cms),
+      'CORE_FIELD_LOCKED', 'core field privacy is locked (trigger)');
   
     perform tt_test.expect_err(format('delete from public.tournament_entry_fields where id = %L', v_cms),
       'CORE_FIELD_LOCKED', 'core field cannot be deleted');

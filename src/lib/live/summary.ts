@@ -128,6 +128,7 @@ function summarizeTimed(s: TimedSnapshot, rules: TimedRules, opts: SummaryOption
   } else {
     parts.push(periodName(rules, s.period));
     if (s.addedMinutes > 0) parts.push(`+${s.addedMinutes}'`);
+    if (s.phase === 'overtime' && rules.otTarget) parts.push(`First to ${rules.otTarget}`);
     for (const side of ['a', 'b'] as const) {
       if (inBonus(s, rules, side)) parts.push(`Bonus ${sideName(side, opts.names)}`);
     }
