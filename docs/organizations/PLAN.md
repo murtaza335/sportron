@@ -1,7 +1,8 @@
 # Organizations on Sportron: Phase 1 plan (NUST)
 
-Status: **draft for owner approval**. Plan only: no code, migration or deployment has been changed.
-Source: [`BRIEF.md`](BRIEF.md) (2026-11-28) + the owner's answers below. Next migration number: **138**.
+Status: **built (steps A–G and docs), not yet applied or deployed.** Migrations 138–145. What differs from this
+plan and what is left (rollout, rehearsal, usability test): [`ROLLOUT.md`](ROLLOUT.md).
+Source: [`BRIEF.md`](BRIEF.md) (2026-11-28) + the owner's answers below.
 
 ---
 
