@@ -196,9 +196,10 @@ function FieldRow({ f, rules, set }: { f: Field; rules: Record<string, unknown>;
 export function ModuleRulesSection({ module, onSaved }: { module: TournamentModule; onSaved: () => void | Promise<void> }) {
   const theme = useTheme();
   const enabled = useFlag('live_scoring', false);
+  const doublesModule = module.participant_type === 'team' && module.roster_max === 2;
   const current = useMemo(
-    () => resolveRules({ sport: module.sport, sportKey: module.sport_key, liveRules: module.live_rules ?? null }),
-    [module.sport, module.sport_key, module.live_rules],
+    () => resolveRules({ sport: module.sport, sportKey: module.sport_key, liveRules: module.live_rules ?? null, doublesModule }),
+    [module.sport, module.sport_key, module.live_rules, doublesModule],
   );
   const [open, setOpen] = useState(false);
   const [draft, setDraft] = useState<LiveRules>(current);
@@ -209,7 +210,13 @@ export function ModuleRulesSection({ module, onSaved }: { module: TournamentModu
 
   if (!enabled) return null;
 
-  const choosePreset = (id: string) => setDraft({ ...PRESETS[id] } as LiveRules);
+  const choosePreset = (id: string) => {
+    const next = { ...PRESETS[id] } as LiveRules;
+    if (next.family === 'sets' && next.serveOrder && doublesModule) {
+      next.doubles = true;
+    }
+    setDraft(next);
+  };
   const setField = (key: string, v: unknown) => setDraft((d) => ({ ...d, [key]: v }) as LiveRules);
 
   const save = async (rules: LiveRules | null) => {

@@ -51,6 +51,8 @@ export function actionLabel(action: LiveAction, rules: LiveRules, names?: Names)
       return `Added time ${action.minutes}'`;
     case 'setServer':
       return `Serve ${n(action.side)}`;
+    case 'timeout':
+      return `Timeout ${action.delta >= 0 ? '+' : '−'}1 ${n(action.side)}`;
     case 'ball':
       return action.kind === 'normal' ? `${action.runs} run${action.runs === 1 ? '' : 's'}` : `${action.kind} ${action.runs}`;
     case 'wicket':

@@ -75,6 +75,8 @@ function useScoreContext(moduleId: string | undefined, matchId: string | undefin
   return { ...state, match, courts };
 }
 
+const isDoublesModule = (m: ModuleDetail['module'] | null) => m?.participant_type === 'team' && m.roster_max === 2;
+
 async function fetchUsername(profileId: string): Promise<string | null> {
   try {
     return (await fetchProfile(profileId))?.username ?? null;
@@ -124,6 +126,7 @@ function LiveRoute() {
         liveRules: preset ? { preset } : (mod?.live_rules ?? null),
         matchBestOf: bestOf ?? match?.best_of ?? null,
         drawAllowed: !!match?.can_draw,
+        doublesModule: isDoublesModule(mod),
       }),
     [mod, match],
   );
@@ -589,6 +592,9 @@ function Scoring({
           <ThemedText>• Undo is always bottom-left and says what it undoes. Redo appears right after.</ThemedText>
           <ThemedText>• Games, sets and periods end by themselves — Undo reopens them.</ThemedText>
           <ThemedText>• Lock the screen between games; hold 1 second to unlock.</ThemedText>
+          {rules.family === 'sets' && rules.doubles && rules.serveOrder && (
+            <ThemedText>• Doubles: player 1 of each pair is the one who serves or receives first for that pair.</ThemedText>
+          )}
           <ThemedText>• No signal? Keep scoring: everything is saved on this phone and sent when you’re back online.</ThemedText>
           {Platform.OS === 'web' && <ThemedText>• Keyboard: A / L point (Shift = −1), Z undo, Y redo, Space start/stop the clock.</ThemedText>}
         </SheetScrollView>

@@ -633,4 +633,116 @@ const scoreTo = (a, b) => {
   eq(L.buildTiles([mm('a', 'Court 1', '1')], ['Court 1', 'court 1'], ck, cmp).length, 1, 'duplicate pinned court ignored');
 }
 
+// ─── NUST sports fixes (docs/organizations/PLAN.md §9) ─────────────────────
+{
+  const play = (rules, snap, actions) => actions.reduce((x, a) => L.reduce(x, a, rules), snap);
+  const pt = (side) => ({ t: 'point', side });
+
+  // basketball: FIBA timeouts 2 / 3 / 1 per overtime
+  const fiba = L.PRESETS.basketball_fiba;
+  ok(L.timeoutLimit(fiba, 1) === 2 && L.timeoutLimit(fiba, 2) === 2, 'FIBA first half: 2 timeouts');
+  ok(L.timeoutLimit(fiba, 3) === 3 && L.timeoutLimit(fiba, 4) === 3, 'FIBA second half: 3 timeouts');
+  ok(L.timeoutLimit(fiba, 5) === 1 && L.timeoutLimit(fiba, 6) === 1, 'FIBA overtime: 1 timeout');
+  ok(L.timeoutLimit(L.PRESETS.handball, 2) === 2, 'other sports keep per-half timeouts');
+  const next = (s) => play(fiba, s, [{ t: 'endPeriod', at: 1 }, { t: 'nextPeriod' }]);
+  let b = L.initSnapshot(fiba, { at: 0 });
+  b = L.reduce(b, { t: 'counter', side: 'a', key: 'timeouts', delta: 1 }, fiba);
+  b = next(b);
+  ok(b.counters.a.timeouts === 1, 'timeouts carry inside a half');
+  b = next(b);
+  ok(b.period === 3 && b.counters.a.timeouts === 0, 'timeouts reset at half-time');
+  b = next(next(b));                             // Q3 → Q4 → level → OT1
+  ok(b.period === 5, 'level game goes to overtime');
+  b = L.reduce(b, { t: 'counter', side: 'a', key: 'timeouts', delta: 1 }, fiba);
+  b = next(b);
+  ok(b.period === 6 && b.counters.a.timeouts === 0, 'each overtime has its own timeout');
+
+  // basketball: a countdown never runs past 0:00
+  let c = L.reduce(L.initSnapshot(fiba, { at: 0 }), { t: 'clockStart', at: 0 }, fiba);
+  c = L.reduce(c, { t: 'clockStop', at: 700000 }, fiba);
+  ok(c.clock.elapsedMs === 600000 && !c.clock.running, 'late stop clamps to the period length');
+  const foot = L.PRESETS.football_11;
+  let f = L.reduce(L.initSnapshot(foot, { at: 0 }), { t: 'clockStart', at: 0 }, foot);
+  f = L.reduce(f, { t: 'clockStop', at: 2800000 }, foot);
+  ok(f.clock.elapsedMs === 2800000, 'count-up clocks keep added time');
+
+  // 3x3: overtime ends at the first side to score 2, not the first basket
+  const x = L.PRESETS.basketball_3x3;
+  const sc = (side, value) => ({ t: 'score', side, value, at: 1 });
+  let t = play(x, L.initSnapshot(x, { at: 0 }), [sc('a', 20), sc('b', 20), { t: 'endPeriod', at: 2 }, { t: 'nextPeriod' }]);
+  ok(t.phase === 'overtime' && L.periodLimitMs(x, t.period) === null, '3x3 overtime is untimed');
+  ok(L.reduce(t, { t: 'endPeriod', at: 3 }, x) === t, '3x3 overtime cannot be ended by the clock');
+  t = L.reduce(t, sc('a', 1), x);
+  ok(t.state === 'live', 'one point (21 total) does not end overtime');
+  t = L.reduce(t, sc('b', 1), x);
+  ok(t.state === 'live', '1–1 in overtime continues');
+  ok(L.summarize(t, x).line.includes('First to 2'), 'summary says first to 2');
+  t = L.reduce(t, sc('a', 1), x);
+  ok(t.state === 'decided' && t.winner === 'a', 'second overtime point wins');
+  const reg = L.reduce(L.initSnapshot(x, { at: 0 }), sc('a', 21), x);
+  ok(reg.state === 'decided', 'regular time still ends at 21');
+
+  // volleyball: 2 timeouts per set
+  const v = L.PRESETS.volleyball_25;
+  const to = (side, delta) => ({ t: 'timeout', side, delta });
+  let vs = play(v, L.initSnapshot(v), [to('a', 1), to('a', 1), to('a', 1)]);
+  ok(vs.timeouts.a === 2 && vs.timeouts.b === 0, 'no third timeout');
+  vs = play(v, vs, Array(25).fill(pt('a')));
+  vs = L.reduce(vs, { t: 'nextGame' }, v);
+  ok(vs.timeouts.a === 0, 'timeouts reset each set');
+  const old = { ...L.initSnapshot(v) };
+  delete old.timeouts;
+  ok(L.reduce(old, to('b', 1), v).timeouts.b === 1, 'older snapshots without timeouts still work');
+  const noTo = L.PRESETS.badminton_21;
+  const plain = L.initSnapshot(noTo);
+  ok(L.reduce(plain, to('a', 1), noTo) === plain, 'sports without timeouts ignore the action');
+
+  // badminton: service court from the server's score; doubles rotation
+  const bs = L.PRESETS.badminton_21;
+  let s1 = L.initSnapshot(bs, { firstServer: 'a' });
+  ok(L.serviceCall(s1, bs).court === 'right' && L.serviceCall(s1, bs).server === null, 'singles: even score, right court');
+  s1 = L.reduce(s1, pt('a'), bs);
+  ok(L.serviceCall(s1, bs).court === 'left', 'odd score, left court');
+  const bd = L.resolveRules({ sport: 'badminton', doublesModule: true });
+  ok(bd.doubles === true, 'a doubles module turns doubles on');
+  ok(L.resolveRules({ sport: 'badminton', liveRules: { doubles: false }, doublesModule: true }).doubles === false, 'a saved setting wins');
+  const call = (s) => { const k = L.serviceCall(s, bd); return `${k.side}${k.server}>${k.receiver} ${k.court}`; };
+  let d = L.initSnapshot(bd, { firstServer: 'a' });
+  ok(call(d) === 'a1>1 right', '0-0: A1 to B1 from the right');
+  d = L.reduce(d, pt('a'), bd);
+  ok(call(d) === 'a1>2 left', 'serving side scores: same server, other court, other receiver');
+  d = L.reduce(d, pt('b'), bd);
+  ok(call(d) === 'b2>1 left', 'side out at 1-1: the player in the left court serves');
+  d = L.reduce(d, pt('b'), bd);
+  ok(call(d) === 'b2>2 right', 'B scores on serve: same server moves to the right court');
+  d = L.reduce(d, pt('a'), bd);
+  ok(call(d).startsWith('a'), 'serve returns to A');
+  ok(L.reduce(d, { t: 'unpoint', side: 'a' }, bd).rightPlayer.a !== undefined, 'manual correction keeps positions');
+
+  // table tennis doubles: A1→B1, B1→A2, A2→B2, B2→A1
+  const tt = L.resolveRules({ sport: 'table_tennis', matchBestOf: 1, doublesModule: true });
+  const ttc = (s) => { const k = L.serviceCall(s, tt); const o = k.side === 'a' ? 'b' : 'a'; return `${k.side}${k.server}>${o}${k.receiver}`; };
+  let q = L.initSnapshot(tt, { firstServer: 'a' });
+  const seen = [ttc(q)];
+  for (const side of ['a', 'b', 'a', 'b', 'a', 'b', 'a', 'b']) {
+    q = L.reduce(q, pt(side), tt);
+    if ((q.cur.a + q.cur.b) % 2 === 0) seen.push(ttc(q));
+  }
+  eq(seen, ['a1>b1', 'b1>a2', 'a2>b2', 'b2>a1', 'a1>b1'], 'doubles rotation every two points');
+  const tt3 = L.resolveRules({ sport: 'table_tennis', matchBestOf: 3, doublesModule: true });
+  let g = play(tt3, L.initSnapshot(tt3, { firstServer: 'a' }), Array(11).fill(pt('a')));
+  g = L.reduce(g, { t: 'nextGame' }, tt3);
+  ok(L.serviceCall(g, tt3).side === 'b' && g.swappedPair === null, 'second game: the other pair serves first');
+  g = play(tt3, g, Array(11).fill(pt('b')));
+  g = L.reduce(g, { t: 'nextGame' }, tt3);
+  g = play(tt3, g, Array(4).fill(pt('a')));
+  const before = L.serviceCall(g, tt3);
+  ok(g.swappedPair === null, 'no swap before 5');
+  g = L.reduce(g, pt('a'), tt3);
+  ok(g.swappedPair !== null, 'deciding game: receiving pair swaps at 5');
+  ok(g.swappedPair !== L.serviceCall(g, tt3).side && before !== null, 'the swapped pair is the receiving one');
+  g = L.reduce(g, { t: 'unpoint', side: 'a' }, tt3);
+  ok(g.swappedPair === null, 'correcting below 5 undoes the swap');
+}
+
 console.log(`engine tests: ${passed} checks passed`);
