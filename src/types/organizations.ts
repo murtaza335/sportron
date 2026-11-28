@@ -76,3 +76,30 @@ export type NewModulePayload = {
   settings?: Record<string, unknown>;
   live_rules?: Record<string, unknown>;
 };
+
+/** A permanent screen (TV) of an organization (`org_list_screens`). */
+export type OrgScreen = {
+  id: string;
+  name: string;
+  venue: string | null;
+  code: string;
+  courts: string[] | null;
+  layout: 'auto' | 'row' | 'grid' | null;
+  tournament: null | {
+    id: string;
+    name: string;
+    status: TournamentStatus;
+    hidden: boolean;
+    live_public: boolean;
+    /** Courts used by its matches (for the filter chips). */
+    courts: string[];
+    /** I administer it. */
+    mine: boolean;
+  };
+  assigned_by: string | null;
+  assigned_at: string | null;
+  base_url: string;
+};
+
+/** Thrown details of SCREEN_BUSY: what the screen shows now and who put it there. */
+export type ScreenBusyInfo = { tournament: string; assigned_by: string | null; assigned_at: string | null };

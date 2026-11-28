@@ -1,5 +1,5 @@
 import { Stack, useLocalSearchParams, useRouter } from 'expo-router';
-import { History, Plus, Trophy, UserPlus } from 'lucide-react-native';
+import { History, Monitor, Plus, Trophy, UserPlus } from 'lucide-react-native';
 import { useState } from 'react';
 import { ScrollView, StyleSheet, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -101,6 +101,12 @@ export default function OrganizeScreen() {
             label="Create tournament"
             icon={<Plus size={20} color={theme.background} />}
             onPress={() => router.push(tournamentRoutes.organizeNew(org.id))}
+          />
+          <LinkRow
+            title="Screens"
+            sub="What each venue TV shows"
+            icon={<Monitor size={20} color={theme.text} />}
+            onPress={() => router.push(tournamentRoutes.organizeScreens(org.id))}
           />
           {isAdmin && (
             <View style={{ gap: Spacing.sm }}>

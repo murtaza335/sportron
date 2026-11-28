@@ -9,6 +9,7 @@ import { DateTimeField } from '@/components/tournaments/DateTimeField';
 import { ProjectorCard } from '@/components/live/ProjectorCard';
 import { CoOrganizers } from '@/components/organize/CoOrganizers';
 import { OrgLifecycle } from '@/components/organize/OrgLifecycle';
+import { ShowOnScreen } from '@/components/organize/ShowOnScreen';
 import { SuspendedBanner } from '@/components/organize/parts';
 import { FormField, PillSelect, SectionLabel, TextField } from '@/components/tournaments/form';
 import { PromoManageSection } from '@/components/tournaments/PromoManageSection';
@@ -237,6 +238,8 @@ export default function TournamentManageScreen() {
       </View>
 
       <PromoManageSection tournamentId={id} />
+
+      {orgMode && <ShowOnScreen detail={detail} />}
 
       <ProjectorCard tournamentId={id} tournamentName={t.name} />
 

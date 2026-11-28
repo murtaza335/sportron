@@ -96,3 +96,12 @@ body.idle { cursor: none; }
 .qr { background: #fff; padding: 4px; border-radius: 6px; }
 .qr svg { width: 100%; height: 100%; display: block; }
 .compact .tile .head { font-size: clamp(10px, 1.6vh, 18px); }
+
+/* Permanent Sportron mark */
+.mark { display: inline-flex; align-items: center; gap: 0.35em; font-weight: 900; letter-spacing: 0.04em; font-size: clamp(11px, 2vh, 24px); color: var(--text); opacity: 0.85; white-space: nowrap; }
+.mark i { display: inline-block; width: 0.75em; height: 0.75em; border-radius: 50%; background: linear-gradient(135deg, var(--a) 50%, var(--b) 50%); }
+.mark-corner { position: fixed; right: 1.5vw; bottom: 1.5vh; }
+.waiting h1 { font-size: clamp(40px, 12vh, 140px); }
+.waiting-brand .mark { font-size: clamp(20px, 5vh, 56px); }
+.waiting p { font-size: clamp(18px, 4vh, 44px); color: var(--text); line-height: 1.4; }
+.waiting small { color: var(--muted); font-size: clamp(12px, 2vh, 20px); }

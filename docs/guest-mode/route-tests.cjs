@@ -36,6 +36,8 @@ const blocked = [
   [['organize', 'organizers'], 'organizers'],
   [['organize', 'activity'], 'organization activity'],
   [['organize', 'sports'], 'my sports'],
+  [['organize', 'screens'], 'screens'],
+  [['organize', 'screens', '[screenId]'], 'one screen'],
   [['(tabs)', 'profile'], 'own profile'],
   [['profile', '[id]'], 'public profile'],
   [['settings'], 'settings'],

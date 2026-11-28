@@ -7,6 +7,9 @@ side. Players and spectators follow matches **inside the Sportron app**; this pa
   app (*Tournament → Manage → Projector screen*).
 - `?court=Court 1,Court 2` only those courts (one projector per hall) · `?module=<id>` one module · `?match=<id>` one
   match · `?layout=row|grid|auto` · `?max=3` tiles per screen.
+- **Screen links** `…/s/<code>`: one permanent link per physical TV, created in the app by an organization admin
+  (*Organize → Screens*). It shows whichever tournament is assigned to it and a waiting page in between
+  (`get_screen_board`, migration 145; channel `screen:<code>`).
 - `/demo` shows a made-up tournament built with the real scoring engine (no backend needed) — handy to test a projector.
 - Open it on the venue PC and press **F11**. It reconnects by itself, keeps the screen awake, hides the cursor and reloads
   itself every 6 hours.

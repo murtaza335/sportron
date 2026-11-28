@@ -27,6 +27,8 @@ const FIELD_LABELS: Record<string, string> = {
   location: 'Location',
   reason: 'Reason',
   mode: 'Setting',
+  code: 'Link',
+  venue: 'Venue',
   court: 'Court',
 };
 
@@ -78,6 +80,10 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('LIVE_TAKEN')) return 'Someone else is scoring this match.';
   if (message.includes('ORG_SUSPENDED'))
     return 'This organization’s account is paused. Contact Sportron.';
+  if (message.includes('SCREEN_BUSY')) return 'That screen is showing another tournament.';
+  if (message.includes('SCREEN_CODE_TAKEN')) return 'That link is already used by another screen. Try a different one.';
+  if (message.includes('LIVE_NOT_PUBLIC')) return 'Turn on the projector link for this tournament first.';
+  if (message.includes('PROMOS_DISABLED')) return 'Discount codes are switched off for this organization.';
   if (message.includes('NOT_ORG_MEMBER')) return 'Only people in this organization can be co-organizers.';
   if (message.includes('CANNOT_REMOVE_SELF')) return 'You can’t remove yourself.';
   if (message.includes('LAST_ADMIN')) return 'A tournament needs at least one person who can run it.';

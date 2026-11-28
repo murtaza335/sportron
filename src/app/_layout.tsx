@@ -239,6 +239,8 @@ function RootNavigator() {
         <Stack.Screen name="organize/new" options={modalOptions} />
         <Stack.Screen name="organize/organizers" options={{ ...pushOptions, title: 'Organizers' }} />
         <Stack.Screen name="organize/activity" options={{ ...pushOptions, title: 'Activity' }} />
+        <Stack.Screen name="organize/screens/index" options={{ ...pushOptions, title: 'Screens' }} />
+        <Stack.Screen name="organize/screens/[screenId]" options={{ ...pushOptions, title: 'Screen' }} />
         <Stack.Screen name="organize/sports" options={{ ...pushOptions, title: 'My sports' }} />
         <Stack.Screen name="score" options={{ ...pushOptions, title: 'To score' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />

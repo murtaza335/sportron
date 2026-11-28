@@ -32,6 +32,8 @@ export const tournamentRoutes = {
   organizeOrganizers: (orgId: string) => h(`/organize/organizers?org=${orgId}`),
   organizeActivity: (orgId: string) => h(`/organize/activity?org=${orgId}`),
   mySports: () => h('/organize/sports'),
+  organizeScreens: (orgId: string) => h(`/organize/screens?org=${orgId}`),
+  organizeScreen: (orgId: string, screenId: string) => h(`/organize/screens/${screenId}?org=${orgId}`),
   liveBoard: (id: string) => h(`/tournament/${id}/live`),
   liveMatch: (id: string, matchId: string) => h(`/tournament/${id}/live/${matchId}`),
   profile: (id: string) => h(`/profile/${id}`),
