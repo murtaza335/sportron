@@ -2,7 +2,32 @@ import type { Profile, Sport } from './index';
 
 export type TournamentStatus = 'draft' | 'published' | 'completed' | 'cancelled';
 export type ModuleStatus = 'draft' | 'open' | 'seeding' | 'in_progress' | 'completed' | 'cancelled';
-export type TournamentRole = 'tournament_admin' | 'module_admin' | 'entrant' | null;
+export type TournamentRole = 'tournament_admin' | 'module_admin' | 'scorer' | 'entrant' | null;
+
+/** One row of the "To score" list (`get_my_scoring_matches`). Names, time and place only. */
+export type ScoringMatch = {
+  match_id: string;
+  module_id: string;
+  tournament_id: string;
+  tournament_name: string;
+  module_name: string;
+  sport: Sport;
+  custom_sport_name: string | null;
+  round_name: string | null;
+  a_name: string;
+  b_name: string;
+  scheduled_at: string | null;
+  venue: string | null;
+  court: string | null;
+  live_state: 'live' | 'break' | null;
+  live_updated_at: string | null;
+  scorer_name: string | null;
+  /** True when this user is the one scoring it right now. */
+  mine: boolean;
+  my_role: 'scorer' | 'manager';
+};
+
+export type MatchScorer = { recorded_by: string | null; scoring_now: string | null };
 export type EntryFieldType = 'text' | 'email' | 'phone' | 'number' | 'select';
 export type TournamentMatchStatus =
   | 'pending'

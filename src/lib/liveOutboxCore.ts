@@ -152,7 +152,7 @@ export function createOutbox(deps: OutboxDeps) {
       phase = 'ended';
     } else if (s.taken) {
       phase = 'taken';
-      message = 'Another admin took over scoring.';
+      message = 'Someone else took over scoring.';
     } else if (s.ended) {
       phase = 'ended';
       message = 'This match was ended elsewhere.';
@@ -279,7 +279,9 @@ export function createOutbox(deps: OutboxDeps) {
             return;
           }
           if (FATAL.test(m)) {
-            s.fatal = 'Live scoring stopped: ' + m;
+            s.fatal = m.includes('NOT_ALLOWED')
+              ? 'You can no longer score this match. Your points are saved on this phone. Ask a sport manager to finish it.'
+              : 'Live scoring stopped: ' + m;
             emit(s.matchId);
             return;
           }

@@ -52,6 +52,7 @@ function getIcon(type: string, theme: ReturnType<typeof useTheme>) {
       return <Swords size={20} color={theme.text} strokeWidth={2.2} />;
     case 'tournament_admin_assigned':
     case 'tournament_module_admin_assigned':
+    case 'tournament_scorer_assigned':
     case 'tournament_entry_added':
     case 'tournament_match_scheduled':
     case 'tournament_match_result':

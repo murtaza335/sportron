@@ -295,6 +295,37 @@ grant execute on function public.remove_module_scorer(uuid, uuid) to authenticat
 grant execute on function public.get_module_scorers(uuid) to authenticated;
 grant execute on function public.get_my_scoring_matches() to authenticated;
 
+-- Who recorded / is scoring one match (managers only).
+create or replace function public.get_match_scorer(p_match uuid)
+returns jsonb
+language plpgsql
+stable
+security definer
+set search_path = public
+as $$
+declare
+  m public.tournament_matches;
+begin
+  select * into m from public.tournament_matches where id = p_match;
+  if not found or auth.uid() is null or not public.is_module_admin(m.module_id) then
+    raise exception 'NOT_ALLOWED';
+  end if;
+  return jsonb_build_object(
+    'recorded_by', (select p.username from public.public_profiles p where p.id = m.recorded_by),
+    'scoring_now', (select p.username from public.tournament_live_scores ls
+                    join public.public_profiles p on p.id = ls.scorer_id
+                    where ls.match_id = p_match and ls.state in ('live', 'break')));
+end;
+$$;
+revoke all on function public.get_match_scorer(uuid) from public, anon;
+grant execute on function public.get_match_scorer(uuid) to authenticated;
+
+-- App switch for the organizations / scorer screens (OFF until the rehearsal passes). The server is
+-- gated by roles regardless; this only hides UI.
+insert into public.feature_flags (key, enabled, description)
+values ('organizations', false, 'Organizations Phase 1: Organize cards, To score list, scorer screens')
+on conflict (key) do nothing;
+
 -- ───────────────────────────────────────────────────────────────────────────
 -- 5. Result engine split: same checks and behaviour, permission moved to the public wrapper
 -- ───────────────────────────────────────────────────────────────────────────

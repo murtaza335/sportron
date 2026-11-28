@@ -30,6 +30,7 @@ for (const [segs, name] of allowed) check(gm.isGuestRoute(segs) === true, `guest
 
 // ── routes that must STILL require an account
 const blocked = [
+  [['score'], 'to-score list'],
   [['(tabs)', 'profile'], 'own profile'],
   [['profile', '[id]'], 'public profile'],
   [['settings'], 'settings'],

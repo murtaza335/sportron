@@ -42,6 +42,7 @@ export type NotificationType =
   | 'tournament_match_scheduled'
   | 'tournament_match_result'
   | 'tournament_module_completed'
+  | 'tournament_scorer_assigned'
   | 'community_post_created'
   | 'community_post_liked'
   | 'community_post_commented'

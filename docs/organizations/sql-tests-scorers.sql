@@ -186,6 +186,12 @@ begin
   perform public.reset_tournament_match(v_m1);
   perform sc_test.chk((public.record_tournament_result(v_m1, 2, 1) ->> 'status') = 'completed', 'admin result entry unchanged');
 
+  perform sc_test.chk(public.get_match_scorer(v_m1) ->> 'recorded_by' = 'sc_user_1', 'manager sees who recorded a match');
+  perform sc_test.as_user('scorer');
+  perform sc_test.expect_err(format('select public.get_match_scorer(%L)', v_m1), 'NOT_ALLOWED', 'scorer cannot query who scored');
+  perform sc_test.chk((select enabled from public.feature_flags where key = 'organizations') = false, 'organizations flag seeded OFF');
+  perform sc_test.as_user('admin');
+
   -- ── drafts: a scorer can prepare, others cannot see
   v_dm := public.create_tournament_module(v_draft, 'Draft Sport', 'badminton', null, null, null, null, null, false, 'manual');
   perform public.add_module_scorer(v_dm, v_ids[3]);

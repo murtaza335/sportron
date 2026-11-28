@@ -43,6 +43,7 @@ import { bestOfLabel, matchTitle } from '@/lib/tournamentFormat';
 import { tournamentRoutes } from '@/lib/tournamentRoutes';
 import { fetchModuleDetail, fetchModuleMatches } from '@/services/tournaments';
 import { abandonLive, fetchLiveMatch, startLive } from '@/services/tournamentsLive';
+import { fetchProfile } from '@/services/profiles';
 import type { LiveMatchDetail, ModuleDetail, TournamentMatch } from '@/types';
 
 // ─── Loading the match + module once (no realtime: nothing here changes while scoring) ──────────────────────────
@@ -74,6 +75,14 @@ function useScoreContext(moduleId: string | undefined, matchId: string | undefin
   return { ...state, match, courts };
 }
 
+async function fetchUsername(profileId: string): Promise<string | null> {
+  try {
+    return (await fetchProfile(profileId))?.username ?? null;
+  } catch {
+    return null;
+  }
+}
+
 type Boot =
   | { phase: 'loading' }
   | { phase: 'blocked'; reason: string }
@@ -97,6 +106,10 @@ function LiveRoute() {
   const mod = ctx.detail?.module ?? null;
   const match = ctx.match;
   const isAdmin = ctx.detail?.my_role === 'module_admin' || ctx.detail?.my_role === 'tournament_admin';
+  const scorerUi = useFlag('organizations', false);
+  // A scorer starts and scores matches but cannot change the rules.
+  const isScorer = scorerUi && ctx.detail?.my_role === 'scorer';
+  const [takenBy, setTakenBy] = useState<string | null>(null);
 
   const goBack = useCallback(() => {
     if (router.canGoBack()) router.back();
@@ -158,7 +171,7 @@ function LiveRoute() {
         return setBoot({ phase: 'blocked', reason: 'Live scoring isn’t available yet.' });
       }
       startLiveOutbox();
-      if (!isAdmin) return setBoot({ phase: 'blocked', reason: 'Only tournament or module admins can score matches.' });
+      if (!isAdmin && !isScorer) return setBoot({ phase: 'blocked', reason: 'You are not a scorer for this sport. Ask a sport manager to add you.' });
       // 1. unsent work from this phone (works offline, e.g. after the app was killed)
       const local = await liveOutbox.peek(matchId);
       if (local) return setBoot({ phase: 'running', rules: local.rules, timeline: local.timeline });
@@ -176,14 +189,17 @@ function LiveRoute() {
       }
       if (row && (row.state === 'live' || row.state === 'break')) {
         const recent = row.updated_at ? Date.now() - new Date(row.updated_at).getTime() < 2 * 60_000 : false;
-        if (row.scorer_id && row.scorer_id !== user?.id && recent) return setBoot({ phase: 'takeover', row });
+        if (row.scorer_id && row.scorer_id !== user?.id && recent) {
+          void fetchUsername(row.scorer_id).then(setTakenBy);
+          return setBoot({ phase: 'takeover', row });
+        }
         return void resumeFrom(row, false);
       }
       if (row && row.state === 'finished') return setBoot({ phase: 'blocked', reason: 'This match is already finished.' });
       setBoot({ phase: 'start' });
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [ctx.loading, ctx.error, mod, match, enabled, isAdmin]);
+  }, [ctx.loading, ctx.error, mod, match, enabled, isAdmin, isScorer]);
 
   const start = async (c: StartChoice) => {
     setBusy(true);
@@ -237,10 +253,10 @@ function LiveRoute() {
       ) : boot.phase === 'takeover' ? (
         <View style={styles.blocked}>
           <ThemedText variant="heading" style={{ textAlign: 'center' }}>
-            Another admin is scoring this match
+            {takenBy ? `@${takenBy}` : 'Someone else'} is scoring this match
           </ThemedText>
           <ThemedText muted style={{ textAlign: 'center' }}>
-            If you take over, they stop scoring and you continue from the current score.
+            If you take over, their phone stops scoring and you continue from the current score.
           </ThemedText>
           <BarButton label="Take over scoring" tone="primary" onPress={() => void resumeFrom(boot.row, true)} />
           <BarButton label="Back" onPress={goBack} />
@@ -254,6 +270,7 @@ function LiveRoute() {
           module={mod}
           courts={ctx.courts}
           resolve={resolve}
+          lockRules={isScorer}
           busy={busy}
           error={startError}
           onStart={start}
@@ -483,7 +500,7 @@ function Scoring({
         </Pressable>
       </View>
 
-      {sync?.phase === 'taken' && <Banner tone="error" text="Another admin took over scoring. This screen is read-only now." actionLabel="Leave" onAction={onLeave} />}
+      {sync?.phase === 'taken' && <Banner tone="error" text="Someone else took over scoring. This screen is read-only now." actionLabel="Leave" onAction={onLeave} />}
       {sync?.phase === 'ended' && !sync.finished && <Banner tone="warn" text="This match was ended elsewhere." actionLabel="Leave" onAction={onLeave} />}
       {sync?.phase === 'error' && <Banner tone="error" text={sync.message ?? 'Live scoring stopped.'} actionLabel="Leave" onAction={onLeave} />}
 

@@ -6,6 +6,7 @@ import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { ModuleRulesSection } from '@/components/live/RulesEditor';
+import { ScorersSection } from '@/components/organize/ScorersSection';
 import { SectionLabel } from '@/components/tournaments/form';
 import { ProfilePickerSheet } from '@/components/tournaments/ProfilePickerSheet';
 import { StatusPill } from '@/components/tournaments/StatusPill';
@@ -13,6 +14,7 @@ import { UserAvatar } from '@/components/UserAvatar';
 import { Button } from '@/components/ui/Button';
 import { ThemedText } from '@/components/ui/Text';
 import { MaxContentWidth, Radius, Spacing } from '@/constants/theme';
+import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournament } from '@/hooks/useTournament';
 import { useTournamentModule } from '@/hooks/useTournamentModule';
@@ -35,6 +37,7 @@ export default function ModuleManageScreen() {
   const router = useRouter();
   const insets = useSafeAreaInsets();
   const m = useTournamentModule(moduleId);
+  const scorerUi = useFlag('organizations', false);
   const { isTournamentAdmin } = useTournament(id);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
@@ -231,8 +234,10 @@ export default function ModuleManageScreen() {
 
       <ModuleRulesSection module={mod} onSaved={m.refresh} />
 
+      {scorerUi && <ScorersSection tournamentId={id} moduleId={moduleId} locked={tournamentLocked || finished} />}
+
       <View style={{ gap: Spacing.sm }}>
-        <SectionLabel>Module admins</SectionLabel>
+        <SectionLabel>{scorerUi ? 'Sport managers' : 'Module admins'}</SectionLabel>
         {m.admins.length === 0 && <ThemedText variant="caption" muted>No module admins yet.</ThemedText>}
         {m.admins.map((a) => (
           <View key={a.id} style={styles.adminRow}>

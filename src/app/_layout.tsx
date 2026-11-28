@@ -235,6 +235,7 @@ function RootNavigator() {
         <Stack.Screen name="community/[id]/pending-matches"options={{ ...pushOptions, title: 'Pending Matches' }} />
         <Stack.Screen name="community/[id]/edit" options={{ ...pushOptions, title: 'Edit Community' }} />
         <Stack.Screen name="discover" options={{ ...pushOptions, title: 'Discover' }} />
+        <Stack.Screen name="score" options={{ ...pushOptions, title: 'To score' }} />
         <Stack.Screen name="tournament/[id]" options={{ ...pushOptions, title: 'Tournament' }} />
         <Stack.Screen name="tournament/[id]/manage" options={{ ...pushOptions, title: 'Manage tournament' }} />
         <Stack.Screen name="tournament/[id]/live/index" options={{ ...pushOptions, title: 'Live' }} />

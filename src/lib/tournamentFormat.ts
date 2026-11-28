@@ -64,6 +64,7 @@ export function tint(color: string): string {
 
 export function roleTag(role: TournamentRole): string | null {
   if (role === 'tournament_admin' || role === 'module_admin') return 'ADMIN';
+  if (role === 'scorer') return 'SCORER';
   if (role === 'entrant') return 'PLAYING';
   return null;
 }

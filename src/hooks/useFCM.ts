@@ -169,6 +169,10 @@ export function useFCM() {
           }
           return;
         }
+        case 'tournament_scorer_assigned': {
+          router.push(tournamentRoutes.toScore());
+          return;
+        }
         case 'tournament_admin_assigned':
         case 'tournament_module_admin_assigned':
         case 'tournament_entry_added':

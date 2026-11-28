@@ -31,6 +31,7 @@ import { ResumeScoringBanner } from '@/components/live/ResumeBanner';
 import { useLiveBoard } from '@/hooks/useLiveBoard';
 import { useIsLive } from '@/lib/liveStatusStore';
 import { useAuth } from '@/contexts/AuthContext';
+import { MatchScorerLine } from '@/components/organize/MatchScorerLine';
 import { useFlag } from '@/contexts/RemoteConfigContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useTournamentFields } from '@/hooks/useTournamentFields';
@@ -155,8 +156,27 @@ export default function ModuleScreen() {
   // keeps the LIVE pills on rows / bracket nodes up to date (polls every 20 s while this screen is focused)
   useLiveBoard(id, { realtime: false, pollMs: 20_000 });
 
+  const scorerUi = useFlag('organizations', false);
   const matchActions = (match: TournamentMatch) => {
-    if (!m.isModuleAdmin || !mod) return null;
+    if (!mod) return null;
+    if (!m.isModuleAdmin) {
+      // Scorers get one action: start (or resume) live scoring.
+      const canScore =
+        scorerUi && liveScoringOn && m.isScorer && mod.status === 'in_progress' && !!match.entry_a && !!match.entry_b &&
+        (match.status === 'pending' || match.status === 'scheduled');
+      if (!canScore) return null;
+      return (
+        <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+          <Button
+            label="Score this match"
+            onPress={() => {
+              setSelectedMatchId(null);
+              router.push(tournamentRoutes.score(id, moduleId, match.id));
+            }}
+          />
+        </View>
+      );
+    }
     const decided = match.status === 'completed' || match.status === 'walkover';
     const bothPresent = !!match.entry_a && !!match.entry_b;
     const live = mod.status === 'in_progress';
@@ -184,6 +204,7 @@ export default function ModuleScreen() {
       ]);
     return (
       <View style={{ gap: Spacing.sm, marginTop: Spacing.md }}>
+        {scorerUi && <MatchScorerLine matchId={match.id} decided={decided} />}
         {canResult && !decided && liveScoringOn && (
           <Button
             label="Live scoring"

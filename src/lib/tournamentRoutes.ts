@@ -25,6 +25,8 @@ export const tournamentRoutes = {
   /** Full-screen live scoring (or `?mode=result` for the full-screen result entry). */
   score: (id: string, moduleId: string, matchId: string, mode?: 'result') =>
     h(`/tournament/${id}/module/${moduleId}/score/${matchId}${mode ? `?mode=${mode}` : ''}`),
+  /** "To score": the matches I score or manage. */
+  toScore: () => h('/score'),
   liveBoard: (id: string) => h(`/tournament/${id}/live`),
   liveMatch: (id: string, matchId: string) => h(`/tournament/${id}/live/${matchId}`),
   profile: (id: string) => h(`/profile/${id}`),

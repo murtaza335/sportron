@@ -40,6 +40,7 @@ export function StartSheet({
   module,
   courts,
   resolve,
+  lockRules,
   busy,
   error,
   onStart,
@@ -52,6 +53,8 @@ export function StartSheet({
   courts: string[];
   /** Resolves rules for a preset id / best-of (the module's saved rules + the match's best-of + draw flag). */
   resolve: (preset: string | null, bestOf: number | null) => LiveRules;
+  /** Scorers: show the rules but hide the "Change" options (only managers may change them). */
+  lockRules?: boolean;
   busy: boolean;
   error: string | null;
   onStart: (c: StartChoice) => void;
@@ -89,10 +92,16 @@ export function StartSheet({
             Rules
           </ThemedText>
           <ThemedText style={{ fontWeight: '600' }}>{describeRules(rules)}</ThemedText>
-          <Pressable onPress={() => setChanging((v) => !v)} accessibilityRole="button" hitSlop={8}>
-            <ThemedText style={{ color: theme.accent, fontWeight: '700' }}>{changing ? 'Hide options' : 'Change'}</ThemedText>
-          </Pressable>
-          {changing && (
+          {lockRules ? (
+            <ThemedText variant="caption" muted>
+              Set by the sport manager.
+            </ThemedText>
+          ) : (
+            <Pressable onPress={() => setChanging((v) => !v)} accessibilityRole="button" hitSlop={8}>
+              <ThemedText style={{ color: theme.accent, fontWeight: '700' }}>{changing ? 'Hide options' : 'Change'}</ThemedText>
+            </Pressable>
+          )}
+          {changing && !lockRules && (
             <View style={{ gap: Spacing.sm }}>
               {hasBestOf && (
                 <View style={styles.wrapRow}>
