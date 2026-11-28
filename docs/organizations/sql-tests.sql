@@ -436,6 +436,104 @@ begin
   perform og_test.as_user('scorer');
   perform og_test.expect_err(format('select public.set_core_field_mode(%L, ''off'')', v_code), 'NOT_ALLOWED', 'scorer cannot change the form');
 
+  -- ═══ E1: screens, brand lock, promos ═══
+  perform og_test.as_user('norg2');
+  perform og_test.expect_err(format('select public.org_upsert_screen(%L, null, ''{"name":"Old Gym TV"}'')', v_nust), 'NOT_ALLOWED', 'organizer cannot create screens');
+  perform og_test.as_user('nadmin');
+  v_id := public.org_upsert_screen(v_nust, null, '{"name":"Old Gym TV","venue":"Old Gym"}');
+  select code into v_code from public.organization_screens where id = v_id;
+  perform og_test.chk(v_code ~ '^[a-z0-9]{6}$', 'screen gets a code');
+  perform og_test.expect_err(format('select public.org_upsert_screen(%L, null, %L::jsonb)', v_nust, jsonb_build_object('name', 'Dup', 'code', upper(v_code))), 'SCREEN_CODE_TAKEN', 'codes are unique');
+  perform og_test.as_anon();
+  v_json := public.get_screen_board(v_code);
+  perform og_test.chk((v_json ->> 'found')::boolean and (v_json ->> 'waiting')::boolean and v_json #>> '{org,short_name}' = 'NUST' and v_json -> 'board' = 'null'::jsonb, 'unassigned screen waits');
+  perform og_test.chk(not (public.get_screen_board('zzzz9999') ->> 'found')::boolean, 'unknown code');
+  perform og_test.chk(public._live_topic_readable('screen:' || v_code) and not public._live_topic_readable('screen:zzzz9999'), 'screen topic');
+
+  -- a published NUST tournament owned by norg2 with a match on court 1 and one on court 2
+  perform og_test.as_user('norg2');
+  v_t2 := public.org_create_tournament(v_nust, jsonb_build_object('name', 'Screen Cup', 'starts_at', now() - interval '1 hour'));
+  v_bm := og_test.mk_module('norg2', v_t2, 'Screen Singles');
+  perform og_test.expect_err(format('select public.assign_screen(%L, %L)', v_id, v_t2), 'INVALID_STATUS', 'drafts cannot go on a screen');
+  update public.tournaments set status = 'published' where id = v_t2;
+  select id into v_m1 from public.tournament_matches where module_id = v_bm and entry_a_id is not null order by match_number limit 1;
+  perform public.live_start_match(v_m1, 'd1', false, 'Court 1', v_rules);
+  perform public.live_start_match(og_test.match_of(v_bm, 2), 'd2', false, 'Court 2', v_rules);
+  perform public.set_tournament_live_public(v_t2, false);
+  perform og_test.expect_err(format('select public.assign_screen(%L, %L)', v_id, v_t2), 'LIVE_NOT_PUBLIC', 'public viewing must be on');
+  perform public.set_tournament_live_public(v_t2, true);
+  perform public.assign_screen(v_id, v_t2);
+  perform og_test.expect_err(format('select public.assign_screen(%L, %L)', v_id, v_bt), 'NOT_ALLOWED', 'another organization''s tournament refused');
+  perform og_test.as_user('badmin');
+  perform og_test.expect_err(format('select public.assign_screen(%L, %L, true)', v_id, v_bt), 'NOT_ALLOWED', 'other org cannot touch the screen');
+  perform og_test.expect_err(format('select public.org_list_screens(%L)', v_nust), 'NOT_ALLOWED', 'other org cannot list screens');
+  perform og_test.as_user('nadmin');
+  perform og_test.expect_err(format('select public.assign_screen(%L, %L)', v_id, v_t), 'SCREEN_BUSY', 'busy screen asks first');
+  begin
+    perform public.assign_screen(v_id, v_t);
+  exception when others then
+    declare v_detail text;
+    begin
+      get stacked diagnostics v_detail = pg_exception_detail;
+      perform og_test.chk(v_detail::jsonb ->> 'tournament' = 'Screen Cup' and v_detail::jsonb ->> 'assigned_by' = 'og_norg2', 'busy names the tournament and who assigned it');
+    end;
+  end;
+
+  perform og_test.as_anon();
+  v_json := public.get_screen_board(v_code);
+  perform og_test.chk(not (v_json ->> 'waiting')::boolean and jsonb_array_length(v_json #> '{board,live}') = 2, 'screen shows all courts');
+  perform og_test.chk(v_json::text !~* '03001234567|@example|cms_id|"phone"|"email"', 'screen board never carries contact details');
+  perform og_test.chk((v_json #>> '{board,brand,locked}')::boolean and (v_json #>> '{board,display,show_app_promo}')::boolean, 'brand locked');
+  perform og_test.as_user('norg2');
+  perform public.set_screen_display(v_id, '{"courts":["Court 2"],"layout":"row"}');
+  perform og_test.as_anon();
+  v_json := public.get_screen_board(v_code);
+  perform og_test.chk(jsonb_array_length(v_json #> '{board,live}') = 1 and v_json #>> '{board,live,0,court}' = 'Court 2'
+                      and v_json #>> '{board,display,layout}' = 'row', 'court filter applied on the server');
+  perform og_test.as_user('norg2');
+  perform og_test.chk((public.set_tournament_live_display(v_t2, '{"show_app_promo":false}') ->> 'show_app_promo')::boolean, 'promo cannot be switched off');
+  perform og_test.chk((public.get_tournament_live_settings(v_t2) ->> 'promo_locked')::boolean, 'settings say it is locked');
+  perform og_test.expect_err(format('select public.upsert_tournament_promo(%L, null, ''{"title":"x","code":"123456"}'')', v_t2), 'PROMOS_DISABLED', 'no discount codes');
+  perform og_test.expect_err(format('select * from public.get_tournament_promos_manage(%L)', v_t2), 'PROMOS_DISABLED', 'no discount code management');
+  perform og_test.as_user('borg');
+  perform public.set_tournament_live_display(v_bt, '{"show_app_promo":false}');
+  perform og_test.chk((public.get_tournament_live_settings(v_bt) ->> 'promo_locked')::boolean, 'other org locked by default');
+  perform og_test.as_user('super');
+  perform public.admin_update_organization(v_orgb, '{"settings":{"brand_locked":false,"promos_enabled":true}}');
+  perform og_test.as_user('borg');
+  perform og_test.chk(not (public.set_tournament_live_display(v_bt, '{"show_app_promo":false}') ->> 'show_app_promo')::boolean, 'unlocked org may switch promo off');
+  perform public.upsert_tournament_promo(v_bt, null, '{"title":"x","code":"123456","display_mode":"visible"}');
+  perform og_test.chk((select count(*) from public.get_tournament_promos(v_bt)) = 1, 'unlocked org has discount codes');
+
+  perform og_test.as_user('nadmin');
+  perform public.set_tournament_hidden(v_t2, true);
+  perform og_test.as_anon();
+  perform og_test.chk((public.get_screen_board(v_code) ->> 'waiting')::boolean, 'hidden tournament: waiting page');
+  perform og_test.as_user('nadmin');
+  perform public.set_tournament_hidden(v_t2, false);
+  update public.organizations set status = 'suspended' where id = v_nust;
+  perform og_test.as_anon();
+  perform og_test.chk((public.get_screen_board(v_code) ->> 'waiting')::boolean, 'suspended: waiting page');
+  update public.organizations set status = 'active' where id = v_nust;
+  perform og_test.as_user('nadmin');
+  perform public.cancel_tournament(v_t2);
+  perform og_test.as_anon();
+  perform og_test.chk((public.get_screen_board(v_code) ->> 'waiting')::boolean, 'cancelled: waiting page');
+  perform og_test.as_user('nadmin');
+  perform public.assign_screen(v_id, v_t);
+  perform og_test.chk((public.org_list_screens(v_nust) -> 0 #>> '{tournament,id}') = v_t::text, 'finished tournament is replaced without asking');
+  perform public.unassign_screen(v_id);
+  perform public.org_archive_screen(v_id);
+  perform og_test.as_anon();
+  perform og_test.chk(not (public.get_screen_board(v_code) ->> 'found')::boolean, 'removed screen link stops working');
+
+  -- anonymous callers can run none of this feature's functions except the screen board
+  perform og_test.chk(not exists (
+    select 1 from pg_proc p where p.pronamespace = 'public'::regnamespace
+      and (p.proname ~ '^_?(org_|admin_.*organization|admin_.*org_member|assign_screen|unassign_screen|set_screen|set_core|publish_|cancel_tournament|delete_draft|add_tournament_admin|remove_tournament_admin|reopen_|add_module_scorer|remove_module_scorer|get_module_scorers|get_my_|get_match_scorer|get_publish|assert_screen|guard_org|screen_|reopen_module_core|record_tournament_result_core)'
+           or p.proname in ('is_org_admin','is_org_member','is_module_scorer','can_score_module'))
+      and has_function_privilege('anon', p.oid, 'execute')), 'anon is shut out of every organization function');
+
   -- more checks are appended below by later migrations
   perform og_test.put('t', v_t::text);
 
