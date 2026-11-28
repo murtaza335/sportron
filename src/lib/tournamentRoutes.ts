@@ -27,6 +27,11 @@ export const tournamentRoutes = {
     h(`/tournament/${id}/module/${moduleId}/score/${matchId}${mode ? `?mode=${mode}` : ''}`),
   /** "To score": the matches I score or manage. */
   toScore: () => h('/score'),
+  organize: (orgId?: string) => h(`/organize${orgId ? `?org=${orgId}` : ''}`),
+  organizeNew: (orgId: string) => h(`/organize/new?org=${orgId}`),
+  organizeOrganizers: (orgId: string) => h(`/organize/organizers?org=${orgId}`),
+  organizeActivity: (orgId: string) => h(`/organize/activity?org=${orgId}`),
+  mySports: () => h('/organize/sports'),
   liveBoard: (id: string) => h(`/tournament/${id}/live`),
   liveMatch: (id: string, matchId: string) => h(`/tournament/${id}/live/${matchId}`),
   profile: (id: string) => h(`/profile/${id}`),

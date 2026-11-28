@@ -29,6 +29,7 @@ import {
   removeModuleAdmin,
   setModuleStatus,
 } from '@/services/tournaments';
+import { reopenModule } from '@/services/organizations';
 import type { ModuleStatus, ProfileLite } from '@/types';
 
 export default function ModuleManageScreen() {
@@ -38,7 +39,7 @@ export default function ModuleManageScreen() {
   const insets = useSafeAreaInsets();
   const m = useTournamentModule(moduleId);
   const scorerUi = useFlag('organizations', false);
-  const { isTournamentAdmin } = useTournament(id);
+  const { detail: tournamentDetail, isTournamentAdmin } = useTournament(id);
   const [busy, setBusy] = useState(false);
   const [pickerOpen, setPickerOpen] = useState(false);
 
@@ -120,6 +121,12 @@ export default function ModuleManageScreen() {
         onPress: () =>
           run(() => deleteModule(moduleId), () => router.replace(tournamentRoutes.tournament(id))),
       },
+    ]);
+
+  const reopenFinished = () =>
+    alert('Reopen this sport?', 'Final ranks and the champion are cleared until the final is decided again.', [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Reopen', style: 'destructive', onPress: () => run(() => reopenModule(moduleId, true)) },
     ]);
 
   const pickAdmin = (p: ProfileLite) => {
@@ -257,6 +264,14 @@ export default function ModuleManageScreen() {
           <ThemedText variant="caption" muted>Only tournament admins can change module admins.</ThemedText>
         )}
       </View>
+
+      {scorerUi && tournamentDetail?.tournament.organization_id && isTournamentAdmin && mod.status === 'completed' && !tournamentLocked && (
+        <View style={{ gap: Spacing.sm }}>
+          <SectionLabel>Finished</SectionLabel>
+          <ThemedText variant="caption" muted>Reopen to correct a result. The champion is decided again afterwards.</ThemedText>
+          <Button label="Reopen sport" variant="secondary" onPress={reopenFinished} disabled={busy} />
+        </View>
+      )}
 
       {!tournamentLocked && (!finished || isTournamentAdmin) && (
         <View style={{ gap: Spacing.sm }}>

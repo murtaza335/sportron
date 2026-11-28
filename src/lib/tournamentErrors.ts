@@ -21,6 +21,11 @@ const FIELD_LABELS: Record<string, string> = {
   max_per_page: 'Tiles per screen',
   final_hold_seconds: 'Keep FINAL for',
   title: 'Title',
+  modules: 'Sports',
+  starts_at: 'Start date',
+  ends_at: 'End date',
+  location: 'Location',
+  reason: 'Reason',
   court: 'Court',
 };
 
@@ -72,6 +77,13 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   if (message.includes('LIVE_TAKEN')) return 'Someone else is scoring this match.';
   if (message.includes('ORG_SUSPENDED'))
     return 'This organization’s account is paused. Contact Sportron.';
+  if (message.includes('NOT_ORG_MEMBER')) return 'Only people in this organization can be co-organizers.';
+  if (message.includes('CANNOT_REMOVE_SELF')) return 'You can’t remove yourself.';
+  if (message.includes('LAST_ADMIN')) return 'A tournament needs at least one person who can run it.';
+  if (message.includes('NOT_READY')) return 'Set a start date and add a sport before publishing.';
+  if (message.includes('CONFIRM_MISMATCH')) return 'The name you typed doesn’t match.';
+  if (message.includes('NOT_COMPLETED')) return 'Only a finished sport can be reopened.';
+  if (message.includes('TOURNAMENT_FINISHED')) return 'The tournament is finished or cancelled.';
   if (message.includes('RULES_LOCKED'))
     return 'Only a sport manager can change the match rules. Update the app or ask a manager, then try again.';
   if (message.includes('LIVE_CODE_TAKEN')) return 'That link is already used by another tournament. Try a different one.';

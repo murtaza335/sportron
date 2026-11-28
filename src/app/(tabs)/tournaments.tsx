@@ -14,6 +14,7 @@ import { ThemedRefreshControl } from '@/components/motion/ThemedRefreshControl';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 import { LiveTournamentsStrip } from '@/components/live/LiveNowSection';
+import { OrganizeCards } from '@/components/organize/OrganizeCards';
 import { ToScoreCard } from '@/components/organize/ToScoreCard';
 import { TournamentCard } from '@/components/tournaments/TournamentCard';
 import { SegmentedControl } from '@/components/ui/SegmentedControl';
@@ -76,6 +77,7 @@ export default function TournamentsScreen() {
                 reason="generic"
               />
             )}
+            {!guest && <OrganizeCards />}
             {!guest && <ToScoreCard />}
             <LiveTournamentsStrip />
             <TipCard id="tournaments" />

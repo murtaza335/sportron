@@ -169,6 +169,10 @@ export function useFCM() {
           }
           return;
         }
+        case 'organization_role_assigned': {
+          router.push(tournamentRoutes.organize(data.organizationId));
+          return;
+        }
         case 'tournament_scorer_assigned': {
           router.push(tournamentRoutes.toScore());
           return;
