@@ -85,7 +85,50 @@ export interface TournamentAdminRow {
   avatar_url: string | null;
   added_at: string;
 }
+export type OrgRole = 'admin' | 'organizer';
+export type EntryFieldMode = 'required' | 'optional' | 'off';
+export interface OrgSettings {
+  promos_enabled: boolean;
+  brand_locked: boolean;
+  entry_fields: Record<'cms_id' | 'school' | 'phone' | 'email', EntryFieldMode>;
+}
+export interface OrgListRow {
+  id: string;
+  name: string;
+  short_name: string | null;
+  status: 'active' | 'suspended';
+  admin_count: number;
+  organizer_count: number;
+  tournament_count: number;
+  created_at: string;
+}
+export interface OrgMember {
+  profile_id: string;
+  username: string;
+  avatar_url: string | null;
+  role: OrgRole;
+  added_at: string;
+}
+export interface OrgDetail {
+  id: string;
+  name: string;
+  short_name: string | null;
+  status: 'active' | 'suspended';
+  suspended_at: string | null;
+  suspended_reason: string | null;
+  settings: OrgSettings;
+  created_at: string;
+  members: OrgMember[];
+  tournaments: { id: string; name: string; status: TournamentStatus; hidden: boolean }[];
+}
+export interface TournamentOrg {
+  organization_id: string | null;
+  organization_name: string | null;
+  hidden: boolean;
+}
 export interface TournamentPatch {
+  /** Only used when creating (super admin). */
+  organization_id?: string | null;
   name?: string;
   description?: string | null;
   organization?: string | null;
@@ -256,6 +299,26 @@ export const rpc = {
     call<string>('admin_update_announcement', { p_id: id, p_data: data }),
   endAnnouncement: (id: string) => call<void>('admin_end_announcement', { p_id: id }),
 
+  listOrganizations: () => call<OrgListRow[]>('admin_list_organizations'),
+  getOrganization: (id: string) => call<OrgDetail>('admin_get_organization', { p_org: id }),
+  createOrganization: (name: string, shortName: string | null) =>
+    call<string>('admin_create_organization', { p_name: name, p_short_name: shortName }),
+  updateOrganization: (
+    id: string,
+    set: { name?: string; short_name?: string | null; settings?: Partial<OrgSettings> },
+    note?: string,
+  ) => call<void>('admin_update_organization', { p_org: id, p_set: set, p_note: note || null }),
+  setOrganizationStatus: (id: string, status: 'active' | 'suspended', reason?: string) =>
+    call<void>('admin_set_organization_status', { p_org: id, p_status: status, p_reason: reason || null }),
+  addOrgMember: (id: string, profile: string, role: OrgRole) =>
+    call<void>('admin_add_org_member', { p_org: id, p_profile: profile, p_role: role }),
+  removeOrgMember: (id: string, profile: string, note?: string) =>
+    call<number>('admin_remove_org_member', { p_org: id, p_profile: profile, p_note: note || null }),
+  getTournamentOrg: (id: string) => call<TournamentOrg>('admin_get_tournament_organization', { p_tournament: id }),
+  setTournamentOrg: (id: string, org: string | null, note?: string) =>
+    call<void>('admin_set_tournament_organization', { p_tournament: id, p_org: org, p_note: note || null }),
+  setTournamentHidden: (id: string, hidden: boolean, note?: string) =>
+    call<void>('admin_set_tournament_hidden', { p_tournament: id, p_hidden: hidden, p_note: note || null }),
   listTournaments: (args: { status?: TournamentStatus | null; search?: string; limit?: number; offset?: number }) =>
     call<TournamentListRow[]>('admin_list_tournaments', {
       p_status: args.status ?? null,

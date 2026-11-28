@@ -29,6 +29,7 @@ export function Layout() {
             </NavLink>
           )}
           {!isModerator && <NavLink to="/tournaments">Tournaments</NavLink>}
+          {isSuper && <NavLink to="/organizations">Organizations</NavLink>}
           {canReview && (
             <NavLink to="/reports">
               Reports{openReports > 0 && <span className="nav-badge">{openReports > 99 ? '99+' : openReports}</span>}

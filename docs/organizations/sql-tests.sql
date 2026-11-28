@@ -229,6 +229,39 @@ begin
   perform og_test.chk(not has_function_privilege('authenticated', 'public._org_remove_member(uuid,uuid)', 'execute')
                       and not has_function_privilege('authenticated', 'public._org_role(uuid,uuid)', 'execute'), 'internal helpers are internal');
 
+  -- ═══ B3: platform staff organization functions ═══
+  perform og_test.as_user('nadmin2');
+  perform og_test.expect_err('select * from public.admin_list_organizations()', 'NOT_ALLOWED', 'org admin has no admin panel access');
+  perform og_test.expect_err(format('select public.admin_add_org_member(%L, %L, ''admin'')', v_nust, og_test.id('stranger')), 'NOT_ALLOWED', 'org admin cannot appoint admins');
+  perform og_test.expect_err(format('select public.admin_set_organization_status(%L, ''suspended'')', v_nust), 'NOT_ALLOWED', 'org admin cannot suspend');
+  perform og_test.as_user('super');
+  v_id := public.admin_create_organization('OG Third Org', 'T3', '{"entry_fields":{"cms_id":"off"}}');
+  perform og_test.chk(public.admin_get_organization(v_id) #>> '{settings,entry_fields,cms_id}' = 'off'
+                      and public.admin_get_organization(v_id) #>> '{settings,entry_fields,phone}' = 'required'
+                      and (public.admin_get_organization(v_id) #>> '{settings,brand_locked}')::boolean, 'create: defaults + patch');
+  perform og_test.expect_err('select public.admin_create_organization(''og third org'')', 'DUPLICATE_ORGANIZATION', 'names are unique');
+  perform og_test.expect_err(format('select public.admin_update_organization(%L, ''{"settings":{"nope":1}}'')', v_id), 'FIELD_INVALID', 'unknown setting refused');
+  perform og_test.expect_err(format('select public.admin_update_organization(%L, ''{"settings":{"entry_fields":{"name":"off"}}}'')', v_id), 'FIELD_INVALID', 'name field cannot be switched off');
+  perform public.admin_add_org_member(v_id, og_test.id('stranger'), 'organizer');
+  perform public.admin_add_org_member(v_id, og_test.id('stranger'), 'admin');
+  perform og_test.chk((select count(*) from public.organization_members where organization_id = v_id and removed_at is null) = 1, 'role change keeps one membership');
+  perform og_test.chk(public.admin_remove_org_member(v_id, og_test.id('stranger')) = 0, 'last admin removable by staff, reports zero left');
+  perform og_test.expect_err(format('select public.admin_remove_org_member(%L, %L)', v_id, og_test.id('stranger')), 'NOT_FOUND', 'removing twice');
+  v_draft := public.admin_create_tournament(jsonb_build_object('name', 'Staff Made', 'organization_id', v_nust));
+  perform og_test.chk((select organization_id = v_nust and organization = 'OG Test NUST' from public.tournaments where id = v_draft), 'staff creates for an organization');
+  perform public.admin_set_tournament_organization(v_free, v_nust);
+  perform og_test.chk(public.admin_get_tournament_organization(v_free) ->> 'organization_id' = v_nust::text, 'attach');
+  perform public.admin_set_tournament_organization(v_free, null);
+  perform og_test.chk(public.admin_get_tournament_organization(v_free) ->> 'organization_id' is null, 'detach');
+  perform public.admin_set_tournament_hidden(v_free, true);
+  perform og_test.chk((public.admin_get_tournament_organization(v_free) ->> 'hidden')::boolean, 'staff hide');
+  perform public.admin_set_tournament_hidden(v_free, false);
+  perform public.admin_update_organization(v_nust, '{"name":"OG Test NUST Renamed"}');
+  perform og_test.chk((select organization from public.tournaments where id = v_draft) = 'OG Test NUST Renamed', 'rename updates card label');
+  perform public.admin_update_organization(v_nust, '{"name":"OG Test NUST"}');
+  perform og_test.chk(exists (select 1 from public.organization_activity where organization_id = v_nust), 'activity recorded');
+  perform og_test.chk(not has_function_privilege('anon', 'public.admin_list_organizations()', 'execute'), 'anon cannot call admin functions');
+
   -- more checks are appended below by later migrations
   perform og_test.put('t', v_t::text);
 

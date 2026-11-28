@@ -14,6 +14,7 @@ import { useToast } from '../components/Toast';
 import { useConfirm } from '../components/ConfirmDialog';
 import { StatusBadge } from '../components/StatusBadge';
 import { UserPicker } from '../components/UserPicker';
+import { TournamentOrgSection } from '../components/TournamentOrgSection';
 import { TournamentForm, isoToLocalInput, toPatch } from '../components/TournamentForm';
 
 const STATUS_ACTIONS: { to: TournamentStatus; label: string; hint: string }[] = [
@@ -188,6 +189,8 @@ export function TournamentDetail() {
           ))}
         </div>
       </div>
+
+      {isSuper && <TournamentOrgSection tournamentId={id} name={t.name} />}
 
       <h2>Admins</h2>
       <div className="card">
