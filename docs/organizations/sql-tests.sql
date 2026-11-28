@@ -311,6 +311,103 @@ begin
   update public.organizations set status = 'active' where id = v_nust;
   perform og_test.chk(not has_function_privilege('anon', 'public.get_my_work(timestamptz)', 'execute'), 'anon: no my work');
 
+  -- ═══ C1: organizer lifecycle ═══
+  perform og_test.as_user('stranger');
+  perform og_test.expect_err(format('select public.org_create_tournament(%L, ''{"name":"Nope Cup"}'')', v_nust), 'NOT_ALLOWED', 'outsider cannot create');
+  perform og_test.as_user('borg');
+  perform og_test.expect_err(format('select public.org_create_tournament(%L, ''{"name":"Nope Cup"}'')', v_nust), 'NOT_ALLOWED', 'other org cannot create');
+  perform og_test.as_user('norg2');
+  v_id := public.org_create_tournament(v_nust, '{"name":"Organizer Open","organization":"Fake Label"}');
+  perform og_test.chk((select status = 'draft' and organization_id = v_nust and organization = 'OG Test NUST' and created_by = og_test.id('norg2')
+                       from public.tournaments where id = v_id), 'organizer creates a draft for the org');
+  perform og_test.chk(public.is_tournament_admin(v_id), 'creator administers it');
+  perform og_test.chk((public.get_publish_check(v_id) -> 'problems') ? 'Add at least one sport.'
+                      and (public.get_publish_check(v_id) -> 'problems') ? 'Set a start date.', 'publish check lists problems');
+  perform og_test.expect_err(format('select public.publish_tournament(%L)', v_id), 'NOT_READY', 'cannot publish when not ready');
+  perform public.update_tournament(v_id, jsonb_build_object('starts_at', now()));
+  perform og_test.expect_err(format('select public.org_create_tournament_modules(%L, ''[{"name":"Ok","sport":"badminton"},{"name":"Bad","sport":"nope"}]'')', v_id), 'FIELD_INVALID', 'bad sport rolls back the batch');
+  perform og_test.chk((select count(*) from public.tournament_modules where tournament_id = v_id) = 0, 'nothing half-created');
+  perform public.org_create_tournament_modules(v_id, '[
+    {"name":"Badminton Men''s Singles","sport":"badminton","live_rules":{"family":"sets","preset":"badminton_21","bestOf":3}},
+    {"name":"Badminton Doubles","sport":"badminton","settings":{"participant_type":"team","roster_min":2,"roster_max":2,"lineup_size":2}},
+    {"name":"Basketball Men","sport":"basketball","settings":{"format":"round_robin"}}]');
+  perform og_test.chk((select count(*) from public.tournament_modules where tournament_id = v_id) = 3
+                      and (select participant_type from public.tournament_modules where tournament_id = v_id and name = 'Badminton Doubles') = 'team'
+                      and (select format from public.tournament_modules where tournament_id = v_id and name = 'Basketball Men') = 'round_robin', 'wizard creates sports with settings');
+  perform og_test.chk(jsonb_array_length(public.get_publish_check(v_id) -> 'warnings') = 3, 'warnings: no players yet');
+  perform public.publish_tournament(v_id);
+  perform og_test.chk((select status from public.tournaments where id = v_id) = 'published'
+                      and not exists (select 1 from public.tournament_modules where tournament_id = v_id and status <> 'open'), 'publish opens the sports');
+  perform og_test.expect_err(format('select public.publish_tournament(%L)', v_id), 'INVALID_STATUS', 'cannot publish twice');
+  perform og_test.expect_err(format('select public.update_tournament(%L, ''{"status":"draft"}'')', v_id), 'INVALID_STATUS', 'organizer cannot unpublish');
+  perform og_test.expect_err(format('select public.delete_draft_tournament(%L, ''Organizer Open'')', v_id), 'NOT_ALLOWED', 'published cannot be deleted');
+  perform public.update_tournament(v_id, '{"organization":"Hacked"}');
+  perform og_test.chk((select organization from public.tournaments where id = v_id) = 'OG Test NUST', 'organization label is locked');
+
+  -- best-of comes from the sport's rules
+  select id into v_bm from public.tournament_modules where tournament_id = v_id and name = 'Badminton Men''s Singles';
+  for v_n in 1..4 loop
+    perform public.upsert_tournament_entry(v_bm, null, 'W' || v_n, null,
+      jsonb_build_object('cms_id', 'w' || v_n, 'school', 's', 'phone', '03001234567', 'email', 'w@x.com'));
+  end loop;
+  perform public.set_module_status(v_bm, 'seeding');
+  perform public.generate_bracket(v_bm);
+  perform og_test.chk((select bool_and(best_of = 3) from public.tournament_rounds where module_id = v_bm), 'rounds start at the sport''s best-of');
+
+  -- co-organizers
+  perform og_test.expect_err(format('select public.add_tournament_admin(%L, %L)', v_id, og_test.id('mgr')), 'NOT_ORG_MEMBER', 'co-organizer must be a member');
+  perform og_test.expect_err(format('select public.add_tournament_admin(%L, %L)', v_id, og_test.id('borg')), 'NOT_ORG_MEMBER', 'other org member refused');
+  perform public.org_create_tournament_modules(v_id, '[{"name":"Extra","sport":"volleyball"}]');
+  perform public.add_tournament_admin(v_id, og_test.id('nadmin'));
+  perform public.remove_tournament_admin(v_id, og_test.id('nadmin'));
+  perform public.remove_tournament_admin(v_id, og_test.id('norg2'));
+  perform og_test.chk(not public.is_tournament_admin(v_id), 'organizer can step out while an org admin exists');
+  perform og_test.expect_err(format('select public.add_tournament_admin(%L, %L)', v_free, og_test.id('norg2')), 'NOT_ALLOWED', 'Sportron tournaments unchanged');
+
+  -- hide
+  perform og_test.as_user('norg');
+  perform og_test.expect_err(format('select public.set_tournament_hidden(%L, true)', v_t2), 'NOT_ALLOWED', 'removed organizer cannot hide');
+  perform og_test.as_user('norg2');
+  perform og_test.expect_err(format('select public.set_tournament_hidden(%L, true)', v_t2), 'NOT_ALLOWED', 'organizer cannot hide');
+  perform og_test.as_user('nadmin');
+  perform public.set_tournament_hidden(v_t2, true);
+  perform public.set_tournament_hidden(v_t2, false);
+  perform og_test.expect_err(format('select public.set_tournament_hidden(%L, true)', v_bt), 'NOT_ALLOWED', 'cannot hide another org''s');
+
+  -- reopen
+  perform og_test.expect_err(format('select public.reopen_tournament_module(%L)', v_bm), 'NOT_COMPLETED', 'only finished sports reopen');
+  perform public.set_module_status(v_bm, 'in_progress');
+  for v_n in 1..3 loop
+    select id into v_m1 from public.tournament_matches where module_id = v_bm and status in ('pending','scheduled')
+      and entry_a_id is not null and entry_b_id is not null limit 1;
+    perform public.record_tournament_result(v_m1, 2, 0);
+  end loop;
+  perform og_test.chk((select status from public.tournament_modules where id = v_bm) = 'completed', 'sport completes');
+  perform public.reopen_tournament_module(v_bm, true);
+  perform og_test.chk((select status = 'in_progress' and champion_entry_id is null from public.tournament_modules where id = v_bm), 'org admin reopens');
+  perform og_test.as_user('scorer');
+  perform og_test.expect_err(format('select public.reopen_tournament_module(%L)', v_bm), 'NOT_ALLOWED', 'scorer cannot reopen');
+
+  -- cancel and delete draft
+  perform og_test.as_user('nadmin');
+  select id into v_m1 from public.tournament_matches where module_id = v_bm and entry_a_id is not null and entry_b_id is not null and status in ('pending','scheduled') limit 1;
+  if v_m1 is not null then
+    perform public.live_start_match(v_m1, 'd', false, null, v_rules || '{"bestOf":3}'::jsonb);
+  end if;
+  perform public.cancel_tournament(v_id, 'Venue closed');
+  perform og_test.chk((select status from public.tournaments where id = v_id) = 'cancelled'
+                      and not exists (select 1 from public.tournament_live_scores where tournament_id = v_id and state in ('live','break')), 'cancel stops live matches');
+  v_id := public.org_create_tournament(v_nust, '{"name":"Throwaway"}');
+  perform public.org_create_tournament_modules(v_id, '[{"name":"TT","sport":"table_tennis"}]');
+  perform og_test.expect_err(format('select public.cancel_tournament(%L)', v_id), 'INVALID_STATUS', 'drafts are deleted, not cancelled');
+  perform og_test.expect_err(format('select public.delete_draft_tournament(%L, ''wrong'')', v_id), 'CONFIRM_MISMATCH', 'name must match');
+  perform public.delete_draft_tournament(v_id, 'Throwaway');
+  perform og_test.chk(not exists (select 1 from public.tournaments where id = v_id)
+                      and not exists (select 1 from public.tournament_modules where tournament_id = v_id), 'draft deleted with its sports');
+  perform og_test.chk(exists (select 1 from public.org_get_activity(v_nust) a where a.summary = 'deleted “Throwaway”'), 'deletion is in the history');
+  perform og_test.chk(not has_function_privilege('anon', 'public.org_create_tournament(uuid,jsonb)', 'execute')
+                      and not has_function_privilege('authenticated', 'public._reopen_module_core(uuid,boolean)', 'execute'), 'privileges');
+
   -- more checks are appended below by later migrations
   perform og_test.put('t', v_t::text);
 
