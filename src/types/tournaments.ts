@@ -290,8 +290,18 @@ export type TournamentModuleSummary = {
   my_role: TournamentRole;
 };
 
+export type OrgRole = 'admin' | 'organizer';
+
 export type TournamentDetail = {
-  tournament: Tournament;
+  tournament: Tournament & {
+    /** Organization fields (migration 140). Absent on an older server. */
+    organization_id?: string | null;
+    organization_name?: string | null;
+    organization_suspended?: boolean;
+    hidden?: boolean;
+  };
+  /** My role in the tournament's organization (null for Sportron-run tournaments). */
+  my_org_role?: OrgRole | null;
   admins: ProfileLite[];
   my_role: TournamentRole;
   champions: TournamentChampion[];

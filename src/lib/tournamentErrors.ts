@@ -70,6 +70,8 @@ export function friendlyTournamentError(err: unknown, labels?: Record<string, st
   }
   if (message.includes('FIELD_INVALID:live_rules_family')) return "Those scoring rules don't fit this sport's scoring.";
   if (message.includes('LIVE_TAKEN')) return 'Someone else is scoring this match.';
+  if (message.includes('ORG_SUSPENDED'))
+    return 'This organization’s account is paused. Contact Sportron.';
   if (message.includes('RULES_LOCKED'))
     return 'Only a sport manager can change the match rules. Update the app or ask a manager, then try again.';
   if (message.includes('LIVE_CODE_TAKEN')) return 'That link is already used by another tournament. Try a different one.';
