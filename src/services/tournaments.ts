@@ -203,6 +203,11 @@ export async function upsertEntryField(
   });
 }
 
+/** Name is always required; the other core fields can be required, optional or off (migration 144). */
+export async function setCoreFieldMode(fieldId: string, mode: 'required' | 'optional' | 'off'): Promise<void> {
+  await rpc<null>('set_core_field_mode', { p_field: fieldId, p_mode: mode });
+}
+
 export async function archiveEntryField(fieldId: string): Promise<void> {
   await rpc<null>('archive_tournament_entry_field', { p_field: fieldId });
 }

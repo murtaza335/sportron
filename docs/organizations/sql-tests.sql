@@ -408,6 +408,34 @@ begin
   perform og_test.chk(not has_function_privilege('anon', 'public.org_create_tournament(uuid,jsonb)', 'execute')
                       and not has_function_privilege('authenticated', 'public._reopen_module_core(uuid,boolean)', 'execute'), 'privileges');
 
+  -- ═══ D: flexible sign-up fields ═══
+  perform og_test.as_user('super');
+  perform public.admin_update_organization(v_nust, '{"settings":{"entry_fields":{"cms_id":"optional","phone":"off"}}}');
+  perform og_test.as_user('norg2');
+  v_id := public.org_create_tournament(v_nust, '{"name":"Open To All"}');
+  perform og_test.chk((select not is_required and archived_at is null from public.tournament_entry_fields where tournament_id = v_id and key = 'cms_id')
+                      and (select archived_at is not null from public.tournament_entry_fields where tournament_id = v_id and key = 'phone')
+                      and (select is_required from public.tournament_entry_fields where tournament_id = v_id and key = 'email'), 'organization defaults applied');
+  perform og_test.chk((select bool_and(is_required and archived_at is null) from public.tournament_entry_fields where tournament_id = v_bt and is_core), 'other organizations keep all required');
+  v_bm := public.create_tournament_module(v_id, 'Open Singles', 'badminton', null, null, null, null, null, false, 'manual');
+  perform public.set_module_status(v_bm, 'open');
+  perform public.upsert_tournament_entry(v_bm, null, 'Outsider One', null, '{"school":"Elsewhere","email":"a@x.com","phone":"0300 1234567"}');
+  perform public.upsert_tournament_entry(v_bm, null, 'Outsider Two', null, '{"school":"Elsewhere","email":"b@x.com"}');
+  perform og_test.chk((select count(*) from public.tournament_entries where module_id = v_bm) = 2, 'no CMS id needed; two empty ids do not clash');
+  perform og_test.chk(not exists (select 1 from public.tournament_entries where module_id = v_bm and field_values ? 'phone'), 'switched-off field is not stored');
+  select id into v_code from public.tournament_entry_fields where tournament_id = v_id and key = 'name';
+  perform og_test.expect_err(format('select public.set_core_field_mode(%L, ''off'')', v_code), 'CORE_FIELD_LOCKED', 'name cannot be switched off');
+  perform og_test.expect_err(format('update public.tournament_entry_fields set is_public = true where tournament_id = %L and key = ''phone''', v_id), 'CORE_FIELD_LOCKED', 'private fields cannot be made public');
+  select id into v_code from public.tournament_entry_fields where tournament_id = v_id and key = 'phone';
+  perform public.set_core_field_mode(v_code::uuid, 'required');
+  perform og_test.expect_err(format('select public.upsert_tournament_entry(%L, null, ''No Phone'', null, ''{"school":"s","email":"c@x.com"}'')', v_bm), 'FIELD_REQUIRED:phone', 'switched back on and required');
+  perform og_test.chk((select count(*) from public.tournament_entries where module_id = v_bm) = 2, 'old entries untouched');
+  perform public.set_core_field_mode(v_code::uuid, 'optional');
+  perform public.upsert_tournament_entry_field(v_id, v_code::uuid, 'phone', 'Mobile', 'phone', null, null, true, false, null);
+  perform og_test.chk((select label = 'Mobile' and not is_required from public.tournament_entry_fields where id = v_code::uuid), 'old-build rename keeps it optional');
+  perform og_test.as_user('scorer');
+  perform og_test.expect_err(format('select public.set_core_field_mode(%L, ''off'')', v_code), 'NOT_ALLOWED', 'scorer cannot change the form');
+
   -- more checks are appended below by later migrations
   perform og_test.put('t', v_t::text);
 

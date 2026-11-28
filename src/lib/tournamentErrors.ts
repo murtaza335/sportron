@@ -26,6 +26,7 @@ const FIELD_LABELS: Record<string, string> = {
   ends_at: 'End date',
   location: 'Location',
   reason: 'Reason',
+  mode: 'Setting',
   court: 'Court',
 };
 
